@@ -226,9 +226,19 @@
                   Teaching Tasks
                 </h2>
                 <p id="teacher-daily-class-label" class="teacher-daily-class-label" aria-live="polite"></p>
-                <button type="button" class="btn-primary teacher-new-task-btn" id="teacher-new-task-btn" data-i18n="teacher_new_task_btn">
-                  New task for this day
-                </button>
+                <div class="teacher-daily-header__actions">
+                  <button type="button" class="btn-primary teacher-new-task-btn" id="teacher-new-task-btn" data-i18n="teacher_new_task_btn">
+                    New task for this day
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-secondary teacher-open-templates-btn"
+                    id="teacher-open-templates-btn"
+                    data-i18n="teacher_open_templates_btn"
+                  >
+                    Task templates
+                  </button>
+                </div>
                 <div
                   id="teacher-daily-chips"
                   class="teacher-daily-chips"
@@ -429,18 +439,65 @@
                 </div>
               </details>
 
-              <details class="teacher-from-template-details">
+              <details class="teacher-from-template-details" id="teacher-from-template-details">
                 <summary class="teacher-from-template-details__summary" data-i18n="create_from_template">Create from Template</summary>
                 <div class="teacher-from-template-details__body">
-                  <div class="field">
-                    <label for="teacher-template-select" data-i18n="template_label">Template</label>
-                    <select id="teacher-template-select" aria-describedby="teacher-template-hint">
-                      <option value="" data-i18n="select_template">Select a template…</option>
+                  <div
+                    id="teacher-template-apply-context"
+                    class="teacher-template-apply-context"
+                    aria-live="polite"
+                  ></div>
+                  <p id="teacher-template-hint" class="field-hint" data-i18n="template_hint">
+                    Pick a saved template, then choose where to place the new task.
+                  </p>
+
+                  <fieldset class="teacher-template-category-field">
+                    <legend data-i18n="filter_templates">Filter templates</legend>
+                    <div
+                      id="teacher-template-category-chips"
+                      class="teacher-category-chips"
+                      role="group"
+                      aria-label="Template category filter"
+                    ></div>
+                    <select
+                      id="teacher-template-category-filter"
+                      class="visually-hidden"
+                      tabindex="-1"
+                      aria-hidden="true"
+                    >
+                      <option value="all">All categories</option>
                     </select>
-                    <p id="teacher-template-hint" class="field-hint" data-i18n="template_hint">
-                      Pick a saved template, then choose where to place the new task.
-                    </p>
+                  </fieldset>
+
+                  <div class="teacher-template-workspace">
+                    <div class="teacher-template-library" aria-labelledby="teacher-template-library-heading">
+                      <h4 id="teacher-template-library-heading" class="teacher-template-library__heading" data-i18n="template_library">
+                        Template library
+                      </h4>
+                      <ul id="teacher-template-library-list" class="teacher-template-library-list"></ul>
+                      <p id="teacher-template-library-empty" class="teacher-template-library-empty hidden" data-i18n="template_library_empty">
+                        No templates in this category. Save a task as a template or choose another filter.
+                      </p>
+                    </div>
+                    <div
+                      class="teacher-template-preview"
+                      id="teacher-template-preview"
+                      aria-labelledby="teacher-template-preview-heading"
+                    >
+                      <h4 id="teacher-template-preview-heading" class="teacher-template-preview__heading" data-i18n="template_preview">
+                        Preview
+                      </h4>
+                      <div id="teacher-template-preview-inner" class="teacher-template-preview__inner">
+                        <p class="teacher-template-preview__empty" data-i18n="template_preview_empty">
+                          Select a template from the list to preview it here.
+                        </p>
+                      </div>
+                    </div>
                   </div>
+
+                  <select id="teacher-template-select" class="visually-hidden" tabindex="-1" aria-hidden="true">
+                    <option value=""></option>
+                  </select>
 
                   <details class="teacher-template-manage-details">
                     <summary class="teacher-template-manage-details__summary" data-i18n="manage_templates">Manage templates</summary>

@@ -322,5 +322,16 @@ window.EAP_STRINGS_ZH = {
   "waiting_for_feedback": "等待反馈",
   "feedback_received": "已收反馈",
   "revisions_submitted": "已提交修订",
-  "completion_rate": "完成率"
+  "completion_rate": "完成率",
+  "teacher_open_templates_btn": "任务模板",
+  "filter_templates": "筛选模板",
+  "template_library": "模板库",
+  "template_library_empty": "该类别下暂无模板。可将任务保存为模板，或选择其他类别。",
+  "template_preview": "预览",
+  "template_preview_empty": "请从列表中选择一个模板以预览。",
+  "template_apply_context_hint": "新任务将创建在当前班级与日期下。",
+  "use_template": "使用",
+  "has_material": "含材料",
+  "view_material": "查看材料",
+  "no_description": "暂无说明。"
 };

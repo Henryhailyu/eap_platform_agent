@@ -912,6 +912,173 @@ body.eap-wix .eap-class-overview__roster-table-wrap {
   overflow-x: auto;
 }
 
+body.eap-wix .teacher-daily-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+body.eap-wix .teacher-template-apply-context {
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  border-radius: 10px;
+  background: rgba(0, 113, 227, 0.06);
+  border: 1px solid rgba(0, 113, 227, 0.15);
+}
+
+body.eap-wix .teacher-template-apply-context__line {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+body.eap-wix .teacher-template-apply-context__class {
+  color: var(--wix-blue, #0071e3);
+}
+
+body.eap-wix .teacher-template-apply-context__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .teacher-template-category-field {
+  border: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+body.eap-wix .teacher-template-category-field legend {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+body.eap-wix .teacher-template-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  body.eap-wix .teacher-template-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.eap-wix .teacher-template-library__heading,
+body.eap-wix .teacher-template-preview__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+body.eap-wix .teacher-template-library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+body.eap-wix .teacher-template-library-item {
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--wix-card-border);
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+body.eap-wix .teacher-template-library-item:hover {
+  border-color: var(--wix-blue, #0071e3);
+}
+
+body.eap-wix .teacher-template-library-item--selected {
+  border-color: var(--wix-blue, #0071e3);
+  background: rgba(0, 113, 227, 0.08);
+  box-shadow: inset 3px 0 0 var(--wix-blue, #0071e3);
+}
+
+body.eap-wix .teacher-template-library-item__title {
+  display: block;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+body.eap-wix .teacher-template-library-item__meta {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--wix-muted);
+  margin-top: 0.15rem;
+}
+
+body.eap-wix .teacher-template-library-empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .teacher-template-preview__inner {
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--wix-card-border);
+  background: rgba(248, 250, 252, 0.9);
+  min-height: 120px;
+}
+
+body.eap-wix .teacher-template-preview__name {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--wix-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+body.eap-wix .teacher-template-preview__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+body.eap-wix .teacher-template-preview__meta {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .teacher-template-preview__description {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+body.eap-wix .teacher-template-preview__material {
+  margin: 0.65rem 0 0;
+  font-size: 0.8125rem;
+}
+
+body.eap-wix .teacher-template-preview__empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .teacher-template-manage-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

@@ -3022,6 +3022,166 @@ function setTeacherClassOverviewValues(stats, rosterPayload, scopeEl, progressBa
   }
 }
 
+function populateTeacherTemplateCategoryFilterSelect(selectEl) {
+  if (!selectEl) return;
+  selectEl.innerHTML = "";
+  const all = document.createElement("option");
+  all.value = "all";
+  all.textContent = t("all_categories");
+  selectEl.appendChild(all);
+  TASK_CATEGORIES.forEach((label) => {
+    const opt = document.createElement("option");
+    opt.value = label;
+    opt.textContent = translateCategory(label);
+    selectEl.appendChild(opt);
+  });
+}
+
+function syncTeacherTemplateCategoryChipHighlight(chipsEl, selectEl) {
+  if (!chipsEl || !selectEl) return;
+  const val = selectEl.value || "all";
+  chipsEl.querySelectorAll(".teacher-category-chip").forEach((chip) => {
+    const cat = chip.getAttribute("data-category");
+    const on = cat === val;
+    chip.classList.toggle("teacher-category-chip--active", on);
+    chip.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
+function populateTeacherTemplateCategoryChips(chipsEl, selectEl) {
+  if (!chipsEl || !selectEl) return;
+  chipsEl.innerHTML = "";
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = "teacher-category-chip";
+  allBtn.textContent = t("all_categories");
+  allBtn.setAttribute("data-category", "all");
+  allBtn.addEventListener("click", () => {
+    selectEl.value = "all";
+    syncTeacherTemplateCategoryChipHighlight(chipsEl, selectEl);
+    selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  chipsEl.appendChild(allBtn);
+  TASK_CATEGORIES.forEach((label) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "teacher-category-chip";
+    btn.textContent = translateCategory(label);
+    btn.setAttribute("data-category", label);
+    btn.addEventListener("click", () => {
+      selectEl.value = label;
+      syncTeacherTemplateCategoryChipHighlight(chipsEl, selectEl);
+      selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    chipsEl.appendChild(btn);
+  });
+  syncTeacherTemplateCategoryChipHighlight(chipsEl, selectEl);
+}
+
+function filterTeacherTemplatesByCategory(list, filterValue) {
+  const items = Array.isArray(list) ? list : [];
+  const f = String(filterValue || "all");
+  if (f === "all") return items;
+  return items.filter((row) => String(row.category || "").trim() === f);
+}
+
+function renderTeacherTemplatePreview(previewInnerEl, template) {
+  if (!previewInnerEl) return;
+  previewInnerEl.innerHTML = "";
+  if (!template || template.id == null) {
+    const empty = document.createElement("p");
+    empty.className = "teacher-template-preview__empty";
+    empty.textContent = t("template_preview_empty");
+    previewInnerEl.appendChild(empty);
+    return;
+  }
+
+  const name = document.createElement("p");
+  name.className = "teacher-template-preview__name";
+  name.textContent =
+    template.name != null && String(template.name).trim()
+      ? String(template.name).trim()
+      : t("untitled_task");
+
+  const title = document.createElement("h5");
+  title.className = "teacher-template-preview__title";
+  title.textContent = taskDisplayTitle(template);
+
+  const meta = document.createElement("p");
+  meta.className = "teacher-template-preview__meta";
+  const cat = translateCategory(template.category || "—");
+  const period =
+    template.period != null && String(template.period).trim()
+      ? String(template.period).trim()
+      : "—";
+  meta.textContent = `${cat} · ${period}`;
+
+  const desc = document.createElement("p");
+  desc.className = "teacher-template-preview__description";
+  const descShown = taskDisplayDescription(template);
+  desc.textContent = descShown || t("no_description");
+
+  previewInnerEl.appendChild(name);
+  previewInnerEl.appendChild(title);
+  previewInnerEl.appendChild(meta);
+  previewInnerEl.appendChild(desc);
+
+  if (template.file_path && String(template.file_path).trim()) {
+    const mat = document.createElement("p");
+    mat.className = "teacher-template-preview__material";
+    const link = document.createElement("a");
+    link.href = `${API_BASE}/uploads/${encodeURIComponent(String(template.file_path).trim())}`;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent =
+      template.file_name && String(template.file_name).trim()
+        ? String(template.file_name).trim()
+        : t("view_material");
+    mat.appendChild(link);
+    previewInnerEl.appendChild(mat);
+  }
+}
+
+function renderTeacherTemplateLibrary(listEl, emptyEl, templates, selectedId) {
+  if (!listEl) return;
+  listEl.innerHTML = "";
+  const items = Array.isArray(templates) ? templates : [];
+  if (emptyEl) emptyEl.classList.toggle("hidden", items.length > 0);
+  items.forEach((tmpl) => {
+    const tid = tmpl.id != null ? Number(tmpl.id) : NaN;
+    if (!Number.isFinite(tid)) return;
+
+    const li = document.createElement("li");
+    li.className = "teacher-template-library-li";
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "teacher-template-library-item";
+    btn.setAttribute("data-template-id", String(tid));
+    const on = Number.isFinite(selectedId) && tid === Number(selectedId);
+    if (on) btn.classList.add("teacher-template-library-item--selected");
+    btn.setAttribute("aria-current", on ? "true" : "false");
+
+    const titleEl = document.createElement("span");
+    titleEl.className = "teacher-template-library-item__title";
+    titleEl.textContent =
+      tmpl.name != null && String(tmpl.name).trim()
+        ? String(tmpl.name).trim()
+        : `Template ${tid}`;
+
+    const metaEl = document.createElement("span");
+    metaEl.className = "teacher-template-library-item__meta";
+    const cat = translateCategory(tmpl.category || "—");
+    const hasMat = !!(tmpl.file_path && String(tmpl.file_path).trim());
+    metaEl.textContent = hasMat ? `${cat} · ${t("has_material")}` : cat;
+
+    btn.appendChild(titleEl);
+    btn.appendChild(metaEl);
+    li.appendChild(btn);
+    listEl.appendChild(li);
+  });
+}
+
 function renderTeacherRosterTable(tbody, wrapEl, emptyEl, students) {
   if (!tbody) return;
   tbody.innerHTML = "";
@@ -3086,6 +3246,14 @@ function initTeacherPage() {
   const dailyTitleEl = document.getElementById("teacher-daily-title");
   const backToCalendarBtn = document.getElementById("teacher-back-to-calendar");
   const templateSelectEl = document.getElementById("teacher-template-select");
+  const templateCategoryFilterEl = document.getElementById("teacher-template-category-filter");
+  const templateCategoryChipsEl = document.getElementById("teacher-template-category-chips");
+  const templateLibraryListEl = document.getElementById("teacher-template-library-list");
+  const templateLibraryEmptyEl = document.getElementById("teacher-template-library-empty");
+  const templatePreviewInnerEl = document.getElementById("teacher-template-preview-inner");
+  const templateApplyContextEl = document.getElementById("teacher-template-apply-context");
+  const fromTemplateDetailsEl = document.getElementById("teacher-from-template-details");
+  const openTemplatesBtn = document.getElementById("teacher-open-templates-btn");
   const templateApplyDateEl = document.getElementById("teacher-template-apply-date");
   const templateApplyClassEl = document.getElementById("teacher-template-apply-class");
   const templateIncludeMatEl = document.getElementById("teacher-template-include-material");
@@ -3094,6 +3262,8 @@ function initTeacherPage() {
   const templateManageListEl = document.getElementById("teacher-template-manage-list");
   const templateManageEmptyEl = document.getElementById("teacher-template-manage-empty");
   const templateManageStatusEl = document.getElementById("teacher-template-manage-status");
+  let teacherTemplatesCache = [];
+  let teacherSelectedTemplateId = null;
   const teacherStudyPlansTbody = document.getElementById("teacher-study-plans-tbody");
   const teacherStudyPlansEmptyEl = document.getElementById("teacher-study-plans-empty");
   const teacherStudyPlansWrapEl = document.getElementById("teacher-study-plans-table-wrap");
@@ -3257,19 +3427,98 @@ function initTeacherPage() {
     const d = getTaskListDate().trim().slice(0, 10);
     if (templateApplyDateEl && d.length >= 10) templateApplyDateEl.value = d;
     if (templateApplyClassEl) templateApplyClassEl.value = getFilterClass();
+    syncTeacherTemplateApplyContext();
+  }
+
+  function syncTeacherTemplateApplyContext() {
+    if (!templateApplyContextEl) return;
+    const cls = getFilterClass();
+    const iso = getTaskListDate().trim().slice(0, 10);
+    templateApplyContextEl.innerHTML = "";
+    const line = document.createElement("p");
+    line.className = "teacher-template-apply-context__line";
+    const classSpan = document.createElement("span");
+    classSpan.className = "teacher-template-apply-context__class";
+    classSpan.textContent = cls;
+    const sep = document.createElement("span");
+    sep.className = "teacher-template-apply-context__sep";
+    sep.textContent = " · ";
+    const dateSpan = document.createElement("span");
+    dateSpan.className = "teacher-template-apply-context__date";
+    dateSpan.textContent = iso.length >= 10 ? formatDisplayDate(iso) : "—";
+    line.appendChild(classSpan);
+    line.appendChild(sep);
+    line.appendChild(dateSpan);
+    templateApplyContextEl.appendChild(line);
+    const hint = document.createElement("p");
+    hint.className = "teacher-template-apply-context__hint";
+    hint.textContent = t("template_apply_context_hint");
+    templateApplyContextEl.appendChild(hint);
   }
 
   function syncTeacherTemplateMaterialFromSelect() {
-    const opt = templateSelectEl.selectedOptions && templateSelectEl.selectedOptions[0];
     if (!templateIncludeMatEl) return;
-    if (!opt || !String(opt.value || "").trim()) {
+    const tid = teacherSelectedTemplateId;
+    const tmpl =
+      tid != null
+        ? teacherTemplatesCache.find((row) => Number(row.id) === Number(tid))
+        : null;
+    if (!tmpl) {
       templateIncludeMatEl.disabled = true;
       templateIncludeMatEl.checked = false;
       return;
     }
-    const has = opt.dataset.hasMaterial === "1";
+    const has = !!(tmpl.file_path && String(tmpl.file_path).trim());
     templateIncludeMatEl.disabled = !has;
     if (!has) templateIncludeMatEl.checked = false;
+  }
+
+  function setTeacherTemplateSelection(templateId) {
+    const tid = templateId != null ? Number(templateId) : NaN;
+    teacherSelectedTemplateId = Number.isFinite(tid) ? tid : null;
+    if (templateSelectEl) {
+      templateSelectEl.value =
+        teacherSelectedTemplateId != null ? String(teacherSelectedTemplateId) : "";
+    }
+    const filterVal = templateCategoryFilterEl
+      ? templateCategoryFilterEl.value || "all"
+      : "all";
+    const filtered = filterTeacherTemplatesByCategory(teacherTemplatesCache, filterVal);
+    renderTeacherTemplateLibrary(
+      templateLibraryListEl,
+      templateLibraryEmptyEl,
+      filtered,
+      teacherSelectedTemplateId,
+    );
+    const tmpl = Number.isFinite(tid)
+      ? teacherTemplatesCache.find((row) => Number(row.id) === tid)
+      : null;
+    renderTeacherTemplatePreview(templatePreviewInnerEl, tmpl);
+    syncTeacherTemplateMaterialFromSelect();
+  }
+
+  function refreshTeacherTemplateLibraryView() {
+    const filterVal = templateCategoryFilterEl
+      ? templateCategoryFilterEl.value || "all"
+      : "all";
+    const filtered = filterTeacherTemplatesByCategory(teacherTemplatesCache, filterVal);
+    let sel = teacherSelectedTemplateId;
+    if (sel != null && !filtered.some((row) => Number(row.id) === Number(sel))) {
+      sel = filtered.length ? filtered[0].id : null;
+    }
+    if (sel == null && filtered.length > 0) {
+      sel = filtered[0].id;
+    }
+    setTeacherTemplateSelection(sel);
+  }
+
+  function openTeacherTemplatePanel() {
+    syncTeacherTemplateFormDefaults();
+    if (fromTemplateDetailsEl) fromTemplateDetailsEl.open = true;
+    refreshTeacherTemplateLibraryView();
+    if (fromTemplateDetailsEl) {
+      fromTemplateDetailsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }
 
   function renderTeacherTemplateManageList(list) {
@@ -3301,14 +3550,25 @@ function initTeacherPage() {
       meta.appendChild(nameEl);
       meta.appendChild(subEl);
 
+      const actions = document.createElement("div");
+      actions.className = "teacher-template-manage-list__actions";
+
+      const useBtn = document.createElement("button");
+      useBtn.type = "button";
+      useBtn.className = "btn-secondary teacher-template-manage-use";
+      useBtn.setAttribute("data-template-id", String(t.id));
+      useBtn.textContent = t("use_template");
+
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn-secondary teacher-template-manage-delete";
       btn.setAttribute("data-template-id", String(t.id));
       btn.textContent = t("delete_btn");
 
+      actions.appendChild(useBtn);
+      actions.appendChild(btn);
       li.appendChild(meta);
-      li.appendChild(btn);
+      li.appendChild(actions);
       templateManageListEl.appendChild(li);
     });
   }
@@ -3316,43 +3576,73 @@ function initTeacherPage() {
   async function loadTeacherTemplatesForPage() {
     try {
       const rows = await apiGet("/api/task-templates");
-      const list = Array.isArray(rows) ? rows : [];
-      const cur = templateSelectEl.value;
-      templateSelectEl.innerHTML = "";
-      const emptyOpt = document.createElement("option");
-      emptyOpt.value = "";
-      emptyOpt.textContent = "Select a template…";
-      templateSelectEl.appendChild(emptyOpt);
-      list.forEach((t) => {
-        const o = document.createElement("option");
-        o.value = String(t.id);
-        o.textContent =
-          t.name != null && String(t.name).trim() ? String(t.name).trim() : `Template ${t.id}`;
-        const hf = t.file_path && String(t.file_path).trim() !== "";
-        o.dataset.hasMaterial = hf ? "1" : "0";
-        templateSelectEl.appendChild(o);
-      });
-      if (cur && [...templateSelectEl.options].some((o) => o.value === cur)) {
-        templateSelectEl.value = cur;
-      } else {
-        templateSelectEl.value = "";
+      teacherTemplatesCache = Array.isArray(rows) ? rows : [];
+      const cur = teacherSelectedTemplateId;
+      if (templateSelectEl) {
+        templateSelectEl.innerHTML = "";
+        teacherTemplatesCache.forEach((row) => {
+          const o = document.createElement("option");
+          o.value = String(row.id);
+          o.textContent =
+            row.name != null && String(row.name).trim()
+              ? String(row.name).trim()
+              : `Template ${row.id}`;
+          templateSelectEl.appendChild(o);
+        });
       }
-      syncTeacherTemplateMaterialFromSelect();
-      renderTeacherTemplateManageList(list);
+      renderTeacherTemplateManageList(teacherTemplatesCache);
+      if (
+        cur != null &&
+        teacherTemplatesCache.some((row) => Number(row.id) === Number(cur))
+      ) {
+        setTeacherTemplateSelection(cur);
+      } else {
+        refreshTeacherTemplateLibraryView();
+      }
     } catch {
-      templateSelectEl.innerHTML = "";
-      const emptyOptCatch = document.createElement("option");
-      emptyOptCatch.value = "";
-      emptyOptCatch.textContent = "Select a template…";
-      templateSelectEl.appendChild(emptyOptCatch);
-      syncTeacherTemplateMaterialFromSelect();
+      teacherTemplatesCache = [];
       renderTeacherTemplateManageList([]);
+      setTeacherTemplateSelection(null);
     }
   }
 
-  templateSelectEl.addEventListener("change", syncTeacherTemplateMaterialFromSelect);
+  populateTeacherTemplateCategoryFilterSelect(templateCategoryFilterEl);
+  populateTeacherTemplateCategoryChips(templateCategoryChipsEl, templateCategoryFilterEl);
+
+  if (templateCategoryFilterEl) {
+    templateCategoryFilterEl.addEventListener("change", () => {
+      syncTeacherTemplateCategoryChipHighlight(
+        templateCategoryChipsEl,
+        templateCategoryFilterEl,
+      );
+      refreshTeacherTemplateLibraryView();
+    });
+  }
+
+  if (templateLibraryListEl) {
+    templateLibraryListEl.addEventListener("click", (ev) => {
+      const row = ev.target.closest(".teacher-template-library-item");
+      if (!row) return;
+      const id = Number(row.getAttribute("data-template-id"), 10);
+      if (!Number.isFinite(id)) return;
+      setTeacherTemplateSelection(id);
+    });
+  }
+
+  if (openTemplatesBtn) {
+    openTemplatesBtn.addEventListener("click", () => openTeacherTemplatePanel());
+  }
 
   templateManageListEl.addEventListener("click", async (ev) => {
+    const useBtn = ev.target.closest(".teacher-template-manage-use");
+    if (useBtn) {
+      const id = Number(useBtn.getAttribute("data-template-id"), 10);
+      if (!Number.isFinite(id)) return;
+      setTeacherTemplateSelection(id);
+      openTeacherTemplatePanel();
+      return;
+    }
+
     const btn = ev.target.closest(".teacher-template-manage-delete");
     if (!btn || btn.disabled) return;
     const idStr = btn.getAttribute("data-template-id");
@@ -3427,6 +3717,7 @@ function initTeacherPage() {
     mainEl.classList.add("app-main--daily-mode");
 
     syncTeacherCreateTaskContext();
+    syncTeacherTemplateFormDefaults();
     await refreshTaskList();
     return true;
   }
@@ -4774,8 +5065,10 @@ function initTeacherPage() {
     templateApplyStatusEl.textContent = "";
     templateApplyStatusEl.classList.remove("teacher-template-apply-status--error");
 
-    const tidRaw = String(templateSelectEl.value || "").trim();
-    const tid = tidRaw ? Number(tidRaw, 10) : NaN;
+    const tid =
+      teacherSelectedTemplateId != null
+        ? Number(teacherSelectedTemplateId, 10)
+        : Number(String(templateSelectEl.value || "").trim(), 10);
     if (!Number.isFinite(tid)) {
       templateApplyStatusEl.textContent = t("choose_template");
       templateApplyStatusEl.classList.add("teacher-template-apply-status--error");
@@ -4854,6 +5147,8 @@ function initTeacherPage() {
   window.__eapTeacherLangRefresh = () => {
     populateCategorySelect(typeSelect, false);
     populateTeacherCategoryChips(categoryChipsEl, typeSelect);
+    populateTeacherTemplateCategoryFilterSelect(templateCategoryFilterEl);
+    populateTeacherTemplateCategoryChips(templateCategoryChipsEl, templateCategoryFilterEl);
     syncTeacherCreateTaskContext();
     setTeacherTaskDetailEmpty("no-selection");
     void reloadPlannerTasksFromApi();

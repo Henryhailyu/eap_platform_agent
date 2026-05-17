@@ -596,6 +596,7 @@ def init_database():
     upgrade_demo_users_password_hashes(conn)
     seed_default_classes(conn)
     seed_default_class_memberships(conn)
+    seed_task_templates(conn)
     backfill_calendar_tasks_title_zh(conn)
 
     conn.commit()
@@ -2243,6 +2244,79 @@ def copy_task(task_id):
     return jsonify(task_to_dict(row)), 201
 
 
+def seed_task_templates(conn):
+    """
+    Phase E7: starter templates per skill category when the library is empty.
+    Skips insert if any template row already exists (teachers may have saved their own).
+    """
+    n = conn.execute("SELECT COUNT(*) FROM task_templates").fetchone()[0]
+    if n is not None and int(n) > 0:
+        return
+
+    presets = [
+        (
+            "Classroom — guided discussion",
+            "Classroom: Guided discussion",
+            "Classroom Learning",
+            "In class",
+            "Prepare notes for the in-class discussion. Participate actively and complete the reflection prompt.",
+        ),
+        (
+            "Vocabulary — unit word list",
+            "Vocabulary: Unit word list",
+            "Vocabulary",
+            "Before class",
+            "Study the word list, complete the matching exercises, and use each target word in an original sentence.",
+        ),
+        (
+            "Listening — lecture clip",
+            "Listening: Academic lecture clip",
+            "Listening",
+            "In class",
+            "Listen to the recording and answer the comprehension questions. Note key phrases for follow-up discussion.",
+        ),
+        (
+            "Reading — academic article",
+            "Reading: Academic article",
+            "Reading",
+            "Prep",
+            "Read the assigned article and annotate the main argument. Answer the guided reading questions.",
+        ),
+        (
+            "Speaking — presentation",
+            "Speaking: Short presentation",
+            "Speaking",
+            "In class",
+            "Prepare a 3–5 minute presentation using the outline provided. Submit slides or notes if requested.",
+        ),
+        (
+            "Writing — essay draft",
+            "Writing: Essay draft",
+            "Writing",
+            "After class",
+            "Write a structured response using academic language. Check organisation, citations, and word count.",
+        ),
+        (
+            "Homework — assessment task",
+            "Homework: Assessment submission",
+            "Homework",
+            "Due date",
+            "Complete the assessment task and upload your work. Review the rubric before submitting.",
+        ),
+    ]
+
+    for name, title, category, period, description in presets:
+        conn.execute(
+            """
+            INSERT INTO task_templates
+                (name, title, title_zh, category, period, description, description_zh,
+                 file_path, file_name, created_at, updated_at)
+            VALUES (?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, datetime('now'), datetime('now'))
+            """,
+            (name, title, category, period, description),
+        )
+
+
 @app.route("/api/task-templates", methods=["GET"])
 def list_task_templates():
     """
@@ -2323,6 +2397,101 @@ def create_task_template():
     ).fetchone()
     conn.close()
     return jsonify(template_to_dict(row)), 201
+
+
+@app.route("/api/task-templates/<int:template_id>", methods=["PUT"])
+def update_task_template(template_id):
+    """
+    Update a reusable template (name, title, category, period, description, optional material refs).
+
+    Phase E7: allows teachers to refine saved templates from the manage list.
+    """
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    title = (data.get("title") or "").strip()
+    category = (data.get("category") or "").strip()
+    if not name or not title or not category:
+        return jsonify({"error": "name, title, and category are required"}), 400
+
+    period = data.get("period")
+    description = data.get("description")
+    period_s = "" if period is None else str(period)
+    description_s = "" if description is None else str(description)
+    title_zh = (data.get("title_zh") or "").strip() or None
+    description_zh = (data.get("description_zh") or "").strip() or None
+
+    fp = None
+    fn = None
+    if "file_path" in data:
+        raw_fp = data.get("file_path")
+        if raw_fp is not None and str(raw_fp).strip():
+            fp = str(raw_fp).strip()
+            raw_fn = data.get("file_name")
+            fn_str = str(raw_fn).strip() if raw_fn is not None else ""
+            fn = fn_str if fn_str else None
+
+    conn = get_db_connection()
+    row = conn.execute(
+        "SELECT id FROM task_templates WHERE id = ?",
+        (template_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "Template not found"}), 404
+
+    d25_guard_err = require_session_role_if_enabled(conn, "teacher")
+    if d25_guard_err is not None:
+        conn.close()
+        return d25_guard_err
+
+    if "file_path" in data:
+        conn.execute(
+            """
+            UPDATE task_templates
+            SET name = ?, title = ?, title_zh = ?, category = ?, period = ?,
+                description = ?, description_zh = ?, file_path = ?, file_name = ?,
+                updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (
+                name,
+                title,
+                title_zh,
+                category,
+                period_s,
+                description_s,
+                description_zh,
+                fp,
+                fn,
+                template_id,
+            ),
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE task_templates
+            SET name = ?, title = ?, title_zh = ?, category = ?, period = ?,
+                description = ?, description_zh = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (
+                name,
+                title,
+                title_zh,
+                category,
+                period_s,
+                description_s,
+                description_zh,
+                template_id,
+            ),
+        )
+    conn.commit()
+    updated = conn.execute(
+        "SELECT * FROM task_templates WHERE id = ?",
+        (template_id,),
+    ).fetchone()
+    conn.close()
+    return jsonify(template_to_dict(updated))
 
 
 @app.route("/api/task-templates/<int:template_id>", methods=["DELETE"])

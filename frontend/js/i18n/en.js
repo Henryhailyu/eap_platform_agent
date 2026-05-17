@@ -322,5 +322,16 @@ window.EAP_STRINGS_EN = {
   "waiting_for_feedback": "Waiting for feedback",
   "feedback_received": "Feedback received",
   "revisions_submitted": "Revisions submitted",
-  "completion_rate": "Completion rate"
+  "completion_rate": "Completion rate",
+  "teacher_open_templates_btn": "Task templates",
+  "filter_templates": "Filter templates",
+  "template_library": "Template library",
+  "template_library_empty": "No templates in this category. Save a task as a template or choose another filter.",
+  "template_preview": "Preview",
+  "template_preview_empty": "Select a template from the list to preview it here.",
+  "template_apply_context_hint": "The new task will be created for this class and date.",
+  "use_template": "Use",
+  "has_material": "Has material",
+  "view_material": "View material",
+  "no_description": "No description provided."
 };
