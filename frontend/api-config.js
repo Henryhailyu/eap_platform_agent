@@ -1,11 +1,9 @@
 /**
- * Flask API base URL — must match the address printed when you start backend/app.py.
+ * Optional API base override. Leave unset for online pilot (same origin as /ui/).
  *
- * Default backend port is 5050 (see backend/app.py) because macOS often reserves port 5000.
- * If you run Flask with PORT=5000, change this string to http://127.0.0.1:5000
+ * Uncomment only when the HTML is NOT served by Flask — e.g. Live Server on port 5500:
+ *   window.EAP_API_BASE = "http://127.0.0.1:5051";
  *
- * Open the UI at http://127.0.0.1:5050/ui/index.html (same origin as /api/*) so session
- * cookies work when EAP_REQUIRE_SESSION_IDENTITY=1. Do not use file:// for teacher/student pages.
+ * Open http://127.0.0.1:5051/ui/index.html for local dev (cookies + session work).
  */
-/** Agent-window fork — default port 5051 (Desktop eap_platform uses 5050). */
-window.EAP_API_BASE = "http://127.0.0.1:5051";
+// window.EAP_API_BASE = "http://127.0.0.1:5051";

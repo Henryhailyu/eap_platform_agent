@@ -17,9 +17,9 @@ def _env_bool(name: str, default: str = "0") -> bool:
     return os.environ.get(name, default).strip().lower() in ("1", "true", "yes")
 
 
-def _parse_cors_origins(raw: str | None) -> list[str]:
+def _parse_cors_origins(raw: str | None, public_url: str | None) -> list[str]:
     if raw is None or not str(raw).strip():
-        return [
+        origins = [
             "http://127.0.0.1:5051",
             "http://localhost:5051",
             "http://127.0.0.1:5500",
@@ -29,8 +29,13 @@ def _parse_cors_origins(raw: str | None) -> list[str]:
             "http://127.0.0.1:3000",
             "http://localhost:3000",
         ]
-    parts = [p.strip() for p in str(raw).split(",")]
-    return [p for p in parts if p]
+    else:
+        origins = [p.strip() for p in str(raw).split(",")]
+        origins = [p for p in origins if p]
+    pub = (public_url or "").strip().rstrip("/")
+    if pub and pub not in origins:
+        origins.append(pub)
+    return origins
 
 
 class EapConfig:
@@ -38,6 +43,10 @@ class EapConfig:
 
     ENV: str = os.environ.get("EAP_ENV", "development").strip().lower()
     IS_PRODUCTION: bool = ENV == "production"
+    IS_PILOT: bool = _env_bool("EAP_PILOT_MODE") or IS_PRODUCTION
+
+    # Public site URL (https://your-host.example) — auto-added to CORS when set.
+    PUBLIC_URL: str | None = (os.environ.get("EAP_PUBLIC_URL") or "").strip().rstrip("/") or None
 
     # Optional one-switch preset for pilot hosts (also set individual flags explicitly).
     PRODUCTION_PRESET: bool = _env_bool("EAP_PRODUCTION_PRESET")
@@ -73,7 +82,10 @@ class EapConfig:
         os.path.join(_BASE_DIR, "submissions"),
     )
 
-    CORS_ORIGINS: list[str] = _parse_cors_origins(os.environ.get("EAP_CORS_ORIGINS"))
+    CORS_ORIGINS: list[str] = _parse_cors_origins(
+        os.environ.get("EAP_CORS_ORIGINS"),
+        (os.environ.get("EAP_PUBLIC_URL") or "").strip().rstrip("/") or None,
+    )
 
     SESSION_COOKIE_SECURE: bool = _env_bool("EAP_SESSION_COOKIE_SECURE") or IS_PRODUCTION
     SESSION_COOKIE_SAMESITE: str = os.environ.get("EAP_SESSION_COOKIE_SAMESITE", "Lax").strip() or "Lax"
@@ -108,10 +120,12 @@ def validate_production_config() -> None:
     log = logging.getLogger("eap.config")
     if config.DATABASE_URL:
         log.warning(
-            "EAP_DATABASE_URL is set but PostgreSQL is not enabled yet (Phase G). "
-            "Using SQLite at %s",
+            "EAP_DATABASE_URL is set but PostgreSQL is not enabled yet. "
+            "Pilot uses SQLite at %s",
             config.DATABASE_PATH,
         )
+    if config.IS_PILOT and config.PUBLIC_URL:
+        log.info("Pilot public URL: %s", config.PUBLIC_URL)
     if not config.IS_PRODUCTION:
         return
     if config.SECRET_KEY == _DEFAULT_DEV_SECRET:

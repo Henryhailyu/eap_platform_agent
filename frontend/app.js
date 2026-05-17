@@ -26,12 +26,20 @@
  * Edit frontend/api-config.js (loaded before this file) if your Flask URL differs.
  */
 const API_BASE = (function resolveApiBase() {
-  if (typeof window === "undefined") return "http://127.0.0.1:5050";
+  if (typeof window === "undefined") return "http://127.0.0.1:5051";
   const custom = window.EAP_API_BASE;
   if (custom != null && String(custom).trim() !== "") {
     return String(custom).trim().replace(/\/$/, "");
   }
-  return "http://127.0.0.1:5050";
+  // Phase G: when UI is served by Flask at /ui/ (online pilot), use same origin.
+  if (
+    typeof window.location !== "undefined" &&
+    window.location.protocol &&
+    /^https?:$/i.test(window.location.protocol)
+  ) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  return "http://127.0.0.1:5051";
 })();
 
 /** Agent build — bilingual UI (see js/i18n-core.js). */

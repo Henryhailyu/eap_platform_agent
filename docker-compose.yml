@@ -1,0 +1,22 @@
+# Phase G — local pilot stack (mirrors production layout with a persistent /data volume)
+services:
+  eap:
+    build: .
+    ports:
+      - "5051:5051"
+    environment:
+      EAP_ENV: production
+      EAP_PILOT_MODE: "1"
+      EAP_PRODUCTION_PRESET: "1"
+      EAP_TRUST_PROXY: "1"
+      EAP_SECRET_KEY: ${EAP_SECRET_KEY:-replace-me-before-public-pilot}
+      EAP_PUBLIC_URL: ${EAP_PUBLIC_URL:-http://localhost:5051}
+      EAP_SEED_PILOT: "1"
+      EAP_SEED_DEMO_TASKS: "1"
+      PORT: "5051"
+    volumes:
+      - eap_data:/data
+    restart: unless-stopped
+
+volumes:
+  eap_data:

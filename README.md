@@ -97,6 +97,44 @@ Schedule that command daily on the host. PostgreSQL migration is planned for Pha
 
 **Health check:** `GET /api/health` returns environment and security-flag status (no secrets).
 
+## Online web pilot (Phase G)
+
+The UI uses **same-origin** API calls when served from Flask (`/ui/`). Open your public URL root — it redirects to the login page.
+
+### Option A — Docker (local test or any VPS)
+
+```bash
+cd "/Users/henryhailyu/Documents/HL folder/Cursor coding file/eap_platform_agent"
+export EAP_SECRET_KEY="$(openssl rand -hex 32)"
+docker compose up --build
+```
+
+Open **http://localhost:5051/** → login. Demo accounts: `teacher1` / `student1` / `manager1` — password `123456` until you run:
+
+```bash
+docker compose exec eap sh -c 'EAP_PILOT_DEFAULT_PASSWORD="your-new-password" python scripts/seed_pilot.py'
+```
+
+Data persists in the `eap_data` Docker volume.
+
+### Option B — Render.com
+
+1. Push this repo to GitHub.  
+2. [Render](https://render.com) → **New** → **Blueprint** → connect the repo (`render.yaml` is included).  
+3. After deploy, set **`EAP_PUBLIC_URL`** to your `https://….onrender.com` URL (same value for **`EAP_CORS_ORIGINS`** if needed).  
+4. Visit the service URL; check **`GET /api/pilot/info`** for pilot onboarding JSON.
+
+### What you provide (outside Cursor)
+
+| Item | Example |
+|------|---------|
+| `EAP_SECRET_KEY` | `openssl rand -hex 32` |
+| Public URL | `https://eap-pilot.onrender.com` → `EAP_PUBLIC_URL` |
+| Strong pilot passwords | `EAP_PILOT_DEFAULT_PASSWORD` + `seed_pilot.py` |
+| HTTPS | Provided by Render / your reverse proxy; set `EAP_TRUST_PROXY=1` |
+
+PostgreSQL remains optional for a later upgrade; the pilot uses **SQLite on a persistent disk**.
+
 ## Tracker
 
 See `../eap_platform cursor agent window/EAP_PROJECT_TRACKER.md`

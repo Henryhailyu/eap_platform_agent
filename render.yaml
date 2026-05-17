@@ -1,0 +1,40 @@
+# Phase G — Render.com blueprint (https://render.com)
+# 1. Push this repo to GitHub
+# 2. New → Blueprint → connect repo → Render reads this file
+# 3. Set EAP_SECRET_KEY and EAP_PUBLIC_URL in the dashboard after first deploy
+
+services:
+  - type: web
+    name: eap-platform-pilot
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: EAP_ENV
+        value: production
+      - key: EAP_PILOT_MODE
+        value: "1"
+      - key: EAP_PRODUCTION_PRESET
+        value: "1"
+      - key: EAP_TRUST_PROXY
+        value: "1"
+      - key: EAP_SEED_PILOT
+        value: "1"
+      - key: EAP_SEED_DEMO_TASKS
+        value: "1"
+      - key: PORT
+        value: "5051"
+      - key: EAP_DATABASE_PATH
+        value: /data/eap_platform.db
+      - key: EAP_UPLOAD_DIR
+        value: /data/uploads
+      - key: EAP_SUBMISSIONS_DIR
+        value: /data/submissions
+      - key: EAP_SECRET_KEY
+        generateValue: true
+      - key: EAP_PUBLIC_URL
+        sync: false
+    disk:
+      name: eap-data
+      mountPath: /data
+      sizeGB: 1

@@ -33,7 +33,7 @@ import uuid
 from calendar import monthrange
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify, request, send_from_directory, abort, session
+from flask import Flask, jsonify, redirect, request, send_from_directory, abort, session
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -77,6 +77,12 @@ def _eap_access_log(response):
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend"))
 
 
+@app.route("/")
+def root_redirect():
+    """Phase G: send visitors to the login UI when the app is deployed online."""
+    return redirect("/ui/index.html", code=302)
+
+
 @app.route("/ui/")
 @app.route("/ui/<path:filename>")
 def serve_ui(filename="index.html"):
@@ -106,6 +112,33 @@ def health_check():
             "strict_security": is_strict_security_enabled(),
             "session_identity_required": EAP_REQUIRE_SESSION_IDENTITY,
             "membership_enforced": EAP_ENFORCE_MEMBERSHIP,
+            "pilot_mode": config.IS_PILOT,
+            "public_url": config.PUBLIC_URL,
+        }
+    )
+
+
+@app.route("/api/pilot/info", methods=["GET"])
+def pilot_info():
+    """
+    Phase G: non-secret pilot onboarding hints for a small user group.
+    Hidden when EAP_PILOT_MODE is off and not in production.
+    """
+    if not config.IS_PILOT and not config.IS_PRODUCTION:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(
+        {
+            "pilot": True,
+            "ui_entry": "/ui/index.html",
+            "admin_entry": "/ui/admin.html",
+            "class_code": "EAP047",
+            "accounts": [
+                {"role": "teacher", "username": "teacher1", "note": "Change password after first login in production."},
+                {"role": "student", "username": "student1", "note": "Change password after first login in production."},
+                {"role": "manager", "username": "manager1", "note": "Authorizes teachers; use admin UI."},
+            ],
+            "public_url": config.PUBLIC_URL,
+            "strict_security": is_strict_security_enabled(),
         }
     )
 
