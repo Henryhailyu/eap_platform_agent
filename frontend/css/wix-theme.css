@@ -627,6 +627,156 @@ body.eap-wix.page-app .eap-lang-bar {
   border: none;
 }
 
+body.eap-wix .student-daily-context {
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 10px;
+  background: rgba(10, 126, 164, 0.06);
+  border: 1px solid rgba(10, 126, 164, 0.18);
+}
+
+body.eap-wix .student-daily-context__line {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+body.eap-wix .student-daily-context__class {
+  color: var(--wix-teal, #0a7ea4);
+}
+
+body.eap-wix .student-daily-context__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .student-daily-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+body.eap-wix .student-task-category-field {
+  border: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+body.eap-wix .student-task-category-field legend {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--wix-text, #1d1d1f);
+}
+
+body.eap-wix .student-category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+body.eap-wix .student-category-chip {
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--wix-card-border);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+body.eap-wix .student-category-chip:hover {
+  border-color: var(--wix-teal, #0a7ea4);
+}
+
+body.eap-wix .student-category-chip--active {
+  background: var(--wix-teal, #0a7ea4);
+  border-color: var(--wix-teal, #0a7ea4);
+  color: #fff;
+}
+
+body.eap-wix .student-task-workflow {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--wix-card-border);
+}
+
+body.eap-wix .student-task-workflow__pill {
+  display: inline-block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.eap-wix .student-task-workflow--needs_submission .student-task-workflow__pill {
+  background: rgba(0, 113, 227, 0.12);
+  color: var(--wix-blue, #0071e3);
+}
+
+body.eap-wix .student-task-workflow--needs_revision .student-task-workflow__pill {
+  background: rgba(255, 149, 0, 0.15);
+  color: #b25c00;
+}
+
+body.eap-wix .student-task-workflow--completed .student-task-workflow__pill,
+body.eap-wix .student-task-workflow--revision_done .student-task-workflow__pill {
+  background: rgba(52, 199, 89, 0.15);
+  color: #1d7a36;
+}
+
+body.eap-wix .student-task-workflow__hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+  line-height: 1.45;
+}
+
+body.eap-wix .task-card__homework--primary {
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 113, 227, 0.2);
+  background: rgba(0, 113, 227, 0.04);
+}
+
+body.eap-wix .student-homework-resubmit-details {
+  margin: 0.75rem 0;
+  border: 1px solid var(--wix-card-border);
+  border-radius: 10px;
+  padding: 0.35rem 0.85rem 0.85rem;
+}
+
+body.eap-wix .student-homework-resubmit-details__summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
+}
+
+body.eap-wix .student-task-submission-panel--highlight {
+  border-color: rgba(255, 149, 0, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 149, 0, 0.12);
+}
+
+body.eap-wix .student-task-subsection--revision-form--emphasis {
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border-radius: 10px;
+  background: rgba(255, 149, 0, 0.06);
+  border: 1px solid rgba(255, 149, 0, 0.25);
+}
+
+body.eap-wix .student-task-master-item--action {
+  border-color: rgba(0, 113, 227, 0.35);
+  box-shadow: inset 3px 0 0 var(--wix-blue, #0071e3);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

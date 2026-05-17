@@ -899,6 +899,49 @@ function populateStudentFilterSelect(selectEl) {
   });
 }
 
+function syncStudentCategoryChipHighlight(chipsEl, selectEl) {
+  if (!chipsEl || !selectEl) return;
+  const val = selectEl.value || "all";
+  chipsEl.querySelectorAll(".student-category-chip").forEach((chip) => {
+    const cat = chip.getAttribute("data-category");
+    const on = cat === val;
+    chip.classList.toggle("student-category-chip--active", on);
+    chip.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
+function populateStudentCategoryChips(chipsEl, selectEl) {
+  if (!chipsEl || !selectEl) return;
+  chipsEl.innerHTML = "";
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = "student-category-chip";
+  allBtn.textContent = t("all_categories");
+  allBtn.setAttribute("data-category", "all");
+  allBtn.setAttribute("aria-pressed", "false");
+  allBtn.addEventListener("click", () => {
+    selectEl.value = "all";
+    syncStudentCategoryChipHighlight(chipsEl, selectEl);
+    selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  chipsEl.appendChild(allBtn);
+  TASK_CATEGORIES.forEach((label) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "student-category-chip";
+    btn.textContent = translateCategory(label);
+    btn.setAttribute("data-category", label);
+    btn.setAttribute("aria-pressed", "false");
+    btn.addEventListener("click", () => {
+      selectEl.value = label;
+      syncStudentCategoryChipHighlight(chipsEl, selectEl);
+      selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    chipsEl.appendChild(btn);
+  });
+  syncStudentCategoryChipHighlight(chipsEl, selectEl);
+}
+
 // ---- Academic + monthly calendar (student / teacher) ---------------------------
 
 /**
@@ -4611,6 +4654,72 @@ function initTeacherPage() {
 
 // ---- Student page (student.html) ---------------------------------------------
 
+/** True when teacher feedback (text or files) exists on a submission row. */
+function studentSubmissionHasFeedback(mySub) {
+  if (!mySub || typeof mySub !== "object") return false;
+  return !!(
+    (mySub.teacher_feedback && String(mySub.teacher_feedback).trim()) ||
+    (mySub.feedback_file_path && String(mySub.feedback_file_path).trim()) ||
+    (Array.isArray(mySub.feedback_attachments) && mySub.feedback_attachments.length > 0)
+  );
+}
+
+/** Workflow step for student daily task cards and master list badges. */
+function getStudentTaskWorkflowState(task, mySub) {
+  if (isStudentTaskCompleted(task)) return "completed";
+  const hasSubmission = !!(mySub && mySub.id != null);
+  if (studentSubmissionHasFeedback(mySub)) {
+    return studentSubmissionHasRevisionRow(mySub) ? "revision_done" : "needs_revision";
+  }
+  if (hasSubmission) return "awaiting_feedback";
+  return "needs_submission";
+}
+
+function studentWorkflowStatusLabel(state) {
+  const keyByState = {
+    completed: "student_wf_completed",
+    revision_done: "student_wf_revision_done",
+    needs_revision: "student_wf_needs_revision",
+    awaiting_feedback: "student_wf_awaiting_feedback",
+    needs_submission: "student_wf_needs_submission",
+  };
+  return t(keyByState[state] || "status_pending");
+}
+
+function studentTaskNeedsAction(task, mySub) {
+  const state = getStudentTaskWorkflowState(task, mySub);
+  return state === "needs_submission" || state === "needs_revision";
+}
+
+function findFirstStudentTaskNeedingAction(tasks, subMap) {
+  const m = subMap instanceof Map ? subMap : new Map();
+  for (let i = 0; i < tasks.length; i += 1) {
+    const task = tasks[i];
+    if (studentTaskNeedsAction(task, m.get(task.id))) return task;
+  }
+  return null;
+}
+
+function buildStudentWorkflowStrip(state) {
+  const wrap = document.createElement("div");
+  wrap.className = `student-task-workflow student-task-workflow--${state}`;
+  const pill = document.createElement("span");
+  pill.className = "student-task-workflow__pill";
+  pill.textContent = studentWorkflowStatusLabel(state);
+  const hintKey = `student_wf_hint_${state}`;
+  const hintText = t(hintKey);
+  if (hintText && hintText !== hintKey) {
+    const hint = document.createElement("p");
+    hint.className = "student-task-workflow__hint";
+    hint.textContent = hintText;
+    wrap.appendChild(pill);
+    wrap.appendChild(hint);
+  } else {
+    wrap.appendChild(pill);
+  }
+  return wrap;
+}
+
 /** True if my-submission row has any stored revision content (same rule as the full task card). */
 function studentSubmissionHasRevisionRow(mySub) {
   if (!mySub || typeof mySub !== "object") return false;
@@ -4695,15 +4804,11 @@ function renderStudentTaskMasterList(masterEl, tasksForDay, subMap) {
   const sorted = [...tasksForDay].sort(compareTasksForSort);
   sorted.forEach((task) => {
     const mySub = m.get(task.id);
-    const done = isStudentTaskCompleted(task);
+    const wfState = getStudentTaskWorkflowState(task, mySub);
+    const needsAction = studentTaskNeedsAction(task, mySub);
     const hasMaterial = !!(task.file_path && String(task.file_path).trim());
     const hasSubmission = !!(mySub && mySub.id != null);
-    const hasFb = !!(
-      mySub &&
-      ((mySub.teacher_feedback && String(mySub.teacher_feedback).trim()) ||
-        (mySub.feedback_file_path && String(mySub.feedback_file_path).trim()) ||
-        (Array.isArray(mySub.feedback_attachments) && mySub.feedback_attachments.length > 0))
-    );
+    const hasFb = studentSubmissionHasFeedback(mySub);
     const hasRev = studentSubmissionHasRevisionRow(mySub);
 
     const li = document.createElement("li");
@@ -4712,7 +4817,9 @@ function renderStudentTaskMasterList(masterEl, tasksForDay, subMap) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "student-task-master-item";
+    if (needsAction) btn.classList.add("student-task-master-item--action");
     btn.setAttribute("data-task-id", String(task.id));
+    btn.setAttribute("data-workflow-state", wfState);
 
     const titleEl = document.createElement("span");
     titleEl.className = "student-task-master-item__title";
@@ -4720,23 +4827,23 @@ function renderStudentTaskMasterList(masterEl, tasksForDay, subMap) {
 
     const line2 = document.createElement("span");
     line2.className = "student-task-master-item__meta";
-    const cat = task.category || task.type || "—";
-    line2.textContent = `${cat} · ${done ? "Completed" : "Pending"}`;
+    const cat = translateCategory(task.category || task.type || "—");
+    line2.textContent = `${cat} · ${studentWorkflowStatusLabel(wfState)}`;
 
     const badges = document.createElement("div");
     badges.className = "student-task-master-item__badges";
 
-    const addBadge = (cls, label) => {
+    const addBadge = (cls, labelKey) => {
       const sp = document.createElement("span");
       sp.className = `student-learn-badge ${cls}`;
-      sp.textContent = label;
+      sp.textContent = t(labelKey);
       badges.appendChild(sp);
     };
-    if (hasMaterial) addBadge("student-learn-badge--material", "Material");
-    if (hasSubmission) addBadge("student-learn-badge--submitted", "Submitted");
-    if (hasFb) addBadge("student-learn-badge--feedback", "Feedback");
-    if (hasRev) addBadge("student-learn-badge--revision", "Revision");
-    if (done) addBadge("student-learn-badge--completed", "Completed");
+    if (hasMaterial) addBadge("student-learn-badge--material", "student_badge_material");
+    if (hasSubmission) addBadge("student-learn-badge--submitted", "student_badge_submitted");
+    if (hasFb) addBadge("student-learn-badge--feedback", "student_badge_feedback");
+    if (hasRev) addBadge("student-learn-badge--revision", "student_badge_revision");
+    if (wfState === "completed") addBadge("student-learn-badge--completed", "student_badge_completed");
 
     btn.appendChild(titleEl);
     btn.appendChild(line2);
@@ -4753,9 +4860,12 @@ function renderStudentTaskMasterList(masterEl, tasksForDay, subMap) {
  */
 function buildStudentTaskCardElement(task, mySub) {
   const done = isStudentTaskCompleted(task);
+  const wfState = getStudentTaskWorkflowState(task, mySub);
+  const hasSubmissionRow = !!(mySub && typeof mySub === "object" && mySub.id != null);
 
   const li = document.createElement("li");
   li.className = done ? "task-card task-card--done task-card--student" : "task-card task-card--student";
+  li.setAttribute("data-workflow-state", wfState);
 
   const title = document.createElement("h3");
   title.className = "task-card__title";
@@ -4774,6 +4884,8 @@ function buildStudentTaskCardElement(task, mySub) {
 
   meta.appendChild(catPill);
   meta.appendChild(periodPill);
+
+  const workflowStrip = buildStudentWorkflowStrip(wfState);
 
   const desc = document.createElement("p");
   desc.className = "task-card__description";
@@ -4859,10 +4971,13 @@ function buildStudentTaskCardElement(task, mySub) {
   homework.appendChild(hwStatus);
 
   let submissionPanel = null;
-  if (mySub && typeof mySub === "object" && mySub.id != null) {
+  if (hasSubmissionRow) {
     submissionPanel = document.createElement("aside");
     submissionPanel.className = "student-task-submission-panel";
-    submissionPanel.setAttribute("aria-label", "Your homework submission and feedback");
+    if (wfState === "needs_revision") {
+      submissionPanel.classList.add("student-task-submission-panel--highlight");
+    }
+    submissionPanel.setAttribute("aria-label", t("submission_feedback"));
 
     const panelHeading = document.createElement("h4");
     panelHeading.className = "student-task-submission-panel__heading";
@@ -4908,7 +5023,7 @@ function buildStudentTaskCardElement(task, mySub) {
       "student-task-submission-panel__subsection student-task-subsection--meta";
     const statusLabel = document.createElement("div");
     statusLabel.className = "student-task-submission-panel__label";
-    statusLabel.textContent = "Submission status";
+    statusLabel.textContent = t("submission_status_label");
     const statusRow = document.createElement("p");
     statusRow.className = "student-task-submission-panel__row";
     statusRow.appendChild(
@@ -4926,7 +5041,7 @@ function buildStudentTaskCardElement(task, mySub) {
       "student-task-submission-panel__subsection student-task-subsection--feedback";
     const fbLabel = document.createElement("div");
     fbLabel.className = "student-task-submission-panel__label";
-    fbLabel.textContent = "Teacher Feedback";
+    fbLabel.textContent = t("teacher_feedback");
     const fbPara = document.createElement("p");
     fbPara.className = "student-task-submission-panel__feedback-body";
     const hasFbText = !!(mySub.teacher_feedback && String(mySub.teacher_feedback).trim());
@@ -4939,10 +5054,10 @@ function buildStudentTaskCardElement(task, mySub) {
     if (hasFbText) {
       fbPara.textContent = String(mySub.teacher_feedback).trim();
     } else if (hasFbFile || hasFbAttach) {
-      fbPara.textContent = "No written feedback (see teacher files below).";
+      fbPara.textContent = t("no_written_feedback_files_below");
       fbPara.classList.add("student-task-submission-panel__feedback-body--muted");
     } else {
-      fbPara.textContent = "Feedback has not been given yet.";
+      fbPara.textContent = t("feedback_not_yet");
       fbPara.classList.add("student-task-submission-panel__feedback-body--muted");
     }
     fbSection.appendChild(fbLabel);
@@ -4951,7 +5066,7 @@ function buildStudentTaskCardElement(task, mySub) {
     if (hasFbFile) {
       const fbFileLabel = document.createElement("div");
       fbFileLabel.className = "student-task-submission-panel__label";
-      fbFileLabel.textContent = "Teacher feedback file";
+      fbFileLabel.textContent = t("teacher_feedback_file");
       const fbFileRow = document.createElement("p");
       fbFileRow.className = "student-task-submission-panel__file";
       const fblink = document.createElement("a");
@@ -4968,7 +5083,7 @@ function buildStudentTaskCardElement(task, mySub) {
     if (hasFbAttach) {
       const multiLabel = document.createElement("div");
       multiLabel.className = "student-task-submission-panel__label";
-      multiLabel.textContent = "Teacher Feedback Files";
+      multiLabel.textContent = t("teacher_feedback_files");
       const ul = document.createElement("ul");
       ul.className = "student-task-feedback-files-list";
       feedbackAttachList.forEach((att) => {
@@ -5027,14 +5142,14 @@ function buildStudentTaskCardElement(task, mySub) {
 
         const revReadTitle = document.createElement("h5");
         revReadTitle.className = "student-task-subsection__title";
-        revReadTitle.textContent = "Current revision";
+        revReadTitle.textContent = t("current_revision");
 
         const revTextP = document.createElement("p");
         revTextP.className = "student-task-submission-panel__answer";
         if (mySub.revision_text && String(mySub.revision_text).trim()) {
           revTextP.textContent = String(mySub.revision_text).trim();
         } else {
-          revTextP.textContent = "No revision text (file only is fine).";
+          revTextP.textContent = t("no_revision_text_file_ok");
           revTextP.classList.add("student-task-submission-panel__answer--muted");
         }
 
@@ -5060,7 +5175,7 @@ function buildStudentTaskCardElement(task, mySub) {
         const revTime = document.createElement("p");
         revTime.className = "student-task-submission-panel__row";
         const tStrong = document.createElement("strong");
-        tStrong.textContent = "Revision submitted: ";
+        tStrong.textContent = `${t("revision_submitted_at")}: `;
         revTime.appendChild(tStrong);
         revTime.appendChild(
           document.createTextNode(
@@ -5073,7 +5188,7 @@ function buildStudentTaskCardElement(task, mySub) {
         const revStat = document.createElement("p");
         revStat.className = "student-task-submission-panel__row";
         const sStrong = document.createElement("strong");
-        sStrong.textContent = "Revision status: ";
+        sStrong.textContent = `${t("revision_status_label")}: `;
         revStat.appendChild(sStrong);
         revStat.appendChild(
           document.createTextNode(
@@ -5146,17 +5261,38 @@ function buildStudentTaskCardElement(task, mySub) {
       revFormSection.appendChild(revTextarea);
       revFormSection.appendChild(revFileWrap);
       revFormSection.appendChild(revSubmitBtn);
+      if (wfState === "needs_revision") {
+        revFormSection.classList.add("student-task-subsection--revision-form--emphasis");
+        revFormSection.setAttribute("data-student-revision-focus", "true");
+      }
+
       revFormSection.appendChild(revStatus);
       submissionPanel.appendChild(revFormSection);
     }
+  }
+
+  let homeworkNode = homework;
+  if (hasSubmissionRow) {
+    const hwDetails = document.createElement("details");
+    hwDetails.className = "student-homework-resubmit-details";
+    const hwSummary = document.createElement("summary");
+    hwSummary.className = "student-homework-resubmit-details__summary";
+    hwSummary.textContent = t("student_resubmit_homework");
+    hwDetails.appendChild(hwSummary);
+    hwDetails.appendChild(homework);
+    homeworkNode = hwDetails;
+  } else if (wfState === "needs_submission") {
+    homework.classList.add("task-card__homework--primary");
   }
 
   const tail = document.createElement("div");
   tail.className = "task-card__student-tail";
 
   const status = document.createElement("p");
-  status.className = done ? "task-status task-status--done" : "task-status";
-  status.textContent = done ? "Completed" : "Pending";
+  status.className = done
+    ? "task-status task-status--done"
+    : `task-status task-status--${wfState}`;
+  status.textContent = studentWorkflowStatusLabel(wfState);
 
   const classLine = document.createElement("p");
   classLine.className = "task-card__student-class-name";
@@ -5174,9 +5310,9 @@ function buildStudentTaskCardElement(task, mySub) {
 
   if (done) {
     btn.disabled = true;
-    btn.textContent = "Completed";
+    btn.textContent = t("status_completed");
   } else {
-    btn.textContent = "Complete";
+    btn.textContent = t("mark_complete");
     btn.setAttribute("data-task-id", String(task.id));
   }
 
@@ -5184,11 +5320,12 @@ function buildStudentTaskCardElement(task, mySub) {
 
   li.appendChild(title);
   li.appendChild(meta);
+  li.appendChild(workflowStrip);
   li.appendChild(desc);
   li.appendChild(material);
-  li.appendChild(tail);
-  li.appendChild(homework);
   if (submissionPanel) li.appendChild(submissionPanel);
+  li.appendChild(homeworkNode);
+  li.appendChild(tail);
   li.appendChild(footer);
 
   return li;
@@ -5314,6 +5451,9 @@ function initStudentPage() {
   const taskDetailInner = document.getElementById("student-task-detail-inner");
   const taskDetailEmpty = document.getElementById("student-task-detail-empty");
   const dailyClassLabelEl = document.getElementById("student-daily-class-label");
+  const dailyContextEl = document.getElementById("student-daily-context");
+  const focusNextBtn = document.getElementById("student-focus-next-btn");
+  const categoryChipsEl = document.getElementById("student-category-chips");
   const emptyHintEl = document.getElementById("student-empty-hint");
   const messageEl = document.getElementById("student-form-message");
   const dateInput = document.getElementById("student-date");
@@ -5425,6 +5565,59 @@ function initStudentPage() {
   }
 
   populateStudentFilterSelect(filterSelect);
+  populateStudentCategoryChips(categoryChipsEl, filterSelect);
+
+  function syncStudentDailyContext() {
+    if (!dailyContextEl) return;
+    const iso = String(dateInput.value || "").trim().slice(0, 10);
+    dailyContextEl.innerHTML = "";
+    const line = document.createElement("p");
+    line.className = "student-daily-context__line";
+    const classSpan = document.createElement("span");
+    classSpan.className = "student-daily-context__class";
+    classSpan.textContent = studentClassName || "—";
+    const sep = document.createElement("span");
+    sep.className = "student-daily-context__sep";
+    sep.textContent = " · ";
+    const dateSpan = document.createElement("span");
+    dateSpan.className = "student-daily-context__date";
+    dateSpan.textContent = iso.length >= 10 ? formatDisplayDate(iso) : "—";
+    line.appendChild(classSpan);
+    line.appendChild(sep);
+    line.appendChild(dateSpan);
+    dailyContextEl.appendChild(line);
+    const hint = document.createElement("p");
+    hint.className = "student-daily-context__hint";
+    hint.textContent = t("student_daily_context_hint");
+    dailyContextEl.appendChild(hint);
+  }
+
+  function pulseStudentMasterItem(taskId) {
+    const row = masterListEl.querySelector(
+      `.student-task-master-item[data-task-id="${String(taskId)}"]`,
+    );
+    if (!row) return;
+    row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    row.classList.add("student-task-master-item--pulse");
+    window.setTimeout(() => {
+      row.classList.remove("student-task-master-item--pulse");
+    }, 1400);
+  }
+
+  function focusNextStudentTask() {
+    const actionTask = findFirstStudentTaskNeedingAction(
+      lastStudentFilteredTasks,
+      lastSubmissionsByTaskId,
+    );
+    if (!actionTask) {
+      messageEl.textContent = t("student_no_action_tasks");
+      messageEl.classList.remove("form-message--error");
+      messageEl.classList.add("form-message--success");
+      return;
+    }
+    selectStudentTaskById(actionTask.id);
+    pulseStudentMasterItem(actionTask.id);
+  }
 
   const today = new Date();
   const todayISO = getTodayISODateLocal();
@@ -5805,6 +5998,15 @@ function initStudentPage() {
     taskDetailInner.classList.remove("hidden");
     taskDetailInner.removeAttribute("hidden");
     taskDetailInner.classList.add("student-task-detail-inner--enter");
+
+    if (getStudentTaskWorkflowState(task, mySub) === "needs_revision") {
+      const revFocus = taskDetailInner.querySelector("[data-student-revision-focus]");
+      if (revFocus) {
+        window.setTimeout(() => {
+          revFocus.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 80);
+      }
+    }
   }
 
   function applyFilterAndRender(successFlash) {
@@ -5814,6 +6016,7 @@ function initStudentPage() {
     if (!day) return;
 
     dailyClassLabelEl.textContent = `Class: ${studentClassName}`;
+    syncStudentDailyContext();
 
     const tasksNormAll =
       lastStudentTasksNormMerged.length > 0
@@ -5828,6 +6031,11 @@ function initStudentPage() {
 
     const sorted = [...filtered].sort(compareTasksForSort);
     lastStudentFilteredTasks = sorted;
+
+    if (focusNextBtn) {
+      const hasAction = !!findFirstStudentTaskNeedingAction(sorted, lastSubmissionsByTaskId);
+      focusNextBtn.disabled = !hasAction;
+    }
 
     let emptyMsg =
       "No tasks for this date for your class yet. Ask your teacher or pick another day.";
@@ -5869,7 +6077,8 @@ function initStudentPage() {
 
     let selId = selectedStudentTaskId;
     if (selId == null || !sorted.some((t) => Number(t.id) === Number(selId))) {
-      selId = sorted[0].id;
+      const actionTask = findFirstStudentTaskNeedingAction(sorted, lastSubmissionsByTaskId);
+      selId = actionTask ? actionTask.id : sorted[0].id;
     }
     selectStudentTaskById(selId);
   }
@@ -6302,8 +6511,15 @@ function initStudentPage() {
   }
 
   filterSelect.addEventListener("change", () => {
+    syncStudentCategoryChipHighlight(categoryChipsEl, filterSelect);
     if (lastLoadedDay) applyFilterAndRender();
   });
+
+  if (focusNextBtn) {
+    focusNextBtn.addEventListener("click", () => {
+      focusNextStudentTask();
+    });
+  }
 
   masterListEl.addEventListener("click", (ev) => {
     const row = ev.target.closest(".student-task-master-item");
@@ -6808,11 +7024,12 @@ function initStudentPage() {
   }
 
   window.__eapStudentLangRefresh = () => {
-    const filterSel = document.getElementById("student-filter-category");
-    if (filterSel) populateStudentFilterSelect(filterSel);
-    void reloadStudentView();
+    populateStudentFilterSelect(filterSelect);
+    populateStudentCategoryChips(categoryChipsEl, filterSelect);
+    syncStudentDailyContext();
+    if (lastLoadedDay) applyFilterAndRender();
     void refreshStudentProgressDashboard();
-    window.EAP_I18N && window.EAP_I18N.applyStatic();
+    if (window.EAP_I18N) window.EAP_I18N.applyStatic();
   };
   void bootStudentClassScopeAndData();
   })();

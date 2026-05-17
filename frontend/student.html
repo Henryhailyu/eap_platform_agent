@@ -235,19 +235,41 @@
               <!-- #student-date stays in the DOM for reloadStudentView(); hidden from layout. -->
               <input id="student-date" name="date" type="date" required class="visually-hidden" tabindex="-1" aria-hidden="true" />
 
-              <div class="eap-daily-toolbar">
+              <div id="student-daily-context" class="student-daily-context" aria-live="polite"></div>
+
+              <div class="eap-daily-toolbar student-daily-toolbar">
                 <button type="button" class="btn-secondary" id="student-refresh-day-btn">
                   Refresh task list
                 </button>
+                <button
+                  type="button"
+                  class="btn-secondary student-focus-next-btn"
+                  id="student-focus-next-btn"
+                  data-i18n="student_focus_next"
+                >
+                  Focus next task
+                </button>
               </div>
 
-              <div class="field student-filter">
-                <label for="student-category-filter">Filter by category</label>
-                <select id="student-category-filter" aria-describedby="filter-help"></select>
+              <fieldset class="student-task-category-field">
+                <legend data-i18n="filter_by_category">Filter by category</legend>
+                <div
+                  id="student-category-chips"
+                  class="student-category-chips"
+                  role="group"
+                  aria-label="Category filter"
+                ></div>
+                <select
+                  id="student-category-filter"
+                  class="visually-hidden"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  aria-describedby="filter-help"
+                ></select>
                 <p id="filter-help" class="field-hint">
                   Tasks are for your class only. Narrow the list by category if you like.
                 </p>
-              </div>
+              </fieldset>
 
               <p id="student-form-message" class="form-message" role="status" aria-live="polite"></p>
               <p id="student-empty-hint" class="empty-hint hidden">
