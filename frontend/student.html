@@ -42,8 +42,11 @@
       >
         <div class="student-progress-dashboard__header">
           <h2 id="student-progress-heading" class="student-progress-dashboard__title" data-i18n="your_progress">Your progress</h2>
+          <p id="student-progress-scope" class="student-progress-dashboard__scope" aria-live="polite">—</p>
           <p id="student-progress-message" class="student-progress-dashboard__message" role="status" aria-live="polite"></p>
         </div>
+
+        <div id="student-progress-bar" class="student-progress-dashboard__progress"></div>
 
         <div class="student-progress-cards" role="list">
           <article class="student-progress-card" role="listitem">
@@ -64,16 +67,21 @@
           </article>
           <article class="student-progress-card" role="listitem">
             <span class="student-progress-card__value" id="student-progress-stat-feedback">—</span>
-            <span class="student-progress-card__label">Feedback received</span>
+            <span class="student-progress-card__label" data-i18n="feedback_received">Feedback received</span>
           </article>
           <article class="student-progress-card" role="listitem">
             <span class="student-progress-card__value" id="student-progress-stat-revisions">—</span>
-            <span class="student-progress-card__label">Revisions submitted</span>
+            <span class="student-progress-card__label" data-i18n="revisions_submitted">Revisions submitted</span>
           </article>
           <article class="student-progress-card student-progress-card--accent" role="listitem">
             <span class="student-progress-card__value" id="student-progress-stat-actions">—</span>
-            <span class="student-progress-card__label">Tasks needing action</span>
+            <span class="student-progress-card__label" data-i18n="tasks_needing_action">Tasks needing action</span>
           </article>
+        </div>
+
+        <div class="student-progress-dashboard__categories">
+          <h3 class="student-progress-dashboard__subheading" data-i18n="by_category">By category</h3>
+          <div id="student-progress-categories" class="eap-category-breakdown"></div>
         </div>
 
         <div class="student-progress-actions-panel">

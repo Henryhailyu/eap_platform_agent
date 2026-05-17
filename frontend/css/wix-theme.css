@@ -777,6 +777,141 @@ body.eap-wix .student-task-master-item--action {
   box-shadow: inset 3px 0 0 var(--wix-blue, #0071e3);
 }
 
+body.eap-wix .eap-class-overview,
+body.eap-wix .student-progress-dashboard {
+  background: var(--wix-card);
+  border: 1px solid var(--wix-card-border);
+  border-radius: var(--wix-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--wix-shadow);
+}
+
+body.eap-wix .eap-class-overview__header,
+body.eap-wix .student-progress-dashboard__header {
+  margin-bottom: 0.85rem;
+}
+
+body.eap-wix .eap-class-overview__title,
+body.eap-wix .student-progress-dashboard__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+body.eap-wix .eap-class-overview__scope,
+body.eap-wix .student-progress-dashboard__scope {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .eap-class-overview__subheading,
+body.eap-wix .student-progress-dashboard__subheading {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+body.eap-wix .eap-progress-bar {
+  margin: 0.75rem 0 1rem;
+}
+
+body.eap-wix .eap-progress-bar__label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+body.eap-wix .eap-progress-bar__value {
+  color: var(--wix-blue, #0071e3);
+}
+
+body.eap-wix .eap-progress-bar__track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+body.eap-wix .eap-progress-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--wix-teal, #0a7ea4), var(--wix-blue, #0071e3));
+  transition: width 0.35s ease;
+}
+
+body.eap-wix .eap-category-breakdown__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+body.eap-wix .eap-category-breakdown__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--wix-card-border);
+  font-size: 0.8125rem;
+}
+
+body.eap-wix .eap-category-breakdown__name {
+  font-weight: 600;
+}
+
+body.eap-wix .eap-category-breakdown__meta {
+  color: var(--wix-muted);
+  text-align: right;
+}
+
+body.eap-wix .eap-category-breakdown__empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .eap-roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+body.eap-wix .eap-roster-table th,
+body.eap-wix .eap-roster-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid var(--wix-card-border);
+  text-align: left;
+}
+
+body.eap-wix .eap-roster-table th {
+  font-weight: 600;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .eap-class-overview__roster {
+  margin-top: 1rem;
+}
+
+body.eap-wix .eap-class-overview__roster-summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+body.eap-wix .eap-class-overview__roster-table-wrap {
+  margin-top: 0.65rem;
+  overflow-x: auto;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

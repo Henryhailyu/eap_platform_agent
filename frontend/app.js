@@ -2801,6 +2801,104 @@ function setTeacherPageError(el, message) {
   el.classList.toggle("form-message--error", !!message);
 }
 
+/** Category rollup from GET /api/teacher/progress task_summary rows. */
+function computeTeacherCategoryBreakdown(taskSummary) {
+  const map = new Map();
+  const items = Array.isArray(taskSummary) ? taskSummary : [];
+  items.forEach((t) => {
+    const cat = String(t.category || "Other").trim() || "Other";
+    if (!map.has(cat)) {
+      map.set(cat, { category: cat, tasks: 0, completed: 0, attention: 0 });
+    }
+    const row = map.get(cat);
+    row.tasks += 1;
+    if (String(t.status || "").trim().toLowerCase() === "completed") {
+      row.completed += 1;
+    }
+    if (Number(t.needs_feedback_count) > 0 || Number(t.revision_count) > 0) {
+      row.attention += 1;
+    }
+  });
+  return [...map.values()].sort((a, b) => b.tasks - a.tasks);
+}
+
+/** Category rollup from GET /api/student/progress category_summary. */
+function normalizeStudentCategoryBreakdown(rows) {
+  const items = Array.isArray(rows) ? rows : [];
+  return items
+    .map((r) => ({
+      category: String(r.category || "Other").trim() || "Other",
+      tasks: Number(r.total) || 0,
+      completed: Number(r.completed) || 0,
+      attention: Number(r.needing_action) || 0,
+    }))
+    .sort((a, b) => b.tasks - a.tasks);
+}
+
+function renderEapProgressBar(containerEl, rate, labelText) {
+  if (!containerEl) return;
+  const pct = Math.max(0, Math.min(100, Number(rate) || 0));
+  containerEl.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "eap-progress-bar";
+  const labelRow = document.createElement("div");
+  labelRow.className = "eap-progress-bar__label-row";
+  const label = document.createElement("span");
+  label.className = "eap-progress-bar__label";
+  label.textContent = labelText || t("completion_rate");
+  const value = document.createElement("span");
+  value.className = "eap-progress-bar__value";
+  value.textContent = `${pct.toFixed(1)}%`;
+  labelRow.appendChild(label);
+  labelRow.appendChild(value);
+  const track = document.createElement("div");
+  track.className = "eap-progress-bar__track";
+  track.setAttribute("role", "progressbar");
+  track.setAttribute("aria-valuemin", "0");
+  track.setAttribute("aria-valuemax", "100");
+  track.setAttribute("aria-valuenow", String(Math.round(pct)));
+  const fill = document.createElement("div");
+  fill.className = "eap-progress-bar__fill";
+  fill.style.width = `${pct}%`;
+  track.appendChild(fill);
+  wrap.appendChild(labelRow);
+  wrap.appendChild(track);
+  containerEl.appendChild(wrap);
+}
+
+function renderEapCategoryBreakdown(containerEl, rows) {
+  if (!containerEl) return;
+  containerEl.innerHTML = "";
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "eap-category-breakdown__empty";
+    empty.textContent = t("dashboard_no_categories");
+    containerEl.appendChild(empty);
+    return;
+  }
+  const ul = document.createElement("ul");
+  ul.className = "eap-category-breakdown__list";
+  list.forEach((row) => {
+    const li = document.createElement("li");
+    li.className = "eap-category-breakdown__item";
+    const name = document.createElement("span");
+    name.className = "eap-category-breakdown__name";
+    name.textContent = translateCategory(row.category);
+    const meta = document.createElement("span");
+    meta.className = "eap-category-breakdown__meta";
+    meta.textContent = t("dashboard_category_meta", {
+      tasks: row.tasks,
+      completed: row.completed,
+      attention: row.attention,
+    });
+    li.appendChild(name);
+    li.appendChild(meta);
+    ul.appendChild(li);
+  });
+  containerEl.appendChild(ul);
+}
+
 /**
  * Build the “needs attention” list from GET /api/teacher/progress task_summary.
  * A task appears when needs_feedback_count > 0 or revision_count > 0 (student resubmitted).
@@ -2884,6 +2982,73 @@ function setDashboardValues(stats) {
     document.getElementById("teacher-attention-empty"),
     stats.task_summary,
   );
+}
+
+function setTeacherClassOverviewValues(stats, rosterPayload, scopeEl, progressBarEl, categoriesEl) {
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(val ?? "—");
+  };
+  setText("teacher-overview-total", stats.total_tasks ?? 0);
+  setText("teacher-overview-completed", stats.completed_tasks ?? 0);
+  setText("teacher-overview-pending", stats.pending_tasks ?? 0);
+  setText("teacher-overview-submissions", stats.total_submissions ?? 0);
+  setText("teacher-overview-feedback", stats.feedback_given_count ?? 0);
+  setText("teacher-overview-waiting", stats.submissions_waiting_for_feedback ?? 0);
+  renderEapProgressBar(progressBarEl, stats.completion_rate ?? 0, t("class_task_completion"));
+  renderEapCategoryBreakdown(
+    categoriesEl,
+    computeTeacherCategoryBreakdown(stats.task_summary),
+  );
+  renderTeacherAttentionList(
+    document.getElementById("teacher-overview-attention-list"),
+    document.getElementById("teacher-overview-attention-empty"),
+    stats.task_summary,
+  );
+  if (scopeEl && rosterPayload) {
+    const month = rosterPayload.month || "";
+    const cls = rosterPayload.class_name || stats.class_name || "";
+    const monthLabel =
+      month.length >= 7
+        ? new Date(`${month}-01T12:00:00`).toLocaleDateString(eapLocale(), {
+            month: "long",
+            year: "numeric",
+          })
+        : month;
+    scopeEl.textContent = t("dashboard_scope_class_month", {
+      class: cls,
+      month: monthLabel,
+    });
+  }
+}
+
+function renderTeacherRosterTable(tbody, wrapEl, emptyEl, students) {
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const list = Array.isArray(students) ? students : [];
+  if (emptyEl) emptyEl.classList.toggle("hidden", list.length > 0);
+  if (wrapEl) wrapEl.classList.toggle("hidden", list.length === 0);
+  list.forEach((s) => {
+    const tr = document.createElement("tr");
+    const tdName = document.createElement("td");
+    const fn = s.full_name != null && String(s.full_name).trim() ? String(s.full_name).trim() : "";
+    const un = s.student_username != null ? String(s.student_username) : "—";
+    tdName.textContent = fn ? `${un} (${fn})` : un;
+    const tdDone = document.createElement("td");
+    tdDone.textContent = `${s.completed_tasks ?? 0} / ${s.total_tasks ?? 0}`;
+    const tdHw = document.createElement("td");
+    tdHw.textContent = `${s.homework_submitted_count ?? 0} / ${s.total_tasks ?? 0}`;
+    const tdRate = document.createElement("td");
+    tdRate.textContent = `${Number(s.completion_rate ?? 0).toFixed(1)}%`;
+    const tdAct = document.createElement("td");
+    tdAct.textContent = String(s.tasks_needing_action_count ?? 0);
+    tr.appendChild(tdName);
+    tr.appendChild(tdDone);
+    tr.appendChild(tdHw);
+    tr.appendChild(tdRate);
+    tr.appendChild(tdAct);
+    tbody.appendChild(tr);
+  });
 }
 
 function initTeacherPage() {
@@ -3487,6 +3652,7 @@ function initTeacherPage() {
       reloadTeacherClassStudyPlanSummaryForViewMonth(),
       reloadTeacherClassStudyPlanProgressForViewMonth(),
     ]);
+    void refreshTeacherClassOverview();
   }
 
   /** Last GET /api/tasks?date= payload for the daily view — drives master list + detail selection. */
@@ -3612,11 +3778,60 @@ function initTeacherPage() {
       const cls = getFilterClass();
       const qs = new URLSearchParams();
       qs.set("class_name", cls);
+      const day = getTaskListDate().trim().slice(0, 10);
+      if (
+        dailyViewEl &&
+        dailyViewEl.classList.contains("eap-view-panel--active") &&
+        day.length >= 10
+      ) {
+        qs.set("date", day);
+      }
       const stats = await apiGet(`/api/teacher/progress?${qs.toString()}`);
       setDashboardValues(stats);
       setTeacherPageError(pageErrorEl, "");
     } catch (err) {
       setTeacherPageError(pageErrorEl, err.message);
+    }
+  }
+
+  async function refreshTeacherClassOverview() {
+    const scopeEl = document.getElementById("teacher-overview-scope");
+    const progressBarEl = document.getElementById("teacher-overview-progress-bar");
+    const categoriesEl = document.getElementById("teacher-overview-categories");
+    const rosterTbody = document.getElementById("teacher-roster-tbody");
+    const rosterWrap = document.getElementById("teacher-roster-table-wrap");
+    const rosterEmpty = document.getElementById("teacher-roster-empty");
+    if (!scopeEl && !progressBarEl) return;
+
+    try {
+      const cls = getFilterClass();
+      const month = teacherPlannerMonthISO();
+      const qsBase = new URLSearchParams();
+      qsBase.set("class_name", cls);
+      qsBase.set("month", month);
+      const [stats, roster] = await Promise.all([
+        apiGet(`/api/teacher/progress?${qsBase.toString()}`),
+        apiGet(`/api/teacher/class-roster-progress?${qsBase.toString()}`),
+      ]);
+      setTeacherClassOverviewValues(stats, roster, scopeEl, progressBarEl, categoriesEl);
+      renderTeacherRosterTable(
+        rosterTbody,
+        rosterWrap,
+        rosterEmpty,
+        roster && Array.isArray(roster.students) ? roster.students : [],
+      );
+    } catch (err) {
+      if (scopeEl) {
+        scopeEl.textContent = err.message || t("could_not_load_progress");
+      }
+      if (categoriesEl) categoriesEl.innerHTML = "";
+      if (progressBarEl) progressBarEl.innerHTML = "";
+      renderTeacherAttentionList(
+        document.getElementById("teacher-overview-attention-list"),
+        document.getElementById("teacher-overview-attention-empty"),
+        [],
+      );
+      renderTeacherRosterTable(rosterTbody, rosterWrap, rosterEmpty, []);
     }
   }
 
@@ -3952,9 +4167,9 @@ function initTeacherPage() {
   /*
     Progress dashboard → jump to the task’s date; refreshTaskList selects the task + optional submissions.
   */
-  const attentionListEl = document.getElementById("teacher-attention-list");
-  if (attentionListEl) {
-    attentionListEl.addEventListener("click", async (ev) => {
+  function bindTeacherAttentionListClick(listEl) {
+    if (!listEl) return;
+    listEl.addEventListener("click", async (ev) => {
       const btn = ev.target.closest(".attention-open-task");
       if (!btn || btn.disabled) return;
 
@@ -3972,7 +4187,6 @@ function initTeacherPage() {
       try {
         const ok = await openTeacherDailyAndLoadTasks(taskDateStr);
         if (!ok) return;
-        /* Selection + optional auto-open submissions happen inside refreshTaskList via pending flags. */
       } catch (err) {
         setTeacherPageError(pageErrorEl, err.message);
       } finally {
@@ -3980,6 +4194,9 @@ function initTeacherPage() {
       }
     });
   }
+
+  bindTeacherAttentionListClick(document.getElementById("teacher-attention-list"));
+  bindTeacherAttentionListClick(document.getElementById("teacher-overview-attention-list"));
 
   /*
     Right detail panel: same delegated handlers as before (View Submissions, Save Feedback, upload).
@@ -4641,6 +4858,7 @@ function initTeacherPage() {
     setTeacherTaskDetailEmpty("no-selection");
     void reloadPlannerTasksFromApi();
     void refreshDashboard();
+    void refreshTeacherClassOverview();
     void loadTeacherTemplatesForPage();
     if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     syncTeacherTaskZhFieldsPanel();
@@ -5532,6 +5750,9 @@ function initStudentPage() {
   }
 
   const progressDash = document.getElementById("student-progress-dashboard");
+  const progressScopeEl = document.getElementById("student-progress-scope");
+  const progressBarEl = document.getElementById("student-progress-bar");
+  const progressCategoriesEl = document.getElementById("student-progress-categories");
   const progressMsg = document.getElementById("student-progress-message");
   const progressStatTotal = document.getElementById("student-progress-stat-total");
   const progressStatCompleted = document.getElementById("student-progress-stat-completed");
@@ -5772,6 +5993,7 @@ function initStudentPage() {
       reloadStudentStudyPlanSummaryForViewMonth(),
       reloadStudentStudyPlanProgressForViewMonth(),
     ]);
+    void refreshStudentProgressDashboard();
   }
 
   function showStudentCalendarView() {
@@ -5913,8 +6135,29 @@ function initStudentPage() {
       const qs = new URLSearchParams();
       qs.set("student_username", uname);
       qs.set("class_name", studentClassName);
+      qs.set("month", studentPlannerMonthISO());
       const data = await apiGet(`/api/student/progress?${qs.toString()}`);
       if (!data || typeof data !== "object") return;
+
+      if (progressScopeEl) {
+        const month = studentPlannerMonthISO();
+        const monthLabel =
+          month.length >= 7
+            ? new Date(`${month}-01T12:00:00`).toLocaleDateString(eapLocale(), {
+                month: "long",
+                year: "numeric",
+              })
+            : month;
+        progressScopeEl.textContent = t("student_dashboard_scope", {
+          class: studentClassName,
+          month: monthLabel,
+        });
+      }
+      renderEapProgressBar(progressBarEl, data.completion_rate ?? 0, t("your_completion_rate"));
+      renderEapCategoryBreakdown(
+        progressCategoriesEl,
+        normalizeStudentCategoryBreakdown(data.category_summary),
+      );
 
       const setNum = (el, v) => {
         if (el) el.textContent = String(v ?? "—");

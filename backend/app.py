@@ -3981,6 +3981,55 @@ def count_students_for_teacher_class_denominator(conn, class_name_norm):
     return int(fb)
 
 
+def list_students_for_class(conn, class_name_norm):
+    """
+    Students enrolled in an active class (class_enrollments), or legacy users.class_name fallback.
+    Returns list of {"username", "full_name"} sorted by username.
+    """
+    class_row = conn.execute(
+        """
+        SELECT id FROM classes
+        WHERE class_code = ? AND COALESCE(is_active, 1) != 0
+        LIMIT 1
+        """,
+        (class_name_norm,),
+    ).fetchone()
+    if class_row is not None:
+        rows = conn.execute(
+            """
+            SELECT u.username, u.full_name
+            FROM class_enrollments ce
+            INNER JOIN users u ON u.id = ce.student_id
+            WHERE ce.class_id = ?
+              AND TRIM(COALESCE(u.role, '')) = 'student'
+            ORDER BY u.username ASC
+            """,
+            (class_row["id"],),
+        ).fetchall()
+        if rows:
+            return [
+                {
+                    "username": r["username"],
+                    "full_name": r["full_name"],
+                }
+                for r in rows
+            ]
+
+    rows = conn.execute(
+        """
+        SELECT username, full_name, class_name
+        FROM users
+        WHERE TRIM(COALESCE(role, '')) = 'student'
+        ORDER BY username ASC
+        """
+    ).fetchall()
+    out = []
+    for r in rows:
+        if normalize_class_name(r["class_name"]) == class_name_norm:
+            out.append({"username": r["username"], "full_name": r["full_name"]})
+    return out
+
+
 @app.route("/api/teacher/task-completions", methods=["GET"])
 def get_teacher_task_completions():
     """
@@ -4403,6 +4452,8 @@ def get_student_progress():
                 "revision_submitted_count": 0,
                 "tasks_needing_action_count": 0,
                 "tasks_needing_action": [],
+                "completion_rate": 0.0,
+                "category_summary": [],
             }
         )
 
@@ -4471,11 +4522,23 @@ def get_student_progress():
     feedback_received_count = 0
     revision_submitted_count = 0
     tasks_needing_action = []
+    category_buckets = {}
 
     for t in tasks:
         tid = int(t["id"])
         has_sub = tid in sub_by_task
         sub = sub_by_task.get(tid)
+        cat_key = str(t["category"] or "Other").strip() or "Other"
+        if cat_key not in category_buckets:
+            category_buckets[cat_key] = {
+                "category": cat_key,
+                "total": 0,
+                "completed": 0,
+                "needing_action": 0,
+            }
+        category_buckets[cat_key]["total"] += 1
+        if task_completed_for_student(t):
+            category_buckets[cat_key]["completed"] += 1
 
         if has_sub:
             homework_submitted_count += 1
@@ -4491,6 +4554,8 @@ def get_student_progress():
         needs = (not has_sub) or (fb and (not rev)) or (not tc)
         if not needs:
             continue
+
+        category_buckets[cat_key]["needing_action"] += 1
 
         if not has_sub:
             action_needed = "Submit homework"
@@ -4515,6 +4580,14 @@ def get_student_progress():
             item["title_zh"] = None
         tasks_needing_action.append(item)
 
+    completion_rate = (
+        0.0 if total_tasks == 0 else round((completed_tasks / total_tasks) * 100, 2)
+    )
+    category_summary = sorted(
+        category_buckets.values(),
+        key=lambda row: (-int(row["total"]), str(row["category"])),
+    )
+
     conn.close()
 
     return jsonify(
@@ -4524,11 +4597,168 @@ def get_student_progress():
             "total_tasks": total_tasks,
             "completed_tasks": completed_tasks,
             "pending_tasks": pending_tasks,
+            "completion_rate": completion_rate,
             "homework_submitted_count": homework_submitted_count,
             "feedback_received_count": feedback_received_count,
             "revision_submitted_count": revision_submitted_count,
             "tasks_needing_action_count": len(tasks_needing_action),
             "tasks_needing_action": tasks_needing_action,
+            "category_summary": category_summary,
+        }
+    )
+
+
+@app.route("/api/teacher/class-roster-progress", methods=["GET"])
+def get_teacher_class_roster_progress():
+    """
+    Per-student task progress for a class and calendar month (Phase E6 class reporting).
+
+    Query:
+      class_name — required (normalized)
+      month — required YYYY-MM
+      teacher_username — optional session fallback (Phase D10)
+    """
+    conn = get_db_connection()
+    raw_class = request.args.get("class_name")
+    if raw_class is None or str(raw_class).strip() == "":
+        conn.close()
+        return jsonify({"error": "class_name is required"}), 400
+
+    _, d10_guard_err = resolve_teacher_with_optional_enforcement(
+        conn,
+        request.args.get("teacher_username"),
+        raw_class,
+    )
+    if d10_guard_err is not None:
+        conn.close()
+        return d10_guard_err
+
+    class_name_norm = normalize_class_name(raw_class)
+    month_q = (request.args.get("month") or "").strip()
+    if len(month_q) != 7 or month_q[4] != "-":
+        conn.close()
+        return jsonify({"error": "month is required (YYYY-MM)"}), 400
+
+    students = list_students_for_class(conn, class_name_norm)
+    task_where_sql, task_params = _teacher_progress_task_where_clause(
+        "t", class_name_norm, date_str="", month_str=month_q
+    )
+    tasks = conn.execute(
+        f"""
+        SELECT t.id, t.category
+        FROM calendar_tasks t
+        WHERE {task_where_sql}
+        """,
+        task_params,
+    ).fetchall()
+    total_tasks = len(tasks)
+    task_ids = [int(t["id"]) for t in tasks]
+
+    completed_set = set()
+    sub_by_key = {}
+
+    if task_ids:
+        placeholders = ",".join("?" * len(task_ids))
+        st_rows = conn.execute(
+            f"""
+            SELECT student_username, task_id
+            FROM student_task_status
+            WHERE class_name = ?
+              AND LOWER(TRIM(COALESCE(status, ''))) = 'completed'
+              AND task_id IN ({placeholders})
+            """,
+            (class_name_norm, *task_ids),
+        ).fetchall()
+        for sr in st_rows:
+            un = str(sr["student_username"] or "").strip()
+            if un:
+                completed_set.add((un, int(sr["task_id"])))
+
+        sub_rows = conn.execute(
+            f"""
+            SELECT s.student_username, s.task_id, s.teacher_feedback, s.feedback_file_path,
+                   s.revision_text, s.revision_file_path, s.id AS submission_id
+            FROM submissions s
+            INNER JOIN (
+                SELECT student_username, task_id, MAX(id) AS max_id
+                FROM submissions
+                WHERE task_id IN ({placeholders})
+                GROUP BY student_username, task_id
+            ) latest
+              ON s.student_username = latest.student_username
+             AND s.task_id = latest.task_id
+             AND s.id = latest.max_id
+            """,
+            (*task_ids,),
+        ).fetchall()
+        sub_ids = [int(r["submission_id"]) for r in sub_rows]
+        att_map = batch_teacher_feedback_attachments(conn, sub_ids) if sub_ids else {}
+
+        def trimmed_nonempty(val):
+            return val is not None and str(val).strip() != ""
+
+        def row_has_feedback(sub_row):
+            if trimmed_nonempty(sub_row["teacher_feedback"]):
+                return True
+            if trimmed_nonempty(sub_row["feedback_file_path"]):
+                return True
+            sid = int(sub_row["submission_id"])
+            return len(att_map.get(sid, [])) > 0
+
+        def row_has_revision(sub_row):
+            return trimmed_nonempty(sub_row["revision_text"]) or trimmed_nonempty(
+                sub_row["revision_file_path"]
+            )
+
+        for sr in sub_rows:
+            un = str(sr["student_username"] or "").strip()
+            if not un:
+                continue
+            sub_by_key[(un, int(sr["task_id"]))] = sr
+
+    roster = []
+    for stu in students:
+        un = str(stu["username"] or "").strip()
+        completed_n = 0
+        hw_n = 0
+        need_n = 0
+        for t in tasks:
+            tid = int(t["id"])
+            key = (un, tid)
+            sub = sub_by_key.get(key)
+            has_sub = sub is not None
+            if has_sub:
+                hw_n += 1
+            fb = row_has_feedback(sub) if has_sub else False
+            rev = row_has_revision(sub) if has_sub else False
+            tc = key in completed_set
+            if tc:
+                completed_n += 1
+            needs = (not has_sub) or (fb and (not rev)) or (not tc)
+            if needs:
+                need_n += 1
+        rate = 0.0 if total_tasks == 0 else round((completed_n / total_tasks) * 100, 2)
+        roster.append(
+            {
+                "student_username": un,
+                "full_name": stu.get("full_name"),
+                "total_tasks": total_tasks,
+                "completed_tasks": completed_n,
+                "pending_tasks": max(0, total_tasks - completed_n),
+                "completion_rate": rate,
+                "homework_submitted_count": hw_n,
+                "tasks_needing_action_count": need_n,
+            }
+        )
+
+    conn.close()
+    return jsonify(
+        {
+            "class_name": class_name_norm,
+            "month": month_q,
+            "total_students": len(roster),
+            "total_tasks": total_tasks,
+            "students": roster,
         }
     )
 

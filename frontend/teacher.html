@@ -39,6 +39,79 @@
       <p id="teacher-page-error" class="form-message hidden" role="alert" aria-live="polite"></p>
 
       <section
+        id="teacher-class-overview"
+        class="eap-class-overview"
+        aria-labelledby="teacher-class-overview-heading"
+      >
+        <div class="eap-class-overview__header">
+          <h2 id="teacher-class-overview-heading" class="eap-class-overview__title" data-i18n="class_overview">
+            Class overview
+          </h2>
+          <p id="teacher-overview-scope" class="eap-class-overview__scope" aria-live="polite">—</p>
+        </div>
+        <div id="teacher-overview-progress-bar" class="eap-class-overview__progress"></div>
+        <div class="eap-class-overview__stats dashboard-grid dashboard-grid--progress" role="list">
+          <article class="dashboard-stat" role="listitem">
+            <h3 class="dashboard-stat__label" data-i18n="total_tasks">Total tasks</h3>
+            <p class="dashboard-stat__value" id="teacher-overview-total">—</p>
+          </article>
+          <article class="dashboard-stat dashboard-stat--completed" role="listitem">
+            <h3 class="dashboard-stat__label" data-i18n="completed">Completed</h3>
+            <p class="dashboard-stat__value" id="teacher-overview-completed">—</p>
+          </article>
+          <article class="dashboard-stat dashboard-stat--pending" role="listitem">
+            <h3 class="dashboard-stat__label" data-i18n="pending">Pending</h3>
+            <p class="dashboard-stat__value" id="teacher-overview-pending">—</p>
+          </article>
+          <article class="dashboard-stat dashboard-stat--submissions" role="listitem">
+            <h3 class="dashboard-stat__label" data-i18n="homework_submissions">Homework submissions</h3>
+            <p class="dashboard-stat__value" id="teacher-overview-submissions">—</p>
+          </article>
+          <article class="dashboard-stat dashboard-stat--feedback" role="listitem">
+            <h3 class="dashboard-stat__label" data-i18n="feedback_given">Feedback given</h3>
+            <p class="dashboard-stat__value" id="teacher-overview-feedback">—</p>
+          </article>
+          <article class="dashboard-stat dashboard-stat--waiting" role="listitem">
+            <h3 class="dashboard-stat__label" data-i18n="waiting_for_feedback">Waiting for feedback</h3>
+            <p class="dashboard-stat__value" id="teacher-overview-waiting">—</p>
+          </article>
+        </div>
+        <div class="eap-class-overview__categories">
+          <h3 class="eap-class-overview__subheading" data-i18n="by_category">By category</h3>
+          <div id="teacher-overview-categories" class="eap-category-breakdown"></div>
+        </div>
+        <div class="eap-class-overview__attention">
+          <h3 class="eap-class-overview__subheading" data-i18n="tasks_needing_attention">Tasks needing attention</h3>
+          <ul id="teacher-overview-attention-list" class="teacher-attention-list"></ul>
+          <p id="teacher-overview-attention-empty" class="teacher-attention-empty hidden" data-i18n="no_attention_tasks">
+            No tasks need attention right now.
+          </p>
+        </div>
+        <details class="eap-class-overview__roster">
+          <summary class="eap-class-overview__roster-summary" data-i18n="student_progress_month">
+            Student progress this month
+          </summary>
+          <p id="teacher-roster-empty" class="eap-class-overview__roster-empty hidden" data-i18n="no_students_class">
+            No students enrolled in this class yet.
+          </p>
+          <div id="teacher-roster-table-wrap" class="eap-class-overview__roster-table-wrap hidden">
+            <table class="eap-roster-table">
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="student">Student</th>
+                  <th scope="col" data-i18n="completed">Completed</th>
+                  <th scope="col" data-i18n="homework_submitted">Homework submitted</th>
+                  <th scope="col" data-i18n="completion_rate">Completion rate</th>
+                  <th scope="col" data-i18n="tasks_needing_action">Tasks needing action</th>
+                </tr>
+              </thead>
+              <tbody id="teacher-roster-tbody"></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section
         id="teacher-study-plan-progress"
         class="teacher-study-plan-progress"
         aria-labelledby="teacher-study-plan-progress-heading"
