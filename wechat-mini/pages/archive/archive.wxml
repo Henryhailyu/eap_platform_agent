@@ -1,0 +1,28 @@
+<view class="container">
+  <view class="card month-nav">
+    <text class="nav-btn" bindtap="prevMonth">‹</text>
+    <text class="month-title">{{monthLabel}}</text>
+    <text class="nav-btn" bindtap="nextMonth">›</text>
+  </view>
+
+  <view class="card" wx:if="{{loading}}">
+    <text class="muted">Loading archive…</text>
+  </view>
+
+  <view class="card" wx:elif="{{error}}">
+    <text class="text-error">{{error}}</text>
+  </view>
+
+  <view wx:elif="{{items.length === 0}}" class="card">
+    <text class="muted">No items for this month.</text>
+  </view>
+
+  <block wx:else>
+    <view class="card archive-item" wx:for="{{items}}" wx:key="task_id">
+      <text class="item-title">{{item.title}}</text>
+      <text class="muted">{{item.date}} · {{item.category}}</text>
+      <text class="badge" wx:if="{{item.workflow_state}}">{{item.workflow_state}}</text>
+      <text class="feedback" wx:if="{{item.submission.teacher_feedback}}">{{item.submission.teacher_feedback}}</text>
+    </view>
+  </block>
+</view>

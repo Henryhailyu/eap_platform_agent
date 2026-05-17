@@ -1,0 +1,43 @@
+<view class="container" wx:if="{{task}}">
+  <view class="card">
+    <text class="task-title">{{task.title}}</text>
+    <text class="badge" wx:if="{{task.category}}">{{task.category}}</text>
+    <text class="muted block">{{task.date}} · {{className}}</text>
+    <text class="desc" wx:if="{{task.description}}">{{task.description}}</text>
+  </view>
+
+  <view class="card">
+    <text class="section-title">Completion</text>
+    <text class="muted">Status: {{completion.status || 'Pending'}}</text>
+    <button class="btn-secondary toggle" bindtap="toggleComplete">
+      {{completion.completed ? 'Mark pending' : 'Mark completed'}}
+    </button>
+  </view>
+
+  <view class="card" wx:if="{{submission}}">
+    <text class="section-title">Your submission</text>
+    <text class="muted">Status: {{submission.status}}</text>
+    <text class="block" wx:if="{{submission.answer_text}}">{{submission.answer_text}}</text>
+    <text class="muted" wx:if="{{submission.teacher_feedback}}">Feedback: {{submission.teacher_feedback}}</text>
+  </view>
+
+  <view class="card" wx:if="{{!submission}}">
+    <text class="section-title">Submit homework</text>
+    <textarea class="textarea" placeholder="Answer text" value="{{answerText}}" bindinput="onAnswer" />
+    <button class="btn-secondary pick" bindtap="pickFile">{{fileName || 'Choose file (optional)'}}</button>
+    <button class="btn-primary submit" loading="{{submitting}}" bindtap="onSubmit">Submit</button>
+  </view>
+
+  <view class="card" wx:if="{{submission && submission.teacher_feedback}}">
+    <text class="section-title">Revision</text>
+    <textarea class="textarea" placeholder="Revision text" value="{{revisionText}}" bindinput="onRevision" />
+    <button class="btn-secondary pick" bindtap="pickRevisionFile">{{revisionFileName || 'Choose file (optional)'}}</button>
+    <button class="btn-primary submit" loading="{{submitting}}" bindtap="onRevision">Send revision</button>
+  </view>
+
+  <text class="text-error" wx:if="{{error}}">{{error}}</text>
+</view>
+
+<view class="container" wx:else>
+  <view class="card"><text class="muted">{{loading ? 'Loading…' : error}}</text></view>
+</view>

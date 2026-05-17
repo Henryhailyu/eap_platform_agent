@@ -1,0 +1,45 @@
+<view class="container">
+  <view class="header-row">
+    <view>
+      <text class="class-label">{{className}}</text>
+      <text class="muted">{{userName}}</text>
+    </view>
+    <view class="header-actions">
+      <text class="link" bindtap="goArchive">Archive</text>
+      <text class="link" bindtap="onLogout">Log out</text>
+    </view>
+  </view>
+
+  <view class="card month-nav">
+    <text class="nav-btn" bindtap="prevMonth">‹</text>
+    <text class="month-title">{{monthLabel}}</text>
+    <text class="nav-btn" bindtap="nextMonth">›</text>
+  </view>
+
+  <view class="card" wx:if="{{loading}}">
+    <text class="muted">Loading tasks…</text>
+  </view>
+
+  <view class="card" wx:elif="{{error}}">
+    <text class="text-error">{{error}}</text>
+    <button class="btn-secondary retry" bindtap="loadTasks">Retry</button>
+  </view>
+
+  <view class="card calendar-grid" wx:else>
+    <view class="weekdays">
+      <text wx:for="{{weekdays}}" wx:key="*this" class="wd">{{item}}</text>
+    </view>
+    <view class="days">
+      <view
+        wx:for="{{cells}}"
+        wx:key="date"
+        class="day-cell {{item.inMonth ? '' : 'other'}} {{item.isToday ? 'today' : ''}}"
+        data-date="{{item.date}}"
+        bindtap="onDayTap"
+      >
+        <text class="day-num">{{item.day}}</text>
+        <text class="dot" wx:if="{{item.count > 0}}">{{item.count}}</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,21 @@
+<view class="container login-page">
+  <view class="brand">
+    <text class="brand-title">EAP Learning</text>
+    <text class="muted">Student sign in</text>
+  </view>
+
+  <view class="card">
+    <view class="field">
+      <text class="label">Username</text>
+      <input class="input" value="{{username}}" bindinput="onUsername" placeholder="student1" />
+    </view>
+    <view class="field">
+      <text class="label">Password</text>
+      <input class="input" password value="{{password}}" bindinput="onPassword" placeholder="Password" />
+    </view>
+    <text class="text-error" wx:if="{{error}}">{{error}}</text>
+    <button class="btn-primary login-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="onLogin">Sign in</button>
+  </view>
+
+  <text class="muted foot">Set apiBase in config.js to your HTTPS pilot URL.</text>
+</view>

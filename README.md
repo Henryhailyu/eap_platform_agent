@@ -141,13 +141,19 @@ Student and teacher pages are responsive below **768px**: compact calendar with 
 
 Test: Chrome DevTools device mode, or open `http://127.0.0.1:5051/ui/student.html` on your phone (same Wi‑Fi).
 
-## WeChat mini-program API (Phase I2c)
+## WeChat mini-program (Phase I3)
 
-Student MVP endpoints, Bearer auth, and file download rules:
+| Resource | Purpose |
+|----------|---------|
+| [`docs/PILOT_DEPLOY.md`](docs/PILOT_DEPLOY.md) | **I0** — deploy checklist + password rotation |
+| [`docs/API_STUDENT_MINI.md`](docs/API_STUDENT_MINI.md) | **I2c** — API reference for mobile clients |
+| [`wechat-mini/`](wechat-mini/) | **I3 scaffold** — import into 微信开发者工具 |
+| `backend/scripts/verify_pilot.py` | Smoke-test health + Bearer student APIs |
 
-**[`docs/API_STUDENT_MINI.md`](docs/API_STUDENT_MINI.md)**
-
-Use after **I0** (HTTPS pilot) and before building the mini-program UI (Phase I3).
+```bash
+cd backend
+python scripts/verify_pilot.py --base https://your-pilot-url --password 'your-password'
+```
 
 ## Tracker
 

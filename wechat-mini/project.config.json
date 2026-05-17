@@ -1,0 +1,15 @@
+{
+  "description": "EAP student mini-program (Phase I3)",
+  "packOptions": { "ignore": [] },
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.4.0",
+  "appid": "touristappid",
+  "projectname": "eap-student",
+  "condition": {}
+}

@@ -1,0 +1,4 @@
+{
+  "desc": "EAP student mini-program",
+  "rules": [{ "action": "allow", "page": "*" }]
+}
