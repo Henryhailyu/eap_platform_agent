@@ -1240,12 +1240,33 @@ def get_current_session_user(conn):
     ).fetchone()
 
 
+def get_current_authenticated_user(conn):
+    """
+    Phase I2b: session user, or Bearer token user (same columns as get_current_session_user).
+
+    Session wins when both are present. Returns None when unauthenticated or unauthorized.
+    """
+    user = get_current_session_user(conn)
+    if user is not None:
+        return user
+    token = get_bearer_token_from_header(request.headers.get("Authorization"))
+    if not token:
+        return None
+    uid = verify_access_token(token)
+    if uid is None:
+        return None
+    row = load_user_by_id_for_auth(conn, uid)
+    if row is None or not user_is_authorized(row):
+        return None
+    return row
+
+
 def get_effective_actor_role(conn):
     """
     Phase D3: session role when logged in as teacher or student; else None.
     Does not enforce auth on routes — for helpers and future phases only.
     """
-    user = get_current_session_user(conn)
+    user = get_current_authenticated_user(conn)
     if user is None:
         return None
     role = str(user["role"] or "").strip()
@@ -1259,7 +1280,7 @@ def get_effective_teacher_username(conn, fallback_username=None):
     Phase D3: prefer Flask session teacher username; else cleaned fallback_username.
     Session wins only when role is teacher. No 401/403 — returns None if unresolved.
     """
-    user = get_current_session_user(conn)
+    user = get_current_authenticated_user(conn)
     if user is not None and str(user["role"] or "").strip() == "teacher":
         uname = str(user["username"] or "").strip()
         if uname:
@@ -1273,7 +1294,7 @@ def get_effective_student_username(conn, fallback_username=None):
     Phase D3: prefer Flask session student username; else cleaned fallback_username.
     Session wins only when role is student. No 401/403 — returns None if unresolved.
     """
-    user = get_current_session_user(conn)
+    user = get_current_authenticated_user(conn)
     if user is not None and str(user["role"] or "").strip() == "student":
         uname = str(user["username"] or "").strip()
         if uname:
@@ -1452,12 +1473,12 @@ def authorize_upload_download(conn, basename):
     if not task_rows and not template_rows:
         return "not_found"
 
-    session_user = get_current_session_user(conn)
-    if session_user is None:
+    actor = get_current_authenticated_user(conn)
+    if actor is None:
         return jsonify({"error": "Not logged in"}), 401
 
-    role = str(session_user["role"] or "").strip()
-    uname = str(session_user["username"] or "").strip()
+    role = str(actor["role"] or "").strip()
+    uname = str(actor["username"] or "").strip()
 
     if role == "student":
         for row in task_rows:
@@ -1527,12 +1548,12 @@ def authorize_submission_file_download(conn, basename):
     if not contexts:
         return "not_found"
 
-    session_user = get_current_session_user(conn)
-    if session_user is None:
+    actor = get_current_authenticated_user(conn)
+    if actor is None:
         return jsonify({"error": "Not logged in"}), 401
 
-    role = str(session_user["role"] or "").strip()
-    uname = str(session_user["username"] or "").strip()
+    role = str(actor["role"] or "").strip()
+    uname = str(actor["username"] or "").strip()
 
     if role == "student":
         for ctx in contexts:
@@ -1560,7 +1581,7 @@ def require_session_user_if_enabled(conn):
     """
     if not should_require_session_identity():
         return None
-    user = get_current_session_user(conn)
+    user = get_current_authenticated_user(conn)
     if user is None:
         return jsonify({"error": "Not logged in"}), 401
     return None
@@ -1575,7 +1596,7 @@ def require_session_role_if_enabled(conn, expected_role):
     """
     if not should_require_session_identity():
         return None
-    user = get_current_session_user(conn)
+    user = get_current_authenticated_user(conn)
     if user is None:
         return jsonify({"error": "Not logged in"}), 401
     if str(user["role"] or "").strip() != expected_role:
@@ -1649,7 +1670,7 @@ def resolve_my_classes_username(conn, role, query_param):
         err = require_session_role_if_enabled(conn, role)
         if err is not None:
             return None, err
-        user = get_current_session_user(conn)
+        user = get_current_authenticated_user(conn)
         username = str(user["username"] or "").strip()
         if not username:
             return None, (jsonify({"error": "Not logged in"}), 401)
@@ -2057,18 +2078,9 @@ def api_v1_auth_me():
 
 @app.route("/api/me", methods=["GET"])
 def api_me():
-    """Return the current session user (Phase D1); same user shape as login, no password fields."""
-    uid_raw = session.get("user_id")
-    if uid_raw is None:
-        return jsonify({"success": False, "message": "Not logged in"}), 401
-    try:
-        int(uid_raw)
-    except (TypeError, ValueError):
-        session.clear()
-        return jsonify({"success": False, "message": "Not logged in"}), 401
-
+    """Return the current user (Phase D1 session; Phase I2b Bearer). Same shape as login."""
     conn = get_db_connection()
-    row = get_current_session_user(conn)
+    row = get_current_authenticated_user(conn)
     conn.close()
 
     if row is None:
@@ -2761,12 +2773,12 @@ def get_tasks():
         class_name_norm = normalize_class_name(class_name_filter)
         conn = get_db_connection()
 
-        session_user = get_current_session_user(conn)
-        if session_user is None:
+        actor = get_current_authenticated_user(conn)
+        if actor is None:
             conn.close()
             return jsonify({"error": "Not logged in"}), 401
 
-        role = str(session_user["role"] or "").strip()
+        role = str(actor["role"] or "").strip()
         if role == "student":
             _, d38_student_guard_err = resolve_student_with_optional_enforcement(
                 conn,
@@ -3817,12 +3829,12 @@ def list_submission_attachments(submission_id):
 
     if is_strict_security_enabled():
         submission_class = normalize_class_name(submission_row["class_name"])
-        session_user = get_current_session_user(conn)
-        if session_user is None:
+        actor = get_current_authenticated_user(conn)
+        if actor is None:
             conn.close()
             return jsonify({"error": "Not logged in"}), 401
 
-        role = str(session_user["role"] or "").strip()
+        role = str(actor["role"] or "").strip()
         if role == "student":
             student_username, d42_student_guard_err = resolve_student_with_optional_enforcement(
                 conn,
