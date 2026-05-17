@@ -59,6 +59,44 @@ git log --oneline
 git checkout <commit> -- .   # restore files from a commit (careful)
 ```
 
+## Production / online pilot (Phase F)
+
+Copy environment variables from `.env.example` into your host dashboard or `backend/.env` (never commit secrets).
+
+**Recommended for any public pilot:**
+
+```bash
+export EAP_ENV=production
+export EAP_SECRET_KEY="your-long-random-secret"
+export EAP_PRODUCTION_PRESET=1
+export EAP_TRUST_PROXY=1
+export PORT=5051
+export EAP_CORS_ORIGINS="https://your-school.example"
+```
+
+**Run with Gunicorn** (install `pip install -r requirements-prod.txt`):
+
+```bash
+cd backend
+source venv/bin/activate
+gunicorn -w 2 -b 0.0.0.0:5051 wsgi:app
+```
+
+Put **HTTPS** in front (nginx, Caddy, or your cloud load balancer). Set `EAP_TRUST_PROXY=1` so secure session cookies work behind TLS termination.
+
+**Persistent data** on the server: mount volumes for `EAP_DATABASE_PATH`, `EAP_UPLOAD_DIR`, and `EAP_SUBMISSIONS_DIR`.
+
+**Backup** (SQLite + files):
+
+```bash
+cd backend
+python scripts/backup_database.py --out ../backups
+```
+
+Schedule that command daily on the host. PostgreSQL migration is planned for Phase G (`EAP_DATABASE_URL` in `.env.example`).
+
+**Health check:** `GET /api/health` returns environment and security-flag status (no secrets).
+
 ## Tracker
 
 See `../eap_platform cursor agent window/EAP_PROJECT_TRACKER.md`

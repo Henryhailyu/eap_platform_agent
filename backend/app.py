@@ -35,40 +35,41 @@ from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request, send_from_directory, abort, session
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from eap_config import config, setup_logging, validate_production_config
+
+setup_logging()
+validate_production_config()
 
 # Create the Flask application
 app = Flask(__name__)
-
-app.secret_key = os.environ.get("EAP_SECRET_KEY", "dev-secret-key-change-before-production")
+app.secret_key = config.SECRET_KEY
 app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SAMESITE"] = config.SESSION_COOKIE_SAMESITE
+app.config["SESSION_COOKIE_SECURE"] = config.SESSION_COOKIE_SECURE
+
+if config.TRUST_PROXY:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # When true, selected student read routes require a logged-in student session (Phase D9).
-# Default off — query/body student_username fallback remains for MVP and curl/file://.
-EAP_REQUIRE_SESSION_IDENTITY = os.environ.get("EAP_REQUIRE_SESSION_IDENTITY", "0").strip().lower() in (
-    "1",
-    "true",
-    "yes",
-)
+EAP_REQUIRE_SESSION_IDENTITY = config.REQUIRE_SESSION_IDENTITY
 
-# Credentialed browser requests (session cookie). Add origins you use to serve the static frontend.
-# file:// sends Origin: null — include the string "null" if you must test that way (prefer http://).
-EAP_CORS_ORIGINS = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-    "http://127.0.0.1:8000",
-    "http://localhost:8000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3000",
-    "null",
-]
+EAP_CORS_ORIGINS = config.CORS_ORIGINS
 
 CORS(
     app,
     supports_credentials=True,
     origins=EAP_CORS_ORIGINS,
 )
+
+
+@app.after_request
+def _eap_access_log(response):
+    if config.ACCESS_LOG:
+        app.logger.info("%s %s %s", request.method, request.path, response.status_code)
+    return response
 
 
 # Static frontend on the same origin as the API so Flask session cookies work under strict flags.
@@ -94,10 +95,17 @@ def serve_ui(filename="index.html"):
 @app.route("/api/health", methods=["GET"])
 def health_check():
     """Simple test route to check whether the backend is running."""
+    db_ok = os.path.isfile(config.DATABASE_PATH)
     return jsonify(
         {
-            "status": "ok",
+            "status": "ok" if db_ok else "degraded",
             "message": "EAP backend is running",
+            "environment": config.ENV,
+            "database_backend": config.DATABASE_BACKEND,
+            "database_ready": db_ok,
+            "strict_security": is_strict_security_enabled(),
+            "session_identity_required": EAP_REQUIRE_SESSION_IDENTITY,
+            "membership_enforced": EAP_ENFORCE_MEMBERSHIP,
         }
     )
 
@@ -156,15 +164,11 @@ def debug_membership_check():
         conn.close()
 
 
-# Database file path
+# Database and upload paths (Phase F: overridable via environment — see .env.example)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_PATH = os.path.join(BASE_DIR, "eap_platform.db")
-
-# Teaching material files (POST /api/tasks/<id>/upload saves here; GET /uploads/<fn> serves them)
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-
-# Student homework files (POST /api/tasks/<id>/submit saves here; GET /submission-files/<fn> serves them)
-SUBMISSIONS_DIR = os.path.join(BASE_DIR, "submissions")
+DATABASE_PATH = config.DATABASE_PATH
+UPLOAD_DIR = config.UPLOAD_DIR
+SUBMISSIONS_DIR = config.SUBMISSIONS_DIR
 
 # Lowercase extensions (no dot) — keep in sync with what teachers may upload.
 ALLOWED_UPLOAD_EXTENSIONS = frozenset(
@@ -1157,13 +1161,8 @@ def normalize_class_name(value):
 # ---- Phase C4 / D9: class membership helpers ---------------------------------------
 #
 # EAP_ENFORCE_MEMBERSHIP: when true, selected student read routes (Phase D9) also require
-# enrollment via is_student_enrolled_in_class. Other routes remain unchanged until later phases.
-# Pair with EAP_REQUIRE_SESSION_IDENTITY for stricter demos; defaults remain off for MVP curl/file://.
-EAP_ENFORCE_MEMBERSHIP = os.environ.get("EAP_ENFORCE_MEMBERSHIP", "0").strip().lower() in (
-    "1",
-    "true",
-    "yes",
-)
+# enrollment via is_student_enrolled_in_class. See eap_config / .env.example.
+EAP_ENFORCE_MEMBERSHIP = config.ENFORCE_MEMBERSHIP
 
 
 def get_user_by_username(conn, username):
@@ -6568,8 +6567,5 @@ if __name__ == "__main__":
     # Flask is installed in backend/venv, not system Python. Either:
     #   source venv/bin/activate && python app.py
     #   ./venv/bin/python app.py
-    # Plain "python3 app.py" can raise: ModuleNotFoundError: No module named 'flask'
-    #
-    # Agent fork default 5051 (Desktop copy uses 5050). Override with PORT=… if needed.
-    port = int(os.environ.get("PORT", "5051"))
-    app.run(host="127.0.0.1", port=port, debug=True)
+    # Production: use gunicorn wsgi:app (see README). Plain "python3 app.py" needs venv.
+    app.run(host=config.HOST, port=config.PORT, debug=config.FLASK_DEBUG)

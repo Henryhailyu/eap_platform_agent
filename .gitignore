@@ -21,6 +21,9 @@ backend/submissions/
 *.sqlite
 *.sqlite3
 
+# Local backups (Phase F script output)
+backups/
+
 # Cursor / VS Code local settings
 .vscode/
 .cursor/
