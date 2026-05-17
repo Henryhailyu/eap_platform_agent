@@ -153,6 +153,9 @@
                   Teaching Tasks
                 </h2>
                 <p id="teacher-daily-class-label" class="teacher-daily-class-label" aria-live="polite"></p>
+                <button type="button" class="btn-primary teacher-new-task-btn" id="teacher-new-task-btn" data-i18n="teacher_new_task_btn">
+                  New task for this day
+                </button>
                 <div
                   id="teacher-daily-chips"
                   class="teacher-daily-chips"
@@ -242,14 +245,15 @@
                 </div>
               </details>
 
-              <details class="teacher-create-task-details">
+              <details class="teacher-create-task-details" id="teacher-create-task-details">
                 <summary class="teacher-create-task-details__summary" data-i18n="create_new_task">Create New Task</summary>
                 <div class="teacher-create-task-details__body">
                   <section class="content-section content-section--nested" aria-labelledby="create-task-heading">
                     <h3 id="create-task-heading" class="section-heading section-heading--nested visually-hidden">
                       Create a task
                     </h3>
-                    <form id="teacher-task-form" class="panel-form" novalidate>
+                    <form id="teacher-task-form" class="panel-form panel-form--create-task" novalidate>
+                  <div id="teacher-task-create-context" class="teacher-task-create-context" aria-live="polite"></div>
                   <div class="field synced-field visually-hidden">
                     <label for="teacher-task-class">Class</label>
                     <select id="teacher-task-class" name="class_name" required>
@@ -262,6 +266,16 @@
                     <label for="task-date">Date</label>
                     <input id="task-date" name="date" type="date" required />
                   </div>
+                  <fieldset class="teacher-task-category-field">
+                    <legend data-i18n="category">Task category</legend>
+                    <div
+                      id="teacher-task-category-chips"
+                      class="teacher-category-chips"
+                      role="group"
+                      aria-label="Task category"
+                    ></div>
+                    <select id="task-type" name="type" class="visually-hidden" required aria-hidden="true" tabindex="-1"></select>
+                  </fieldset>
                   <div class="field">
                     <label for="task-title" data-i18n="task_title_en">Task title</label>
                     <input
@@ -301,10 +315,6 @@
                     </div>
                   </details>
                   <div class="field">
-                    <label for="task-type" data-i18n="category">Task category</label>
-                    <select id="task-type" name="type" required></select>
-                  </div>
-                  <div class="field">
                     <label for="task-period" data-i18n="class_period">Class period</label>
                     <input
                       id="task-period"
@@ -323,6 +333,21 @@
                       data-i18n-placeholder="task_description_en_placeholder"
                       placeholder="Instructions, links, or notes for students…"
                     ></textarea>
+                  </div>
+                  <div class="field teacher-task-create-material">
+                    <label for="teacher-task-create-material" data-i18n="teacher_create_material_label"
+                      >Teaching material (optional)</label
+                    >
+                    <input
+                      id="teacher-task-create-material"
+                      type="file"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.mp3,.mp4,.txt,.jpg,.jpeg,.png"
+                    />
+                    <p
+                      id="teacher-task-create-material-summary"
+                      class="file-selection-summary"
+                      aria-live="polite"
+                    ></p>
                   </div>
                   <button type="submit" class="btn-primary" data-i18n="save_task">Save Task</button>
                   <p id="teacher-form-message" class="form-message" role="status" aria-live="polite"></p>

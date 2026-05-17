@@ -263,6 +263,85 @@ body.eap-wix .teacher-from-template-details__body {
   padding-top: 0.35rem;
 }
 
+body.eap-wix .teacher-daily-header__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+body.eap-wix .teacher-new-task-btn {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+}
+
+body.eap-wix .teacher-task-create-context {
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 10px;
+  background: rgba(0, 113, 227, 0.06);
+  border: 1px solid rgba(0, 113, 227, 0.15);
+}
+
+body.eap-wix .teacher-task-create-context__line {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+body.eap-wix .teacher-task-create-context__class {
+  color: var(--wix-blue, #0071e3);
+}
+
+body.eap-wix .teacher-task-create-context__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .teacher-task-category-field {
+  border: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+body.eap-wix .teacher-task-category-field legend {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--wix-text, #1d1d1f);
+}
+
+body.eap-wix .teacher-category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+body.eap-wix .teacher-category-chip {
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--wix-card-border);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+body.eap-wix .teacher-category-chip:hover {
+  border-color: var(--wix-blue, #0071e3);
+}
+
+body.eap-wix .teacher-category-chip--active {
+  background: var(--wix-blue, #0071e3);
+  border-color: var(--wix-blue, #0071e3);
+  color: #fff;
+}
+
+body.eap-wix .panel-form--create-task .teacher-task-create-material input[type="file"] {
+  max-width: 100%;
+}
+
 body.eap-wix .wix-features {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

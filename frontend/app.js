@@ -853,6 +853,35 @@ function populateCategorySelect(selectEl, includePlaceholder) {
   });
 }
 
+function syncTeacherCategoryChipHighlight(chipsEl, selectEl) {
+  if (!chipsEl || !selectEl) return;
+  const value = String(selectEl.value || "").trim();
+  chipsEl.querySelectorAll(".teacher-category-chip").forEach((btn) => {
+    const on = btn.getAttribute("data-category") === value;
+    btn.classList.toggle("teacher-category-chip--active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
+function populateTeacherCategoryChips(chipsEl, selectEl) {
+  if (!chipsEl || !selectEl) return;
+  chipsEl.innerHTML = "";
+  TASK_CATEGORIES.forEach((label) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "teacher-category-chip";
+    btn.textContent = translateCategory(label);
+    btn.setAttribute("data-category", label);
+    btn.setAttribute("aria-pressed", "false");
+    btn.addEventListener("click", () => {
+      selectEl.value = label;
+      syncTeacherCategoryChipHighlight(chipsEl, selectEl);
+    });
+    chipsEl.appendChild(btn);
+  });
+  syncTeacherCategoryChipHighlight(chipsEl, selectEl);
+}
+
 /**
  * Student filter: "All" plus each category.
  */
@@ -2948,7 +2977,73 @@ function initTeacherPage() {
     return;
   }
 
-  populateCategorySelect(typeSelect, true);
+  populateCategorySelect(typeSelect, false);
+
+  const categoryChipsEl = document.getElementById("teacher-task-category-chips");
+  const createTaskDetailsEl = document.getElementById("teacher-create-task-details");
+  const createContextEl = document.getElementById("teacher-task-create-context");
+  const newTaskBtn = document.getElementById("teacher-new-task-btn");
+  const createMaterialInput = document.getElementById("teacher-task-create-material");
+  const createMaterialSummary = document.getElementById("teacher-task-create-material-summary");
+
+  populateTeacherCategoryChips(categoryChipsEl, typeSelect);
+
+  function syncTeacherCreateTaskContext() {
+    if (!createContextEl) return;
+    const cls = getFilterClass();
+    const iso = getTaskListDate().trim().slice(0, 10);
+    createContextEl.innerHTML = "";
+    const line = document.createElement("p");
+    line.className = "teacher-task-create-context__line";
+    const classSpan = document.createElement("span");
+    classSpan.className = "teacher-task-create-context__class";
+    classSpan.textContent = cls;
+    const sep = document.createElement("span");
+    sep.className = "teacher-task-create-context__sep";
+    sep.textContent = " · ";
+    const dateSpan = document.createElement("span");
+    dateSpan.className = "teacher-task-create-context__date";
+    dateSpan.textContent = formatDisplayDate(iso);
+    line.appendChild(classSpan);
+    line.appendChild(sep);
+    line.appendChild(dateSpan);
+    createContextEl.appendChild(line);
+    const hint = document.createElement("p");
+    hint.className = "teacher-task-create-context__hint";
+    hint.textContent = t("teacher_create_context_hint");
+    createContextEl.appendChild(hint);
+    taskClassSelect.value = cls;
+    if (iso.length >= 10) dateInput.value = iso;
+  }
+
+  function openTeacherCreateTaskPanel(options = {}) {
+    const { focusTitle = true, scroll = true } = options;
+    syncTeacherCreateTaskContext();
+    if (createTaskDetailsEl) createTaskDetailsEl.open = true;
+    if (!String(typeSelect.value || "").trim() && TASK_CATEGORIES.length) {
+      typeSelect.value = TASK_CATEGORIES.includes("Homework") ? "Homework" : TASK_CATEGORIES[0];
+      syncTeacherCategoryChipHighlight(categoryChipsEl, typeSelect);
+    }
+    if (scroll && createTaskDetailsEl) {
+      createTaskDetailsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+    if (focusTitle) {
+      const titleEl = document.getElementById("task-title");
+      if (titleEl) titleEl.focus();
+    }
+  }
+
+  if (newTaskBtn) {
+    newTaskBtn.addEventListener("click", () => openTeacherCreateTaskPanel());
+  }
+
+  if (createMaterialInput && createMaterialSummary) {
+    const refreshMaterialSummary = () => {
+      updateSelectedFileSummary(createMaterialInput, createMaterialSummary);
+    };
+    createMaterialInput.addEventListener("change", refreshMaterialSummary);
+    refreshMaterialSummary();
+  }
 
   function syncTeacherTemplateFormDefaults() {
     const d = getTaskListDate().trim().slice(0, 10);
@@ -3123,6 +3218,7 @@ function initTeacherPage() {
     dailyViewEl.setAttribute("aria-hidden", "false");
     mainEl.classList.add("app-main--daily-mode");
 
+    syncTeacherCreateTaskContext();
     await refreshTaskList();
     return true;
   }
@@ -3687,6 +3783,7 @@ function initTeacherPage() {
         taskDetailEmpty.classList.remove("hidden");
         setTeacherTaskDetailEmpty("no-tasks");
         selectedTeacherTaskId = null;
+        openTeacherCreateTaskPanel({ focusTitle: false, scroll: false });
         await loadTeacherStudyPlans();
         return;
       }
@@ -3766,7 +3863,10 @@ function initTeacherPage() {
     syncAllClassSelectors(calendarClassSelect.value);
     reloadPlannerTasksFromApi().then(() => {
       refreshDashboard();
-      if (isTeacherDailyVisible()) refreshTaskList();
+      if (isTeacherDailyVisible()) {
+        syncTeacherCreateTaskContext();
+        refreshTaskList();
+      }
     });
   });
 
@@ -3778,11 +3878,13 @@ function initTeacherPage() {
 
   viewDateInput.addEventListener("change", () => {
     syncSelectedDateFromInputs(viewDateInput);
+    syncTeacherCreateTaskContext();
     if (isTeacherDailyVisible()) refreshTaskList();
   });
 
   dateInput.addEventListener("change", () => {
     syncSelectedDateFromInputs(dateInput);
+    syncTeacherCreateTaskContext();
     if (isTeacherDailyVisible()) refreshTaskList();
   });
 
@@ -4340,13 +4442,16 @@ function initTeacherPage() {
     const description_zh = String(formData.get("description_zh") || "").trim();
 
     if (!date || !title || !category) {
-      messageEl.textContent = "Please fill in date, title, and category.";
+      messageEl.textContent = t("teacher_create_validation");
       messageEl.classList.add("form-message--error");
       return;
     }
 
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
     try {
-      await apiPost("/api/tasks", {
+      const created = await apiPost("/api/tasks", {
         date,
         title,
         title_zh: title_zh || null,
@@ -4357,13 +4462,37 @@ function initTeacherPage() {
         class_name: class_name || teacherDefaultClassFallback(),
       });
 
-      messageEl.textContent = t("task_saved");
-      messageEl.classList.add("form-message--success");
+      let savedMsg = t("task_saved");
+      let uploadFailed = false;
+      if (
+        createMaterialInput &&
+        createMaterialInput.files &&
+        createMaterialInput.files.length > 0 &&
+        created &&
+        created.id != null
+      ) {
+        try {
+          await apiUploadTaskFile(Number(created.id, 10), createMaterialInput.files[0]);
+          createMaterialInput.value = "";
+          if (createMaterialSummary) {
+            updateSelectedFileSummary(createMaterialInput, createMaterialSummary);
+          }
+          savedMsg = t("teacher_task_saved_with_material");
+        } catch (uploadErr) {
+          uploadFailed = true;
+          savedMsg = `${t("task_saved")} ${uploadErr.message}`;
+        }
+      }
+
+      messageEl.textContent = savedMsg;
+      messageEl.classList.toggle("form-message--success", !uploadFailed);
+      messageEl.classList.toggle("form-message--error", uploadFailed);
 
       form.querySelector("#task-title").value = "";
       const titleZhEl = form.querySelector("#task-title-zh");
       if (titleZhEl) titleZhEl.value = "";
-      typeSelect.value = "";
+      typeSelect.value = TASK_CATEGORIES.includes("Homework") ? "Homework" : TASK_CATEGORIES[0] || "";
+      syncTeacherCategoryChipHighlight(categoryChipsEl, typeSelect);
       form.querySelector("#task-period").value = "";
       form.querySelector("#task-description").value = "";
       const descZhEl = form.querySelector("#task-description-zh");
@@ -4375,6 +4504,9 @@ function initTeacherPage() {
     } catch (err) {
       messageEl.textContent = err.message;
       messageEl.classList.add("form-message--error");
+    } finally {
+      const submitBtnDone = form.querySelector('button[type="submit"]');
+      if (submitBtnDone) submitBtnDone.disabled = false;
     }
   });
 
@@ -4460,7 +4592,9 @@ function initTeacherPage() {
   }
 
   window.__eapTeacherLangRefresh = () => {
-    populateCategorySelect(typeSelect, true);
+    populateCategorySelect(typeSelect, false);
+    populateTeacherCategoryChips(categoryChipsEl, typeSelect);
+    syncTeacherCreateTaskContext();
     setTeacherTaskDetailEmpty("no-selection");
     void reloadPlannerTasksFromApi();
     void refreshDashboard();
