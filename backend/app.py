@@ -38,6 +38,7 @@ from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from auth_v1 import get_bearer_token_from_header, issue_access_token, verify_access_token
 from eap_config import config, setup_logging, validate_production_config
 
 setup_logging()
@@ -1885,6 +1886,93 @@ def login_failure_json():
     ), 401
 
 
+def teacher_not_authorized_json():
+    return (
+        jsonify(
+            {
+                "success": False,
+                "message": "This teacher account is not authorized yet. Please contact your manager.",
+            }
+        ),
+        403,
+    )
+
+
+def login_user_public_dict(row):
+    """Safe user fields for login and v1 auth responses (no password)."""
+    return {
+        "id": row["id"],
+        "username": row["username"],
+        "role": row["role"],
+        "full_name": row["full_name"],
+        "class_name": row["class_name"],
+        "is_authorized": bool(user_is_authorized(row)),
+    }
+
+
+def authenticate_username_password(conn, username, password):
+    """
+    Shared credential check for /api/login and /api/v1/auth/login.
+
+    Returns (user_row, None) on success or (None, flask_response_tuple) on failure.
+    May commit password_hash upgrade for legacy plain passwords.
+    """
+    u = (username or "").strip()
+    p = (password or "").strip()
+    if not u or not p:
+        return None, login_failure_json()
+
+    row = conn.execute(
+        """
+        SELECT id, username, password, password_hash, role, full_name, class_name, is_authorized
+        FROM users
+        WHERE username = ?
+        """,
+        (u,),
+    ).fetchone()
+
+    if row is None:
+        return None, login_failure_json()
+
+    hash_val = row["password_hash"]
+    if hash_val is not None and str(hash_val).strip():
+        if not check_password_hash(hash_val, p):
+            return None, login_failure_json()
+    else:
+        legacy = row["password"] if row["password"] is not None else ""
+        if legacy != p:
+            return None, login_failure_json()
+        conn.execute(
+            """
+            UPDATE users
+            SET password_hash = ?, password = ?
+            WHERE id = ?
+            """,
+            (generate_password_hash(p), "", row["id"]),
+        )
+        conn.commit()
+
+    if not user_is_authorized(row):
+        return None, teacher_not_authorized_json()
+
+    return row, None
+
+
+def bearer_auth_failure_json():
+    return jsonify({"success": False, "message": "Invalid or expired access token"}), 401
+
+
+def load_user_by_id_for_auth(conn, user_id):
+    return conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized
+        FROM users
+        WHERE id = ?
+        """,
+        (int(user_id),),
+    ).fetchone()
+
+
 @app.route("/api/login", methods=["POST"])
 def login():
     """
@@ -1900,54 +1988,11 @@ def login():
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
 
-    if not username or not password:
-        return login_failure_json()
-
     conn = get_db_connection()
-    row = conn.execute(
-        """
-        SELECT id, username, password, password_hash, role, full_name, class_name, is_authorized
-        FROM users
-        WHERE username = ?
-        """,
-        (username,),
-    ).fetchone()
-
-    if row is None:
+    row, err = authenticate_username_password(conn, username, password)
+    if err is not None:
         conn.close()
-        return login_failure_json()
-
-    hash_val = row["password_hash"]
-    if hash_val is not None and str(hash_val).strip():
-        if not check_password_hash(hash_val, password):
-            conn.close()
-            return login_failure_json()
-    else:
-        legacy = row["password"] if row["password"] is not None else ""
-        if legacy != password:
-            conn.close()
-            return login_failure_json()
-        conn.execute(
-            """
-            UPDATE users
-            SET password_hash = ?, password = ?
-            WHERE id = ?
-            """,
-            (generate_password_hash(password), "", row["id"]),
-        )
-        conn.commit()
-
-    if not user_is_authorized(row):
-        conn.close()
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": "This teacher account is not authorized yet. Please contact your manager.",
-                }
-            ),
-            403,
-        )
+        return err
 
     conn.close()
 
@@ -1956,19 +2001,58 @@ def login():
     session["username"] = row["username"]
     session["role"] = row["role"]
 
+    return jsonify({"success": True, "user": login_user_public_dict(row)})
+
+
+@app.route("/api/v1/auth/login", methods=["POST"])
+def api_v1_auth_login():
+    """
+    Phase I2a: token login for mobile / WeChat clients. Does not set Flask session.
+
+    Request JSON: { "username": "...", "password": "..." }
+    Response: access_token, expires_in, token_type, user (no password fields).
+    """
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+
+    conn = get_db_connection()
+    row, err = authenticate_username_password(conn, username, password)
+    conn.close()
+    if err is not None:
+        return err
+
+    token, expires_in = issue_access_token(int(row["id"]))
     return jsonify(
         {
             "success": True,
-            "user": {
-                "id": row["id"],
-                "username": row["username"],
-                "role": row["role"],
-                "full_name": row["full_name"],
-                "class_name": row["class_name"],
-                "is_authorized": bool(user_is_authorized(row)),
-            },
+            "access_token": token,
+            "expires_in": expires_in,
+            "token_type": "Bearer",
+            "user": login_user_public_dict(row),
         }
     )
+
+
+@app.route("/api/v1/auth/me", methods=["GET"])
+def api_v1_auth_me():
+    """Phase I2a: current user from Authorization: Bearer <access_token> only."""
+    token = get_bearer_token_from_header(request.headers.get("Authorization"))
+    if not token:
+        return bearer_auth_failure_json()
+
+    uid = verify_access_token(token)
+    if uid is None:
+        return bearer_auth_failure_json()
+
+    conn = get_db_connection()
+    row = load_user_by_id_for_auth(conn, uid)
+    conn.close()
+
+    if row is None:
+        return bearer_auth_failure_json()
+
+    return jsonify({"success": True, "user": login_user_public_dict(row)})
 
 
 @app.route("/api/me", methods=["GET"])

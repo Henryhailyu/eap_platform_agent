@@ -99,6 +99,9 @@ class EapConfig:
 
     FLASK_DEBUG: bool = _env_bool("FLASK_DEBUG") and not IS_PRODUCTION
 
+    # Phase I2a: Bearer access_token lifetime for /api/v1/auth/* (seconds).
+    TOKEN_TTL_SECONDS: int = int(os.environ.get("EAP_TOKEN_TTL_SECONDS", str(7 * 24 * 3600)))
+
 
 config = EapConfig()
 
