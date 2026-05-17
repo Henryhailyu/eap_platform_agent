@@ -778,7 +778,8 @@ body.eap-wix .student-task-master-item--action {
 }
 
 body.eap-wix .eap-class-overview,
-body.eap-wix .student-progress-dashboard {
+body.eap-wix .student-progress-dashboard,
+body.eap-wix .student-learning-archive {
   background: var(--wix-card);
   border: 1px solid var(--wix-card-border);
   border-radius: var(--wix-radius);
@@ -788,22 +789,164 @@ body.eap-wix .student-progress-dashboard {
 }
 
 body.eap-wix .eap-class-overview__header,
-body.eap-wix .student-progress-dashboard__header {
+body.eap-wix .student-progress-dashboard__header,
+body.eap-wix .student-learning-archive__header {
   margin-bottom: 0.85rem;
 }
 
 body.eap-wix .eap-class-overview__title,
-body.eap-wix .student-progress-dashboard__title {
+body.eap-wix .student-progress-dashboard__title,
+body.eap-wix .student-learning-archive__title {
   margin: 0 0 0.25rem;
   font-size: 1.25rem;
   font-weight: 700;
 }
 
 body.eap-wix .eap-class-overview__scope,
-body.eap-wix .student-progress-dashboard__scope {
+body.eap-wix .student-progress-dashboard__scope,
+body.eap-wix .student-learning-archive__scope {
   margin: 0;
   font-size: 0.875rem;
   color: var(--wix-muted);
+}
+
+body.eap-wix .student-progress-open-archive {
+  margin-top: 0.65rem;
+}
+
+body.eap-wix .student-learning-archive__intro {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--wix-muted);
+  line-height: 1.45;
+}
+
+body.eap-wix .student-learning-archive__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+body.eap-wix .student-learning-archive__filter-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+body.eap-wix .student-learning-archive__filter-category label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+body.eap-wix .student-archive-category-select {
+  min-width: 12rem;
+}
+
+body.eap-wix .student-learning-archive__error {
+  color: #b42318;
+  font-size: 0.875rem;
+}
+
+body.eap-wix .student-learning-archive__empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .student-archive-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 34%) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  body.eap-wix .student-archive-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.eap-wix .student-archive-layout__list-heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+body.eap-wix .student-archive-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 28rem;
+  overflow-y: auto;
+  border: 1px solid var(--wix-card-border);
+  border-radius: 10px;
+}
+
+body.eap-wix .student-archive-list-li + .student-archive-list-li {
+  border-top: 1px solid var(--wix-card-border);
+}
+
+body.eap-wix .student-archive-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+body.eap-wix .student-archive-list-item:hover {
+  background: rgba(0, 113, 227, 0.05);
+}
+
+body.eap-wix .student-archive-list-item--selected {
+  background: rgba(0, 113, 227, 0.08);
+  box-shadow: inset 3px 0 0 var(--wix-blue, #0071e3);
+}
+
+body.eap-wix .student-archive-list-item__title {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+body.eap-wix .student-archive-list-item__meta {
+  font-size: 0.75rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .student-archive-detail-empty {
+  margin: 0;
+  padding: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--wix-muted);
+  border: 1px dashed var(--wix-card-border);
+  border-radius: 10px;
+}
+
+body.eap-wix .student-archive-detail .student-archive-readonly-card {
+  list-style: none;
+}
+
+body.eap-wix .student-archive-readonly-card__date {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .student-archive-readonly-card__actions {
+  margin-top: 0.75rem;
 }
 
 body.eap-wix .eap-class-overview__subheading,

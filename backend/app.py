@@ -933,6 +933,79 @@ def seed_default_class_memberships(conn):
                 )
 
 
+def seed_task_templates(conn):
+    """
+    Phase E7: starter templates per skill category when the library is empty.
+    Skips insert if any template row already exists (teachers may have saved their own).
+    """
+    n = conn.execute("SELECT COUNT(*) FROM task_templates").fetchone()[0]
+    if n is not None and int(n) > 0:
+        return
+
+    presets = [
+        (
+            "Classroom — guided discussion",
+            "Classroom: Guided discussion",
+            "Classroom Learning",
+            "In class",
+            "Prepare notes for the in-class discussion. Participate actively and complete the reflection prompt.",
+        ),
+        (
+            "Vocabulary — unit word list",
+            "Vocabulary: Unit word list",
+            "Vocabulary",
+            "Before class",
+            "Study the word list, complete the matching exercises, and use each target word in an original sentence.",
+        ),
+        (
+            "Listening — lecture clip",
+            "Listening: Academic lecture clip",
+            "Listening",
+            "In class",
+            "Listen to the recording and answer the comprehension questions. Note key phrases for follow-up discussion.",
+        ),
+        (
+            "Reading — academic article",
+            "Reading: Academic article",
+            "Reading",
+            "Prep",
+            "Read the assigned article and annotate the main argument. Answer the guided reading questions.",
+        ),
+        (
+            "Speaking — presentation",
+            "Speaking: Short presentation",
+            "Speaking",
+            "In class",
+            "Prepare a 3–5 minute presentation using the outline provided. Submit slides or notes if requested.",
+        ),
+        (
+            "Writing — essay draft",
+            "Writing: Essay draft",
+            "Writing",
+            "After class",
+            "Write a structured response using academic language. Check organisation, citations, and word count.",
+        ),
+        (
+            "Homework — assessment task",
+            "Homework: Assessment submission",
+            "Homework",
+            "Due date",
+            "Complete the assessment task and upload your work. Review the rubric before submitting.",
+        ),
+    ]
+
+    for name, title, category, period, description in presets:
+        conn.execute(
+            """
+            INSERT INTO task_templates
+                (name, title, title_zh, category, period, description, description_zh,
+                 file_path, file_name, created_at, updated_at)
+            VALUES (?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, datetime('now'), datetime('now'))
+            """,
+            (name, title, category, period, description),
+        )
+
+
 def class_row_to_dict(row):
     """Public JSON for one classes row."""
     return {
@@ -2242,79 +2315,6 @@ def copy_task(task_id):
     ).fetchone()
     conn.close()
     return jsonify(task_to_dict(row)), 201
-
-
-def seed_task_templates(conn):
-    """
-    Phase E7: starter templates per skill category when the library is empty.
-    Skips insert if any template row already exists (teachers may have saved their own).
-    """
-    n = conn.execute("SELECT COUNT(*) FROM task_templates").fetchone()[0]
-    if n is not None and int(n) > 0:
-        return
-
-    presets = [
-        (
-            "Classroom — guided discussion",
-            "Classroom: Guided discussion",
-            "Classroom Learning",
-            "In class",
-            "Prepare notes for the in-class discussion. Participate actively and complete the reflection prompt.",
-        ),
-        (
-            "Vocabulary — unit word list",
-            "Vocabulary: Unit word list",
-            "Vocabulary",
-            "Before class",
-            "Study the word list, complete the matching exercises, and use each target word in an original sentence.",
-        ),
-        (
-            "Listening — lecture clip",
-            "Listening: Academic lecture clip",
-            "Listening",
-            "In class",
-            "Listen to the recording and answer the comprehension questions. Note key phrases for follow-up discussion.",
-        ),
-        (
-            "Reading — academic article",
-            "Reading: Academic article",
-            "Reading",
-            "Prep",
-            "Read the assigned article and annotate the main argument. Answer the guided reading questions.",
-        ),
-        (
-            "Speaking — presentation",
-            "Speaking: Short presentation",
-            "Speaking",
-            "In class",
-            "Prepare a 3–5 minute presentation using the outline provided. Submit slides or notes if requested.",
-        ),
-        (
-            "Writing — essay draft",
-            "Writing: Essay draft",
-            "Writing",
-            "After class",
-            "Write a structured response using academic language. Check organisation, citations, and word count.",
-        ),
-        (
-            "Homework — assessment task",
-            "Homework: Assessment submission",
-            "Homework",
-            "Due date",
-            "Complete the assessment task and upload your work. Review the rubric before submitting.",
-        ),
-    ]
-
-    for name, title, category, period, description in presets:
-        conn.execute(
-            """
-            INSERT INTO task_templates
-                (name, title, title_zh, category, period, description, description_zh,
-                 file_path, file_name, created_at, updated_at)
-            VALUES (?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, datetime('now'), datetime('now'))
-            """,
-            (name, title, category, period, description),
-        )
 
 
 @app.route("/api/task-templates", methods=["GET"])
@@ -4928,6 +4928,186 @@ def get_teacher_class_roster_progress():
             "total_students": len(roster),
             "total_tasks": total_tasks,
             "students": roster,
+        }
+    )
+
+
+def _student_archive_workflow_state(task_row, sub_row, att_map, student_completed):
+    """Mirror frontend student workflow labels for archive list/detail."""
+    if student_completed:
+        return "completed"
+    if sub_row is None:
+        return "needs_submission"
+
+    def trimmed_nonempty(val):
+        return val is not None and str(val).strip() != ""
+
+    has_fb = False
+    if trimmed_nonempty(sub_row["teacher_feedback"]) or trimmed_nonempty(sub_row["feedback_file_path"]):
+        has_fb = True
+    else:
+        sid = int(sub_row["id"])
+        has_fb = len(att_map.get(sid, [])) > 0
+
+    has_rev = (
+        trimmed_nonempty(sub_row["revision_submitted_at"])
+        or trimmed_nonempty(sub_row["revision_text"])
+        or trimmed_nonempty(sub_row["revision_file_path"])
+    )
+    if has_fb:
+        return "revision_done" if has_rev else "needs_revision"
+    return "awaiting_feedback"
+
+
+@app.route("/api/student/learning-archive", methods=["GET"])
+def get_student_learning_archive():
+    """
+    Phase E8: read-only portfolio of past tasks with submission, feedback, and revision history.
+
+    Query:
+      student_username — required without student session (Phase D4)
+      class_name — required
+      month — optional YYYY-MM (omit for all tasks in this class)
+      category — optional exact category label filter
+    """
+    conn = get_db_connection()
+    student_username, d9_err = resolve_student_with_optional_enforcement(
+        conn, request.args.get("student_username"), request.args.get("class_name")
+    )
+    if d9_err is not None:
+        conn.close()
+        return d9_err
+
+    raw_class = request.args.get("class_name")
+    if raw_class is None or str(raw_class).strip() == "":
+        conn.close()
+        return jsonify({"error": "class_name is required"}), 400
+
+    class_name_norm = normalize_class_name(raw_class)
+    month_q = (request.args.get("month") or "").strip()
+    category_q = (request.args.get("category") or "").strip()
+
+    if month_q:
+        task_where_sql, task_params = _teacher_progress_task_where_clause(
+            "t", class_name_norm, date_str="", month_str=month_q
+        )
+    else:
+        task_where_sql, task_params = _teacher_progress_task_where_clause(
+            "t", class_name_norm
+        )
+
+    extra_sql = ""
+    extra_params = []
+    if category_q:
+        extra_sql = " AND t.category = ?"
+        extra_params.append(category_q)
+
+    tasks = conn.execute(
+        f"""
+        SELECT t.*
+        FROM calendar_tasks t
+        WHERE {task_where_sql}{extra_sql}
+        ORDER BY t.date DESC, t.id DESC
+        """,
+        (*task_params, *extra_params),
+    ).fetchall()
+
+    if not tasks:
+        conn.close()
+        return jsonify(
+            {
+                "student_username": student_username,
+                "class_name": class_name_norm,
+                "month": month_q or None,
+                "category": category_q or None,
+                "total": 0,
+                "items": [],
+            }
+        )
+
+    task_ids = [int(t["id"]) for t in tasks]
+    placeholders = ",".join("?" * len(task_ids))
+
+    st_rows = conn.execute(
+        f"""
+        SELECT task_id, status, completed_at
+        FROM student_task_status
+        WHERE student_username = ? AND class_name = ? AND task_id IN ({placeholders})
+        """,
+        (student_username, class_name_norm, *task_ids),
+    ).fetchall()
+    completed_set = {
+        int(sr["task_id"])
+        for sr in st_rows
+        if str(sr["status"] or "").strip().lower() == "completed"
+    }
+
+    sub_rows = conn.execute(
+        f"""
+        SELECT s.*
+        FROM submissions s
+        INNER JOIN (
+            SELECT task_id, MAX(id) AS max_id
+            FROM submissions
+            WHERE student_username = ? AND task_id IN ({placeholders})
+            GROUP BY task_id
+        ) latest ON s.task_id = latest.task_id AND s.id = latest.max_id
+        """,
+        (student_username, *task_ids),
+    ).fetchall()
+    sub_by_task = {int(r["task_id"]): r for r in sub_rows}
+    sub_ids = [int(r["id"]) for r in sub_rows]
+    att_map = batch_teacher_feedback_attachments(conn, sub_ids) if sub_ids else {}
+
+    items = []
+    for t in tasks:
+        tid = int(t["id"])
+        sub = sub_by_task.get(tid)
+        student_completed = tid in completed_set
+        wf = _student_archive_workflow_state(t, sub, att_map, student_completed)
+
+        title_zh = None
+        description_zh = None
+        try:
+            title_zh = t["title_zh"]
+            description_zh = t["description_zh"]
+        except (IndexError, KeyError):
+            pass
+
+        item = {
+            "task_id": tid,
+            "date": t["date"],
+            "title": t["title"],
+            "title_zh": title_zh,
+            "category": t["category"],
+            "period": t["period"],
+            "description": t["description"],
+            "description_zh": description_zh,
+            "file_path": t["file_path"],
+            "file_name": t["file_name"],
+            "student_completed": student_completed,
+            "workflow_state": wf,
+            "has_submission": sub is not None,
+            "has_feedback": wf in ("needs_revision", "revision_done"),
+            "has_revision": wf == "revision_done",
+        }
+        if sub is not None:
+            payload = submission_to_dict(sub)
+            payload["feedback_attachments"] = att_map.get(int(sub["id"]), [])
+            item["submission"] = payload
+        else:
+            item["submission"] = None
+        items.append(item)
+
+    conn.close()
+    return jsonify(
+        {
+            "student_username": student_username,
+            "class_name": class_name_norm,
+            "month": month_q or None,
+            "category": category_q or None,
+            "total": len(items),
+            "items": items,
         }
     )
 

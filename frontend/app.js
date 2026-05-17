@@ -5844,6 +5844,103 @@ function buildStudentTaskCardElement(task, mySub) {
   return li;
 }
 
+/** Phase E8: read-only archive card (no homework submit, revision form, or complete button). */
+function buildStudentArchiveReadOnlyCard(item) {
+  const task = {
+    id: item.task_id,
+    date: item.date,
+    title: item.title,
+    title_zh: item.title_zh,
+    category: item.category,
+    period: item.period,
+    description: item.description,
+    description_zh: item.description_zh,
+    file_path: item.file_path,
+    file_name: item.file_name,
+    student_completed: !!item.student_completed,
+    class_name: item.class_name,
+  };
+  const mySub = item.submission;
+  const card = buildStudentTaskCardElement(task, mySub);
+  card.classList.add("student-archive-readonly-card", "task-card--archive");
+
+  card.querySelector(".task-card__homework")?.remove();
+  card.querySelector(".student-homework-resubmit-details")?.remove();
+  card.querySelector(".task-card__footer")?.remove();
+  card.querySelector(".student-task-subsection--revision-form")?.remove();
+
+  const iso = String(item.date || "").slice(0, 10);
+  const dateLine = document.createElement("p");
+  dateLine.className = "student-archive-readonly-card__date";
+  dateLine.textContent = iso.length >= 10 ? formatDisplayDate(iso) : "—";
+
+  const openBtn = document.createElement("button");
+  openBtn.type = "button";
+  openBtn.className = "btn-secondary student-archive-open-calendar";
+  openBtn.textContent = t("student_archive_open_calendar");
+  openBtn.setAttribute("data-task-id", String(item.task_id));
+  openBtn.setAttribute("data-task-date", iso);
+
+  const actions = document.createElement("div");
+  actions.className = "student-archive-readonly-card__actions";
+  actions.appendChild(openBtn);
+
+  card.insertBefore(dateLine, card.firstChild);
+  card.appendChild(actions);
+  return card;
+}
+
+function setStudentArchiveListSelection(listEl, selectedId) {
+  if (!listEl) return;
+  listEl.querySelectorAll(".student-archive-list-item").forEach((row) => {
+    const rid = Number(row.getAttribute("data-task-id"), 10);
+    const on = Number.isFinite(selectedId) && Number.isFinite(rid) && rid === Number(selectedId);
+    row.classList.toggle("student-archive-list-item--selected", on);
+    row.setAttribute("aria-current", on ? "true" : "false");
+  });
+}
+
+function renderStudentArchiveList(listEl, items, selectedId) {
+  if (!listEl) return;
+  listEl.innerHTML = "";
+  const sorted = [...(items || [])].sort((a, b) => {
+    const da = String(a.date || "");
+    const db = String(b.date || "");
+    if (da !== db) return db.localeCompare(da);
+    return Number(b.task_id) - Number(a.task_id);
+  });
+  sorted.forEach((item) => {
+    const wfState = item.workflow_state || "needs_submission";
+    const li = document.createElement("li");
+    li.className = "student-archive-list-li";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "student-archive-list-item";
+    btn.setAttribute("data-task-id", String(item.task_id));
+    btn.setAttribute("data-workflow-state", wfState);
+
+    const titleEl = document.createElement("span");
+    titleEl.className = "student-archive-list-item__title";
+    titleEl.textContent = taskDisplayTitle({
+      title: item.title,
+      title_zh: item.title_zh,
+    });
+
+    const meta = document.createElement("span");
+    meta.className = "student-archive-list-item__meta";
+    const iso = String(item.date || "").slice(0, 10);
+    const dateLabel = iso.length >= 10 ? formatDisplayDate(iso) : "—";
+    const cat = translateCategory(item.category || "—");
+    meta.textContent = `${dateLabel} · ${cat} · ${studentWorkflowStatusLabel(wfState)}`;
+
+    btn.appendChild(titleEl);
+    btn.appendChild(meta);
+    li.appendChild(btn);
+    listEl.appendChild(li);
+  });
+  setStudentArchiveListSelection(listEl, selectedId);
+}
+
 /** One row in the student progress “Next actions” or “View all” lists (same button shape for navigation). */
 function appendStudentProgressActionItem(ul, row) {
   if (!ul || !row) return;
@@ -6062,6 +6159,17 @@ function initStudentPage() {
   const progressHasItemsEl = document.getElementById("student-progress-actions-has-items");
   const progressExpandDetails = document.getElementById("student-progress-actions-expand");
   const progressExpandSummary = document.getElementById("student-progress-actions-expand-summary");
+  const progressOpenArchiveBtn = document.getElementById("student-progress-open-archive");
+  const archiveSectionEl = document.getElementById("student-learning-archive");
+  const archiveScopeEl = document.getElementById("student-archive-scope");
+  const archiveAllMonthsEl = document.getElementById("student-archive-all-months");
+  const archiveCategoryEl = document.getElementById("student-archive-category");
+  const archiveErrorEl = document.getElementById("student-archive-error");
+  const archiveEmptyEl = document.getElementById("student-archive-empty");
+  const archiveBodyEl = document.getElementById("student-archive-body");
+  const archiveListEl = document.getElementById("student-archive-list");
+  const archiveDetailEl = document.getElementById("student-archive-detail");
+  const archiveDetailEmptyEl = document.getElementById("student-archive-detail-empty");
 
   /** Right panel copy when nothing is selected or the filtered list is empty. */
   function setStudentTaskDetailEmpty(kind) {
@@ -6289,6 +6397,107 @@ function initStudentPage() {
       reloadStudentStudyPlanProgressForViewMonth(),
     ]);
     void refreshStudentProgressDashboard();
+    void reloadStudentLearningArchive();
+  }
+
+  let lastArchiveItems = [];
+  let lastArchiveItemsFiltered = [];
+  let selectedArchiveTaskId = null;
+
+  if (archiveCategoryEl) populateStudentFilterSelect(archiveCategoryEl);
+
+  function archiveScopeLabel() {
+    if (archiveAllMonthsEl && archiveAllMonthsEl.checked) {
+      return t("student_archive_scope_all", { class: studentClassName });
+    }
+    const month = studentPlannerMonthISO();
+    const monthLabel =
+      month.length >= 7
+        ? new Date(`${month}-01T12:00:00`).toLocaleDateString(eapLocale(), {
+            month: "long",
+            year: "numeric",
+          })
+        : month;
+    return t("student_dashboard_scope", { class: studentClassName, month: monthLabel });
+  }
+
+  function selectStudentArchiveItem(taskId) {
+    const item = lastArchiveItemsFiltered.find((it) => Number(it.task_id) === Number(taskId));
+    if (!item || !archiveDetailEl) return;
+    selectedArchiveTaskId = item.task_id;
+    setStudentArchiveListSelection(archiveListEl, selectedArchiveTaskId);
+    if (archiveDetailEmptyEl) archiveDetailEmptyEl.classList.add("hidden");
+    archiveDetailEl.innerHTML = "";
+    archiveDetailEl.appendChild(buildStudentArchiveReadOnlyCard(item));
+    archiveDetailEl.classList.remove("hidden");
+    archiveDetailEl.removeAttribute("hidden");
+  }
+
+  function renderStudentArchiveView() {
+    lastArchiveItemsFiltered = lastArchiveItems;
+    if (archiveScopeEl) archiveScopeEl.textContent = archiveScopeLabel();
+
+    if (!lastArchiveItemsFiltered.length) {
+      if (archiveBodyEl) archiveBodyEl.classList.add("hidden");
+      if (archiveEmptyEl) archiveEmptyEl.classList.remove("hidden");
+      if (archiveErrorEl) archiveErrorEl.classList.add("hidden");
+      if (archiveDetailEl) {
+        archiveDetailEl.classList.add("hidden");
+        archiveDetailEl.setAttribute("hidden", "");
+        archiveDetailEl.innerHTML = "";
+      }
+      if (archiveDetailEmptyEl) archiveDetailEmptyEl.classList.remove("hidden");
+      if (archiveListEl) archiveListEl.innerHTML = "";
+      return;
+    }
+
+    if (archiveEmptyEl) archiveEmptyEl.classList.add("hidden");
+    if (archiveBodyEl) archiveBodyEl.classList.remove("hidden");
+    if (archiveErrorEl) archiveErrorEl.classList.add("hidden");
+
+    const stillSelected =
+      selectedArchiveTaskId != null &&
+      lastArchiveItemsFiltered.some((it) => Number(it.task_id) === Number(selectedArchiveTaskId));
+    if (!stillSelected) selectedArchiveTaskId = lastArchiveItemsFiltered[0].task_id;
+
+    renderStudentArchiveList(archiveListEl, lastArchiveItemsFiltered, selectedArchiveTaskId);
+    selectStudentArchiveItem(selectedArchiveTaskId);
+  }
+
+  async function reloadStudentLearningArchive() {
+    const user = getLoggedInUser();
+    const uname = user && user.username != null ? String(user.username).trim() : "";
+    if (!uname || !archiveListEl) return;
+
+    const qs = new URLSearchParams();
+    qs.set("student_username", uname);
+    qs.set("class_name", studentClassName);
+    if (!archiveAllMonthsEl || !archiveAllMonthsEl.checked) {
+      qs.set("month", studentPlannerMonthISO());
+    }
+    const cat =
+      archiveCategoryEl && archiveCategoryEl.value && archiveCategoryEl.value !== "all"
+        ? archiveCategoryEl.value
+        : "";
+    if (cat) qs.set("category", cat);
+
+    try {
+      const data = await apiGet(`/api/student/learning-archive?${qs.toString()}`);
+      lastArchiveItems = data && Array.isArray(data.items) ? data.items : [];
+      if (archiveErrorEl) {
+        archiveErrorEl.textContent = "";
+        archiveErrorEl.classList.add("hidden");
+      }
+      renderStudentArchiveView();
+    } catch (err) {
+      lastArchiveItems = [];
+      if (archiveErrorEl) {
+        archiveErrorEl.textContent = err.message || t("student_archive_load_error");
+        archiveErrorEl.classList.remove("hidden");
+      }
+      if (archiveBodyEl) archiveBodyEl.classList.add("hidden");
+      if (archiveEmptyEl) archiveEmptyEl.classList.add("hidden");
+    }
   }
 
   function showStudentCalendarView() {
@@ -7554,6 +7763,44 @@ function initStudentPage() {
     }
   });
 
+  if (progressOpenArchiveBtn && archiveSectionEl) {
+    progressOpenArchiveBtn.addEventListener("click", () => {
+      archiveSectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  if (archiveAllMonthsEl) {
+    archiveAllMonthsEl.addEventListener("change", () => {
+      void reloadStudentLearningArchive();
+    });
+  }
+
+  if (archiveCategoryEl) {
+    archiveCategoryEl.addEventListener("change", () => {
+      void reloadStudentLearningArchive();
+    });
+  }
+
+  if (archiveListEl) {
+    archiveListEl.addEventListener("click", (ev) => {
+      const row = ev.target.closest(".student-archive-list-item");
+      if (!row) return;
+      const id = Number(row.getAttribute("data-task-id"), 10);
+      if (!Number.isFinite(id)) return;
+      selectStudentArchiveItem(id);
+    });
+  }
+
+  if (archiveDetailEl) {
+    archiveDetailEl.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest(".student-archive-open-calendar");
+      if (!btn) return;
+      const d = btn.getAttribute("data-task-date");
+      const tid = btn.getAttribute("data-task-id");
+      await openStudentDayAndTask(d, tid);
+    });
+  }
+
   async function bootStudentClassScopeAndData() {
     await loadStudentEnrolledClasses();
     updateStudentClassDisplay();
@@ -7564,9 +7811,11 @@ function initStudentPage() {
   window.__eapStudentLangRefresh = () => {
     populateStudentFilterSelect(filterSelect);
     populateStudentCategoryChips(categoryChipsEl, filterSelect);
+    if (archiveCategoryEl) populateStudentFilterSelect(archiveCategoryEl);
     syncStudentDailyContext();
     if (lastLoadedDay) applyFilterAndRender();
     void refreshStudentProgressDashboard();
+    if (lastArchiveItems.length) renderStudentArchiveView();
     if (window.EAP_I18N) window.EAP_I18N.applyStatic();
   };
   void bootStudentClassScopeAndData();
