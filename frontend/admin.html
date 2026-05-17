@@ -32,8 +32,7 @@
           <div class="page-hero">
             <h1 data-i18n="admin_page_title">Manager centre</h1>
             <p data-i18n="admin_page_lead">
-              Authorize teachers, view accounts, and manage the school academic calendar shown on
-              teaching and learning calendars.
+              Authorize teachers, manage classes and rosters, and edit the school academic calendar.
             </p>
           </div>
 
@@ -80,6 +79,67 @@
               <button type="button" class="btn-primary" id="admin-calendar-save-btn" data-i18n="admin_cal_save">
                 Save calendar
               </button>
+            </div>
+          </section>
+
+          <section class="content-section admin-panel" aria-labelledby="admin-classes-heading">
+            <h2 id="admin-classes-heading" class="section-heading" data-i18n="admin_classes_heading">
+              Classes
+            </h2>
+            <p class="admin-panel__hint" data-i18n="admin_classes_hint">
+              Create classes and assign teachers and students. Membership controls which calendars they can use.
+            </p>
+            <form id="admin-class-create-form" class="admin-inline-form" novalidate>
+              <div class="field">
+                <label for="admin-new-class-code" data-i18n="admin_class_code">Class code</label>
+                <input id="admin-new-class-code" type="text" required placeholder="EAP050" />
+              </div>
+              <div class="field">
+                <label for="admin-new-class-name" data-i18n="admin_class_display_name">Display name</label>
+                <input id="admin-new-class-name" type="text" placeholder="EAP050" />
+              </div>
+              <button type="submit" class="btn-primary" data-i18n="admin_class_create_btn">Add class</button>
+            </form>
+            <div class="admin-table-wrap">
+              <table class="admin-table" id="admin-classes-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="admin_class_code">Class</th>
+                    <th scope="col" data-i18n="admin_class_display_name">Name</th>
+                    <th scope="col" data-i18n="admin_col_teachers">Teachers</th>
+                    <th scope="col" data-i18n="admin_col_students">Students</th>
+                    <th scope="col" data-i18n="admin_col_action">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-classes-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-classes-empty" class="admin-empty hidden" data-i18n="admin_no_classes">No classes yet.</p>
+
+            <div id="admin-class-detail" class="admin-class-detail hidden" aria-live="polite">
+              <h3 id="admin-class-detail-title" class="admin-class-detail__title"></h3>
+              <div class="admin-class-detail__grid">
+                <div>
+                  <h4 data-i18n="admin_class_teachers">Teachers in class</h4>
+                  <ul id="admin-class-teachers-list" class="admin-member-list"></ul>
+                  <div class="admin-inline-form">
+                    <select id="admin-class-add-teacher" aria-label="Add teacher"></select>
+                    <button type="button" class="btn-secondary" id="admin-class-add-teacher-btn" data-i18n="admin_add_teacher_btn">
+                      Add teacher
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <h4 data-i18n="admin_class_students">Students in class</h4>
+                  <ul id="admin-class-students-list" class="admin-member-list"></ul>
+                  <div class="admin-inline-form">
+                    <select id="admin-class-add-student" aria-label="Add student"></select>
+                    <button type="button" class="btn-secondary" id="admin-class-add-student-btn" data-i18n="admin_add_student_btn">
+                      Add student
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 

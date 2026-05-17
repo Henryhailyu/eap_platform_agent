@@ -5442,6 +5442,382 @@ def user_public_dict(row):
     }
 
 
+def admin_user_assigned_class_codes(conn, user_id, role):
+    """Class codes from teacher_classes or class_enrollments (Phase E3)."""
+    role_norm = str(role or "").strip().lower()
+    if role_norm == "teacher":
+        rows = conn.execute(
+            """
+            SELECT c.class_code
+            FROM teacher_classes tc
+            INNER JOIN classes c ON c.id = tc.class_id
+            WHERE tc.teacher_id = ?
+            ORDER BY c.class_code ASC
+            """,
+            (user_id,),
+        ).fetchall()
+    elif role_norm == "student":
+        rows = conn.execute(
+            """
+            SELECT c.class_code
+            FROM class_enrollments ce
+            INNER JOIN classes c ON c.id = ce.class_id
+            WHERE ce.student_id = ?
+            ORDER BY c.class_code ASC
+            """,
+            (user_id,),
+        ).fetchall()
+    else:
+        return []
+    return [str(r["class_code"]) for r in rows]
+
+
+def admin_user_dict(conn, row):
+    """Admin list user with assigned class codes from membership tables."""
+    payload = user_public_dict(row)
+    payload["assigned_classes"] = admin_user_assigned_class_codes(
+        conn, row["id"], row["role"]
+    )
+    return payload
+
+
+def admin_class_member_user_dict(row):
+    return {
+        "id": row["id"],
+        "username": row["username"],
+        "full_name": row["full_name"],
+    }
+
+
+def admin_class_summary_dict(conn, row):
+    teacher_count = conn.execute(
+        "SELECT COUNT(*) AS c FROM teacher_classes WHERE class_id = ?",
+        (row["id"],),
+    ).fetchone()
+    student_count = conn.execute(
+        "SELECT COUNT(*) AS c FROM class_enrollments WHERE class_id = ?",
+        (row["id"],),
+    ).fetchone()
+    return {
+        **class_row_to_dict(row),
+        "teacher_count": int(teacher_count["c"]) if teacher_count else 0,
+        "student_count": int(student_count["c"]) if student_count else 0,
+    }
+
+
+def admin_class_detail_payload(conn, class_id):
+    row = conn.execute(
+        """
+        SELECT id, class_code, display_name, course_code, semester, is_active
+        FROM classes
+        WHERE id = ?
+        """,
+        (class_id,),
+    ).fetchone()
+    if row is None:
+        return None
+
+    teachers = conn.execute(
+        """
+        SELECT u.id, u.username, u.full_name
+        FROM teacher_classes tc
+        INNER JOIN users u ON u.id = tc.teacher_id
+        WHERE tc.class_id = ?
+        ORDER BY u.username ASC
+        """,
+        (class_id,),
+    ).fetchall()
+    students = conn.execute(
+        """
+        SELECT u.id, u.username, u.full_name
+        FROM class_enrollments ce
+        INNER JOIN users u ON u.id = ce.student_id
+        WHERE ce.class_id = ?
+        ORDER BY u.username ASC
+        """,
+        (class_id,),
+    ).fetchall()
+
+    summary = admin_class_summary_dict(conn, row)
+    summary["teachers"] = [admin_class_member_user_dict(t) for t in teachers]
+    summary["students"] = [admin_class_member_user_dict(s) for s in students]
+    return summary
+
+
+def resolve_teacher_id(conn, data):
+    if data.get("teacher_id") is not None:
+        try:
+            return int(data["teacher_id"])
+        except (TypeError, ValueError):
+            return None
+    username = str(data.get("teacher_username") or "").strip()
+    if not username:
+        return None
+    row = conn.execute(
+        """
+        SELECT id FROM users
+        WHERE username = ? AND TRIM(COALESCE(role, '')) = 'teacher'
+        """,
+        (username,),
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
+def resolve_student_id(conn, data):
+    if data.get("student_id") is not None:
+        try:
+            return int(data["student_id"])
+        except (TypeError, ValueError):
+            return None
+    username = str(data.get("student_username") or "").strip()
+    if not username:
+        return None
+    row = conn.execute(
+        """
+        SELECT id FROM users
+        WHERE username = ? AND TRIM(COALESCE(role, '')) = 'student'
+        """,
+        (username,),
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
+@app.route("/api/admin/classes", methods=["GET", "POST"])
+def admin_classes():
+    """Phase E3: list or create classes (admin only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    if request.method == "GET":
+        rows = conn.execute(
+            """
+            SELECT id, class_code, display_name, course_code, semester, is_active
+            FROM classes
+            ORDER BY class_code ASC
+            """
+        ).fetchall()
+        payload = [admin_class_summary_dict(conn, r) for r in rows]
+        conn.close()
+        return jsonify(payload)
+
+    data = request.get_json(silent=True) or {}
+    class_code = str(data.get("class_code") or "").strip().upper()
+    display_name = str(data.get("display_name") or class_code).strip()
+    course_code = str(data.get("course_code") or "EAP").strip() or "EAP"
+    semester = str(data.get("semester") or "").strip() or None
+
+    if not class_code:
+        conn.close()
+        return jsonify({"error": "class_code is required"}), 400
+
+    existing = conn.execute(
+        "SELECT id FROM classes WHERE class_code = ?",
+        (class_code,),
+    ).fetchone()
+    if existing is not None:
+        conn.close()
+        return jsonify({"error": "class_code already exists"}), 409
+
+    now = utc_now_iso()
+    cur = conn.execute(
+        """
+        INSERT INTO classes (class_code, display_name, course_code, semester, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?)
+        """,
+        (class_code, display_name, course_code, semester, now, now),
+    )
+    conn.commit()
+    class_id = cur.lastrowid
+    payload = admin_class_detail_payload(conn, class_id)
+    conn.close()
+    return jsonify(payload), 201
+
+
+@app.route("/api/admin/classes/<int:class_id>", methods=["GET", "PUT"])
+def admin_class_detail(class_id):
+    """Phase E3: class detail or update (admin only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    if request.method == "GET":
+        payload = admin_class_detail_payload(conn, class_id)
+        conn.close()
+        if payload is None:
+            return jsonify({"error": "Class not found"}), 404
+        return jsonify(payload)
+
+    data = request.get_json(silent=True) or {}
+    row = conn.execute(
+        "SELECT id FROM classes WHERE id = ?",
+        (class_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "Class not found"}), 404
+
+    display_name = data.get("display_name")
+    course_code = data.get("course_code")
+    semester = data.get("semester")
+    is_active = data.get("is_active")
+
+    fields = []
+    values = []
+    if display_name is not None:
+        fields.append("display_name = ?")
+        values.append(str(display_name).strip() or None)
+    if course_code is not None:
+        fields.append("course_code = ?")
+        values.append(str(course_code).strip() or "EAP")
+    if semester is not None:
+        fields.append("semester = ?")
+        values.append(str(semester).strip() or None)
+    if is_active is not None:
+        fields.append("is_active = ?")
+        values.append(1 if bool(is_active) else 0)
+
+    if fields:
+        fields.append("updated_at = ?")
+        values.append(utc_now_iso())
+        values.append(class_id)
+        conn.execute(
+            f"UPDATE classes SET {', '.join(fields)} WHERE id = ?",
+            tuple(values),
+        )
+        conn.commit()
+
+    payload = admin_class_detail_payload(conn, class_id)
+    conn.close()
+    return jsonify(payload)
+
+
+@app.route("/api/admin/classes/<int:class_id>/teachers", methods=["POST"])
+def admin_class_assign_teacher(class_id):
+    """Assign a teacher to a class."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    if conn.execute("SELECT id FROM classes WHERE id = ?", (class_id,)).fetchone() is None:
+        conn.close()
+        return jsonify({"error": "Class not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    teacher_id = resolve_teacher_id(conn, data)
+    if teacher_id is None:
+        conn.close()
+        return jsonify({"error": "teacher_id or teacher_username is required"}), 400
+
+    teacher = conn.execute(
+        "SELECT id FROM users WHERE id = ? AND TRIM(COALESCE(role, '')) = 'teacher'",
+        (teacher_id,),
+    ).fetchone()
+    if teacher is None:
+        conn.close()
+        return jsonify({"error": "Teacher not found"}), 404
+
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO teacher_classes (class_id, teacher_id, assigned_at)
+        VALUES (?, ?, ?)
+        """,
+        (class_id, teacher_id, utc_now_iso()),
+    )
+    conn.commit()
+    payload = admin_class_detail_payload(conn, class_id)
+    conn.close()
+    return jsonify(payload)
+
+
+@app.route("/api/admin/classes/<int:class_id>/teachers/<int:teacher_id>", methods=["DELETE"])
+def admin_class_unassign_teacher(class_id, teacher_id):
+    """Remove a teacher from a class."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    conn.execute(
+        "DELETE FROM teacher_classes WHERE class_id = ? AND teacher_id = ?",
+        (class_id, teacher_id),
+    )
+    conn.commit()
+    payload = admin_class_detail_payload(conn, class_id)
+    conn.close()
+    if payload is None:
+        return jsonify({"error": "Class not found"}), 404
+    return jsonify(payload)
+
+
+@app.route("/api/admin/classes/<int:class_id>/students", methods=["POST"])
+def admin_class_enroll_student(class_id):
+    """Enroll a student in a class."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    if conn.execute("SELECT id FROM classes WHERE id = ?", (class_id,)).fetchone() is None:
+        conn.close()
+        return jsonify({"error": "Class not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    student_id = resolve_student_id(conn, data)
+    if student_id is None:
+        conn.close()
+        return jsonify({"error": "student_id or student_username is required"}), 400
+
+    student = conn.execute(
+        "SELECT id FROM users WHERE id = ? AND TRIM(COALESCE(role, '')) = 'student'",
+        (student_id,),
+    ).fetchone()
+    if student is None:
+        conn.close()
+        return jsonify({"error": "Student not found"}), 404
+
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO class_enrollments (class_id, student_id, enrolled_at)
+        VALUES (?, ?, ?)
+        """,
+        (class_id, student_id, utc_now_iso()),
+    )
+    conn.commit()
+    payload = admin_class_detail_payload(conn, class_id)
+    conn.close()
+    return jsonify(payload)
+
+
+@app.route("/api/admin/classes/<int:class_id>/students/<int:student_id>", methods=["DELETE"])
+def admin_class_unenroll_student(class_id, student_id):
+    """Remove a student from a class."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    conn.execute(
+        "DELETE FROM class_enrollments WHERE class_id = ? AND student_id = ?",
+        (class_id, student_id),
+    )
+    conn.commit()
+    payload = admin_class_detail_payload(conn, class_id)
+    conn.close()
+    if payload is None:
+        return jsonify({"error": "Class not found"}), 404
+    return jsonify(payload)
+
+
 @app.route("/api/admin/teachers", methods=["GET"])
 def admin_list_teachers():
     """List teacher accounts and authorization status (admin only)."""
@@ -5458,7 +5834,7 @@ def admin_list_teachers():
         ORDER BY username ASC
         """
     ).fetchall()
-    payload = [user_public_dict(r) for r in rows]
+    payload = [admin_user_dict(conn, r) for r in rows]
     conn.close()
     return jsonify(payload)
 
@@ -5479,7 +5855,7 @@ def admin_list_students():
         ORDER BY username ASC
         """
     ).fetchall()
-    payload = [user_public_dict(r) for r in rows]
+    payload = [admin_user_dict(conn, r) for r in rows]
     conn.close()
     return jsonify(payload)
 

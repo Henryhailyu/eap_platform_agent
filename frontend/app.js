@@ -1506,8 +1506,12 @@ function renderAdminTeachersTable(teachers, tbody, emptyEl, onToggle) {
     btn.addEventListener("click", () => onToggle(teacher, !authorized, btn));
     actionTd.appendChild(btn);
 
+    const classLabel =
+      Array.isArray(teacher.assigned_classes) && teacher.assigned_classes.length
+        ? teacher.assigned_classes.join(", ")
+        : teacher.class_name || "—";
     tr.innerHTML = "";
-    [teacher.username || "—", teacher.full_name || "—", teacher.class_name || "—"].forEach((val) => {
+    [teacher.username || "—", teacher.full_name || "—", classLabel].forEach((val) => {
       const td = document.createElement("td");
       td.textContent = val;
       tr.appendChild(td);
@@ -1525,7 +1529,11 @@ function renderAdminStudentsTable(students, tbody, emptyEl) {
   if (emptyEl) emptyEl.classList.toggle("hidden", list.length > 0);
   list.forEach((student) => {
     const tr = document.createElement("tr");
-    [student.username || "—", student.full_name || "—", student.class_name || "—"].forEach((val) => {
+    const classLabel =
+      Array.isArray(student.assigned_classes) && student.assigned_classes.length
+        ? student.assigned_classes.join(", ")
+        : student.class_name || "—";
+    [student.username || "—", student.full_name || "—", classLabel].forEach((val) => {
       const td = document.createElement("td");
       td.textContent = val;
       tr.appendChild(td);
@@ -1552,17 +1560,169 @@ function initAdminPage() {
     const studentsEmpty = document.getElementById("admin-students-empty");
 
     let teachersCache = [];
+    let studentsCache = [];
+    let classesCache = [];
+    let activeClassId = null;
+
+    const classesTbody = document.getElementById("admin-classes-tbody");
+    const classesEmpty = document.getElementById("admin-classes-empty");
+    const classCreateForm = document.getElementById("admin-class-create-form");
+    const classDetailEl = document.getElementById("admin-class-detail");
+    const classDetailTitle = document.getElementById("admin-class-detail-title");
+    const classTeachersList = document.getElementById("admin-class-teachers-list");
+    const classStudentsList = document.getElementById("admin-class-students-list");
+    const classAddTeacherSel = document.getElementById("admin-class-add-teacher");
+    const classAddStudentSel = document.getElementById("admin-class-add-student");
+    const classAddTeacherBtn = document.getElementById("admin-class-add-teacher-btn");
+    const classAddStudentBtn = document.getElementById("admin-class-add-student-btn");
+
+    function formatAssignedClasses(user) {
+      if (Array.isArray(user.assigned_classes) && user.assigned_classes.length) {
+        return user.assigned_classes.join(", ");
+      }
+      return user.class_name || "—";
+    }
+
+    function populateClassMemberSelects(classDetail, allTeachers, allStudents) {
+      if (!classAddTeacherSel || !classAddStudentSel) return;
+      const inClassTeacherIds = new Set((classDetail.teachers || []).map((t) => t.id));
+      const inClassStudentIds = new Set((classDetail.students || []).map((s) => s.id));
+
+      classAddTeacherSel.innerHTML = "";
+      const teacherPlaceholder = document.createElement("option");
+      teacherPlaceholder.value = "";
+      teacherPlaceholder.textContent = t("admin_add_teacher_btn");
+      classAddTeacherSel.appendChild(teacherPlaceholder);
+      allTeachers
+        .filter((row) => !inClassTeacherIds.has(row.id))
+        .forEach((row) => {
+          const opt = document.createElement("option");
+          opt.value = String(row.id);
+          opt.textContent = `${row.username} (${row.full_name || row.username})`;
+          classAddTeacherSel.appendChild(opt);
+        });
+
+      classAddStudentSel.innerHTML = "";
+      const studentPlaceholder = document.createElement("option");
+      studentPlaceholder.value = "";
+      studentPlaceholder.textContent = t("admin_add_student_btn");
+      classAddStudentSel.appendChild(studentPlaceholder);
+      allStudents
+        .filter((row) => !inClassStudentIds.has(row.id))
+        .forEach((row) => {
+          const opt = document.createElement("option");
+          opt.value = String(row.id);
+          opt.textContent = `${row.username} (${row.full_name || row.username})`;
+          classAddStudentSel.appendChild(opt);
+        });
+    }
+
+    function renderClassMemberList(listEl, members, classId, role) {
+      if (!listEl) return;
+      listEl.innerHTML = "";
+      const list = Array.isArray(members) ? members : [];
+      if (!list.length) {
+        const li = document.createElement("li");
+        li.textContent = "—";
+        listEl.appendChild(li);
+        return;
+      }
+      list.forEach((member) => {
+        const li = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = `${member.username}${member.full_name ? ` · ${member.full_name}` : ""}`;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn-secondary";
+        btn.textContent = t("admin_remove_member_btn");
+        btn.addEventListener("click", async () => {
+          try {
+            const path =
+              role === "teacher"
+                ? `/api/admin/classes/${classId}/teachers/${member.id}`
+                : `/api/admin/classes/${classId}/students/${member.id}`;
+            const updated = await apiDelete(path);
+            showClassDetail(updated);
+            setAdminPageMessage(statusEl, t("admin_class_members_updated"), false);
+            await reloadAdminLists();
+          } catch (err) {
+            setAdminPageMessage(errorEl, err.message, true);
+          }
+        });
+        li.appendChild(label);
+        li.appendChild(btn);
+        listEl.appendChild(li);
+      });
+    }
+
+    function showClassDetail(classDetail) {
+      if (!classDetailEl || !classDetail) return;
+      activeClassId = classDetail.id;
+      classDetailEl.classList.remove("hidden");
+      if (classDetailTitle) {
+        classDetailTitle.textContent = `${classDetail.class_code} — ${classDetail.display_name || classDetail.class_code}`;
+      }
+      renderClassMemberList(classTeachersList, classDetail.teachers, classDetail.id, "teacher");
+      renderClassMemberList(classStudentsList, classDetail.students, classDetail.id, "student");
+      populateClassMemberSelects(classDetail, teachersCache, studentsCache);
+    }
+
+    function renderAdminClassesTable(classes) {
+      if (!classesTbody) return;
+      classesTbody.innerHTML = "";
+      const list = Array.isArray(classes) ? classes : [];
+      if (classesEmpty) classesEmpty.classList.toggle("hidden", list.length > 0);
+      list.forEach((cls) => {
+        const tr = document.createElement("tr");
+        [cls.class_code, cls.display_name || cls.class_code, String(cls.teacher_count ?? 0), String(cls.student_count ?? 0)].forEach(
+          (val) => {
+            const td = document.createElement("td");
+            td.textContent = val;
+            tr.appendChild(td);
+          },
+        );
+        const actionTd = document.createElement("td");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn-secondary";
+        btn.textContent = t("admin_class_manage_btn");
+        btn.addEventListener("click", async () => {
+          try {
+            const detail = await apiGet(`/api/admin/classes/${cls.id}`);
+            showClassDetail(detail);
+          } catch (err) {
+            setAdminPageMessage(errorEl, err.message, true);
+          }
+        });
+        actionTd.appendChild(btn);
+        tr.appendChild(actionTd);
+        classesTbody.appendChild(tr);
+      });
+    }
 
     async function reloadAdminLists() {
       setAdminPageMessage(errorEl, "", false);
       try {
-        const [teachers, students] = await Promise.all([
+        const [teachers, students, classes] = await Promise.all([
           apiGet("/api/admin/teachers"),
           apiGet("/api/admin/students"),
+          apiGet("/api/admin/classes"),
         ]);
         teachersCache = Array.isArray(teachers) ? teachers : [];
+        studentsCache = Array.isArray(students) ? students : [];
+        classesCache = Array.isArray(classes) ? classes : [];
         renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle);
-        renderAdminStudentsTable(students, studentsTbody, studentsEmpty);
+        renderAdminStudentsTable(studentsCache, studentsTbody, studentsEmpty);
+        renderAdminClassesTable(classesCache);
+        if (activeClassId) {
+          try {
+            const detail = await apiGet(`/api/admin/classes/${activeClassId}`);
+            showClassDetail(detail);
+          } catch {
+            activeClassId = null;
+            if (classDetailEl) classDetailEl.classList.add("hidden");
+          }
+        }
       } catch (err) {
         setAdminPageMessage(errorEl, err.message || t("admin_load_error"), true);
       }
@@ -1629,8 +1789,66 @@ function initAdminPage() {
       });
     }
 
+    if (classCreateForm) {
+      classCreateForm.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const codeEl = document.getElementById("admin-new-class-code");
+        const nameEl = document.getElementById("admin-new-class-name");
+        const classCode = (codeEl && codeEl.value ? codeEl.value : "").trim();
+        const displayName = (nameEl && nameEl.value ? nameEl.value : "").trim() || classCode;
+        if (!classCode) return;
+        try {
+          const created = await apiPost("/api/admin/classes", {
+            class_code: classCode,
+            display_name: displayName,
+          });
+          if (codeEl) codeEl.value = "";
+          if (nameEl) nameEl.value = "";
+          setAdminPageMessage(statusEl, t("admin_class_created"), false);
+          await reloadAdminLists();
+          showClassDetail(created);
+        } catch (err) {
+          setAdminPageMessage(errorEl, err.message, true);
+        }
+      });
+    }
+
+    if (classAddTeacherBtn) {
+      classAddTeacherBtn.addEventListener("click", async () => {
+        if (!activeClassId || !classAddTeacherSel || !classAddTeacherSel.value) return;
+        try {
+          const updated = await apiPost(`/api/admin/classes/${activeClassId}/teachers`, {
+            teacher_id: Number(classAddTeacherSel.value, 10),
+          });
+          showClassDetail(updated);
+          setAdminPageMessage(statusEl, t("admin_class_members_updated"), false);
+          await reloadAdminLists();
+        } catch (err) {
+          setAdminPageMessage(errorEl, err.message, true);
+        }
+      });
+    }
+
+    if (classAddStudentBtn) {
+      classAddStudentBtn.addEventListener("click", async () => {
+        if (!activeClassId || !classAddStudentSel || !classAddStudentSel.value) return;
+        try {
+          const updated = await apiPost(`/api/admin/classes/${activeClassId}/students`, {
+            student_id: Number(classAddStudentSel.value, 10),
+          });
+          showClassDetail(updated);
+          setAdminPageMessage(statusEl, t("admin_class_members_updated"), false);
+          await reloadAdminLists();
+        } catch (err) {
+          setAdminPageMessage(errorEl, err.message, true);
+        }
+      });
+    }
+
     window.__eapAdminLangRefresh = () => {
       renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle);
+      renderAdminStudentsTable(studentsCache, studentsTbody, studentsEmpty);
+      renderAdminClassesTable(classesCache);
       void reloadAdminLists();
       void loadAdminCalendarForm();
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();

@@ -470,6 +470,52 @@ body.eap-wix .admin-calendar-form textarea {
   font-size: 0.875rem;
 }
 
+body.eap-wix .admin-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+body.eap-wix .admin-inline-form .field {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+}
+
+body.eap-wix .admin-class-detail {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--wix-card-border);
+}
+
+body.eap-wix .admin-class-detail__title {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+body.eap-wix .admin-class-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+body.eap-wix .admin-member-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+body.eap-wix .admin-member-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--wix-card-border);
+  font-size: 0.9rem;
+}
+
 body.eap-wix .eap-cal__nav-btn {
   border-radius: var(--wix-pill) !important;
 }
