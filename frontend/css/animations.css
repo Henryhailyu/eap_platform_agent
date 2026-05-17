@@ -1,0 +1,75 @@
+/* Subtle motion — inspired by modern landing pages; respects reduced motion */
+
+@keyframes eap-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes eap-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+body.eap-shell-active .btn-primary {
+  transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+}
+
+body.eap-shell-active .btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+body.eap-shell-active .btn-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+body.eap-shell-active .login-card,
+body.eap-shell-active .student-progress-card,
+body.eap-shell-active .task-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+body.eap-shell-active .login-card:hover,
+body.eap-shell-active .student-progress-card:hover,
+body.eap-shell-active .task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--eap-shadow-hover);
+}
+
+body.eap-shell-active .landing-float-tag {
+  animation: eap-float 5s ease-in-out infinite;
+}
+
+body.eap-shell-active .landing-hero-copy--animate,
+body.eap-shell-active .landing-hero-auth--animate {
+  animation: eap-fade-up 0.55s ease both;
+}
+
+body.eap-shell-active .landing-hero-auth--animate {
+  animation-delay: 0.08s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.eap-shell-active .landing-float-tag,
+  body.eap-shell-active .landing-hero-copy--animate,
+  body.eap-shell-active .landing-hero-auth--animate {
+    animation: none;
+  }
+
+  body.eap-shell-active .btn-primary:hover:not(:disabled),
+  body.eap-shell-active .login-card:hover,
+  body.eap-shell-active .student-progress-card:hover,
+  body.eap-shell-active .task-card:hover {
+    transform: none;
+  }
+}

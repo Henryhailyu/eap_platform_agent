@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="EAP Platform — Manager administration" />
+    <title>Manager Centre — EAP Platform</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="page-app eap-shell-active" data-page="admin">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+        <header class="site-header">
+          <div class="site-header__inner">
+            <a class="site-logo" href="admin.html"
+              ><span data-i18n="brand">EAP Platform</span
+              ><span class="eap-build-badge" data-i18n="build_badge">Agent build</span></a
+            >
+            <div class="site-header__actions">
+              <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">
+                中文
+              </button>
+              <p class="site-welcome" id="header-welcome" aria-live="polite">
+                <span data-i18n="welcome">Welcome,</span>
+              </p>
+              <button type="button" class="btn-logout" id="logout-btn" data-i18n="logout">Logout</button>
+            </div>
+          </div>
+        </header>
+
+        <main id="main" class="app-main">
+          <div class="page-hero">
+            <h1 data-i18n="admin_page_title">Manager centre</h1>
+            <p data-i18n="admin_page_lead">
+              Authorize teachers, view accounts, and manage the school academic calendar shown on
+              teaching and learning calendars.
+            </p>
+          </div>
+
+          <p id="admin-page-error" class="form-message hidden" role="alert" aria-live="polite"></p>
+          <p id="admin-page-status" class="form-message hidden" role="status" aria-live="polite"></p>
+
+          <section class="content-section admin-panel" aria-labelledby="admin-calendar-heading">
+            <h2 id="admin-calendar-heading" class="section-heading" data-i18n="admin_cal_heading">
+              Academic calendar
+            </h2>
+            <p class="admin-panel__hint" data-i18n="admin_cal_hint">
+              Sets teaching-week labels and holiday notes on teacher and student calendars. One date per
+              line: YYYY-MM-DD | Label
+            </p>
+            <div class="admin-calendar-form">
+              <div class="field">
+                <label for="admin-calendar-semester-start" data-i18n="admin_cal_semester_start"
+                  >Semester start date</label
+                >
+                <input id="admin-calendar-semester-start" type="date" required />
+              </div>
+              <div class="field">
+                <label for="admin-calendar-teaching-weeks" data-i18n="admin_cal_teaching_weeks"
+                  >Teaching weeks</label
+                >
+                <input
+                  id="admin-calendar-teaching-weeks"
+                  type="number"
+                  min="1"
+                  max="52"
+                  value="16"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="admin-calendar-notes" data-i18n="admin_cal_notes">Notable dates</label>
+                <textarea
+                  id="admin-calendar-notes"
+                  rows="8"
+                  spellcheck="false"
+                  placeholder="2026-01-01 | New Year's Day"
+                ></textarea>
+              </div>
+              <button type="button" class="btn-primary" id="admin-calendar-save-btn" data-i18n="admin_cal_save">
+                Save calendar
+              </button>
+            </div>
+          </section>
+
+          <section class="content-section admin-panel" aria-labelledby="admin-teachers-heading">
+            <h2 id="admin-teachers-heading" class="section-heading" data-i18n="admin_teachers_heading">
+              Teachers
+            </h2>
+            <p class="admin-panel__hint" data-i18n="admin_teachers_hint">
+              Only authorized teachers can sign in to the teaching calendar.
+            </p>
+            <div class="admin-table-wrap">
+              <table class="admin-table" id="admin-teachers-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="username">Username</th>
+                    <th scope="col" data-i18n="admin_col_name">Name</th>
+                    <th scope="col" data-i18n="class_label">Class</th>
+                    <th scope="col" data-i18n="admin_col_status">Access</th>
+                    <th scope="col" data-i18n="admin_col_action">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-teachers-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-teachers-empty" class="admin-empty hidden" data-i18n="admin_no_teachers">
+              No teacher accounts found.
+            </p>
+          </section>
+
+          <section class="content-section admin-panel" aria-labelledby="admin-students-heading">
+            <h2 id="admin-students-heading" class="section-heading" data-i18n="admin_students_heading">
+              Students
+            </h2>
+            <div class="admin-table-wrap">
+              <table class="admin-table" id="admin-students-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="username">Username</th>
+                    <th scope="col" data-i18n="admin_col_name">Name</th>
+                    <th scope="col" data-i18n="class_label">Class</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-students-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-students-empty" class="admin-empty hidden" data-i18n="admin_no_students">
+              No student accounts found.
+            </p>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

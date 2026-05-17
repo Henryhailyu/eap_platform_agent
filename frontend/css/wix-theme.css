@@ -1,0 +1,524 @@
+/* ==========================================================================
+   EAP Agent — Wix-inspired theme (overrides legacy look)
+   ========================================================================== */
+
+:root {
+  --wix-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --wix-blue: #116dff;
+  --wix-blue-dark: #0e5fd9;
+  --wix-teal: #0a7ea4;
+  --wix-text: #162d3d;
+  --wix-muted: #5e6b78;
+  --wix-card: rgba(255, 255, 255, 0.92);
+  --wix-card-border: rgba(22, 45, 61, 0.08);
+  --wix-shadow: 0 8px 40px rgba(17, 109, 255, 0.08);
+  --wix-radius: 16px;
+  --wix-pill: 999px;
+  --eap-overlay: rgba(255, 255, 255, 0.78);
+}
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/* —— Visible photo background —— */
+body.eap-wix {
+  font-family: var(--wix-font) !important;
+  color: var(--wix-text);
+  background: #f0f4f8 !important;
+}
+
+body.eap-wix #page-shell {
+  min-height: 100vh;
+  background-color: #c5d4e4;
+  background-image: var(--eap-bg-image) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+body.eap-wix #page-shell > .page-overlay {
+  min-height: 100vh;
+  background: var(--eap-overlay) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Kill old landing layers */
+body.eap-wix.page-landing::before,
+body.eap-wix .landing-decor,
+body.eap-wix .landing-wash {
+  display: none !important;
+}
+
+/* —— Top bar (Wix-style) —— */
+body.eap-wix .wix-nav,
+body.eap-wix .eap-lang-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--wix-card-border);
+}
+
+body.eap-wix .wix-nav__brand {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--wix-text);
+  text-decoration: none;
+  letter-spacing: -0.02em;
+}
+
+body.eap-wix .btn-lang {
+  font-family: var(--wix-font);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  padding: 8px 18px;
+  border-radius: var(--wix-pill);
+  border: 1px solid var(--wix-card-border);
+  background: #fff;
+  color: var(--wix-teal);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.eap-wix .btn-lang:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--wix-shadow);
+}
+
+/* —— Landing (index) —— */
+body.eap-wix.page-landing .landing-content {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 100px 24px 48px;
+  position: relative;
+  z-index: 2;
+}
+
+body.eap-wix .wix-hero {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+body.eap-wix .wix-hero__title {
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0 0 1rem;
+  color: var(--wix-text);
+}
+
+body.eap-wix .wix-hero__subtitle {
+  font-size: clamp(1.05rem, 2.5vw, 1.35rem);
+  color: var(--wix-muted);
+  max-width: 36rem;
+  margin: 0 auto 1.25rem;
+  line-height: 1.5;
+}
+
+body.eap-wix .wix-hero__lead {
+  font-size: 1rem;
+  color: var(--wix-muted);
+  max-width: 32rem;
+  margin: 0 auto 1.5rem;
+  line-height: 1.6;
+}
+
+body.eap-wix .wix-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+
+body.eap-wix .wix-pill {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: var(--wix-pill);
+  background: rgba(17, 109, 255, 0.08);
+  color: var(--wix-blue);
+}
+
+body.eap-wix .wix-login-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+body.eap-wix .login-card {
+  background: var(--wix-card) !important;
+  border: 1px solid var(--wix-card-border) !important;
+  border-radius: var(--wix-radius) !important;
+  box-shadow: var(--wix-shadow) !important;
+  padding: 1.75rem !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+body.eap-wix .login-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(17, 109, 255, 0.12) !important;
+}
+
+body.eap-wix .login-card__heading {
+  font-family: var(--wix-font) !important;
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: var(--wix-text) !important;
+}
+
+body.eap-wix .login-card--student {
+  border-top: 4px solid var(--wix-teal) !important;
+}
+
+body.eap-wix .login-card--teacher {
+  border-top: 4px solid var(--wix-blue) !important;
+}
+
+body.eap-wix .btn-primary {
+  width: 100%;
+  font-family: var(--wix-font) !important;
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+  padding: 0.85rem 1.5rem !important;
+  border: none !important;
+  border-radius: var(--wix-pill) !important;
+  background: linear-gradient(135deg, var(--wix-blue) 0%, var(--wix-blue-dark) 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(17, 109, 255, 0.35) !important;
+  cursor: pointer;
+}
+
+body.eap-wix .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-2px);
+}
+
+body.eap-wix .field label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .field input,
+body.eap-wix .field select,
+body.eap-wix .field textarea {
+  border-radius: 10px !important;
+  border: 1px solid var(--wix-card-border) !important;
+  padding: 0.75rem 1rem !important;
+  line-height: 1.45 !important;
+  box-sizing: border-box !important;
+}
+
+body.eap-wix .field textarea {
+  min-height: 6.5rem !important;
+}
+
+body.eap-wix .field {
+  margin-bottom: 1.15rem !important;
+}
+
+body.eap-wix .field label {
+  display: block;
+  margin-bottom: 0.45rem !important;
+}
+
+body.eap-wix .teacher-task-zh-fields {
+  margin: 0.25rem 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px dashed var(--wix-card-border);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.85);
+}
+
+body.eap-wix .teacher-task-zh-fields > summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--wix-muted);
+  padding: 0.35rem 0.15rem;
+  list-style: none;
+}
+
+body.eap-wix .teacher-task-zh-fields > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.eap-wix .teacher-task-zh-fields__body {
+  padding-top: 0.65rem;
+}
+
+body.eap-wix .teacher-create-task-details__body .panel-form,
+body.eap-wix .teacher-from-template-details__body {
+  padding-top: 0.35rem;
+}
+
+body.eap-wix .wix-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+body.eap-wix .wix-feature-card {
+  background: var(--wix-card);
+  border: 1px solid var(--wix-card-border);
+  border-radius: var(--wix-radius);
+  padding: 1.5rem;
+  box-shadow: var(--wix-shadow);
+}
+
+body.eap-wix .wix-feature-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+body.eap-wix .wix-feature-card p {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--wix-muted);
+  line-height: 1.55;
+}
+
+body.eap-wix .landing-footer-note {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+}
+
+/* Hide old landing chrome */
+body.eap-wix .landing-hero-mega,
+body.eap-wix .landing-section--explore,
+body.eap-wix .landing-hero-auth__intro {
+  display: none;
+}
+
+body.eap-wix .landing-hero-split {
+  display: contents;
+}
+
+/* —— App pages (student / teacher) —— */
+body.eap-wix.page-app .site-header {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--wix-card-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+body.eap-wix.page-app .site-logo {
+  font-family: var(--wix-font) !important;
+  font-weight: 700 !important;
+  color: var(--wix-text) !important;
+}
+
+body.eap-wix .eap-build-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  margin-left: 8px;
+  border-radius: 6px;
+  background: rgba(17, 109, 255, 0.1);
+  color: var(--wix-blue);
+  vertical-align: middle;
+}
+
+body.eap-wix .page-hero {
+  background: var(--wix-card) !important;
+  border: 1px solid var(--wix-card-border);
+  border-radius: var(--wix-radius);
+  box-shadow: var(--wix-shadow);
+  padding: 1.5rem 1.75rem !important;
+  margin-bottom: 1.5rem;
+}
+
+body.eap-wix .page-hero h1 {
+  font-family: var(--wix-font) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+}
+
+body.eap-wix .student-progress-card,
+body.eap-wix .dashboard-stat,
+body.eap-wix .task-card,
+body.eap-wix .teacher-progress-dashboard,
+body.eap-wix .eap-cal {
+  background: var(--wix-card) !important;
+  border: 1px solid var(--wix-card-border) !important;
+  border-radius: var(--wix-radius) !important;
+  box-shadow: var(--wix-shadow) !important;
+}
+
+body.eap-wix .btn-secondary {
+  border-radius: var(--wix-pill) !important;
+  font-weight: 600 !important;
+  color: var(--wix-blue) !important;
+  border-color: rgba(17, 109, 255, 0.25) !important;
+  padding: 0.65rem 1.25rem !important;
+}
+
+body.eap-wix .task-card--teacher .task-card__copy-summary,
+body.eap-wix .task-card--teacher .task-card__template-save-summary {
+  display: block;
+  padding: 0.75rem 1.15rem !important;
+  margin: 0.35rem 0;
+  border-radius: 10px;
+  border: 1px solid rgba(17, 109, 255, 0.2);
+  background: #fff;
+}
+
+body.eap-wix .task-card--teacher .task-card__copy,
+body.eap-wix .task-card--teacher .task-card__template-save {
+  padding: 0.5rem 0.65rem 0.75rem !important;
+}
+
+body.eap-wix .task-card__description {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.65rem 0.85rem;
+  line-height: 1.5;
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+body.eap-wix .login-card--admin {
+  border-top: 4px solid #5856d6 !important;
+}
+
+body.eap-wix .admin-panel {
+  background: var(--wix-card);
+  border: 1px solid var(--wix-card-border);
+  border-radius: var(--wix-radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--wix-shadow);
+}
+
+body.eap-wix .admin-panel__hint {
+  margin: -0.25rem 0 1rem;
+  font-size: 0.9rem;
+  color: var(--wix-muted);
+}
+
+body.eap-wix .admin-table-wrap {
+  overflow-x: auto;
+}
+
+body.eap-wix .admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+body.eap-wix .admin-table th,
+body.eap-wix .admin-table td {
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  border-bottom: 1px solid var(--wix-card-border);
+}
+
+body.eap-wix .admin-table th {
+  font-weight: 600;
+  color: var(--wix-muted);
+  font-size: 0.8125rem;
+}
+
+body.eap-wix .admin-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+body.eap-wix .admin-badge--ok {
+  background: rgba(10, 126, 164, 0.12);
+  color: var(--wix-teal, #0a7ea4);
+}
+
+body.eap-wix .admin-badge--pending {
+  background: rgba(255, 149, 0, 0.12);
+  color: #b45309;
+}
+
+body.eap-wix .admin-empty {
+  font-size: 0.9rem;
+  color: var(--wix-muted);
+  margin: 0.5rem 0 0;
+}
+
+body.eap-wix .admin-calendar-form {
+  display: grid;
+  gap: 1rem;
+  max-width: 36rem;
+}
+
+body.eap-wix .admin-calendar-form textarea {
+  min-height: 10rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875rem;
+}
+
+body.eap-wix .eap-cal__nav-btn {
+  border-radius: var(--wix-pill) !important;
+}
+
+body.eap-wix .eap-cal__cell--day.eap-cal__cell--selected {
+  outline: 2px solid var(--wix-blue);
+  outline-offset: 2px;
+}
+
+body.eap-wix .cal-pill {
+  border-radius: 6px;
+}
+
+body.eap-wix .app-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+body.eap-wix.page-app .site-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+body.eap-wix.page-app .eap-lang-bar {
+  position: static;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  body.eap-wix .wix-nav {
+    padding: 12px 16px;
+  }
+  body.eap-wix.page-landing .landing-content {
+    padding-top: 88px;
+  }
+}

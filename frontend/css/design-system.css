@@ -1,0 +1,162 @@
+/* EAP Agent — design tokens & shell (Apple-like + academic teal) */
+
+:root {
+  --eap-blue: #0071e3;
+  --eap-blue-hover: #0077ed;
+  --eap-teal: #0a7ea4;
+  --eap-teal-soft: rgba(10, 126, 164, 0.12);
+  --eap-text: #1d1d1f;
+  --eap-text-secondary: #86868b;
+  --eap-surface: rgba(255, 255, 255, 0.78);
+  --eap-surface-strong: rgba(255, 255, 255, 0.92);
+  --eap-border: rgba(0, 0, 0, 0.08);
+  --eap-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
+  --eap-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.1);
+  --eap-radius: 12px;
+  --eap-radius-pill: 980px;
+  --eap-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --eap-overlay: rgba(250, 250, 252, 0.82);
+  --eap-bg-image: none;
+}
+
+/* Hide legacy landing photo layers when shell is active */
+body.eap-shell-active.page-landing::before,
+body.eap-shell-active.page-landing .landing-decor,
+body.eap-shell-active.page-landing .landing-wash {
+  display: none !important;
+}
+
+body.eap-shell-active {
+  font-family: var(--eap-font);
+  color: var(--eap-text);
+  margin: 0;
+  min-height: 100vh;
+  background: #fafafa;
+}
+
+.page-shell {
+  min-height: 100vh;
+  position: relative;
+  background-color: #e8eaed;
+  background-image: var(--eap-bg-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.page-overlay {
+  min-height: 100vh;
+  background: var(--eap-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Language toggle */
+.eap-lang-bar {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 2000;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+body.page-app .eap-lang-bar {
+  position: static;
+}
+
+body.page-app .site-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-lang {
+  font-family: var(--eap-font);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--eap-radius-pill);
+  border: 1px solid var(--eap-border);
+  background: var(--eap-surface-strong);
+  color: var(--eap-teal);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn-lang:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--eap-shadow);
+}
+
+/* Glass surfaces */
+body.eap-shell-active .login-card,
+body.eap-shell-active .landing-hero-auth,
+body.eap-shell-active .student-progress-card,
+body.eap-shell-active .teacher-progress-card,
+body.eap-shell-active .task-card,
+body.eap-shell-active .planner-day-detail,
+body.eap-shell-active .page-hero {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+body.eap-shell-active .site-header {
+  background: var(--eap-surface-strong);
+  border-bottom: 1px solid var(--eap-border);
+  backdrop-filter: blur(16px);
+}
+
+body.eap-shell-active .site-logo {
+  color: var(--eap-text);
+  font-weight: 600;
+}
+
+/* Primary actions — Apple blue */
+body.eap-shell-active .btn-primary {
+  background: var(--eap-blue) !important;
+  border: none !important;
+  border-radius: var(--eap-radius-pill) !important;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  box-shadow: 0 2px 8px rgba(0, 113, 227, 0.35);
+}
+
+body.eap-shell-active .btn-primary:hover:not(:disabled) {
+  background: var(--eap-blue-hover) !important;
+  box-shadow: var(--eap-shadow-hover);
+}
+
+/* Secondary / teal accents */
+body.eap-shell-active .btn-secondary,
+body.eap-shell-active .planner-nav-btn {
+  border-color: var(--eap-teal);
+  color: var(--eap-teal);
+}
+
+body.eap-shell-active a:not(.site-logo):not(.btn-primary) {
+  color: var(--eap-teal);
+}
+
+body.eap-shell-active .student-progress-card__value,
+body.eap-shell-active .teacher-progress-card__value {
+  color: var(--eap-blue);
+}
+
+/* Agent build badge */
+.eap-build-badge {
+  font-size: 0.6875rem;
+  color: var(--eap-text-secondary);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--eap-teal-soft);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.landing-footer-note a {
+  color: var(--eap-blue);
+}

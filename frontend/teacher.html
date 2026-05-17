@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Teaching Calendar Centre — EAP Platform" />
+    <title>Teaching Calendar Centre — EAP Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,600;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="page-app eap-shell-active" data-page="teacher">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="site-logo" href="teacher.html"><span data-i18n="brand">EAP Platform</span><span class="eap-build-badge" data-i18n="build_badge">Agent build</span></a>
+        <div class="site-header__actions">
+          <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">中文</button>
+          <p class="site-welcome" id="header-welcome" aria-live="polite"><span data-i18n="welcome">Welcome,</span></p>
+          <button type="button" class="btn-logout" id="logout-btn" data-i18n="logout">Logout</button>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="app-main app-main--calendar">
+      <div class="page-hero">
+        <h1 data-i18n="teacher_page_title">Teaching Calendar Centre</h1>
+        <p data-i18n="teacher_page_lead">
+          Choose your class, then pick a date on the calendar to manage that day's tasks, uploads,
+          and submissions.
+        </p>
+      </div>
+
+      <p id="teacher-page-error" class="form-message hidden" role="alert" aria-live="polite"></p>
+
+      <section
+        id="teacher-study-plan-progress"
+        class="teacher-study-plan-progress"
+        aria-labelledby="teacher-study-plan-progress-heading"
+      >
+        <div class="teacher-study-plan-progress__header">
+          <h2 id="teacher-study-plan-progress-heading" class="teacher-study-plan-progress__title">
+            Student Study Plan Progress
+          </h2>
+          <p id="teacher-study-plan-progress-subtitle" class="teacher-study-plan-progress__subtitle" aria-live="polite">
+            Class: — · —
+          </p>
+        </div>
+        <p
+          id="teacher-study-plan-progress-error"
+          class="teacher-study-plan-progress__error hidden"
+          role="alert"
+          aria-live="polite"
+        ></p>
+        <p
+          id="teacher-study-plan-progress-empty"
+          class="teacher-study-plan-progress__empty hidden"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <div id="teacher-study-plan-progress-body" class="teacher-study-plan-progress__body hidden">
+          <div class="teacher-study-plan-progress-cards" role="list">
+            <article class="teacher-study-plan-progress-card" role="listitem">
+              <span id="teacher-study-plan-progress-stat-total" class="teacher-study-plan-progress-card__value">—</span>
+              <span class="teacher-study-plan-progress-card__label">Total plans</span>
+            </article>
+            <article class="teacher-study-plan-progress-card" role="listitem">
+              <span id="teacher-study-plan-progress-stat-completed" class="teacher-study-plan-progress-card__value">—</span>
+              <span class="teacher-study-plan-progress-card__label">Completed</span>
+            </article>
+            <article class="teacher-study-plan-progress-card" role="listitem">
+              <span id="teacher-study-plan-progress-stat-planned" class="teacher-study-plan-progress-card__value">—</span>
+              <span class="teacher-study-plan-progress-card__label">Planned</span>
+            </article>
+            <article class="teacher-study-plan-progress-card" role="listitem">
+              <span id="teacher-study-plan-progress-stat-rate" class="teacher-study-plan-progress-card__value">—</span>
+              <span class="teacher-study-plan-progress-card__label">Completion rate</span>
+            </article>
+            <article class="teacher-study-plan-progress-card" role="listitem">
+              <span id="teacher-study-plan-progress-stat-students" class="teacher-study-plan-progress-card__value">—</span>
+              <span class="teacher-study-plan-progress-card__label">Students active</span>
+            </article>
+            <article class="teacher-study-plan-progress-card" role="listitem">
+              <span id="teacher-study-plan-progress-stat-mins-total" class="teacher-study-plan-progress-card__value">—</span>
+              <span class="teacher-study-plan-progress-card__label">Planned minutes</span>
+            </article>
+            <article class="teacher-study-plan-progress-card" role="listitem">
+              <span id="teacher-study-plan-progress-stat-mins-completed" class="teacher-study-plan-progress-card__value">—</span>
+              <span class="teacher-study-plan-progress-card__label">Completed minutes</span>
+            </article>
+          </div>
+          <div class="teacher-study-plan-progress-skills">
+            <h3 class="teacher-study-plan-progress-skills__title">Skill areas</h3>
+            <ul id="teacher-study-plan-progress-skills" class="teacher-study-plan-progress-skills__list"></ul>
+          </div>
+          <details id="teacher-study-plan-progress-top-students" class="teacher-study-plan-progress-top hidden">
+            <summary class="teacher-study-plan-progress-top__summary">Top students this month</summary>
+            <p id="teacher-study-plan-progress-top-hint" class="teacher-study-plan-progress-top__hint"></p>
+            <ul id="teacher-study-plan-progress-top-list" class="teacher-study-plan-progress-top__list"></ul>
+          </details>
+        </div>
+      </section>
+
+      <div class="eap-view-shell">
+        <div
+          id="teacher-calendar-view"
+          class="eap-view-panel eap-view-panel--active"
+          role="region"
+          aria-labelledby="teacher-class-heading"
+        >
+          <section class="content-section content-section--class-bar" aria-labelledby="teacher-class-heading">
+            <h2 id="teacher-class-heading" class="section-heading">Class</h2>
+            <div class="field dashboard-class-field">
+              <label for="teacher-calendar-class">Choose class</label>
+              <select id="teacher-calendar-class" name="calendar_class" required>
+                <option value="EAP047">EAP047</option>
+                <option value="EAP048">EAP048</option>
+                <option value="EAP049">EAP049</option>
+              </select>
+              <p class="field-hint">
+                Pick a date below to open the daily workspace for this class.
+              </p>
+            </div>
+          </section>
+
+          <section class="content-section" aria-labelledby="teacher-cal-heading">
+            <h2 id="teacher-cal-heading" class="section-heading visually-hidden">Monthly calendar</h2>
+            <div id="teacher-calendar-root" class="eap-calendar-root" aria-label="Monthly teaching calendar"></div>
+          </section>
+        </div>
+
+        <div
+          id="teacher-daily-view"
+          class="eap-view-panel eap-view-panel--inactive"
+          role="region"
+          aria-labelledby="teacher-daily-title"
+          aria-hidden="true"
+        >
+          <article class="eap-daily-card eap-daily-card--teacher">
+            <header class="eap-daily-card__header teacher-daily-header">
+              <div class="teacher-daily-header__top">
+                <button type="button" class="btn-secondary eap-daily-card__back" id="teacher-back-to-calendar">
+                  ← Back to Monthly Calendar
+                </button>
+              </div>
+              <div class="teacher-daily-header__body">
+                <h2 id="teacher-daily-title" class="eap-daily-card__title teacher-daily-header__title">
+                  Teaching Tasks
+                </h2>
+                <p id="teacher-daily-class-label" class="teacher-daily-class-label" aria-live="polite"></p>
+                <div
+                  id="teacher-daily-chips"
+                  class="teacher-daily-chips"
+                  role="group"
+                  aria-label="Summary for this class and day"
+                >
+                  <span class="teacher-daily-chip"
+                    ><span class="teacher-daily-chip__value" id="teacher-chip-tasks">—</span>
+                    <span class="teacher-daily-chip__label">tasks</span></span
+                  >
+                  <span class="teacher-daily-chip"
+                    ><span class="teacher-daily-chip__value" id="teacher-chip-submissions">—</span>
+                    <span class="teacher-daily-chip__label">submissions</span></span
+                  >
+                  <span class="teacher-daily-chip"
+                    ><span class="teacher-daily-chip__value" id="teacher-chip-feedback">—</span>
+                    <span class="teacher-daily-chip__label">feedback</span></span
+                  >
+                  <span class="teacher-daily-chip"
+                    ><span class="teacher-daily-chip__value" id="teacher-chip-revisions">—</span>
+                    <span class="teacher-daily-chip__label">revisions</span></span
+                  >
+                  <span class="teacher-daily-chip"
+                    ><span class="teacher-daily-chip__value" id="teacher-chip-waiting">—</span>
+                    <span class="teacher-daily-chip__label">waiting</span></span
+                  >
+                </div>
+              </div>
+            </header>
+
+            <div class="eap-daily-card__body teacher-daily-body">
+              <div class="teacher-calendar-filter teacher-calendar-filter--compact visually-hidden" aria-hidden="true">
+                <input id="teacher-task-view-date" name="view_date" type="date" required />
+                <button type="button" class="hidden" id="teacher-view-tasks-btn" tabindex="-1">Reload</button>
+              </div>
+
+              <p id="teacher-task-scope" class="teacher-task-scope" aria-live="polite"></p>
+
+              <p id="teacher-empty-hint" class="empty-hint hidden">
+                No tasks found for this class and date. Please create a new task or choose another date.
+              </p>
+
+              <!-- Master–detail: compact list (left) + one full task card (right). Same APIs as before. -->
+              <div class="teacher-daily-workspace">
+                <aside class="teacher-daily-master" aria-labelledby="teacher-master-heading">
+                  <h3 id="teacher-master-heading" class="teacher-daily-master__heading">Tasks</h3>
+                  <ul id="teacher-task-master-list" class="teacher-task-master-list"></ul>
+                </aside>
+                <section
+                  class="teacher-daily-detail"
+                  id="teacher-task-detail"
+                  aria-label="Selected task details"
+                >
+                  <div id="teacher-task-detail-empty" class="teacher-task-detail-empty">
+                    <p class="teacher-task-detail-empty__title">No task selected</p>
+                    <p class="teacher-task-detail-empty__text">
+                      Choose a day from the calendar, then pick a task from the list on the left.
+                    </p>
+                  </div>
+                  <div id="teacher-task-detail-inner" class="teacher-task-detail-inner hidden" hidden></div>
+                </section>
+              </div>
+
+              <details class="teacher-student-study-plans-details" id="teacher-student-study-plans-details">
+                <summary class="teacher-student-study-plans-details__summary" data-i18n="student_plans_heading">Student Personal Study Plans</summary>
+                <div class="teacher-student-study-plans-details__body">
+                  <p id="teacher-study-plans-empty" class="teacher-study-plans-empty hidden">
+                    No personal study plans for this class and date.
+                  </p>
+                  <div id="teacher-study-plans-table-wrap" class="teacher-study-plans-table-wrap hidden">
+                    <table class="teacher-study-plans-table" aria-label="Student personal study plans">
+                      <thead>
+                        <tr>
+                          <th scope="col">Student</th>
+                          <th scope="col">Date</th>
+                          <th scope="col">Skill</th>
+                          <th scope="col">Title</th>
+                          <th scope="col">Description</th>
+                          <th scope="col">Minutes</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Suggestion</th>
+                        </tr>
+                      </thead>
+                      <tbody id="teacher-study-plans-tbody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
+
+              <details class="teacher-create-task-details">
+                <summary class="teacher-create-task-details__summary" data-i18n="create_new_task">Create New Task</summary>
+                <div class="teacher-create-task-details__body">
+                  <section class="content-section content-section--nested" aria-labelledby="create-task-heading">
+                    <h3 id="create-task-heading" class="section-heading section-heading--nested visually-hidden">
+                      Create a task
+                    </h3>
+                    <form id="teacher-task-form" class="panel-form" novalidate>
+                  <div class="field synced-field visually-hidden">
+                    <label for="teacher-task-class">Class</label>
+                    <select id="teacher-task-class" name="class_name" required>
+                      <option value="EAP047">EAP047</option>
+                      <option value="EAP048">EAP048</option>
+                      <option value="EAP049">EAP049</option>
+                    </select>
+                  </div>
+                  <div class="field visually-hidden">
+                    <label for="task-date">Date</label>
+                    <input id="task-date" name="date" type="date" required />
+                  </div>
+                  <div class="field">
+                    <label for="task-title" data-i18n="task_title_en">Task title</label>
+                    <input
+                      id="task-title"
+                      name="title"
+                      type="text"
+                      required
+                      data-i18n-placeholder="task_title_en_placeholder"
+                      placeholder="e.g. Academic vocabulary — hedging"
+                      autocomplete="off"
+                    />
+                  </div>
+                  <details id="teacher-task-zh-fields" class="teacher-task-zh-fields">
+                    <summary data-i18n="task_zh_optional">Chinese (optional)</summary>
+                    <div class="teacher-task-zh-fields__body">
+                  <div class="field">
+                    <label for="task-title-zh" data-i18n="task_title_zh">Task title (Chinese)</label>
+                    <input
+                      id="task-title-zh"
+                      name="title_zh"
+                      type="text"
+                      data-i18n-placeholder="task_title_zh_placeholder"
+                      placeholder="例如：学术词汇 — 含糊限制语"
+                      autocomplete="off"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="task-description-zh" data-i18n="task_description_zh">Description (Chinese)</label>
+                    <textarea
+                      id="task-description-zh"
+                      name="description_zh"
+                      rows="4"
+                      data-i18n-placeholder="task_description_zh_placeholder"
+                      placeholder="给学生的说明、链接或备注…"
+                    ></textarea>
+                  </div>
+                    </div>
+                  </details>
+                  <div class="field">
+                    <label for="task-type" data-i18n="category">Task category</label>
+                    <select id="task-type" name="type" required></select>
+                  </div>
+                  <div class="field">
+                    <label for="task-period" data-i18n="class_period">Class period</label>
+                    <input
+                      id="task-period"
+                      name="period"
+                      type="text"
+                      placeholder="e.g. Period 1 or 14:00–15:00 (optional)"
+                      autocomplete="off"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="task-description" data-i18n="task_description_en">Description</label>
+                    <textarea
+                      id="task-description"
+                      name="description"
+                      rows="4"
+                      data-i18n-placeholder="task_description_en_placeholder"
+                      placeholder="Instructions, links, or notes for students…"
+                    ></textarea>
+                  </div>
+                  <button type="submit" class="btn-primary" data-i18n="save_task">Save Task</button>
+                  <p id="teacher-form-message" class="form-message" role="status" aria-live="polite"></p>
+                </form>
+              </section>
+                </div>
+              </details>
+
+              <details class="teacher-from-template-details">
+                <summary class="teacher-from-template-details__summary" data-i18n="create_from_template">Create from Template</summary>
+                <div class="teacher-from-template-details__body">
+                  <div class="field">
+                    <label for="teacher-template-select" data-i18n="template_label">Template</label>
+                    <select id="teacher-template-select" aria-describedby="teacher-template-hint">
+                      <option value="" data-i18n="select_template">Select a template…</option>
+                    </select>
+                    <p id="teacher-template-hint" class="field-hint" data-i18n="template_hint">
+                      Pick a saved template, then choose where to place the new task.
+                    </p>
+                  </div>
+
+                  <details class="teacher-template-manage-details">
+                    <summary class="teacher-template-manage-details__summary" data-i18n="manage_templates">Manage templates</summary>
+                    <div class="teacher-template-manage-details__body">
+                      <p id="teacher-template-manage-empty" class="teacher-template-manage-empty hidden">
+                        No saved templates yet.
+                      </p>
+                      <ul
+                        id="teacher-template-manage-list"
+                        class="teacher-template-manage-list"
+                        aria-label="Saved task templates"
+                      ></ul>
+                      <p
+                        id="teacher-template-manage-status"
+                        class="teacher-template-manage-status"
+                        role="status"
+                        aria-live="polite"
+                      ></p>
+                    </div>
+                  </details>
+
+                  <div class="field">
+                    <label for="teacher-template-apply-date" data-i18n="target_date">Target date</label>
+                    <input id="teacher-template-apply-date" type="date" required />
+                  </div>
+                  <div class="field">
+                    <label for="teacher-template-apply-class" data-i18n="target_class">Target class</label>
+                    <select id="teacher-template-apply-class" required>
+                      <option value="EAP047">EAP047</option>
+                      <option value="EAP048">EAP048</option>
+                      <option value="EAP049">EAP049</option>
+                    </select>
+                  </div>
+                  <div class="field teacher-from-template-details__check">
+                    <label class="teacher-from-template-details__check-label">
+                      <input id="teacher-template-include-material" type="checkbox" />
+                      <span data-i18n="include_material_ref">Include teaching material (same file reference)</span>
+                    </label>
+                  </div>
+                  <button type="button" class="btn-secondary" id="teacher-template-apply-btn" data-i18n="create_task_btn">
+                    Create Task
+                  </button>
+                  <p id="teacher-template-apply-status" class="teacher-template-apply-status" role="status" aria-live="polite"></p>
+                </div>
+              </details>
+
+              <section
+                class="content-section content-section--nested teacher-progress-dashboard"
+                aria-labelledby="dashboard-heading"
+              >
+                <h3 id="dashboard-heading" class="section-heading section-heading--nested" data-i18n="progress_dashboard">
+                  Progress dashboard
+                </h3>
+                <p id="teacher-progress-dashboard-hint" class="teacher-progress-hint" data-i18n="progress_dashboard_hint">
+                  Totals reflect the teaching class chosen above (calendar class). Uses homework and
+                  feedback data from the server.
+                </p>
+                <div class="field dashboard-class-field synced-field visually-hidden">
+                  <label for="teacher-dashboard-class">Class</label>
+                  <select id="teacher-dashboard-class" name="dashboard_class" required>
+                    <option value="EAP047">EAP047</option>
+                    <option value="EAP048">EAP048</option>
+                    <option value="EAP049">EAP049</option>
+                  </select>
+                </div>
+                <div
+                  class="dashboard-grid dashboard-grid--progress"
+                  role="region"
+                  aria-label="Class progress analytics from API"
+                >
+                  <article class="dashboard-stat">
+                    <h4 class="dashboard-stat__label">Total Tasks</h4>
+                    <p class="dashboard-stat__value" id="dash-total">—</p>
+                  </article>
+                  <article class="dashboard-stat dashboard-stat--completed">
+                    <h4 class="dashboard-stat__label">Completed Tasks</h4>
+                    <p class="dashboard-stat__value" id="dash-completed">—</p>
+                  </article>
+                  <article class="dashboard-stat dashboard-stat--pending">
+                    <h4 class="dashboard-stat__label">Pending Tasks</h4>
+                    <p class="dashboard-stat__value" id="dash-pending">—</p>
+                  </article>
+                  <article class="dashboard-stat dashboard-stat--rate">
+                    <h4 class="dashboard-stat__label">Completion Rate</h4>
+                    <p class="dashboard-stat__value" id="dash-rate">—</p>
+                  </article>
+                  <article class="dashboard-stat dashboard-stat--submissions">
+                    <h4 class="dashboard-stat__label">Homework Submissions</h4>
+                    <p class="dashboard-stat__value" id="dash-submissions">—</p>
+                  </article>
+                  <article class="dashboard-stat dashboard-stat--feedback">
+                    <h4 class="dashboard-stat__label">Feedback Given</h4>
+                    <p class="dashboard-stat__value" id="dash-feedback-given">—</p>
+                  </article>
+                  <article class="dashboard-stat dashboard-stat--revisions">
+                    <h4 class="dashboard-stat__label">Revisions Submitted</h4>
+                    <p class="dashboard-stat__value" id="dash-revisions">—</p>
+                  </article>
+                  <article class="dashboard-stat dashboard-stat--waiting">
+                    <h4 class="dashboard-stat__label">Waiting for Feedback</h4>
+                    <p class="dashboard-stat__value" id="dash-waiting-feedback">—</p>
+                  </article>
+                </div>
+
+                <h4 id="teacher-attention-heading" class="teacher-attention-section__heading">
+                  Tasks Needing Teacher Attention
+                </h4>
+                <p class="teacher-attention-section__hint">
+                  Tasks where at least one submission still needs feedback, or a student has sent a revision.
+                  Open the calendar date below to expand “View submissions” on the task card.
+                </p>
+                <ul
+                  id="teacher-attention-list"
+                  class="teacher-attention-list"
+                  aria-labelledby="teacher-attention-heading"
+                ></ul>
+                <p id="teacher-attention-empty" class="teacher-attention-empty hidden" aria-live="polite">
+                  No tasks need attention right now.
+                </p>
+              </section>
+            </div>
+          </article>
+        </div>
+      </div>
+    </main>
+      </div>
+    </div>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

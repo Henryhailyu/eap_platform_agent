@@ -1,0 +1,7 @@
+/**
+ * Agent build — Wix-inspired theme on top of functional layout CSS.
+ * Legacy = structure (calendar, tasks). wix-theme = look & visible backgrounds.
+ */
+@import url("style-legacy.css");
+@import url("css/wix-theme.css");
+@import url("css/animations.css");

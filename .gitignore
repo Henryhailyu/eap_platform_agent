@@ -1,0 +1,26 @@
+# Python virtual environment
+backend/venv/
+venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# macOS system files
+.DS_Store
+
+# Environment files
+.env
+
+# Uploaded teaching materials and homework submissions
+backend/uploads/
+backend/submissions/
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Cursor / VS Code local settings
+.vscode/
+.cursor/

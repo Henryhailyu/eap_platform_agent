@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="EAP Platform — calendar-centred English for Academic Purposes"
+    />
+    <title>EAP Platform — Sign in</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="page-landing">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+        <header class="wix-nav">
+          <a class="wix-nav__brand" href="index.html" data-i18n="brand">EAP Platform</a>
+          <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">中文</button>
+        </header>
+
+        <main class="landing-content" id="login-main">
+          <section class="wix-hero">
+            <h1 class="wix-hero__title" data-i18n="landing_title">The new way to teach and learn EAP</h1>
+            <p class="wix-hero__subtitle" data-i18n="landing_subtitle">
+              Calendar-centred learning and teaching — built for your classroom
+            </p>
+            <p class="wix-hero__lead" data-i18n="landing_lead">
+              Plan lessons, assign tasks, collect homework, and track progress in one calm, modern workspace.
+            </p>
+            <div class="wix-pill-row" aria-label="Features">
+              <span class="wix-pill" data-i18n="highlight_calendar">Calendar hub</span>
+              <span class="wix-pill" data-i18n="highlight_homework">Homework flow</span>
+              <span class="wix-pill" data-i18n="highlight_analytics">Progress insights</span>
+            </div>
+          </section>
+
+          <p class="landing-hero-auth__intro" data-i18n="login_intro" style="text-align: center; margin-bottom: 1.5rem">
+            Choose your role to continue.
+          </p>
+
+          <div class="wix-login-grid" role="presentation">
+            <section class="login-card login-card--student" aria-labelledby="student-login-title">
+              <h3 id="student-login-title" class="login-card__heading" data-i18n="student_login_title">Student sign in</h3>
+              <p class="login-card__intro" data-i18n="student_login_intro">Open your learning calendar</p>
+              <p id="student-login-error" class="login-error hidden" role="alert" aria-live="polite"></p>
+              <form id="student-login-form" action="#" method="post" novalidate>
+                <div class="field">
+                  <label for="student-username" data-i18n="username">Username</label>
+                  <input
+                    id="student-username"
+                    name="username"
+                    type="text"
+                    required
+                    autocomplete="username"
+                    placeholder="e.g. student1"
+                  />
+                </div>
+                <div class="field">
+                  <label for="student-password" data-i18n="password">Password</label>
+                  <input
+                    id="student-password"
+                    name="password"
+                    type="password"
+                    required
+                    autocomplete="current-password"
+                    placeholder="••••••••"
+                  />
+                </div>
+                <button type="submit" class="btn-primary" id="student-login-submit" data-i18n="login_student_btn">
+                  Continue as student
+                </button>
+              </form>
+              <p class="login-card-hint" data-i18n="demo_hint" data-i18n-params='{"user":"student1","pass":"123456"}'>
+                Demo: student1 · 123456
+              </p>
+            </section>
+
+            <section class="login-card login-card--teacher" aria-labelledby="teacher-login-title">
+              <h3 id="teacher-login-title" class="login-card__heading" data-i18n="teacher_login_title">Teacher sign in</h3>
+              <p class="login-card__intro" data-i18n="teacher_login_intro">Open your teaching calendar</p>
+              <p id="teacher-login-error" class="login-error hidden" role="alert" aria-live="polite"></p>
+              <form id="teacher-login-form" action="#" method="post" novalidate>
+                <div class="field">
+                  <label for="teacher-username" data-i18n="username">Username</label>
+                  <input
+                    id="teacher-username"
+                    name="username"
+                    type="text"
+                    required
+                    autocomplete="username"
+                    placeholder="e.g. teacher1"
+                  />
+                </div>
+                <div class="field">
+                  <label for="teacher-password" data-i18n="password">Password</label>
+                  <input
+                    id="teacher-password"
+                    name="password"
+                    type="password"
+                    required
+                    autocomplete="current-password"
+                    placeholder="••••••••"
+                  />
+                </div>
+                <button type="submit" class="btn-primary" id="teacher-login-submit" data-i18n="login_teacher_btn">
+                  Continue as teacher
+                </button>
+              </form>
+              <p class="login-card-hint" data-i18n="demo_hint" data-i18n-params='{"user":"teacher1","pass":"123456"}'>
+                Demo: teacher1 · 123456
+              </p>
+            </section>
+
+            <section class="login-card login-card--admin" aria-labelledby="admin-login-title">
+              <h3 id="admin-login-title" class="login-card__heading" data-i18n="admin_login_title">Manager sign in</h3>
+              <p class="login-card__intro" data-i18n="admin_login_intro">Authorize teachers and view accounts</p>
+              <p id="admin-login-error" class="login-error hidden" role="alert" aria-live="polite"></p>
+              <form id="admin-login-form" action="#" method="post" novalidate>
+                <div class="field">
+                  <label for="admin-username" data-i18n="username">Username</label>
+                  <input
+                    id="admin-username"
+                    name="username"
+                    type="text"
+                    required
+                    autocomplete="username"
+                    placeholder="e.g. manager1"
+                  />
+                </div>
+                <div class="field">
+                  <label for="admin-password" data-i18n="password">Password</label>
+                  <input
+                    id="admin-password"
+                    name="password"
+                    type="password"
+                    required
+                    autocomplete="current-password"
+                    placeholder="••••••••"
+                  />
+                </div>
+                <button type="submit" class="btn-primary" id="admin-login-submit" data-i18n="login_admin_btn">
+                  Continue as manager
+                </button>
+              </form>
+              <p class="login-card-hint" data-i18n="demo_hint" data-i18n-params='{"user":"manager1","pass":"123456"}'>
+                Demo: manager1 · 123456
+              </p>
+            </section>
+          </div>
+
+          <section class="wix-features" aria-labelledby="explore-heading">
+            <h2 id="explore-heading" class="visually-hidden">For students and teachers</h2>
+            <article class="wix-feature-card">
+              <h3 data-i18n="for_students_title">For students</h3>
+              <p data-i18n="for_students_body">
+                See daily tasks on your calendar, submit homework, read feedback, and track your progress.
+              </p>
+            </article>
+            <article class="wix-feature-card">
+              <h3 data-i18n="for_teachers_title">For teachers</h3>
+              <p data-i18n="for_teachers_body">
+                Create class tasks, upload materials, review submissions, and monitor completion at a glance.
+              </p>
+            </article>
+          </section>
+
+          <p class="landing-footer-note">
+            <span data-i18n="api_note">Agent build · port 5051</span>
+            ·
+            <a href="http://127.0.0.1:5051/ui/index.html">http://127.0.0.1:5051/ui/index.html</a>
+          </p>
+        </main>
+      </div>
+    </div>
+
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
