@@ -141,6 +141,14 @@ Student and teacher pages are responsive below **768px**: compact calendar with 
 
 Test: Chrome DevTools device mode, or open `http://127.0.0.1:5051/ui/student.html` on your phone (same Wi‑Fi).
 
+## WeChat mini-program API (Phase I2c)
+
+Student MVP endpoints, Bearer auth, and file download rules:
+
+**[`docs/API_STUDENT_MINI.md`](docs/API_STUDENT_MINI.md)**
+
+Use after **I0** (HTTPS pilot) and before building the mini-program UI (Phase I3).
+
 ## Tracker
 
 See `../eap_platform cursor agent window/EAP_PROJECT_TRACKER.md`
