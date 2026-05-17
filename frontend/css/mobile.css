@@ -1,0 +1,212 @@
+/* ==========================================================================
+   Phase H — mobile-friendly web (touch targets, compact calendar, stacked layouts)
+   ========================================================================== */
+
+/* Touch-friendly controls (44px min — WCAG 2.5.5 target size) */
+@media (max-width: 768px) {
+  body.eap-wix .btn-secondary,
+  body.eap-wix .btn-logout,
+  body.eap-wix .btn-lang {
+    min-height: 44px;
+    padding: 0.65rem 1rem !important;
+  }
+
+  body.eap-wix .student-category-chip,
+  body.eap-wix .teacher-template-category-chip {
+    min-height: 44px;
+    padding: 0.55rem 0.9rem;
+  }
+
+  body.eap-wix .student-task-master-item,
+  body.eap-wix .teacher-task-master-item,
+  body.eap-wix .student-archive-list-item {
+    min-height: 48px;
+    padding: 0.75rem 0.85rem;
+  }
+
+  body.eap-wix .eap-touch-file,
+  body.eap-wix .task-homework-file,
+  body.eap-wix .student-revision-file,
+  body.eap-wix .task-card input[type="file"] {
+    font-size: 16px;
+    min-height: 44px;
+    max-width: 100%;
+  }
+
+  body.eap-wix .task-homework-text,
+  body.eap-wix .student-revision-text,
+  body.eap-wix textarea,
+  body.eap-wix input[type="text"],
+  body.eap-wix input[type="date"],
+  body.eap-wix input[type="number"],
+  body.eap-wix select {
+    font-size: 16px;
+    max-width: 100%;
+  }
+
+  body.eap-wix .app-main {
+    padding: 1rem 0.85rem 2.5rem;
+  }
+
+  body.eap-wix.page-app .site-header {
+    padding: 0.75rem 1rem;
+  }
+
+  body.eap-wix.page-app .site-header__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  body.eap-wix .page-hero {
+    padding: 1rem 1.1rem !important;
+  }
+
+  body.eap-wix .page-hero h1 {
+    font-size: 1.35rem !important;
+  }
+
+  body.eap-wix .student-daily-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  body.eap-wix .student-daily-chip {
+    flex: 1 1 calc(33% - 0.35rem);
+    min-width: 5.5rem;
+    text-align: center;
+  }
+
+  body.eap-wix .eap-daily-toolbar,
+  body.eap-wix .student-daily-toolbar,
+  body.eap-wix .teacher-daily-header__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.eap-wix .eap-daily-toolbar .btn-secondary,
+  body.eap-wix .student-daily-toolbar .btn-secondary {
+    width: 100%;
+  }
+
+  /* Compact month calendar — larger day cells, fewer pill details */
+  body.eap-wix .eap-cal--compact .eap-cal__toolbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+
+  body.eap-wix .eap-cal--compact .eap-cal__title {
+    flex: 1 1 100%;
+    text-align: center;
+    font-size: 1rem;
+  }
+
+  body.eap-wix .eap-cal--compact .eap-cal__nav-btn {
+    flex: 1;
+    min-width: 0;
+  }
+
+  body.eap-wix .eap-cal--compact .eap-cal__row--head .eap-cal__weekday {
+    font-size: 0.65rem;
+    padding: 0.35rem 0.1rem;
+  }
+
+  body.eap-wix .eap-cal--compact .eap-cal__cell--day {
+    min-height: 3.25rem;
+    padding: 0.35rem 0.2rem;
+  }
+
+  body.eap-wix .eap-cal--compact .eap-cal__pills .cal-pill:not(.cal-pill--more) {
+    display: none;
+  }
+
+  body.eap-wix .eap-cal--compact .eap-cal__task-count {
+    display: block;
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-top: 0.15rem;
+    padding: 0.12rem 0.28rem;
+    border-radius: 4px;
+    background: rgba(0, 113, 227, 0.12);
+    color: var(--wix-blue, #0071e3);
+  }
+
+  body.eap-wix .eap-cal--compact .eap-cal__date-note,
+  body.eap-wix .eap-cal--compact .eap-cal__my-plans,
+  body.eap-wix .eap-cal--compact .eap-cal__class-student-plans {
+    font-size: 0.55rem;
+    line-height: 1.15;
+  }
+
+  body.eap-wix .student-learn-calendar-section__title {
+    font-size: 1.1rem;
+  }
+
+  /* Master–detail: show list OR detail full width on small screens */
+  body.eap-wix .student-daily-workspace--detail-open .student-daily-master,
+  body.eap-wix .teacher-daily-workspace--detail-open .teacher-daily-master {
+    display: none;
+  }
+
+  body.eap-wix .student-mobile-back-to-list,
+  body.eap-wix .teacher-mobile-back-to-list {
+    display: none;
+    width: 100%;
+    margin-bottom: 0.75rem;
+  }
+
+  body.eap-wix .student-daily-workspace--detail-open .student-mobile-back-to-list,
+  body.eap-wix .teacher-daily-workspace--detail-open .teacher-mobile-back-to-list {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  body.eap-wix .student-progress-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  body.eap-wix .student-progress-card--accent {
+    grid-column: 1 / -1;
+  }
+
+  body.eap-wix .student-study-plan-progress-cards,
+  body.eap-wix .teacher-study-plan-progress-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.eap-wix .admin-panel,
+  body.eap-wix .eap-class-overview__roster-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.eap-wix .task-card__footer .btn-secondary {
+    width: 100%;
+  }
+
+  body.eap-wix .student-archive-category-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.eap-wix .student-learning-archive__filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (min-width: 769px) {
+  body.eap-wix .eap-cal__task-count {
+    display: none;
+  }
+
+  body.eap-wix .student-mobile-back-to-list,
+  body.eap-wix .teacher-mobile-back-to-list {
+    display: none !important;
+  }
+}

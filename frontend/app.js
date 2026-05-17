@@ -1140,6 +1140,29 @@ function bucketTasksByDate(tasks) {
 }
 
 const CALENDAR_MAX_VISIBLE_PILLS = 3;
+const EAP_MOBILE_LAYOUT_MQ =
+  typeof window !== "undefined" && window.matchMedia
+    ? window.matchMedia("(max-width: 768px)")
+    : null;
+
+/** Phase H: narrow viewport — stacked master–detail, compact calendar. */
+function isEapMobileLayout() {
+  return !!(EAP_MOBILE_LAYOUT_MQ && EAP_MOBILE_LAYOUT_MQ.matches);
+}
+
+function calendarMaxVisiblePills() {
+  return isEapMobileLayout() ? 1 : CALENDAR_MAX_VISIBLE_PILLS;
+}
+
+function setMobileMasterDetailOpen(workspaceEl, open) {
+  if (!workspaceEl) return;
+  workspaceEl.classList.toggle(
+    workspaceEl.classList.contains("teacher-daily-workspace")
+      ? "teacher-daily-workspace--detail-open"
+      : "student-daily-workspace--detail-open",
+    !!open,
+  );
+}
 
 /**
  * Paint one month grid into `mountEl`.
@@ -1168,7 +1191,7 @@ function renderMonthlyCalendarInto(mountEl, config) {
   mountEl.innerHTML = "";
 
   const wrap = document.createElement("div");
-  wrap.className = "eap-cal";
+  wrap.className = isEapMobileLayout() ? "eap-cal eap-cal--compact" : "eap-cal";
 
   const top = document.createElement("div");
   top.className = "eap-cal__toolbar";
@@ -1296,8 +1319,19 @@ function renderMonthlyCalendarInto(mountEl, config) {
       }
 
       const dayTasks = (tasksByDate && tasksByDate[slot.iso]) || [];
-      const show = dayTasks.slice(0, CALENDAR_MAX_VISIBLE_PILLS);
+      const maxPills = calendarMaxVisiblePills();
+      const show = dayTasks.slice(0, maxPills);
       const more = Math.max(0, dayTasks.length - show.length);
+
+      if (isEapMobileLayout() && dayTasks.length > 0) {
+        const countEl = document.createElement("span");
+        countEl.className = "eap-cal__task-count";
+        countEl.textContent =
+          dayTasks.length === 1
+            ? t("cal_tasks_one")
+            : t("cal_tasks_n", { n: dayTasks.length });
+        pills.appendChild(countEl);
+      }
 
       show.forEach((task) => {
         const pill = document.createElement("span");
@@ -3250,6 +3284,8 @@ function initTeacherPage() {
   const calendarRoot = document.getElementById("teacher-calendar-root");
   const calendarViewEl = document.getElementById("teacher-calendar-view");
   const dailyViewEl = document.getElementById("teacher-daily-view");
+  const teacherDailyWorkspaceEl = document.querySelector(".teacher-daily-workspace");
+  const teacherMobileBackBtn = document.getElementById("teacher-mobile-back-to-list");
   const mainEl = document.getElementById("main");
   const dailyTitleEl = document.getElementById("teacher-daily-title");
   const backToCalendarBtn = document.getElementById("teacher-back-to-calendar");
@@ -3689,6 +3725,7 @@ function initTeacherPage() {
 
   /** Month planner only — hides task cards and forms until another date click. */
   function showTeacherCalendarView() {
+    setMobileMasterDetailOpen(teacherDailyWorkspaceEl, false);
     calendarViewEl.classList.add("eap-view-panel--active");
     calendarViewEl.classList.remove("eap-view-panel--inactive");
     dailyViewEl.classList.remove("eap-view-panel--active");
@@ -3704,6 +3741,7 @@ function initTeacherPage() {
     const v = String(iso || "").trim().slice(0, 10);
     if (v.length < 10) return false;
 
+    setMobileMasterDetailOpen(teacherDailyWorkspaceEl, false);
     plannerState.selectedISO = v;
     viewDateInput.value = v;
     dateInput.value = v;
@@ -3737,6 +3775,13 @@ function initTeacherPage() {
   backToCalendarBtn.addEventListener("click", () => {
     showTeacherCalendarView();
   });
+
+  if (teacherMobileBackBtn) {
+    teacherMobileBackBtn.addEventListener("click", () => {
+      setMobileMasterDetailOpen(teacherDailyWorkspaceEl, false);
+    });
+  }
+
   function syncAllClassSelectors(primaryValue) {
     const v =
       primaryValue && String(primaryValue).trim()
@@ -3998,6 +4043,11 @@ function initTeacherPage() {
     taskDetailInner.removeAttribute("hidden");
     taskDetailInner.classList.add("teacher-task-detail-inner--enter");
 
+    if (isEapMobileLayout()) {
+      setMobileMasterDetailOpen(teacherDailyWorkspaceEl, true);
+      taskDetailInner.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     if (openSubmissions) {
       window.requestAnimationFrame(() => {
         const viewBtn = taskDetailInner.querySelector(".task-view-submissions");
@@ -4051,6 +4101,7 @@ function initTeacherPage() {
       },
     });
   }
+  window.__eapTeacherRepaintCalendar = paintPlannerCalendar;
 
   /** Fetch every task for the current class once, then repaint pills (cheap month hops afterwards). */
   async function reloadPlannerTasksFromApi() {
@@ -5462,7 +5513,7 @@ function buildStudentTaskCardElement(task, mySub) {
 
   const fileInput = document.createElement("input");
   fileInput.type = "file";
-  fileInput.className = "task-homework-file";
+  fileInput.className = "task-homework-file eap-touch-file";
   fileInput.accept = ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png";
 
   const homeworkSelectedFile = document.createElement("span");
@@ -5755,7 +5806,7 @@ function buildStudentTaskCardElement(task, mySub) {
       revFileHint.textContent = t("optional_revision_file");
       const revFileInput = document.createElement("input");
       revFileInput.type = "file";
-      revFileInput.className = "student-revision-file task-revision-file";
+      revFileInput.className = "student-revision-file task-revision-file eap-touch-file";
       revFileInput.accept = ".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png";
       const revSelectedFile = document.createElement("span");
       revSelectedFile.className = "file-selection-summary student-revision-selected-file";
@@ -6079,6 +6130,8 @@ function initStudentPage() {
   const calendarRoot = document.getElementById("student-calendar-root");
   const calendarViewEl = document.getElementById("student-calendar-view");
   const dailyViewEl = document.getElementById("student-daily-view");
+  const studentDailyWorkspaceEl = document.querySelector(".student-daily-workspace");
+  const studentMobileBackBtn = document.getElementById("student-mobile-back-to-list");
   const mainEl = document.getElementById("main");
   const dailyTitleEl = document.getElementById("student-daily-title");
   const backToCalendarBtn = document.getElementById("student-back-to-calendar");
@@ -6509,6 +6562,7 @@ function initStudentPage() {
   }
 
   function showStudentCalendarView() {
+    setMobileMasterDetailOpen(studentDailyWorkspaceEl, false);
     calendarViewEl.classList.add("eap-view-panel--active");
     calendarViewEl.classList.remove("eap-view-panel--inactive");
     dailyViewEl.classList.remove("eap-view-panel--active");
@@ -6520,6 +6574,7 @@ function initStudentPage() {
   }
 
   async function showStudentDailyView(iso) {
+    setMobileMasterDetailOpen(studentDailyWorkspaceEl, false);
     plannerState.selectedISO = iso;
     dateInput.value = iso;
     const iso10 = String(iso || "").trim().slice(0, 10);
@@ -6541,6 +6596,12 @@ function initStudentPage() {
   backToCalendarBtn.addEventListener("click", () => {
     showStudentCalendarView();
   });
+
+  if (studentMobileBackBtn) {
+    studentMobileBackBtn.addEventListener("click", () => {
+      setMobileMasterDetailOpen(studentDailyWorkspaceEl, false);
+    });
+  }
 
   refreshDayBtn.addEventListener("click", async () => {
     await reloadStudentView();
@@ -6578,6 +6639,7 @@ function initStudentPage() {
       },
     });
   }
+  window.__eapStudentRepaintCalendar = paintStudentPlanner;
 
   /** One GET lists every task for this student’s class — enough to paint every day in the month. */
   async function reloadStudentPlannerTasksFromApi() {
@@ -6761,6 +6823,11 @@ function initStudentPage() {
           revFocus.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }, 80);
       }
+    }
+
+    if (isEapMobileLayout()) {
+      setMobileMasterDetailOpen(studentDailyWorkspaceEl, true);
+      taskDetailInner.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
 
@@ -7837,6 +7904,26 @@ document.addEventListener("DOMContentLoaded", () => {
   initAdminPage();
   initTeacherPage();
   initStudentPage();
+
+  if (!window.__eapMobileLayoutBound) {
+    window.__eapMobileLayoutBound = true;
+    const repaintCalendars = () => {
+      if (typeof window.__eapStudentRepaintCalendar === "function") {
+        window.__eapStudentRepaintCalendar();
+      }
+      if (typeof window.__eapTeacherRepaintCalendar === "function") {
+        window.__eapTeacherRepaintCalendar();
+      }
+    };
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(repaintCalendars, 180);
+    });
+    if (EAP_MOBILE_LAYOUT_MQ && typeof EAP_MOBILE_LAYOUT_MQ.addEventListener === "function") {
+      EAP_MOBILE_LAYOUT_MQ.addEventListener("change", repaintCalendars);
+    }
+  }
 });
 
 window.addEventListener("eap:langchange", () => {

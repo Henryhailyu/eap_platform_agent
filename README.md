@@ -135,6 +135,12 @@ Data persists in the `eap_data` Docker volume.
 
 PostgreSQL remains optional for a later upgrade; the pilot uses **SQLite on a persistent disk**.
 
+## Mobile (Phase H)
+
+Student and teacher pages are responsive below **768px**: compact calendar with task counts, full-width touch buttons, stacked master–detail with **Back to task list**, and form fields sized to avoid iOS zoom-on-focus.
+
+Test: Chrome DevTools device mode, or open `http://127.0.0.1:5051/ui/student.html` on your phone (same Wi‑Fi).
+
 ## Tracker
 
 See `../eap_platform cursor agent window/EAP_PROJECT_TRACKER.md`
