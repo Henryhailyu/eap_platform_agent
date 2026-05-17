@@ -1,9 +1,12 @@
 const api = require('../../utils/api');
 const auth = require('../../utils/auth');
+const i18n = require('../../utils/i18n');
+const files = require('../../utils/files');
 const { errorMessage } = require('../../utils/format');
 
 Page({
   data: {
+    L: i18n.labels(),
     taskId: null,
     className: '',
     task: null,
@@ -20,6 +23,10 @@ Page({
     error: '',
   },
 
+  onShow() {
+    this.setData({ L: i18n.labels() });
+  },
+
   onLoad(options) {
     if (!auth.requireLogin()) return;
     this.setData({
@@ -29,12 +36,8 @@ Page({
     this.loadTask();
   },
 
-  onShow() {
-    if (this.data.taskId) this.loadTask();
-  },
-
   loadTask() {
-    const { taskId, className } = this.data;
+    const { taskId, className, L } = this.data;
     this.setData({ loading: true, error: '' });
 
     Promise.all([
@@ -46,7 +49,7 @@ Page({
     ])
       .then(([task, completion, submission]) => {
         if (!task) {
-          this.setData({ loading: false, error: 'Task not found' });
+          this.setData({ loading: false, error: L.task_not_found });
           return;
         }
         this.setData({
@@ -62,8 +65,18 @@ Page({
       });
   },
 
+  openMaterial() {
+    const fp = this.data.task && this.data.task.file_path;
+    if (fp) files.downloadAndOpen(fp, true);
+  },
+
+  openSubmissionFile() {
+    const fp = this.data.submission && this.data.submission.file_path;
+    if (fp) files.downloadAndOpen(fp, false);
+  },
+
   toggleComplete() {
-    const { taskId, className, completion } = this.data;
+    const { taskId, className, completion, L } = this.data;
     const next = completion.completed ? 'Pending' : 'Completed';
     api
       .put(`/api/tasks/${taskId}/my-completion`, {
@@ -77,7 +90,7 @@ Page({
             status: res.status,
           },
         });
-        wx.showToast({ title: 'Updated', icon: 'success' });
+        wx.showToast({ title: L.updated, icon: 'success' });
       })
       .catch((err) => {
         wx.showToast({ title: errorMessage(err), icon: 'none' });
@@ -115,11 +128,11 @@ Page({
   },
 
   onSubmit() {
-    const { taskId, className, answerText, filePath, submitting } = this.data;
+    const { taskId, className, answerText, filePath, submitting, L } = this.data;
     if (submitting) return;
     const text = (answerText || '').trim();
     if (!text && !filePath) {
-      wx.showToast({ title: 'Add text or a file', icon: 'none' });
+      wx.showToast({ title: L.add_text_or_file, icon: 'none' });
       return;
     }
     this.setData({ submitting: true });
@@ -136,7 +149,7 @@ Page({
       )
       .then((sub) => {
         this.setData({ submission: sub, answerText: '', filePath: '', fileName: '' });
-        wx.showToast({ title: 'Submitted', icon: 'success' });
+        wx.showToast({ title: L.submitted, icon: 'success' });
       })
       .catch((err) => {
         wx.showToast({ title: errorMessage(err), icon: 'none' });
@@ -147,11 +160,11 @@ Page({
   },
 
   onRevision() {
-    const { submission, className, revisionText, revisionFilePath, submitting } = this.data;
+    const { submission, className, revisionText, revisionFilePath, submitting, L } = this.data;
     if (!submission || submitting) return;
     const text = (revisionText || '').trim();
     if (!text && !revisionFilePath) {
-      wx.showToast({ title: 'Add text or a file', icon: 'none' });
+      wx.showToast({ title: L.add_text_or_file, icon: 'none' });
       return;
     }
     this.setData({ submitting: true });
@@ -171,7 +184,7 @@ Page({
           revisionFilePath: '',
           revisionFileName: '',
         });
-        wx.showToast({ title: 'Revision sent', icon: 'success' });
+        wx.showToast({ title: L.revision_sent, icon: 'success' });
       })
       .catch((err) => {
         wx.showToast({ title: errorMessage(err), icon: 'none' });

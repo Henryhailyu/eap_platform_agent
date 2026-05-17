@@ -3,7 +3,7 @@
   <text class="muted class-line">{{className}}</text>
 
   <view class="card" wx:if="{{loading}}">
-    <text class="muted">Loading…</text>
+    <text class="muted">{{L.loading}}</text>
   </view>
 
   <view class="card" wx:elif="{{error}}">
@@ -11,7 +11,7 @@
   </view>
 
   <view wx:elif="{{tasks.length === 0}}" class="card">
-    <text class="muted">No tasks on this day.</text>
+    <text class="muted">{{L.no_tasks_day}}</text>
   </view>
 
   <block wx:else>
@@ -24,8 +24,8 @@
     >
       <view class="row-top">
         <text class="task-title">{{item.title}}</text>
-        <text class="badge" wx:if="{{item.completion.completed}}">Done</text>
-        <text class="badge pending" wx:else>Pending</text>
+        <text class="badge" wx:if="{{item.completion.completed}}">{{L.completed}}</text>
+        <text class="badge pending" wx:else>{{L.pending}}</text>
       </view>
       <text class="muted" wx:if="{{item.category}}">{{item.category}}</text>
     </view>

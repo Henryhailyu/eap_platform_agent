@@ -6,7 +6,7 @@
   </view>
 
   <view class="card" wx:if="{{loading}}">
-    <text class="muted">Loading archive…</text>
+    <text class="muted">{{L.loading_archive}}</text>
   </view>
 
   <view class="card" wx:elif="{{error}}">
@@ -14,7 +14,7 @@
   </view>
 
   <view wx:elif="{{items.length === 0}}" class="card">
-    <text class="muted">No items for this month.</text>
+    <text class="muted">{{L.archive_empty}}</text>
   </view>
 
   <block wx:else>
@@ -22,7 +22,7 @@
       <text class="item-title">{{item.title}}</text>
       <text class="muted">{{item.date}} · {{item.category}}</text>
       <text class="badge" wx:if="{{item.workflow_state}}">{{item.workflow_state}}</text>
-      <text class="feedback" wx:if="{{item.submission.teacher_feedback}}">{{item.submission.teacher_feedback}}</text>
+      <text class="feedback" wx:if="{{item.submission.teacher_feedback}}">{{L.feedback}}: {{item.submission.teacher_feedback}}</text>
     </view>
   </block>
 </view>

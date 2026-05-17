@@ -22,6 +22,13 @@ Teachers and managers continue to use the web UI at `/ui/`.
 4. For local backend only (not production): enable **详情 → 本地设置 → 不校验合法域名、web-view、TLS** in devtools.  
 5. Build & preview with demo account `student1` and your pilot password.
 
+## Features (Phase I3 polish)
+
+- **EN / 中文** toggle on login and calendar (`utils/i18n.js`)
+- **Class picker** when enrolled in multiple classes (tap class name on calendar)
+- **Academic calendar** — teaching week label + holiday markers on month grid
+- **File open** — teacher materials and submission files via Bearer download (`utils/files.js`)
+
 ## Pages
 
 | Page | Path | Purpose |

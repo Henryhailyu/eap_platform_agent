@@ -1,14 +1,20 @@
 const api = require('../../utils/api');
 const auth = require('../../utils/auth');
+const i18n = require('../../utils/i18n');
 const { errorMessage } = require('../../utils/format');
 
 Page({
   data: {
+    L: i18n.labels(),
     date: '',
     className: '',
     tasks: [],
     loading: true,
     error: '',
+  },
+
+  onShow() {
+    this.setData({ L: i18n.labels() });
   },
 
   onLoad(options) {
@@ -17,7 +23,7 @@ Page({
       date: options.date || '',
       className: options.class_name || '',
     });
-    wx.setNavigationBarTitle({ title: options.date || 'Day' });
+    wx.setNavigationBarTitle({ title: options.date || '' });
     this.loadDay();
   },
 

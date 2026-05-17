@@ -1,19 +1,23 @@
 const api = require('../../utils/api');
 const auth = require('../../utils/auth');
 const config = require('../../config');
+const i18n = require('../../utils/i18n');
+const academic = require('../../utils/academic');
 const { monthKey, todayYmd, daysInMonth, pad2, errorMessage } = require('../../utils/format');
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 Page({
   data: {
+    L: i18n.labels(),
     className: config.defaultClass,
+    classes: [],
     userName: '',
     monthDate: new Date(),
     monthLabel: '',
-    weekdays: WEEKDAYS,
+    weekHint: '',
+    weekdays: i18n.strings().weekdays,
     cells: [],
     tasksByDate: {},
+    academicCal: null,
     loading: true,
     error: '',
   },
@@ -21,11 +25,35 @@ Page({
   onShow() {
     const session = auth.requireLogin();
     if (!session) return;
+    const L = i18n.labels();
     this.setData({
+      L,
+      weekdays: i18n.strings().weekdays,
       className: session.className || config.defaultClass,
+      classes: session.classes || [],
       userName: (session.user && session.user.full_name) || session.user.username || '',
     });
-    this.loadTasks();
+    wx.setNavigationBarTitle({ title: L.calendar });
+    this.loadAcademicAndTasks();
+  },
+
+  onToggleLang() {
+    i18n.toggleLang();
+    const L = i18n.labels();
+    this.setData({ L, weekdays: i18n.strings().weekdays });
+    this.buildCells(this.data.monthDate, this.data.tasksByDate);
+  },
+
+  loadAcademicAndTasks() {
+    api
+      .get('/api/academic-calendar')
+      .then((cal) => {
+        this.setData({ academicCal: cal });
+        this.loadTasks();
+      })
+      .catch(() => {
+        this.loadTasks();
+      });
   },
 
   buildCells(monthDate, tasksByDate) {
@@ -36,26 +64,44 @@ Page({
     const dim = daysInMonth(y, m);
     const cells = [];
     const today = todayYmd();
-    const prefix = monthKey(monthDate);
+    const cal = this.data.academicCal;
+    const L = this.data.L;
 
     for (let i = 0; i < startPad; i++) {
       cells.push({ day: '', date: '', inMonth: false, count: 0 });
     }
     for (let d = 1; d <= dim; d++) {
       const date = `${y}-${pad2(m + 1)}-${pad2(d)}`;
+      const holidayLabel = cal ? academic.notableLabel(cal.notable_dates, date) : '';
       cells.push({
         day: d,
         date,
         inMonth: true,
         isToday: date === today,
+        isHoliday: !!holidayLabel,
+        holidayLabel,
         count: (tasksByDate[date] || []).length,
       });
     }
     while (cells.length % 7 !== 0) {
       cells.push({ day: '', date: '', inMonth: false, count: 0 });
     }
-    const monthLabel = monthDate.toLocaleString('en', { month: 'long', year: 'numeric' });
-    this.setData({ cells, monthLabel, monthDate, tasksByDate });
+
+    let weekHint = '';
+    if (cal && cal.semester_start_date) {
+      const tw = academic.teachingWeekIndex(
+        cal.semester_start_date,
+        cal.teaching_weeks,
+        `${y}-${pad2(m + 1)}-01`
+      );
+      if (tw) weekHint = i18n.t('teaching_week', { n: tw });
+    }
+
+    const monthLabel = monthDate.toLocaleString(i18n.getLang() === 'zh' ? 'zh-CN' : 'en', {
+      month: 'long',
+      year: 'numeric',
+    });
+    this.setData({ cells, monthLabel, monthDate, tasksByDate, weekHint });
   },
 
   loadTasks() {
@@ -84,15 +130,13 @@ Page({
 
   prevMonth() {
     const d = this.data.monthDate;
-    const next = new Date(d.getFullYear(), d.getMonth() - 1, 1);
-    this.setData({ monthDate: next });
+    this.setData({ monthDate: new Date(d.getFullYear(), d.getMonth() - 1, 1) });
     this.loadTasks();
   },
 
   nextMonth() {
     const d = this.data.monthDate;
-    const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-    this.setData({ monthDate: next });
+    this.setData({ monthDate: new Date(d.getFullYear(), d.getMonth() + 1, 1) });
     this.loadTasks();
   },
 
@@ -101,6 +145,23 @@ Page({
     if (!date) return;
     wx.navigateTo({
       url: `/pages/day/day?date=${date}&class_name=${encodeURIComponent(this.data.className)}`,
+    });
+  },
+
+  onPickClass() {
+    const { classes, className } = this.data;
+    if (!classes || classes.length < 2) return;
+    const names = classes.map((c) => c.display_name || c.class_code);
+    wx.showActionSheet({
+      itemList: names,
+      success: (res) => {
+        const picked = classes[res.tapIndex];
+        if (!picked || picked.class_code === className) return;
+        const session = auth.getSession();
+        auth.setSession(Object.assign({}, session, { className: picked.class_code }));
+        this.setData({ className: picked.class_code });
+        this.loadTasks();
+      },
     });
   },
 

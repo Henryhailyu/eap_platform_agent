@@ -1,12 +1,14 @@
 <view class="container">
   <view class="header-row">
-    <view>
-      <text class="class-label">{{className}}</text>
+    <view class="header-main">
+      <text class="class-label" bindtap="onPickClass">{{className}} ▾</text>
       <text class="muted">{{userName}}</text>
+      <text class="week-hint muted" wx:if="{{weekHint}}">{{weekHint}}</text>
     </view>
     <view class="header-actions">
-      <text class="link" bindtap="goArchive">Archive</text>
-      <text class="link" bindtap="onLogout">Log out</text>
+      <text class="link" bindtap="onToggleLang">{{L.lang_toggle}}</text>
+      <text class="link" bindtap="goArchive">{{L.archive}}</text>
+      <text class="link" bindtap="onLogout">{{L.logout}}</text>
     </view>
   </view>
 
@@ -17,12 +19,12 @@
   </view>
 
   <view class="card" wx:if="{{loading}}">
-    <text class="muted">Loading tasks…</text>
+    <text class="muted">{{L.loading_tasks}}</text>
   </view>
 
   <view class="card" wx:elif="{{error}}">
     <text class="text-error">{{error}}</text>
-    <button class="btn-secondary retry" bindtap="loadTasks">Retry</button>
+    <button class="btn-secondary retry" bindtap="loadTasks">{{L.retry}}</button>
   </view>
 
   <view class="card calendar-grid" wx:else>
@@ -33,12 +35,13 @@
       <view
         wx:for="{{cells}}"
         wx:key="date"
-        class="day-cell {{item.inMonth ? '' : 'other'}} {{item.isToday ? 'today' : ''}}"
+        class="day-cell {{item.inMonth ? '' : 'other'}} {{item.isToday ? 'today' : ''}} {{item.isHoliday ? 'holiday' : ''}}"
         data-date="{{item.date}}"
         bindtap="onDayTap"
       >
         <text class="day-num">{{item.day}}</text>
         <text class="dot" wx:if="{{item.count > 0}}">{{item.count}}</text>
+        <text class="holiday-dot" wx:if="{{item.holidayLabel}}">·</text>
       </view>
     </view>
   </view>

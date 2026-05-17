@@ -147,6 +147,7 @@ Test: Chrome DevTools device mode, or open `http://127.0.0.1:5051/ui/student.htm
 |----------|---------|
 | [`docs/PILOT_DEPLOY.md`](docs/PILOT_DEPLOY.md) | **I0** — deploy checklist + password rotation |
 | [`docs/API_STUDENT_MINI.md`](docs/API_STUDENT_MINI.md) | **I2c** — API reference for mobile clients |
+| [`docs/FILE_UPLOAD_CONTRACT.md`](docs/FILE_UPLOAD_CONTRACT.md) | **I2d** — upload types, sizes, WeChat `wx.uploadFile` |
 | [`wechat-mini/`](wechat-mini/) | **I3 scaffold** — import into 微信开发者工具 |
 | `backend/scripts/verify_pilot.py` | Smoke-test health + Bearer student APIs |
 

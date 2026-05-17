@@ -9,12 +9,24 @@
   display: block;
   font-size: 36rpx;
   font-weight: 600;
+  color: #0071e3;
+}
+
+.week-hint {
+  display: block;
+  margin-top: 6rpx;
+}
+
+.header-actions {
+  text-align: right;
+  flex-shrink: 0;
 }
 
 .header-actions .link {
+  display: block;
   color: #0071e3;
   font-size: 26rpx;
-  margin-left: 24rpx;
+  margin-bottom: 8rpx;
 }
 
 .month-nav {
@@ -70,6 +82,10 @@
   background: rgba(0, 113, 227, 0.12);
 }
 
+.day-cell.holiday {
+  background: rgba(10, 126, 164, 0.1);
+}
+
 .day-num {
   font-size: 26rpx;
 }
@@ -78,6 +94,11 @@
   font-size: 20rpx;
   color: #0a7ea4;
   margin-top: 4rpx;
+}
+
+.holiday-dot {
+  font-size: 18rpx;
+  color: #0a7ea4;
 }
 
 .retry {

@@ -45,6 +45,10 @@ Authorization: Bearer <access_token>
 
 Default TTL: 7 days (`EAP_TOKEN_TTL_SECONDS`).
 
+### Upload contract
+
+`GET /api/v1/upload-contract` — allowed extensions and size hints (see [`FILE_UPLOAD_CONTRACT.md`](FILE_UPLOAD_CONTRACT.md)).
+
 ### Current user
 
 Either endpoint works with Bearer:

@@ -2055,6 +2055,24 @@ def api_v1_auth_login():
     )
 
 
+@app.route("/api/v1/upload-contract", methods=["GET"])
+def api_v1_upload_contract():
+    """
+    Phase I2d: machine-readable upload limits for mobile / WeChat clients (no auth).
+    """
+    return jsonify(
+        {
+            "homework_extensions": sorted(ALLOWED_HOMEWORK_EXTENSIONS),
+            "teacher_material_extensions": sorted(ALLOWED_UPLOAD_EXTENSIONS),
+            "max_bytes_recommended": 16 * 1024 * 1024,
+            "wechat_upload_limit_bytes": 10 * 1024 * 1024,
+            "homework_field_name": "file",
+            "submit_path": "/api/tasks/<task_id>/submit",
+            "revision_path": "/api/submissions/<submission_id>/revision",
+        }
+    )
+
+
 @app.route("/api/v1/auth/me", methods=["GET"])
 def api_v1_auth_me():
     """Phase I2a: current user from Authorization: Bearer <access_token> only."""

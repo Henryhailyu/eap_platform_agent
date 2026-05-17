@@ -1,16 +1,24 @@
 const api = require('../../utils/api');
 const auth = require('../../utils/auth');
 const config = require('../../config');
-const { monthKey, pad2, errorMessage } = require('../../utils/format');
+const i18n = require('../../utils/i18n');
+const { pad2, errorMessage } = require('../../utils/format');
 
 Page({
   data: {
+    L: i18n.labels(),
     className: config.defaultClass,
     monthDate: new Date(),
     monthLabel: '',
     items: [],
     loading: true,
     error: '',
+  },
+
+  onShow() {
+    const L = i18n.labels();
+    this.setData({ L });
+    wx.setNavigationBarTitle({ title: L.archive });
   },
 
   onLoad(options) {
@@ -24,7 +32,10 @@ Page({
   },
 
   updateMonthLabel() {
-    const label = this.data.monthDate.toLocaleString('en', { month: 'long', year: 'numeric' });
+    const label = this.data.monthDate.toLocaleString(i18n.getLang() === 'zh' ? 'zh-CN' : 'en', {
+      month: 'long',
+      year: 'numeric',
+    });
     this.setData({ monthLabel: label });
   },
 

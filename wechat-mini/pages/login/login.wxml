@@ -1,21 +1,22 @@
 <view class="container login-page">
+  <view class="top-bar">
+    <text class="lang-toggle" bindtap="onToggleLang">{{L.lang_toggle}}</text>
+  </view>
   <view class="brand">
-    <text class="brand-title">EAP Learning</text>
-    <text class="muted">Student sign in</text>
+    <text class="brand-title">{{L.app_name}}</text>
+    <text class="muted">{{L.student_sign_in}}</text>
   </view>
 
   <view class="card">
     <view class="field">
-      <text class="label">Username</text>
+      <text class="label">{{L.username}}</text>
       <input class="input" value="{{username}}" bindinput="onUsername" placeholder="student1" />
     </view>
     <view class="field">
-      <text class="label">Password</text>
-      <input class="input" password value="{{password}}" bindinput="onPassword" placeholder="Password" />
+      <text class="label">{{L.password}}</text>
+      <input class="input" password value="{{password}}" bindinput="onPassword" placeholder="" />
     </view>
     <text class="text-error" wx:if="{{error}}">{{error}}</text>
-    <button class="btn-primary login-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="onLogin">Sign in</button>
+    <button class="btn-primary login-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="onLogin">{{L.sign_in}}</button>
   </view>
-
-  <text class="muted foot">Set apiBase in config.js to your HTTPS pilot URL.</text>
 </view>
