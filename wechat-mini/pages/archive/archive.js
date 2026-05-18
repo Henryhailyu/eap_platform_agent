@@ -2,7 +2,7 @@ const api = require('../../utils/api');
 const auth = require('../../utils/auth');
 const config = require('../../config');
 const i18n = require('../../utils/i18n');
-const { pad2, errorMessage } = require('../../utils/format');
+const { pad2, formatMonthLabel, errorMessage } = require('../../utils/format');
 
 Page({
   data: {
@@ -32,11 +32,9 @@ Page({
   },
 
   updateMonthLabel() {
-    const label = this.data.monthDate.toLocaleString(i18n.getLang() === 'zh' ? 'zh-CN' : 'en', {
-      month: 'long',
-      year: 'numeric',
+    this.setData({
+      monthLabel: formatMonthLabel(this.data.monthDate, i18n.getLang()),
     });
-    this.setData({ monthLabel: label });
   },
 
   monthParam() {

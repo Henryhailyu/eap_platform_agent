@@ -3,7 +3,14 @@ const auth = require('../../utils/auth');
 const config = require('../../config');
 const i18n = require('../../utils/i18n');
 const academic = require('../../utils/academic');
-const { monthKey, todayYmd, daysInMonth, pad2, errorMessage } = require('../../utils/format');
+const {
+  monthKey,
+  todayYmd,
+  daysInMonth,
+  pad2,
+  formatMonthLabel,
+  errorMessage,
+} = require('../../utils/format');
 
 Page({
   data: {
@@ -97,10 +104,7 @@ Page({
       if (tw) weekHint = i18n.t('teaching_week', { n: tw });
     }
 
-    const monthLabel = monthDate.toLocaleString(i18n.getLang() === 'zh' ? 'zh-CN' : 'en', {
-      month: 'long',
-      year: 'numeric',
-    });
+    const monthLabel = formatMonthLabel(monthDate, i18n.getLang());
     this.setData({ cells, monthLabel, monthDate, tasksByDate, weekHint });
   },
 
@@ -120,8 +124,15 @@ Page({
             byDate[d].push(t);
           }
         });
-        this.buildCells(monthDate, byDate);
-        this.setData({ loading: false });
+        try {
+          this.buildCells(monthDate, byDate);
+          this.setData({ loading: false });
+        } catch (e) {
+          this.setData({
+            loading: false,
+            error: (e && e.message) || 'Could not render calendar',
+          });
+        }
       })
       .catch((err) => {
         this.setData({ loading: false, error: errorMessage(err) });
