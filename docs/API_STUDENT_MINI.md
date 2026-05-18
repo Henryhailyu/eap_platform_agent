@@ -67,14 +67,30 @@ Either endpoint works with Bearer:
 
 ---
 
-## Common errors
+## Common errors (Phase I2e)
 
-| HTTP | Body shape | Meaning |
-|------|------------|---------|
-| 400 | `{ "error": "..." }` | Missing/invalid query or body |
-| 401 | `{ "error": "Not logged in" }` or v1 `success`/`message` | Missing/expired Bearer |
-| 403 | `{ "error": "Forbidden" }` / `Wrong role` / enrollment messages | Not allowed for this class or resource |
-| 404 | `{ "error": "Task not found" }` etc. | Missing row |
+Prefer **`error`** + **`code`** for programmatic handling in the mini-program.
+
+| HTTP | `code` (examples) | Meaning |
+|------|-------------------|---------|
+| 401 | `AUTH_INVALID_CREDENTIALS` | Wrong username/password on v1 login |
+| 401 | `AUTH_INVALID_TOKEN` | Missing/expired Bearer |
+| 401 | `{ "error": "Not logged in" }` | Strict routes without Bearer (legacy shape) |
+| 403 | `AUTH_TEACHER_NOT_AUTHORIZED` | Teacher not approved by manager |
+| 403 | — | `Forbidden`, `Wrong role`, enrollment messages |
+| 400 | — | Missing/invalid query or body |
+| 404 | — | Missing row |
+
+Example 401 login failure:
+
+```json
+{
+  "success": false,
+  "message": "Invalid username or password",
+  "error": "Invalid username or password",
+  "code": "AUTH_INVALID_CREDENTIALS"
+}
+```
 
 With Bearer + strict flags, **do not** send `student_username` in query/body unless you are in legacy dev mode — the token identity is authoritative.
 

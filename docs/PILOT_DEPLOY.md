@@ -2,6 +2,26 @@
 
 Complete these before publishing the **WeChat mini-program** or sharing the public pilot URL.
 
+**While WeChat filing / verification is pending:** finish **I0 (HTTPS pilot)** and test the **web UI on a phone**. The mini-program in DevTools is already working locally; switch `wechat-mini/config.js` to your HTTPS URL after I0.
+
+---
+
+## 0. Local dev (Mac — web + WeChat simulator)
+
+```bash
+cd eap_platform_agent/backend
+chmod +x scripts/start_pilot_dev.sh
+./scripts/start_pilot_dev.sh
+```
+
+WeChat `config.js`: `apiBase: 'http://localhost:5051'` + 不校验合法域名 in DevTools.
+
+Verify:
+
+```bash
+python scripts/verify_pilot.py --base http://127.0.0.1:5051 --password '123456'
+```
+
 ---
 
 ## 1. Choose hosting

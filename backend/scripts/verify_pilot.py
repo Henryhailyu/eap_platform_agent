@@ -132,6 +132,31 @@ def main() -> int:
         f"http {code}",
     )
 
+    code, upload_contract = request_json("GET", f"{base}/api/v1/upload-contract")
+    all_ok &= check(
+        "GET /api/v1/upload-contract",
+        code == 200 and "homework_extensions" in upload_contract,
+        f"http {code}",
+    )
+
+    code, cal = request_json("GET", f"{base}/api/academic-calendar")
+    all_ok &= check(
+        "GET /api/academic-calendar",
+        code == 200 and "semester_start_date" in cal,
+        f"http {code}",
+    )
+
+    code, bad = request_json(
+        "POST",
+        f"{base}/api/v1/auth/login",
+        {"username": STUDENT_USER, "password": "wrong-password"},
+    )
+    all_ok &= check(
+        "v1 login error code",
+        code == 401 and bad.get("code") == "AUTH_INVALID_CREDENTIALS",
+        f"http {code}",
+    )
+
     print()
     if all_ok:
         print("All checks passed.")

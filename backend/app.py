@@ -38,6 +38,11 @@ from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from api_errors import (
+    bearer_auth_failure_response,
+    login_failure_response,
+    teacher_not_authorized_response,
+)
 from auth_v1 import get_bearer_token_from_header, issue_access_token, verify_access_token
 from eap_config import config, setup_logging, validate_production_config
 
@@ -1898,25 +1903,12 @@ def submissions_list_with_attachments(conn, rows):
 
 
 def login_failure_json():
-    """Phase D47: failed login uses HTTP 401; body unchanged for frontend compatibility."""
-    return jsonify(
-        {
-            "success": False,
-            "message": "Invalid username or password",
-        }
-    ), 401
+    """Phase D47 / I2e: failed login — web reads success/message; mobile reads error + code."""
+    return login_failure_response()
 
 
 def teacher_not_authorized_json():
-    return (
-        jsonify(
-            {
-                "success": False,
-                "message": "This teacher account is not authorized yet. Please contact your manager.",
-            }
-        ),
-        403,
-    )
+    return teacher_not_authorized_response()
 
 
 def login_user_public_dict(row):
@@ -1980,7 +1972,7 @@ def authenticate_username_password(conn, username, password):
 
 
 def bearer_auth_failure_json():
-    return jsonify({"success": False, "message": "Invalid or expired access token"}), 401
+    return bearer_auth_failure_response()
 
 
 def load_user_by_id_for_auth(conn, user_id):
