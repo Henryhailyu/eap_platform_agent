@@ -2,7 +2,7 @@ const api = require('../../utils/api');
 const auth = require('../../utils/auth');
 const config = require('../../config');
 const i18n = require('../../utils/i18n');
-const { pad2, formatMonthLabel, errorMessage } = require('../../utils/format');
+const { pad2, toDate, formatMonthLabel, errorMessage } = require('../../utils/format');
 
 Page({
   data: {
@@ -38,7 +38,7 @@ Page({
   },
 
   monthParam() {
-    const d = this.data.monthDate;
+    const d = toDate(this.data.monthDate);
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
   },
 

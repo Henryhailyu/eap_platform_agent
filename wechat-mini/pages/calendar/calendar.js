@@ -6,6 +6,7 @@ const academic = require('../../utils/academic');
 const {
   monthKey,
   todayYmd,
+  toDate,
   daysInMonth,
   pad2,
   formatMonthLabel,
@@ -33,37 +34,44 @@ Page({
     const session = auth.requireLogin();
     if (!session) return;
     const L = i18n.labels();
+    const monthDate = toDate(this.data.monthDate);
     this.setData({
       L,
       weekdays: i18n.strings().weekdays,
       className: session.className || config.defaultClass,
       classes: session.classes || [],
       userName: (session.user && session.user.full_name) || session.user.username || '',
+      monthDate,
+      monthLabel: formatMonthLabel(monthDate, i18n.getLang()),
     });
     wx.setNavigationBarTitle({ title: L.calendar });
-    this.loadAcademicAndTasks();
+    this.loadAcademicInBackground();
+    this.loadTasks();
   },
 
   onToggleLang() {
     i18n.toggleLang();
     const L = i18n.labels();
-    this.setData({ L, weekdays: i18n.strings().weekdays });
-    this.buildCells(this.data.monthDate, this.data.tasksByDate);
+    this.setData({
+      L,
+      weekdays: i18n.strings().weekdays,
+      monthLabel: formatMonthLabel(this.data.monthDate, i18n.getLang()),
+    });
+    this.buildCells(this.data.monthDate, this.data.tasksByDate || {});
   },
 
-  loadAcademicAndTasks() {
+  loadAcademicInBackground() {
     api
       .get('/api/academic-calendar')
       .then((cal) => {
         this.setData({ academicCal: cal });
-        this.loadTasks();
+        this.buildCells(this.data.monthDate, this.data.tasksByDate || {});
       })
-      .catch(() => {
-        this.loadTasks();
-      });
+      .catch(() => {});
   },
 
-  buildCells(monthDate, tasksByDate) {
+  buildCells(monthDateInput, tasksByDate) {
+    const monthDate = toDate(monthDateInput);
     const y = monthDate.getFullYear();
     const m = monthDate.getMonth();
     const first = new Date(y, m, 1);
@@ -72,15 +80,21 @@ Page({
     const cells = [];
     const today = todayYmd();
     const cal = this.data.academicCal;
-    const L = this.data.L;
 
     for (let i = 0; i < startPad; i++) {
-      cells.push({ day: '', date: '', inMonth: false, count: 0 });
+      cells.push({
+        key: `pad-before-${i}`,
+        day: '',
+        date: '',
+        inMonth: false,
+        count: 0,
+      });
     }
     for (let d = 1; d <= dim; d++) {
       const date = `${y}-${pad2(m + 1)}-${pad2(d)}`;
       const holidayLabel = cal ? academic.notableLabel(cal.notable_dates, date) : '';
       cells.push({
+        key: date,
         day: d,
         date,
         inMonth: true,
@@ -90,8 +104,16 @@ Page({
         count: (tasksByDate[date] || []).length,
       });
     }
+    let tail = 0;
     while (cells.length % 7 !== 0) {
-      cells.push({ day: '', date: '', inMonth: false, count: 0 });
+      cells.push({
+        key: `pad-after-${tail}`,
+        day: '',
+        date: '',
+        inMonth: false,
+        count: 0,
+      });
+      tail += 1;
     }
 
     let weekHint = '';
@@ -104,50 +126,59 @@ Page({
       if (tw) weekHint = i18n.t('teaching_week', { n: tw });
     }
 
-    const monthLabel = formatMonthLabel(monthDate, i18n.getLang());
-    this.setData({ cells, monthLabel, monthDate, tasksByDate, weekHint });
+    this.setData({
+      cells,
+      monthLabel: formatMonthLabel(monthDate, i18n.getLang()),
+      monthDate,
+      tasksByDate,
+      weekHint,
+    });
   },
 
   loadTasks() {
-    const { className, monthDate } = this.data;
+    const { className } = this.data;
+    const monthDate = toDate(this.data.monthDate);
     const prefix = monthKey(monthDate);
     this.setData({ loading: true, error: '' });
 
     api
       .get('/api/tasks', { class_name: className })
       .then((tasks) => {
+        const list = Array.isArray(tasks) ? tasks : [];
         const byDate = {};
-        (tasks || []).forEach((t) => {
+        list.forEach((t) => {
           const d = t.date;
-          if (d && d.startsWith(prefix)) {
+          if (d && String(d).startsWith(prefix)) {
             if (!byDate[d]) byDate[d] = [];
             byDate[d].push(t);
           }
         });
-        try {
-          this.buildCells(monthDate, byDate);
-          this.setData({ loading: false });
-        } catch (e) {
-          this.setData({
-            loading: false,
-            error: (e && e.message) || 'Could not render calendar',
-          });
-        }
+        this.buildCells(monthDate, byDate);
+        this.setData({ loading: false });
       })
       .catch((err) => {
+        this.buildCells(monthDate, {});
         this.setData({ loading: false, error: errorMessage(err) });
       });
   },
 
   prevMonth() {
-    const d = this.data.monthDate;
-    this.setData({ monthDate: new Date(d.getFullYear(), d.getMonth() - 1, 1) });
+    const d = toDate(this.data.monthDate);
+    const monthDate = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    this.setData({
+      monthDate,
+      monthLabel: formatMonthLabel(monthDate, i18n.getLang()),
+    });
     this.loadTasks();
   },
 
   nextMonth() {
-    const d = this.data.monthDate;
-    this.setData({ monthDate: new Date(d.getFullYear(), d.getMonth() + 1, 1) });
+    const d = toDate(this.data.monthDate);
+    const monthDate = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    this.setData({
+      monthDate,
+      monthLabel: formatMonthLabel(monthDate, i18n.getLang()),
+    });
     this.loadTasks();
   },
 
