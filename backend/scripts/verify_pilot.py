@@ -28,7 +28,16 @@ DEFAULT_CLASS = "EAP047"
 STUDENT_USER = "student1"
 
 
-def request_json(method: str, url: str, body=None, headers=None, retries: int = 0):
+def request_json(
+    method: str,
+    url: str,
+    body=None,
+    headers=None,
+    retries: int = 0,
+    retry_wait: int = 15,
+):
+    import time
+
     data = None
     hdrs = dict(headers or {})
     if body is not None:
@@ -38,7 +47,7 @@ def request_json(method: str, url: str, body=None, headers=None, retries: int = 
     last_code, last_payload = None, {}
     for attempt in range(retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=60, context=_ssl_context()) as resp:
+            with urllib.request.urlopen(req, timeout=90, context=_ssl_context()) as resp:
                 raw = resp.read().decode("utf-8")
                 return resp.status, json.loads(raw) if raw else {}
         except urllib.error.HTTPError as e:
@@ -48,13 +57,39 @@ def request_json(method: str, url: str, body=None, headers=None, retries: int = 
             except json.JSONDecodeError:
                 last_payload = {"raw": raw}
             last_code = e.code
-            if e.code in (502, 503) and attempt < retries:
-                import time
-
-                time.sleep(8)
+            if e.code in (502, 503, 504) and attempt < retries:
+                print(f"    … http {e.code}, retry {attempt + 1}/{retries} in {retry_wait}s")
+                time.sleep(retry_wait)
                 continue
             return e.code, last_payload
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last_code = None
+            last_payload = {"error": str(e)}
+            if attempt < retries:
+                print(f"    … {e.__class__.__name__}, retry {attempt + 1}/{retries} in {retry_wait}s")
+                time.sleep(retry_wait)
+                continue
+            return None, last_payload
     return last_code, last_payload
+
+
+def wake_remote(base: str, retries: int = 6, retry_wait: int = 15) -> bool:
+    """Ping /api/health until Render (or similar) finishes cold start."""
+    import time
+
+    if not base.startswith("https://"):
+        return True
+    print(f"Waking {base} (cold start may take 1–2 min)…")
+    for attempt in range(retries + 1):
+        code, health = request_json("GET", f"{base}/api/health", retries=0)
+        if code == 200 and health.get("status") in ("ok", "degraded"):
+            print("  Service is up.\n")
+            return True
+        if attempt < retries:
+            print(f"  Not ready (http {code}), wait {retry_wait}s ({attempt + 1}/{retries})…")
+            time.sleep(retry_wait)
+    print("  Service did not become ready — open the URL in a browser, wait, then retry.\n")
+    return False
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:
@@ -71,15 +106,23 @@ def main() -> int:
     parser.add_argument("--base", required=True, help="API base URL, e.g. https://host or http://127.0.0.1:5051")
     parser.add_argument("--password", default="123456", help="student1 password")
     parser.add_argument("--class-name", default=DEFAULT_CLASS, help="Class code (default EAP047)")
+    parser.add_argument(
+        "--wake-retries",
+        type=int,
+        default=6,
+        help="For HTTPS hosts: retries while waking from sleep (default 6)",
+    )
     args = parser.parse_args()
     base = args.base.rstrip("/")
     class_name = args.class_name.strip()
 
+    if not wake_remote(base, retries=args.wake_retries):
+        return 1
+
     print(f"Verifying {base} (class {class_name})…\n")
     all_ok = True
 
-    # Render Starter may return 502 while the container wakes from sleep.
-    code, health = request_json("GET", f"{base}/api/health", retries=3)
+    code, health = request_json("GET", f"{base}/api/health")
     all_ok &= check(
         "GET /api/health",
         code == 200 and health.get("status") in ("ok", "degraded"),
