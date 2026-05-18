@@ -9,9 +9,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import ssl
 import sys
 import urllib.error
 import urllib.request
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """Works on macOS Python.org installs (often missing default CA bundle)."""
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
 
 DEFAULT_CLASS = "EAP047"
 STUDENT_USER = "student1"
@@ -25,7 +36,7 @@ def request_json(method: str, url: str, body=None, headers=None):
         hdrs.setdefault("Content-Type", "application/json")
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as resp:
             raw = resp.read().decode("utf-8")
             return resp.status, json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
