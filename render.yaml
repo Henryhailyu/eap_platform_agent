@@ -32,6 +32,7 @@ services:
         value: /data/submissions
       - key: EAP_SECRET_KEY
         generateValue: true
+      # Optional: set in dashboard to pin a custom domain. If unset, app uses RENDER_EXTERNAL_URL.
       - key: EAP_PUBLIC_URL
         sync: false
     disk:

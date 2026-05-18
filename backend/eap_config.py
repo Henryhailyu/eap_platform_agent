@@ -45,8 +45,13 @@ class EapConfig:
     IS_PRODUCTION: bool = ENV == "production"
     IS_PILOT: bool = _env_bool("EAP_PILOT_MODE") or IS_PRODUCTION
 
-    # Public site URL (https://your-host.example) — auto-added to CORS when set.
-    PUBLIC_URL: str | None = (os.environ.get("EAP_PUBLIC_URL") or "").strip().rstrip("/") or None
+    # Public site URL — auto-added to CORS. Render sets RENDER_EXTERNAL_URL on first deploy.
+    PUBLIC_URL: str | None = (
+        (os.environ.get("EAP_PUBLIC_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "")
+        .strip()
+        .rstrip("/")
+        or None
+    )
 
     # Optional one-switch preset for pilot hosts (also set individual flags explicitly).
     PRODUCTION_PRESET: bool = _env_bool("EAP_PRODUCTION_PRESET")
