@@ -32,3 +32,6 @@ backups/
 
 # WeChat DevTools machine-local settings
 wechat-mini/project.private.config.json
+
+# Local SSH setup helper (public key; keep on Mac only)
+github_ssh_public_key.txt
