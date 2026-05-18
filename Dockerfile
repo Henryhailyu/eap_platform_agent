@@ -1,5 +1,5 @@
 # Phase G — online web pilot (Flask API + /ui/ frontend, SQLite on a persistent volume)
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 

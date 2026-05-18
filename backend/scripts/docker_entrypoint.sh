@@ -15,7 +15,8 @@ if [ "${EAP_SEED_DEMO_TASKS:-0}" = "1" ]; then
   python scripts/seed_internal_demo.py
 fi
 
-WORKERS="${GUNICORN_WORKERS:-2}"
+# SQLite on /data: use one worker (multi-worker causes lock/crash on Render).
+WORKERS="${GUNICORN_WORKERS:-1}"
 BIND="0.0.0.0:${PORT:-5051}"
 echo "EAP pilot: starting gunicorn on ${BIND} (${WORKERS} workers)"
 exec gunicorn -w "${WORKERS}" -b "${BIND}" --access-logfile - --error-logfile - wsgi:app
