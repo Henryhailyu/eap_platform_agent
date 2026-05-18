@@ -6,7 +6,23 @@ Complete these before publishing the **WeChat mini-program** or sharing the publ
 
 ---
 
-## 0. Local dev (Mac — web + WeChat simulator)
+## 0. Local production smoke-test (before HTTPS)
+
+Same checks Gunicorn will run on Render/Docker:
+
+```bash
+cd backend
+chmod +x scripts/start_pilot_prod_local.sh scripts/i0_preflight.sh
+./scripts/start_pilot_prod_local.sh
+# other terminal:
+python scripts/verify_pilot.py --base http://127.0.0.1:5051 --password '123456'
+```
+
+Expect **All checks passed** with `strict=True` on `/api/health`.
+
+---
+
+## 0b. Local dev (Mac — web + WeChat simulator)
 
 ```bash
 cd eap_platform_agent/backend
@@ -65,10 +81,23 @@ docker compose up --build -d
 
 ### Render
 
-1. Push repo to GitHub.  
-2. Render → **New** → **Blueprint** → select repo.  
-3. After first deploy, set **`EAP_PUBLIC_URL`** to `https://<your-service>.onrender.com`.  
-4. Redeploy if needed.
+1. Push repo to GitHub (from `eap_platform_agent`):
+
+   ```bash
+   git remote add origin https://github.com/YOUR_USER/eap_platform_agent.git
+   git push -u origin main
+   ```
+
+2. [Render](https://render.com) → **New** → **Blueprint** → connect the repo (`render.yaml` is detected).  
+3. After first deploy, set **`EAP_PUBLIC_URL`** in the dashboard to `https://<your-service>.onrender.com`.  
+4. **Redeploy** so cookies/CORS match the public URL.  
+5. Preflight helper (prints env checklist + optional verify):
+
+   ```bash
+   cd backend && chmod +x scripts/i0_preflight.sh
+   ./scripts/i0_preflight.sh
+   ./scripts/i0_preflight.sh --verify https://<your-service>.onrender.com --password 'YourStrongPassword'
+   ```
 
 ---
 
