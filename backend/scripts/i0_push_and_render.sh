@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 REPO_API="https://api.github.com/repos/Henryhailyu/eap_platform_agent"
 REMOTE="https://github.com/Henryhailyu/eap_platform_agent.git"
+# SSH alternative: git@github.com:Henryhailyu/eap_platform_agent.git
 
 git remote set-url origin "$REMOTE" 2>/dev/null || git remote add origin "$REMOTE"
 
