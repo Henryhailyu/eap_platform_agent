@@ -34,14 +34,15 @@
     <view class="days">
       <view
         wx:for="{{cells}}"
-        wx:key="date"
-        class="day-cell {{item.inMonth ? '' : 'other'}} {{item.isToday ? 'today' : ''}} {{item.isHoliday ? 'holiday' : ''}}"
-        data-date="{{item.date}}"
+        wx:for-item="cell"
+        wx:key="key"
+        class="day-cell {{cell.inMonth ? '' : 'other'}} {{cell.isToday ? 'today' : ''}} {{cell.isHoliday ? 'holiday' : ''}}"
+        data-date="{{cell.date}}"
         bindtap="onDayTap"
       >
-        <text class="day-num">{{item.day}}</text>
-        <text class="dot" wx:if="{{item.count > 0}}">{{item.count}}</text>
-        <text class="holiday-dot" wx:if="{{item.holidayLabel}}">·</text>
+        <text class="day-num">{{cell.day}}</text>
+        <text class="dot" wx:if="{{cell.count > 0}}">{{cell.count}}</text>
+        <text class="holiday-dot" wx:if="{{cell.holidayLabel}}">·</text>
       </view>
     </view>
   </view>

@@ -2,7 +2,7 @@
   "description": "EAP student mini-program (Phase I3)",
   "packOptions": { "ignore": [] },
   "setting": {
-    "urlCheck": true,
+    "urlCheck": false,
     "es6": true,
     "postcss": true,
     "minified": true

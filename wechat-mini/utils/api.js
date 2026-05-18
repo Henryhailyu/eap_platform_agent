@@ -15,11 +15,25 @@ function request(method, path, options = {}) {
     header.Authorization = `Bearer ${session.token}`;
   }
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(arg);
+    };
+    const timer = setTimeout(() => {
+      finish(reject, {
+        error: 'Request timed out — is Flask running on config.js apiBase?',
+      });
+    }, 20000);
+
     wx.request({
       url: apiUrl(path),
       method,
       data: options.data,
       header,
+      timeout: 15000,
       success(res) {
         if (res.statusCode === 401) {
           auth.clearSession();
@@ -28,13 +42,16 @@ function request(method, path, options = {}) {
           return;
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data);
+          finish(resolve, res.data);
           return;
         }
-        reject(res.data || { error: `HTTP ${res.statusCode}` });
+        finish(reject, res.data || { error: `HTTP ${res.statusCode}` });
       },
-      fail() {
-        reject({ error: 'Network error — check apiBase in config.js' });
+      fail(err) {
+        const detail = (err && err.errMsg) ? err.errMsg : 'request:fail';
+        finish(reject, {
+          error: `Network error — ${detail}. Try apiBase http://localhost:5051, keep Flask running, 不校验合法域名 on.`,
+        });
       },
     });
   });
