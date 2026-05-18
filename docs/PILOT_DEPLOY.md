@@ -86,7 +86,8 @@ docker compose up --build -d
 1. Push repo to GitHub (from `eap_platform_agent`):
 
    ```bash
-   git remote add origin https://github.com/YOUR_USER/eap_platform_agent.git
+   git remote set-url origin https://github.com/Henryhailyu/eap_platform_agent.git
+   # or: sh backend/scripts/setup_github.sh
    git push -u origin main
    ```
 
