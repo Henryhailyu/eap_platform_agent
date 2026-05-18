@@ -28,24 +28,33 @@ DEFAULT_CLASS = "EAP047"
 STUDENT_USER = "student1"
 
 
-def request_json(method: str, url: str, body=None, headers=None):
+def request_json(method: str, url: str, body=None, headers=None, retries: int = 0):
     data = None
     hdrs = dict(headers or {})
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         hdrs.setdefault("Content-Type", "application/json")
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as resp:
-            raw = resp.read().decode("utf-8")
-            return resp.status, json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8")
+    last_code, last_payload = None, {}
+    for attempt in range(retries + 1):
         try:
-            payload = json.loads(raw) if raw else {}
-        except json.JSONDecodeError:
-            payload = {"raw": raw}
-        return e.code, payload
+            with urllib.request.urlopen(req, timeout=60, context=_ssl_context()) as resp:
+                raw = resp.read().decode("utf-8")
+                return resp.status, json.loads(raw) if raw else {}
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode("utf-8")
+            try:
+                last_payload = json.loads(raw) if raw else {}
+            except json.JSONDecodeError:
+                last_payload = {"raw": raw}
+            last_code = e.code
+            if e.code in (502, 503) and attempt < retries:
+                import time
+
+                time.sleep(8)
+                continue
+            return e.code, last_payload
+    return last_code, last_payload
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:
@@ -69,7 +78,8 @@ def main() -> int:
     print(f"Verifying {base} (class {class_name})…\n")
     all_ok = True
 
-    code, health = request_json("GET", f"{base}/api/health")
+    # Render Starter may return 502 while the container wakes from sleep.
+    code, health = request_json("GET", f"{base}/api/health", retries=3)
     all_ok &= check(
         "GET /api/health",
         code == 200 and health.get("status") in ("ok", "degraded"),
