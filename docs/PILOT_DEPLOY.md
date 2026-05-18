@@ -79,7 +79,9 @@ export EAP_PUBLIC_URL="https://your-domain.example"   # or http://localhost:5051
 docker compose up --build -d
 ```
 
-### Render
+### Render (default — chosen for this project)
+
+**One-time (you, ~10 min):** log in to [GitHub](https://github.com) and [Render](https://render.com) in the browser. Create an empty repo, then connect Render Blueprint. The app auto-uses `RENDER_EXTERNAL_URL` for CORS; optional `EAP_PUBLIC_URL` only if you add a custom domain.
 
 1. Push repo to GitHub (from `eap_platform_agent`):
 
