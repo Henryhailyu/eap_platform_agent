@@ -26,4 +26,9 @@ backups/
 
 # Cursor / VS Code local settings
 .vscode/
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# WeChat DevTools machine-local settings
+wechat-mini/project.private.config.json

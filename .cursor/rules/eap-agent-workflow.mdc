@@ -1,0 +1,11 @@
+---
+description: EAP project agent workflow — autonomous decisions and git safety
+alwaysApply: true
+---
+
+# EAP agent workflow
+
+- **Do not ask** the user to choose hosting, tools, or architecture when a clear default exists. Pick the better option (pilot HTTPS → **Render** + `render.yaml`; VPS only if Render is unavailable).
+- **Tell the user** what you will do next and what you completed — not a menu of choices.
+- **Git after each logical step**: commit on `main` in `eap_platform_agent` with a clear message; never commit `.env`, `project.private.config.json`, or `*.db`.
+- **I0 order**: production smoke-test → Render-ready config → commits → user only needed for account login (Render/GitHub) if the agent cannot push from this machine.
