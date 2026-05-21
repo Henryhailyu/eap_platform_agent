@@ -132,8 +132,8 @@ Manual checks:
 
 - [ ] `GET /api/health` → `"status": "ok"`, `"strict_security": true`
 - [ ] Open `https://…/` → login page loads  
-- [ ] Log in as `student1` on **phone** (mobile web `/ui/student.html`)  
-- [ ] Calendar, submit homework, view feedback  
+- [ ] **I0b phone pilot:** follow [`I0_PHONE_PILOT.md`](I0_PHONE_PILOT.md) on a real phone  
+- [ ] Share [`PILOT_HANDOUT.md`](PILOT_HANDOUT.md) with teachers (edit password line privately)  
 - [ ] Daily backup scheduled: `python scripts/backup_database.py`
 
 ---
