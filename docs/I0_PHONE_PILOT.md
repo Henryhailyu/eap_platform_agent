@@ -6,7 +6,13 @@ Use this after `verify_pilot.py` passes on HTTPS. **WeChat mini is not required*
 **Class:** EAP047  
 **Demo password (production):** the value you set with `seed_pilot.py` on Render (e.g. `EapPilot2026!Henry`).
 
-> **Render cold start:** First open after ~15 min idle may take **30–60 seconds**. Wait for the page to load; do not refresh repeatedly.
+> **Render cold start (502 Bad Gateway):** On Starter, the app **sleeps after ~15 min** with no visits. While waking, the browser may show **502** — this is normal, not a broken deploy.
+>
+> **Fix:** Wait **60–90 seconds**, then refresh **once**. Or open `/api/health` first; when you see JSON, open `/ui/index.html`.
+>
+> **Wake order:**  
+> 1. https://eap-platform-pilot.onrender.com/api/health  
+> 2. https://eap-platform-pilot.onrender.com/ui/index.html
 
 ---
 
