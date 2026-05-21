@@ -1,5 +1,7 @@
 # EAP Student — WeChat Mini Program (Phase I3 scaffold)
 
+> **ON HOLD (2026-05-21):** Web-first roadmap until WeChat authorization. See [`docs/WEB_FIRST_ROADMAP.md`](../docs/WEB_FIRST_ROADMAP.md).
+
 Native WeChat mini-program for the **student daily loop**: login → month calendar → day tasks → submit / revision → learning archive.
 
 Teachers and managers continue to use the web UI at `/ui/`.

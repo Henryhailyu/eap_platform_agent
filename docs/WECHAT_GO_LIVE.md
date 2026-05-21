@@ -2,7 +2,7 @@
 
 **App:** EAP学习助手 · AppID `wx1b1247067a43152`  
 **API host:** `eap-platform-pilot.onrender.com`  
-**Status:** Code ready; blocked on WeChat authorization + domain whitelist.
+**Status:** **ON HOLD** (2026-05-21) — product focus is web-first until 备案/认证. Code remains on `main`; resume with this checklist when approved.
 
 ---
 
