@@ -1,8 +1,13 @@
 /**
- * Local simulator: use localhost (WeChat DevTools often fails on 127.0.0.1).
- * Production: HTTPS pilot URL after whitelisting in mp.weixin.qq.com.
+ * API base for the student mini-program.
+ *
+ * Production (Render pilot): HTTPS — required for real phones after 备案/域名.
+ * Local DevTools: set USE_LOCAL_DEV = true and enable 不校验合法域名.
  */
+const PRODUCTION_API = 'https://eap-platform-pilot.onrender.com';
+const USE_LOCAL_DEV = false;
+
 module.exports = {
-  apiBase: 'http://localhost:5051',
+  apiBase: USE_LOCAL_DEV ? 'http://localhost:5051' : PRODUCTION_API,
   defaultClass: 'EAP047',
 };

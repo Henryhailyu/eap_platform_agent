@@ -16,13 +16,10 @@ Teachers and managers continue to use the web UI at `/ui/`.
 
 1. Install [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html).  
 2. **导入项目** → choose this `wechat-mini/` folder (not an empty template).  
-3. Edit **`config.js`** — set `apiBase` to your HTTPS pilot URL (no trailing slash):
+3. **`config.js`** — production URL is preset (`https://eap-platform-pilot.onrender.com`).  
+   For **local Mac backend only:** set `USE_LOCAL_DEV = true` in `config.js`.
 
-   ```js
-   apiBase: 'https://eap-pilot.onrender.com',
-   ```
-
-4. For local backend only (not production): enable **详情 → 本地设置 → 不校验合法域名、web-view、TLS** in devtools.  
+4. Local DevTools: enable **详情 → 本地设置 → 不校验合法域名、web-view、TLS**.  
 5. Build & preview with demo account `student1` and your pilot password.
 
 ## Features (Phase I3 polish)
