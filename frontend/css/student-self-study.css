@@ -535,6 +535,19 @@
   margin-bottom: 1.25rem;
 }
 
+.ssc-script-block {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  padding: 1rem 1.25rem;
+  margin: 0 0 1.25rem;
+  border-radius: 10px;
+  background: rgba(10, 126, 164, 0.06);
+  border: 1px solid rgba(10, 126, 164, 0.12);
+  overflow-x: auto;
+}
+
 .ssc-sort-list {
   list-style: none;
   margin: 0 0 1rem;

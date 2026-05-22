@@ -436,5 +436,11 @@ window.EAP_STRINGS_ZH = {
   "self_study_writing_game_done": "摘要任务完成，共尝试 {attempts} 次。",
   "self_study_writing_complete": "写作模块已完成 — 做得好！",
   "self_study_summary_correct": "摘要选得很好！",
-  "self_study_summary_try_again": "请再选一个选项。"
+  "self_study_summary_try_again": "请再选一个选项。",
+  "self_study_listening_learn_title": "听力与笔记",
+  "self_study_listening_no_audio": "仅文字稿 — 音频（TTS）将在后续阶段加入。",
+  "self_study_listening_game_title": "讲座结构",
+  "self_study_listening_game_hint": "按文字稿顺序排列讲座各部分。",
+  "self_study_listening_game_done": "讲座结构完成，共检查 {attempts} 次。",
+  "self_study_listening_complete": "听力模块已完成 — 做得好！"
 };

@@ -436,5 +436,11 @@ window.EAP_STRINGS_EN = {
   "self_study_writing_game_done": "Summary Mission complete in {attempts} tries.",
   "self_study_writing_complete": "Writing module complete — great work!",
   "self_study_summary_correct": "Excellent summary choice!",
-  "self_study_summary_try_again": "Try another option."
+  "self_study_summary_try_again": "Try another option.",
+  "self_study_listening_learn_title": "Listening & note-taking",
+  "self_study_listening_no_audio": "Text script only — audio (TTS) coming in a later phase.",
+  "self_study_listening_game_title": "Lecture Structure",
+  "self_study_listening_game_hint": "Order the lecture sections to match the script flow.",
+  "self_study_listening_game_done": "Lecture Structure complete in {attempts} checks.",
+  "self_study_listening_complete": "Listening module complete — great work!"
 };

@@ -7,6 +7,7 @@
   const VOCAB = window.EAP_VOCAB_MOCK;
   const READ = window.EAP_READING_MOCK;
   const WRITE = window.EAP_WRITING_MOCK;
+  const LISTEN = window.EAP_LISTENING_MOCK;
 
   function t(key, params) {
     if (typeof window.t === "function") return window.t(key, params);
@@ -374,10 +375,13 @@
       initVocabulary(levelId);
     } else if (skill === "reading") {
       if (!window.EAP_MODULE_RW || !READ) return;
-      window.EAP_MODULE_RW.initReading(levelId, MOCK, renderTabs);
+      window.EAP_MODULE_RW.initReading(levelId, renderTabs);
     } else if (skill === "writing") {
       if (!window.EAP_MODULE_RW || !WRITE) return;
       window.EAP_MODULE_RW.initWriting(levelId, renderTabs);
+    } else if (skill === "listening") {
+      if (!window.EAP_MODULE_LISTENING || !LISTEN) return;
+      window.EAP_MODULE_LISTENING.initListening(levelId, renderTabs);
     } else {
       renderUnsupported(skill || "—");
       return;
@@ -385,8 +389,10 @@
 
     window.addEventListener("eap:langchange", () => {
       if (skill === "vocabulary" && VOCAB) initVocabulary(levelId);
-      else if (skill === "reading" && window.EAP_MODULE_RW) window.EAP_MODULE_RW.initReading(levelId, MOCK, renderTabs);
+      else if (skill === "reading" && window.EAP_MODULE_RW) window.EAP_MODULE_RW.initReading(levelId, renderTabs);
       else if (skill === "writing" && window.EAP_MODULE_RW) window.EAP_MODULE_RW.initWriting(levelId, renderTabs);
+      else if (skill === "listening" && window.EAP_MODULE_LISTENING)
+        window.EAP_MODULE_LISTENING.initListening(levelId, renderTabs);
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     });
   }

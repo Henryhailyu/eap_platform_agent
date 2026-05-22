@@ -27,7 +27,8 @@
       icon: "🎧",
       titleKey: "self_study_mod_listening",
       metaKey: "self_study_mod_listening_meta",
-      soon: true,
+      href: "student-self-study-module.html?skill=listening",
+      available: true,
     },
     {
       id: "speaking",
@@ -113,6 +114,10 @@
         } else if (mod.id === "writing" && window.EAP_WRITING_MOCK) {
           modProgress = window.EAP_WRITING_MOCK.completionPercent(
             window.EAP_WRITING_MOCK.ensureProgress(levelId),
+          );
+        } else if (mod.id === "listening" && window.EAP_LISTENING_MOCK) {
+          modProgress = window.EAP_LISTENING_MOCK.completionPercent(
+            window.EAP_LISTENING_MOCK.ensureProgress(levelId),
           );
         }
       }
