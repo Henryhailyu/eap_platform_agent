@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Vocabulary — AI Self-Study Centre" />
+    <title>Vocabulary — EAP Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,600;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/student-self-study.css" />
+  </head>
+  <body class="page-app eap-shell-active" data-page="student-self-study-module">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+        <a class="skip-link" href="#main">Skip to content</a>
+        <header class="site-header">
+          <div class="site-header__inner">
+            <a class="site-logo" href="student.html"
+              ><span data-i18n="brand">EAP Platform</span
+              ><span class="eap-build-badge" data-i18n="build_badge">Agent build</span></a
+            >
+            <div class="site-header__actions">
+              <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">中文</button>
+              <p class="site-welcome" id="header-welcome" aria-live="polite"><span data-i18n="welcome">Welcome,</span></p>
+              <button type="button" class="btn-logout" id="logout-btn" data-i18n="logout">Logout</button>
+            </div>
+          </div>
+        </header>
+        <main id="main" class="app-main ssc-main">
+          <div class="ssc-back-row">
+            <a class="ssc-back-link" href="student-self-study.html" data-i18n="self_study_back_hub">← AI Self-Study Centre</a>
+            <span id="ssc-module-level" class="ssc-level-badge" hidden></span>
+          </div>
+
+          <div class="ssc-hero ssc-hero--module">
+            <h1 id="ssc-module-title">Vocabulary</h1>
+            <p id="ssc-module-status" class="ssc-hero__lead" data-i18n="self_study_vocab_in_progress">In progress</p>
+            <div class="ssc-module-progress" aria-label="Module progress">
+              <div class="ssc-placement-progress__bar">
+                <div id="ssc-module-progress-fill" class="ssc-placement-progress__fill" style="width: 0%"></div>
+              </div>
+              <span id="ssc-module-progress-pct" class="ssc-module-progress__pct">0%</span>
+            </div>
+          </div>
+
+          <div id="ssc-module-root" class="ssc-module-shell">
+            <nav class="ssc-tabs" role="tablist" aria-label="Vocabulary activities">
+              <button type="button" class="ssc-tab ssc-tab--active" role="tab" data-tab="learn" aria-selected="true" data-i18n="self_study_tab_learn">
+                Learn
+              </button>
+              <button type="button" class="ssc-tab" role="tab" data-tab="practice" aria-selected="false" data-i18n="self_study_tab_practice">
+                Practice
+              </button>
+              <button type="button" class="ssc-tab" role="tab" data-tab="game" aria-selected="false" data-i18n="self_study_tab_game">
+                Game
+              </button>
+            </nav>
+
+            <div id="ssc-panel-learn" class="ssc-tab-panel" data-panel="learn" role="tabpanel"></div>
+            <div id="ssc-panel-practice" class="ssc-tab-panel" data-panel="practice" role="tabpanel" hidden></div>
+            <div id="ssc-panel-game" class="ssc-tab-panel" data-panel="game" role="tabpanel" hidden></div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+    <script src="js/student-self-study-mock.js"></script>
+    <script src="js/student-self-study-vocabulary-mock.js"></script>
+    <script src="js/student-self-study-module.js"></script>
+  </body>
+</html>

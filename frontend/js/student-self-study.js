@@ -11,7 +11,8 @@
       icon: "📚",
       titleKey: "self_study_mod_vocab",
       metaKey: "self_study_mod_vocab_meta",
-      soon: true,
+      href: "student-self-study-module.html?skill=vocabulary",
+      available: true,
     },
     {
       id: "reading",
@@ -96,9 +97,11 @@
 
     gridEl.innerHTML = MODULES.map((mod) => {
       const locked = mod.locked || !hasPlacement;
-      const tagKey = mod.soon ? "self_study_tag_soon" : "self_study_tag_start";
-      const tagText = mod.soon ? t("self_study_tag_soon") : t("self_study_tag_start");
       const levelLabel = levelId && MOCK ? MOCK.levelDisplay(levelId) : "—";
+      const vocabProgress =
+        mod.id === "vocabulary" && window.EAP_VOCAB_MOCK && levelId
+          ? window.EAP_VOCAB_MOCK.completionPercent(window.EAP_VOCAB_MOCK.ensureProgress(levelId))
+          : 0;
 
       if (locked) {
         return `
@@ -106,8 +109,25 @@
             <span class="ssc-module-card__icon" aria-hidden="true">${mod.icon}</span>
             <h3 class="ssc-module-card__title" data-i18n="${mod.titleKey}"></h3>
             <p class="ssc-module-card__meta" data-i18n="${mod.metaKey}"></p>
-            <span class="ssc-module-card__tag ssc-module-card__tag--soon" data-i18n="${mod.locked ? "self_study_tag_locked" : tagKey}">${mod.locked ? t("self_study_tag_locked") : tagText}</span>
+            <span class="ssc-module-card__tag ssc-module-card__tag--soon">${t("self_study_tag_locked")}</span>
           </div>
+        `;
+      }
+
+      if (mod.available && mod.href) {
+        const tag =
+          vocabProgress >= 100
+            ? t("self_study_tag_complete")
+            : vocabProgress > 0
+              ? t("self_study_tag_continue", { pct: String(vocabProgress) })
+              : `${t("self_study_tag_start")} · ${levelLabel}`;
+        return `
+          <a href="${mod.href}" class="ssc-module-card" role="listitem">
+            <span class="ssc-module-card__icon" aria-hidden="true">${mod.icon}</span>
+            <h3 class="ssc-module-card__title" data-i18n="${mod.titleKey}"></h3>
+            <p class="ssc-module-card__meta" data-i18n="${mod.metaKey}"></p>
+            <span class="ssc-module-card__tag">${tag}</span>
+          </a>
         `;
       }
 

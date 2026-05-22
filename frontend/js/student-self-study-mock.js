@@ -620,24 +620,24 @@
     const zh = isZh();
     const plans = {
       beginner: zh
-        ? ["复习 10 个基础学术词", "阅读一篇短文的 main idea", "完成词汇配对练习（即将推出）"]
+        ? ["词汇模块：学习 6 个学术词 + 配对游戏", "阅读一篇短文的 main idea", "听力结构笔记（稍后）"]
         : [
-            "Review 10 foundation academic words",
+            "Vocabulary: learn 6 academic words + matching game",
             "Read one short passage for main idea",
-            "Vocabulary matching practice (coming in S3)",
+            "Listening structure notes (later)",
           ],
       intermediate: zh
-        ? ["练习 8 组学术搭配", "阅读推断题 1 组", "摘要句选择练习 1 组"]
+        ? ["词汇模块：搭配与语域练习", "阅读推断题 1 组", "摘要句选择练习（稍后）"]
         : [
-            "Practice 8 academic collocations",
+            "Vocabulary: collocations and register practice",
             "One set of reading inference questions",
-            "Summary sentence selection practice",
+            "Summary sentence practice (later)",
           ],
       advanced: zh
-        ? ["精读一篇论证结构短文", "综合摘要句写作草稿", "听力结构笔记（文字稿）"]
+        ? ["词汇模块：综合与评价用语", "精读论证结构短文", "听力结构笔记（文字稿）"]
         : [
+            "Vocabulary: synthesis and evaluation language",
             "Close read one argument-structure passage",
-            "Draft a synthesis summary sentence",
             "Lecture structure notes (script-based)",
           ],
     };
