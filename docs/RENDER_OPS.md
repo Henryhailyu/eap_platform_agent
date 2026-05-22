@@ -8,12 +8,17 @@
 
 ## Cold start (502)
 
-Starter **sleeps** after ~15 minutes without traffic.
+Starter **sleeps** after ~15 minutes without traffic. While the container starts, Render may show **502 Bad Gateway** for up to ~60 s.
 
 | User sees | Action |
 |-----------|--------|
-| **502 Bad Gateway** | Wait 60–90 s, refresh once |
-| Slow first load | Open `/api/health` first, then `/ui/` |
+| **502 Bad Gateway** | Wait 30–60 s, refresh once — or open `/ui/index.html` (auto-retries health on Render) |
+| “Starting EAP server…” overlay | Normal after sleep; page retries `/api/health` automatically |
+| Slow first load after deploy | First boot seeds the DB; later restarts skip seeds and start faster |
+
+**Deploy behaviour:** `docker_entrypoint.sh` runs full `seed_pilot` / demo seed only once (marker file `/data/.eap_seeded`). Restarts and wake-from-sleep only run `init_database` then Gunicorn.
+
+To re-seed manually: Render Shell → `touch /data/.eap_seeded` remove + `EAP_FORCE_SEED=1` on one deploy, or delete the marker and redeploy.
 
 For demos: visit the site 2 minutes before class.
 
