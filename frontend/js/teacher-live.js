@@ -1,9 +1,12 @@
 /**
- * Teacher Live Teaching Page (Phase L2–L7, L9 — mock).
+ * Teacher Live Teaching Page (Phase L2–L12 — mock).
  */
 (function () {
   const PAGE = "teacher-live";
-  const MOCK = window.EAP_TEACHER_LIVE_MOCK;
+
+  function getMock() {
+    return window.EAP_TEACHER_LIVE_MOCK || null;
+  }
 
   function t(key, params) {
     if (typeof window.t === "function") return window.t(key, params);
@@ -19,6 +22,56 @@
     };
   }
 
+  function escapeHtml(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /** Logout + welcome — runs immediately (not after async session). */
+  function initPageChrome() {
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn && logoutBtn.dataset.eapBound !== "1") {
+      logoutBtn.dataset.eapBound = "1";
+      logoutBtn.addEventListener("click", () => {
+        if (typeof logoutAndGoHome === "function") {
+          logoutAndGoHome();
+        } else {
+          try {
+            if (typeof authStorageRemoveAll === "function") authStorageRemoveAll();
+          } catch (_) {
+            /* ignore */
+          }
+          window.location.href = "index.html";
+        }
+      });
+    }
+
+    const welcomeEl = document.getElementById("header-welcome");
+    if (welcomeEl && typeof getLoggedInUser === "function") {
+      const user = getLoggedInUser();
+      if (user) {
+        const name = user.full_name || user.username || "User";
+        welcomeEl.textContent = t("welcome_user", { name });
+      }
+    }
+  }
+
+  function showBootError(message) {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas) return;
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
+    canvas.innerHTML = `
+      <div class="tlive-boot-error">
+        <h2 style="color:#0A4D68;margin:0 0 0.5rem">${escapeHtml(t("tlive_boot_error_title"))}</h2>
+        <p>${escapeHtml(message)}</p>
+        <p style="margin-top:1rem"><a class="btn-primary" href="index.html">${escapeHtml(t("tlive_boot_login_link"))}</a></p>
+      </div>
+    `;
+  }
+
   function setActiveTool(toolId) {
     document.querySelectorAll(".tlive-tool").forEach((btn) => {
       btn.classList.toggle("tlive-tool--active", btn.getAttribute("data-tool") === toolId);
@@ -26,31 +79,34 @@
   }
 
   function renderWelcome(ctx) {
+    const MOCK = getMock();
     const canvas = document.getElementById("tlive-canvas-inner");
-    if (!canvas) return;
+    if (!canvas || !MOCK) return;
     canvas.className = "tlive-canvas__inner";
     canvas.innerHTML = `
-      <h2 style="color:#0A4D68;margin:0 0 0.5rem">${t("tlive_welcome_title")}</h2>
-      <p style="color:#6e6e73;max-width:28rem">${t("tlive_welcome_lead")}</p>
-      <p style="font-size:0.875rem;color:#6e6e73">${t("tlive_context", { class: ctx.className, date: ctx.date || "—" })}</p>
-      <p class="tlive-disclaimer">${t("tlive_mock_disclaimer")}</p>
+      <h2 style="color:#0A4D68;margin:0 0 0.5rem">${escapeHtml(t("tlive_welcome_title"))}</h2>
+      <p style="color:#6e6e73;max-width:28rem">${escapeHtml(t("tlive_welcome_lead"))}</p>
+      <p style="font-size:0.875rem;color:#6e6e73">${escapeHtml(t("tlive_context", { class: ctx.className, date: ctx.date || "—" }))}</p>
+      <p class="tlive-disclaimer">${escapeHtml(t("tlive_mock_disclaimer"))}</p>
     `;
   }
 
   function renderBoardRace(boardState, questionIndex) {
+    const MOCK = getMock();
     const canvas = document.getElementById("tlive-canvas-inner");
+    if (!MOCK || !canvas) return;
     const q = MOCK.MOCK_QUESTIONS[questionIndex % MOCK.MOCK_QUESTIONS.length];
-    if (!canvas || !q) return;
+    if (!q) return;
 
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
     const teamsHtml = boardState.teams
       .map(
         (team, i) => `
         <div class="tlive-board__team">
-          <h3>${team.name}</h3>
+          <h3>${escapeHtml(team.name)}</h3>
           <div class="tlive-board__track"><div class="tlive-board__fill" style="width:${team.progress}%"></div></div>
           <div class="tlive-board__score">${team.score}</div>
-          <button type="button" class="btn-secondary tlive-score-btn" data-team="${i}" style="margin-top:0.5rem;font-size:0.75rem">${t("tlive_award_point")}</button>
+          <button type="button" class="btn-secondary tlive-score-btn" data-team="${i}" style="margin-top:0.5rem;font-size:0.75rem">${escapeHtml(t("tlive_award_point"))}</button>
         </div>
       `,
       )
@@ -59,20 +115,20 @@
     const opts = MOCK.questionOptions(q);
     canvas.innerHTML = `
       <div class="tlive-board">
-        <h2 style="color:#0A4D68;margin:0 0 1rem">${t("tlive_board_race_title")}</h2>
+        <h2 style="color:#0A4D68;margin:0 0 1rem">${escapeHtml(t("tlive_board_race_title"))}</h2>
         <div class="tlive-board__teams">${teamsHtml}</div>
         <div class="tlive-question-box">
-          <p style="font-weight:600;margin:0 0 0.75rem">${t("tlive_current_question")}</p>
-          <p style="margin:0 0 0.75rem">${MOCK.questionText(q)}</p>
+          <p style="font-weight:600;margin:0 0 0.75rem">${escapeHtml(t("tlive_current_question"))}</p>
+          <p style="margin:0 0 0.75rem">${escapeHtml(MOCK.questionText(q))}</p>
           <ol style="margin:0;padding-left:1.25rem;text-align:left">
-            ${opts.map((o) => `<li>${o}</li>`).join("")}
+            ${opts.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}
           </ol>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
-          <button type="button" class="btn-primary" id="tlive-launch-q">${t("tlive_launch_question")}</button>
-          <button type="button" class="btn-secondary" id="tlive-next-q">${t("tlive_next_question")}</button>
+          <button type="button" class="btn-primary" id="tlive-launch-q">${escapeHtml(t("tlive_launch_question"))}</button>
+          <button type="button" class="btn-secondary" id="tlive-next-q">${escapeHtml(t("tlive_next_question"))}</button>
         </div>
-        <p class="tlive-disclaimer">${t("tlive_mock_disclaimer")}</p>
+        <p class="tlive-disclaimer">${escapeHtml(t("tlive_mock_disclaimer"))}</p>
       </div>
     `;
 
@@ -93,39 +149,34 @@
   }
 
   function showInteractionPanel(question) {
+    const MOCK = getMock();
     const panel = document.getElementById("tlive-panel-right");
     const body = document.getElementById("tlive-panel-body");
-    if (!panel || !body) return;
+    if (!MOCK || !panel || !body || !question) return;
     panel.classList.remove("hidden");
 
     const rows = MOCK.simulateResponses(question);
     body.innerHTML = `
-      <p style="font-size:0.8125rem;margin:0 0 0.75rem">${MOCK.questionText(question)}</p>
+      <p style="font-size:0.8125rem;margin:0 0 0.75rem">${escapeHtml(MOCK.questionText(question))}</p>
       <table class="tlive-responses-table">
-        <thead><tr><th>${t("tlive_col_student")}</th><th>${t("tlive_col_answer")}</th><th>${t("tlive_col_ok")}</th><th>${t("tlive_col_time")}</th></tr></thead>
+        <thead><tr><th>${escapeHtml(t("tlive_col_student"))}</th><th>${escapeHtml(t("tlive_col_answer"))}</th><th>${escapeHtml(t("tlive_col_ok"))}</th><th>${escapeHtml(t("tlive_col_time"))}</th></tr></thead>
         <tbody>
           ${rows
             .map(
               (r) =>
-                `<tr><td>${r.student}</td><td>${r.answer}</td><td>${r.correct ? "✓" : "—"}</td><td>${r.timeSec}s</td></tr>`,
+                `<tr><td>${escapeHtml(r.student)}</td><td>${escapeHtml(r.answer)}</td><td>${r.correct ? "✓" : "—"}</td><td>${r.timeSec}s</td></tr>`,
             )
             .join("")}
         </tbody>
       </table>
-      <p class="tlive-disclaimer">${t("tlive_responses_mock")}</p>
+      <p class="tlive-disclaimer">${escapeHtml(t("tlive_responses_mock"))}</p>
     `;
   }
 
   function getSavedGamesList() {
+    const MOCK = getMock();
+    if (!MOCK) return [];
     return MOCK.allSavedGames ? MOCK.allSavedGames() : MOCK.SAVED_GAMES;
-  }
-
-  function escapeHtml(text) {
-    return String(text == null ? "" : text)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
   }
 
   function bindGamePickers(root, onPick) {
@@ -138,10 +189,10 @@
     });
   }
 
-  /** Main canvas view — always visible when Games tool is selected. */
   function renderGamesLibrary() {
+    const MOCK = getMock();
     const canvas = document.getElementById("tlive-canvas-inner");
-    if (!canvas) return;
+    if (!canvas || !MOCK) return;
     const games = getSavedGamesList();
     const builderHref = "teacher-game-builder.html" + (window.location.search || "");
 
@@ -188,10 +239,11 @@
   }
 
   function openGamesModal() {
+    const MOCK = getMock();
     ensureGamesModalPortal();
     const modal = document.getElementById("tlive-games-modal");
     const list = document.getElementById("tlive-games-list");
-    if (!modal || !list) return;
+    if (!MOCK || !modal || !list) return;
     const games = getSavedGamesList();
     list.innerHTML = games
       .map(
@@ -200,7 +252,7 @@
       )
       .join("");
     modal.classList.remove("hidden");
-    bindGamePickers(list.parentElement, (id) => {
+    bindGamePickers(modal, (id) => {
       closeGamesModal();
       loadGame(id);
     });
@@ -212,7 +264,9 @@
   }
 
   function loadGame(gameId) {
-    const games = MOCK.allSavedGames ? MOCK.allSavedGames() : MOCK.SAVED_GAMES;
+    const MOCK = getMock();
+    if (!MOCK) return;
+    const games = getSavedGamesList();
     const game = games.find((g) => g.id === gameId);
     if (!game) return;
     setActiveTool("games");
@@ -224,11 +278,11 @@
     }
     const canvas = document.getElementById("tlive-canvas-inner");
     if (canvas) {
-      canvas.className = "tlive-canvas__inner";
+      canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
       canvas.innerHTML = `
-        <h2 style="color:#0A4D68">${MOCK.gameLabel(game, "name")}</h2>
-        <p>${MOCK.gameLabel(game, "desc")}</p>
-        <p class="tlive-disclaimer">${t("tlive_game_soon")}</p>
+        <h2 style="color:#0A4D68">${escapeHtml(MOCK.gameLabel(game, "name"))}</h2>
+        <p>${escapeHtml(MOCK.gameLabel(game, "desc"))}</p>
+        <p class="tlive-disclaimer">${escapeHtml(t("tlive_game_soon"))}</p>
       `;
     }
   }
@@ -236,6 +290,11 @@
   function bindToolbar(ctx) {
     document.querySelectorAll(".tlive-tool").forEach((btn) => {
       btn.addEventListener("click", () => {
+        const MOCK = getMock();
+        if (!MOCK) {
+          showBootError(t("tlive_boot_mock_missing"));
+          return;
+        }
         const tool = btn.getAttribute("data-tool");
         setActiveTool(tool);
         if (tool === "games") showGamesTool();
@@ -248,9 +307,9 @@
             canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
             canvas.innerHTML = `
               <div class="tlive-question-box" style="max-width:32rem;width:100%">
-                <h2 style="color:#0A4D68;margin:0 0 0.75rem">${t("tlive_poll_title")}</h2>
-                <p>${MOCK.questionText(q)}</p>
-                <button type="button" class="btn-primary" id="tlive-launch-poll" style="margin-top:1rem">${t("tlive_launch_question")}</button>
+                <h2 style="color:#0A4D68;margin:0 0 0.75rem">${escapeHtml(t(tool === "quiz" ? "tlive_quiz_title" : "tlive_poll_title"))}</h2>
+                <p>${escapeHtml(MOCK.questionText(q))}</p>
+                <button type="button" class="btn-primary" id="tlive-launch-poll" style="margin-top:1rem">${escapeHtml(t("tlive_launch_question"))}</button>
               </div>
             `;
             document.getElementById("tlive-launch-poll")?.addEventListener("click", () => showInteractionPanel(q));
@@ -258,8 +317,8 @@
         } else {
           const canvas = document.getElementById("tlive-canvas-inner");
           if (canvas) {
-            canvas.className = "tlive-canvas__inner";
-            canvas.innerHTML = `<p>${t("tlive_tool_soon")}</p><p class="tlive-disclaimer">${t("tlive_mock_disclaimer")}</p>`;
+            canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
+            canvas.innerHTML = `<p>${escapeHtml(t("tlive_tool_soon"))}</p><p class="tlive-disclaimer">${escapeHtml(t("tlive_mock_disclaimer"))}</p>`;
           }
         }
       });
@@ -276,21 +335,7 @@
     });
   }
 
-  async function boot() {
-    if (document.body.getAttribute("data-page") !== PAGE) return;
-    if (window.EAP_TEACHER_LIVE_ENABLED === false) {
-      window.location.replace("teacher.html");
-      return;
-    }
-    if (!MOCK) return;
-    if (typeof redirectFilePageToHostedUi === "function" && redirectFilePageToHostedUi()) return;
-
-    const sessionUser = await validatePageSessionOrFallback("teacher");
-    if (!sessionUser) return;
-
-    initAppPageHeader();
-
-    const ctx = contextFromUrl();
+  function initLiveUi(ctx) {
     const titleEl = document.getElementById("tlive-session-title");
     const metaEl = document.getElementById("tlive-session-meta");
     if (titleEl) titleEl.textContent = t("tlive_page_title");
@@ -310,18 +355,52 @@
     bindModal();
     setActiveTool("slides");
     renderWelcome(ctx);
-
-    window.addEventListener("eap:langchange", () => {
-      if (window.__tliveBoard) {
-        renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
-      } else {
-        renderWelcome(ctx);
-      }
-      if (window.EAP_I18N) window.EAP_I18N.applyStatic();
-    });
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    void boot();
-  });
+  function boot() {
+    if (document.body.getAttribute("data-page") !== PAGE) return;
+    if (window.EAP_TEACHER_LIVE_ENABLED === false) {
+      window.location.replace("teacher.html");
+      return;
+    }
+    if (typeof redirectFilePageToHostedUi === "function" && redirectFilePageToHostedUi()) return;
+
+    initPageChrome();
+
+    if (!getMock()) {
+      showBootError(t("tlive_boot_mock_missing"));
+      return;
+    }
+
+    const ctx = contextFromUrl();
+    initLiveUi(ctx);
+
+    window.addEventListener("eap:langchange", () => {
+      const active = document.querySelector(".tlive-tool--active");
+      const tool = active ? active.getAttribute("data-tool") : "slides";
+      if (tool === "games" && !window.__tliveBoard) renderGamesLibrary();
+      else if (window.__tliveBoard) renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
+      else if (tool === "slides") renderWelcome(ctx);
+      if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+      initPageChrome();
+    });
+
+    void (async () => {
+      try {
+        if (typeof validatePageSessionOrFallback !== "function") return;
+        const sessionUser = await validatePageSessionOrFallback("teacher");
+        if (!sessionUser) return;
+        if (typeof initAppPageHeader === "function") initAppPageHeader();
+        initPageChrome();
+      } catch (_) {
+        showBootError(t("tlive_boot_session_hint"));
+      }
+    })();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
 })();

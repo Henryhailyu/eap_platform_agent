@@ -3,7 +3,27 @@
  */
 (function () {
   const PAGE = "teacher-game-builder";
-  const MOCK = window.EAP_GAME_BUILDER_MOCK;
+  function getMock() {
+    return window.EAP_GAME_BUILDER_MOCK || null;
+  }
+
+  function initPageChrome() {
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn && logoutBtn.dataset.eapBound !== "1") {
+      logoutBtn.dataset.eapBound = "1";
+      logoutBtn.addEventListener("click", () => {
+        if (typeof logoutAndGoHome === "function") logoutAndGoHome();
+        else window.location.href = "index.html";
+      });
+    }
+    const welcomeEl = document.getElementById("header-welcome");
+    if (welcomeEl && typeof getLoggedInUser === "function") {
+      const user = getLoggedInUser();
+      if (user) {
+        welcomeEl.textContent = t("welcome_user", { name: user.full_name || user.username || "User" });
+      }
+    }
+  }
 
   function t(key, params) {
     if (typeof window.t === "function") return window.t(key, params);
@@ -24,6 +44,7 @@
   }
 
   function renderTemplates() {
+    const MOCK = getMock();
     const grid = document.getElementById("tgb-template-grid");
     if (!grid || !MOCK) return;
     grid.innerHTML = MOCK.GAME_TEMPLATES.map(
@@ -50,6 +71,7 @@
   }
 
   function runMockGenerate() {
+    const MOCK = getMock();
     const topic = (document.getElementById("tgb-topic")?.value || "").trim();
     const className = (document.getElementById("tgb-class")?.value || "EAP047").trim();
     if (!selectedTemplateId || !MOCK) return;
@@ -60,6 +82,7 @@
   }
 
   function saveGame() {
+    const MOCK = getMock();
     if (!MOCK || !selectedTemplateId) return;
     const topic = (document.getElementById("tgb-topic")?.value || "").trim();
     const className = (document.getElementById("tgb-class")?.value || "EAP047").trim();
@@ -80,9 +103,10 @@
   function bindEvents(ctx) {
     document.getElementById("tgb-to-design")?.addEventListener("click", () => {
       if (!selectedTemplateId) return;
-      const tpl = MOCK.GAME_TEMPLATES.find((x) => x.id === selectedTemplateId);
+      const MOCK = getMock();
+      const tpl = MOCK && MOCK.GAME_TEMPLATES.find((x) => x.id === selectedTemplateId);
       const label = document.getElementById("tgb-selected-template");
-      if (label && tpl) label.textContent = MOCK.tplLabel(tpl, "name");
+      if (label && tpl && MOCK) label.textContent = MOCK.tplLabel(tpl, "name");
       showStep("design");
     });
     document.getElementById("tgb-back-templates")?.addEventListener("click", () => showStep("templates"));
@@ -100,19 +124,16 @@
     }
   }
 
-  async function boot() {
+  function boot() {
     if (document.body.getAttribute("data-page") !== PAGE) return;
     if (window.EAP_TEACHER_LIVE_ENABLED === false) {
       window.location.replace("teacher.html");
       return;
     }
-    if (!MOCK) return;
     if (typeof redirectFilePageToHostedUi === "function" && redirectFilePageToHostedUi()) return;
 
-    const sessionUser = await validatePageSessionOrFallback("teacher");
-    if (!sessionUser) return;
-
-    initAppPageHeader();
+    initPageChrome();
+    if (!getMock()) return;
 
     const p = new URLSearchParams(window.location.search);
     const ctx = {
@@ -132,10 +153,21 @@
         runMockGenerate();
       }
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+      initPageChrome();
     });
+
+    void (async () => {
+      if (typeof validatePageSessionOrFallback !== "function") return;
+      const sessionUser = await validatePageSessionOrFallback("teacher");
+      if (!sessionUser) return;
+      if (typeof initAppPageHeader === "function") initAppPageHeader();
+      initPageChrome();
+    })();
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    void boot();
-  });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
 })();
