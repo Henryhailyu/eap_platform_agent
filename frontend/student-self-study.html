@@ -47,7 +47,19 @@
           <div id="ssc-placement-banner"></div>
 
           <section class="ssc-daily-plan" id="ssc-daily-plan-section" aria-labelledby="ssc-daily-heading">
-            <h2 id="ssc-daily-heading" data-i18n="self_study_daily_plan">Today&apos;s plan (preview)</h2>
+            <div class="ssc-daily-plan__header">
+              <div>
+                <h2 id="ssc-daily-heading" data-i18n="self_study_daily_plan">Today&apos;s AI study plan</h2>
+                <p id="ssc-daily-plan-summary" class="ssc-daily-plan__summary" hidden></p>
+                <p id="ssc-daily-plan-stats" class="ssc-daily-plan__stats" hidden aria-live="polite"></p>
+              </div>
+              <button type="button" id="ssc-daily-regenerate" class="btn-secondary hidden" data-i18n="self_study_daily_regenerate">
+                Refresh plan
+              </button>
+            </div>
+            <p class="ssc-disclaimer" id="ssc-daily-disclaimer" data-i18n="self_study_daily_mock_note" hidden>
+              Rule-based demo plan — not powered by a live AI API.
+            </p>
             <ul id="ssc-daily-plan-list" class="ssc-daily-plan__list">
               <li data-i18n="self_study_daily_placeholder">Complete placement to see personalised tasks.</li>
             </ul>
@@ -77,6 +89,7 @@
     <script src="js/student-self-study-writing-mock.js"></script>
     <script src="js/student-self-study-listening-mock.js"></script>
     <script src="js/student-self-study-speaking-mock.js"></script>
+    <script src="js/student-self-study-daily-plan.js"></script>
     <script src="js/student-self-study.js"></script>
   </body>
 </html>

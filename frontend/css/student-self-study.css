@@ -115,12 +115,36 @@
   margin-bottom: 2rem;
 }
 
+.ssc-daily-plan__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
 .ssc-daily-plan h2 {
   font-size: 1rem;
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.35rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-daily-plan__summary {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--eap-text, #1d1d1f);
+  line-height: 1.45;
+  max-width: 36rem;
+}
+
+.ssc-daily-plan__stats {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--eap-teal, #0a7ea4);
 }
 
 .ssc-daily-plan__list {
@@ -132,12 +156,80 @@
   gap: 0.5rem;
 }
 
-.ssc-daily-plan__list li {
+.ssc-daily-plan__list > li:not(.ssc-daily-task) {
   padding: 0.75rem 1rem;
   background: rgba(255, 255, 255, 0.88);
   border-radius: 8px;
   font-size: 0.9375rem;
   border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ssc-daily-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 0.5rem;
+}
+
+.ssc-daily-task--done {
+  opacity: 0.65;
+}
+
+.ssc-daily-task--done .ssc-daily-task__title {
+  text-decoration: line-through;
+}
+
+.ssc-daily-task__check {
+  flex-shrink: 0;
+  padding-top: 0.2rem;
+}
+
+.ssc-daily-task__link {
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.ssc-daily-task__link:hover .ssc-daily-task__title {
+  color: var(--eap-teal, #0a7ea4);
+}
+
+.ssc-daily-task__mod {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--eap-teal, #0a7ea4);
+  margin-bottom: 0.2rem;
+}
+
+.ssc-daily-task__title {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.ssc-daily-task__meta {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--eap-text-muted, #6e6e73);
+  margin-top: 0.2rem;
+}
+
+.ssc-daily-task__focus {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(10, 126, 164, 0.12);
+  color: var(--eap-teal, #0a7ea4);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .ssc-modules {

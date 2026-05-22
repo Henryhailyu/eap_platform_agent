@@ -87,10 +87,85 @@
     el.hidden = false;
   }
 
-  function renderDailyPlan(listEl, placement) {
-    if (!listEl || !placement || !MOCK) return;
-    const items = MOCK.mockDailyPlan(placement.levelId);
-    listEl.innerHTML = items.map((text) => `<li>${text}</li>`).join("");
+  function renderDailyPlan(placement, forceNew) {
+    const listEl = document.getElementById("ssc-daily-plan-list");
+    const summaryEl = document.getElementById("ssc-daily-plan-summary");
+    const statsEl = document.getElementById("ssc-daily-plan-stats");
+    const regenBtn = document.getElementById("ssc-daily-regenerate");
+    const disclaimerEl = document.getElementById("ssc-daily-disclaimer");
+    const section = document.getElementById("ssc-daily-plan-section");
+
+    if (!listEl) return;
+
+    if (!placement || !window.EAP_DAILY_PLAN) {
+      if (section) section.hidden = false;
+      listEl.innerHTML = `<li data-i18n="self_study_daily_placeholder">${t("self_study_daily_placeholder")}</li>`;
+      if (summaryEl) summaryEl.hidden = true;
+      if (statsEl) statsEl.hidden = true;
+      if (regenBtn) regenBtn.classList.add("hidden");
+      if (disclaimerEl) disclaimerEl.hidden = true;
+      if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+      return;
+    }
+
+    const plan = window.EAP_DAILY_PLAN.generatePlan(placement, !!forceNew);
+    if (!plan || !plan.tasks.length) {
+      listEl.innerHTML = `<li>${t("self_study_daily_all_complete")}</li>`;
+      return;
+    }
+
+    if (summaryEl) {
+      summaryEl.textContent = window.EAP_DAILY_PLAN.planSummary(plan);
+      summaryEl.hidden = false;
+    }
+    const stats = window.EAP_DAILY_PLAN.completionStats(plan);
+    if (statsEl) {
+      statsEl.textContent = t("self_study_daily_stats", {
+        done: String(stats.done),
+        total: String(stats.total),
+        pct: String(stats.pct),
+      });
+      statsEl.hidden = false;
+    }
+    if (regenBtn) regenBtn.classList.remove("hidden");
+    if (disclaimerEl) disclaimerEl.hidden = false;
+
+    listEl.innerHTML = plan.tasks
+      .map((task) => {
+        const meta = window.EAP_DAILY_PLAN.MODULE_META[task.moduleId] || {};
+        const modName = meta.nameKey ? t(meta.nameKey) : task.moduleId;
+        const focus = task.focus ? `<span class="ssc-daily-task__focus">${t("self_study_daily_focus")}</span>` : "";
+        const checked = task.done ? "checked" : "";
+        const doneClass = task.done ? " ssc-daily-task--done" : "";
+        return `
+          <li class="ssc-daily-task${doneClass}">
+            <label class="ssc-daily-task__check">
+              <input type="checkbox" data-task-id="${task.id}" ${checked} aria-label="${t("self_study_daily_mark_done")}" />
+            </label>
+            <a href="${task.href}" class="ssc-daily-task__link">
+              <span class="ssc-daily-task__mod">${meta.icon || ""} ${modName}</span>
+              <span class="ssc-daily-task__title">${task.label}</span>
+              <span class="ssc-daily-task__meta">~${task.minutes} min ${focus}</span>
+            </a>
+          </li>
+        `;
+      })
+      .join("");
+
+    listEl.querySelectorAll("input[data-task-id]").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        window.EAP_DAILY_PLAN.toggleTaskDone(cb.getAttribute("data-task-id"));
+        renderDailyPlan(placement, false);
+      });
+    });
+  }
+
+  function bindDailyRegenerate(placement) {
+    const btn = document.getElementById("ssc-daily-regenerate");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      renderDailyPlan(placement, true);
+    });
   }
 
   function renderModules(gridEl, placement) {
@@ -190,14 +265,14 @@
     const placement = MOCK ? MOCK.getPlacement() : null;
     const bannerEl = document.getElementById("ssc-placement-banner");
     const levelEl = document.getElementById("ssc-level-badge");
-    const dailyEl = document.getElementById("ssc-daily-plan-list");
     const modulesEl = document.getElementById("ssc-modules-grid");
     const retakeWrap = document.getElementById("ssc-retake-wrap");
 
     if (bannerEl) renderPlacementBanner(bannerEl, placement);
     renderLevelBadge(levelEl, placement);
-    renderDailyPlan(dailyEl, placement);
+    renderDailyPlan(placement);
     renderModules(modulesEl, placement);
+    bindDailyRegenerate(placement);
 
     if (retakeWrap) {
       retakeWrap.hidden = !placement;
@@ -208,7 +283,7 @@
       const p = MOCK ? MOCK.getPlacement() : null;
       if (bannerEl) renderPlacementBanner(bannerEl, p);
       renderLevelBadge(levelEl, p);
-      renderDailyPlan(dailyEl, p);
+      renderDailyPlan(p);
       renderModules(modulesEl, p);
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     });
