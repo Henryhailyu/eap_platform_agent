@@ -252,10 +252,15 @@
     body.innerHTML = buildResponsesHtml(question, board);
 
     if (foot) {
-      foot.innerHTML = hasBoardContext(board)
-        ? `<button type="button" class="btn-primary" id="tlive-modal-roll-correct">${escapeHtml(t("tlive_board_roll_correct"))}</button>
+      const quizMode = window.__tliveQuiz && !window.__tliveQuiz.winnerId;
+      const boardMode = hasBoardContext(board) && !quizMode;
+      foot.innerHTML = quizMode
+        ? `<button type="button" class="btn-primary" id="tlive-modal-quiz-award">${escapeHtml(t("tlive_quiz_award_correct"))}</button>
            <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : `<button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`;
+        : boardMode
+          ? `<button type="button" class="btn-primary" id="tlive-modal-roll-correct">${escapeHtml(t("tlive_board_roll_correct"))}</button>
+             <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+          : `<button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`;
     }
 
     modal.classList.remove("hidden");
@@ -271,6 +276,13 @@
       body.innerHTML = buildResponsesHtml(question, window.__tliveBoard);
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     });
+
+    document.getElementById("tlive-modal-quiz-award")?.addEventListener("click", () => {
+      if (!MOCK || !window.__tliveQuiz) return;
+      window.__tliveQuiz = MOCK.processQuizResponses(window.__tliveQuiz, question);
+      renderQuizBattle(window.__tliveQuiz);
+      openResponsesModal(question, null);
+    });
     document.getElementById("tlive-modal-close-btn")?.addEventListener("click", closeResponsesModal);
 
     document.getElementById("tlive-responses-modal-close")?.focus();
@@ -280,7 +292,107 @@
     window.__tliveBoard = null;
     window.__tliveBingo = null;
     window.__tliveMatching = null;
+    window.__tliveQuiz = null;
     window.__tliveQuestionIndex = 0;
+  }
+
+  function renderQuizBattle(state) {
+    const MOCK = getMock();
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!MOCK || !canvas) return;
+
+    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const opts = MOCK.questionOptions(q);
+    const challenge = MOCK.isChallengeRound(state.questionIndex);
+    const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
+    const lastEvent = MOCK.formatQuizEvent(state, t);
+
+    const scoreRows = MOCK.getQuizRanking(state)
+      .map((row, rank) => {
+        const team = state.teams.find((x) => x.id === row.id) || row;
+        return `<tr class="${state.winnerId === row.id ? "tlive-lb-row--winner" : ""}">
+          <td>${rank + 1}</td>
+          <td><span class="tlive-lb-swatch" style="background:${team.color}"></span> ${escapeHtml(MOCK.teamName(team))}</td>
+          <td>${row.score} / ${state.winTarget}</td>
+        </tr>`;
+      })
+      .join("");
+
+    const teamAwardBtns = state.teams
+      .map(
+        (team) =>
+          `<button type="button" class="btn-secondary tlive-quiz-award-btn" data-quiz-award="${team.id}" data-pts="${challenge ? 2 : 1}" ${state.winnerId ? "disabled" : ""} style="border-color:${team.color}">+${challenge ? 2 : 1} ${escapeHtml(MOCK.teamName(team))}</button>`,
+      )
+      .join("");
+
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--board";
+    canvas.innerHTML = `
+      <div class="tlive-board tlive-quiz">
+        <header class="tlive-board__head">
+          <h2 class="tlive-board__title">${escapeHtml(t("tlive_quiz_battle_title"))}</h2>
+          <p class="tlive-board__round">${escapeHtml(t("tlive_board_round", { round: String(state.round) }))}${challenge ? ` · ${escapeHtml(t("tlive_quiz_challenge"))}` : ""}</p>
+        </header>
+        ${winner ? `<div class="tlive-board-winner" role="status">${escapeHtml(t("tlive_board_winner", { team: MOCK.teamName(winner) }))}</div>` : ""}
+        <table class="tlive-leaderboard">
+          <thead><tr>
+            <th>${escapeHtml(t("tlive_board_rank"))}</th>
+            <th>${escapeHtml(t("tlive_board_team"))}</th>
+            <th>${escapeHtml(t("tlive_board_points"))}</th>
+          </tr></thead>
+          <tbody>${scoreRows}</tbody>
+        </table>
+        ${lastEvent ? `<p class="tlive-board-event">${escapeHtml(lastEvent)}</p>` : ""}
+        <div class="tlive-question-box">
+          <p class="tlive-question-box__label">${escapeHtml(t("tlive_current_question"))}</p>
+          <p class="tlive-question-box__text">${escapeHtml(MOCK.questionText(q))}</p>
+          <ol class="tlive-question-box__opts">${opts.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ol>
+        </div>
+        <div class="tlive-board__controls">
+          <button type="button" class="btn-primary" id="tlive-quiz-launch">${escapeHtml(t("tlive_launch_question"))}</button>
+          <button type="button" class="btn-secondary" id="tlive-quiz-view-resp">${escapeHtml(t("tlive_view_responses"))}</button>
+          <button type="button" class="btn-primary" id="tlive-quiz-score-resp" ${state.winnerId ? "disabled" : ""}>${escapeHtml(t("tlive_quiz_award_correct"))}</button>
+        </div>
+        <div class="tlive-quiz-manual">${teamAwardBtns}</div>
+        <div class="tlive-board__controls">
+          <button type="button" class="btn-secondary" id="tlive-quiz-next">${escapeHtml(t("tlive_next_question"))}</button>
+          <button type="button" class="btn-secondary" id="tlive-quiz-reset">${escapeHtml(t("tlive_board_reset"))}</button>
+        </div>
+        <p class="tlive-disclaimer">${escapeHtml(t("tlive_mock_disclaimer"))}</p>
+      </div>
+    `;
+
+    document.getElementById("tlive-quiz-launch")?.addEventListener("click", () => launchToStudents(q, null));
+
+    document.getElementById("tlive-quiz-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
+
+    document.getElementById("tlive-quiz-score-resp")?.addEventListener("click", () => {
+      window.__tliveQuiz = MOCK.processQuizResponses(window.__tliveQuiz, q);
+      renderQuizBattle(window.__tliveQuiz);
+    });
+
+    canvas.querySelectorAll("[data-quiz-award]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const teamId = btn.getAttribute("data-quiz-award");
+        const pts = parseInt(btn.getAttribute("data-pts"), 10) || 1;
+        window.__tliveQuiz = MOCK.awardQuizPoints(window.__tliveQuiz, teamId, pts);
+        renderQuizBattle(window.__tliveQuiz);
+      });
+    });
+
+    document.getElementById("tlive-quiz-next")?.addEventListener("click", () => {
+      window.__tliveQuiz = {
+        ...window.__tliveQuiz,
+        questionIndex: (window.__tliveQuiz.questionIndex + 1) % MOCK.MOCK_QUESTIONS.length,
+        round: window.__tliveQuiz.round + 1,
+      };
+      renderQuizBattle(window.__tliveQuiz);
+    });
+
+    document.getElementById("tlive-quiz-reset")?.addEventListener("click", () => {
+      if (!window.confirm(t("tlive_board_reset_confirm"))) return;
+      window.__tliveQuiz = MOCK.createQuizBattleState();
+      renderQuizBattle(window.__tliveQuiz);
+    });
   }
 
   function renderVocabBingo(state) {
@@ -568,6 +680,11 @@
       renderMatchingRace(window.__tliveMatching);
       return;
     }
+    if (game.type === "quiz_battle" || game.id === "quiz-battle") {
+      window.__tliveQuiz = MOCK.createQuizBattleState();
+      renderQuizBattle(window.__tliveQuiz);
+      return;
+    }
     const canvas = document.getElementById("tlive-canvas-inner");
     if (canvas) {
       canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
@@ -671,7 +788,7 @@
     window.addEventListener("eap:langchange", () => {
       const active = document.querySelector(".tlive-tool--active");
       const tool = active ? active.getAttribute("data-tool") : "slides";
-      if (tool === "games" && !window.__tliveBoard && !window.__tliveBingo && !window.__tliveMatching) {
+      if (tool === "games" && !window.__tliveBoard && !window.__tliveBingo && !window.__tliveMatching && !window.__tliveQuiz) {
         renderGamesLibrary();
       } else if (window.__tliveBoard) {
         renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
@@ -679,6 +796,8 @@
         renderVocabBingo(window.__tliveBingo);
       } else if (window.__tliveMatching) {
         renderMatchingRace(window.__tliveMatching);
+      } else if (window.__tliveQuiz) {
+        renderQuizBattle(window.__tliveQuiz);
       } else if (tool === "slides") {
         renderWelcome(ctx);
       }

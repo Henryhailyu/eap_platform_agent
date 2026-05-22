@@ -2,7 +2,7 @@
  * Teacher Live Teaching — mock games & student responses (Phase L).
  */
 (function (global) {
-  const BUILTIN_GAME_IDS = new Set(["board-race", "vocab-bingo", "matching-race"]);
+  const BUILTIN_GAME_IDS = new Set(["board-race", "vocab-bingo", "matching-race", "quiz-battle"]);
 
   const SAVED_GAMES = [
     {
@@ -28,6 +28,14 @@
       descEn: "Race to match terms and definitions by team",
       descZh: "小组抢答配对术语与释义",
       type: "matching_race",
+    },
+    {
+      id: "quiz-battle",
+      nameEn: "Quiz Battle",
+      nameZh: "问答对战",
+      descEn: "Teams race to score points — challenge rounds worth double",
+      descZh: "小组抢答得分 — 挑战轮双倍分",
+      type: "quiz_battle",
     },
   ];
 
@@ -564,6 +572,83 @@
     return { state: next, ok: true };
   }
 
+  const QUIZ_WIN_TARGET = 10;
+
+  function createQuizBattleState() {
+    return {
+      scores: { A: 0, B: 0, C: 0, D: 0 },
+      questionIndex: 0,
+      round: 1,
+      winnerId: null,
+      winTarget: QUIZ_WIN_TARGET,
+      teams: LIVE_TEAMS.map((x) => ({ ...x })),
+      lastEvent: null,
+    };
+  }
+
+  function isChallengeRound(questionIndex) {
+    return questionIndex % 3 === 2;
+  }
+
+  function awardQuizPoints(state, teamId, points) {
+    const next = { ...state, scores: { ...state.scores }, lastEvent: null };
+    if (next.winnerId) return next;
+    next.scores[teamId] = (next.scores[teamId] || 0) + points;
+    next.lastEvent = { type: "award", teamId, points };
+    if (next.scores[teamId] >= next.winTarget) next.winnerId = teamId;
+    return next;
+  }
+
+  function processQuizResponses(state, question) {
+    const next = { ...state, scores: { ...state.scores } };
+    if (next.winnerId) return next;
+
+    const mult = isChallengeRound(next.questionIndex) ? 2 : 1;
+    const rows = simulateResponses(question);
+    const perTeam = {};
+
+    rows.forEach((r) => {
+      if (r.correct) perTeam[r.teamId] = (perTeam[r.teamId] || 0) + 1;
+    });
+
+    Object.keys(perTeam).forEach((teamId) => {
+      const pts = perTeam[teamId] * mult;
+      next.scores[teamId] = (next.scores[teamId] || 0) + pts;
+      if (next.scores[teamId] >= next.winTarget) next.winnerId = teamId;
+    });
+
+    next.lastEvent = { type: "batch", perTeam, mult };
+    return next;
+  }
+
+  function getQuizRanking(state) {
+    return LIVE_TEAMS.map((t) => ({
+      ...t,
+      score: state.scores[t.id] || 0,
+    })).sort((a, b) => b.score - a.score);
+  }
+
+  function formatQuizEvent(state, tFn) {
+    const ev = state.lastEvent;
+    if (!ev) return "";
+    if (ev.type === "award") {
+      const team = LIVE_TEAMS.find((x) => x.id === ev.teamId);
+      return tFn("tlive_quiz_award", {
+        team: team ? teamName(team) : ev.teamId,
+        pts: String(ev.points),
+      });
+    }
+    if (ev.type === "batch" && ev.perTeam) {
+      const parts = Object.keys(ev.perTeam).map((id) => {
+        const team = LIVE_TEAMS.find((x) => x.id === id);
+        const pts = ev.perTeam[id] * ev.mult;
+        return tFn("tlive_quiz_batch_pts", { team: team ? teamName(team) : id, pts: String(pts) });
+      });
+      return parts.length ? parts.join(" · ") : tFn("tlive_board_no_correct");
+    }
+    return "";
+  }
+
   /** Built-in demos + games saved from Game Builder (sessionStorage). */
   function allSavedGames() {
     const custom = readCustomSavedGames();
@@ -612,5 +697,12 @@
     tryMatchingPair,
     matchingDefText,
     MATCHING_PAIRS,
+    createQuizBattleState,
+    awardQuizPoints,
+    processQuizResponses,
+    getQuizRanking,
+    formatQuizEvent,
+    isChallengeRound,
+    QUIZ_WIN_TARGET,
   };
 })(typeof window !== "undefined" ? window : globalThis);

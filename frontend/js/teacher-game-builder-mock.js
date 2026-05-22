@@ -6,8 +6,9 @@
 
   const GAME_TEMPLATES = [
     { id: "board-race", nameEn: "Board Race", nameZh: "棋盘竞赛", type: "board_race", icon: "🎲" },
-    { id: "vocab-bingo", nameEn: "Vocabulary Bingo", nameZh: "词汇 Bingo", type: "placeholder", icon: "🎯" },
-    { id: "matching-race", nameEn: "Matching Race", nameZh: "配对竞赛", type: "placeholder", icon: "🔗" },
+    { id: "vocab-bingo", nameEn: "Vocabulary Bingo", nameZh: "词汇 Bingo", type: "vocab_bingo", icon: "🎯" },
+    { id: "matching-race", nameEn: "Matching Race", nameZh: "配对竞赛", type: "matching_race", icon: "🔗" },
+    { id: "quiz-battle", nameEn: "Quiz Battle", nameZh: "问答对战", type: "quiz_battle", icon: "⚔" },
     { id: "treasure-hunt", nameEn: "Treasure Hunt", nameZh: "寻宝", type: "placeholder", icon: "🗺" },
     { id: "escape-room", nameEn: "Escape Room", nameZh: "密室逃脱", type: "placeholder", icon: "🔐" },
     { id: "quiz-battle", nameEn: "Quiz Battle", nameZh: "问答对战", type: "placeholder", icon: "⚔" },

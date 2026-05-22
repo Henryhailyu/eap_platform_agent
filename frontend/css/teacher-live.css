@@ -732,6 +732,17 @@ body.tlive-modal-open {
   margin-top: 0.25rem;
 }
 
+.tlive-quiz-manual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.tlive-quiz-award-btn {
+  font-size: 0.8125rem;
+}
+
 @media (max-width: 700px) {
   .tlive-match-board {
     grid-template-columns: 1fr;
