@@ -22,6 +22,9 @@ services:
         value: "1"
       - key: EAP_SEED_DEMO_TASKS
         value: "1"
+      # Demo logins (student1 / teacher1 / manager1) — change in dashboard for production classes
+      - key: EAP_PILOT_DEFAULT_PASSWORD
+        value: "123456"
       - key: PORT
         value: "5051"
       - key: GUNICORN_WORKERS

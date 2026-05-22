@@ -33,7 +33,7 @@ cd /app/backend
 EAP_PILOT_DEFAULT_PASSWORD='YourStrongPassword' python scripts/seed_pilot.py
 ```
 
-Accounts: `student1`, `teacher1`, `manager1`, `teacher2`.
+Accounts: `student1`, `teacher1`, `manager1`, `teacher2` — password **`123456`** (from `EAP_PILOT_DEFAULT_PASSWORD` unless you change it in Render Environment).
 
 ---
 

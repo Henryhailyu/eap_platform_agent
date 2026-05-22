@@ -8,6 +8,11 @@ SEED_MARKER="${DATA_DIR}/.eap_seeded"
 echo "EAP pilot: initializing database at ${EAP_DATABASE_PATH:-/data/eap_platform.db}"
 python -c "from app import init_database; init_database()"
 
+if [ -n "${EAP_PILOT_DEFAULT_PASSWORD:-}" ]; then
+  echo "EAP pilot: syncing demo account passwords"
+  python scripts/seed_pilot.py
+fi
+
 run_seeds=0
 if [ "${EAP_FORCE_SEED:-0}" = "1" ]; then
   run_seeds=1

@@ -65,8 +65,17 @@
 
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
-      const value = dict[key];
-      if (value == null) return;
+      let params = null;
+      const rawParams = el.getAttribute("data-i18n-params");
+      if (rawParams) {
+        try {
+          params = JSON.parse(rawParams);
+        } catch (_) {
+          /* ignore malformed params */
+        }
+      }
+      const value = t(key, params);
+      if (value == null || value === key) return;
       if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
         if (el.hasAttribute("placeholder")) el.placeholder = value;
       } else {

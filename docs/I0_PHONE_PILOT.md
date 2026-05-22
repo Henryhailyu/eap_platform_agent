@@ -4,7 +4,7 @@ Use this after `verify_pilot.py` passes on HTTPS. **WeChat mini is not required*
 
 **Pilot URL:** https://eap-platform-pilot.onrender.com  
 **Class:** EAP047  
-**Demo password (production):** the value you set with `seed_pilot.py` on Render (e.g. `EapPilot2026!Henry`).
+**Demo password (production):** `123456` for `student1`, `teacher1`, `manager1` (set via `EAP_PILOT_DEFAULT_PASSWORD` in `render.yaml`; change in Render dashboard if needed).
 
 > **Render cold start (502 Bad Gateway):** On Starter, the app **sleeps after ~15 min** with no visits. While waking, the browser may show **502** — this is normal, not a broken deploy.
 >
