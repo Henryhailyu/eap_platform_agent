@@ -1,10 +1,12 @@
 /**
- * Student AI Self-Study — module shell (Phase S3: Vocabulary).
+ * Student AI Self-Study — module shell (S3 Vocabulary, S4 Reading & Writing).
  */
 (function () {
   const PAGE = "student-self-study-module";
   const MOCK = window.EAP_SELF_STUDY_MOCK;
   const VOCAB = window.EAP_VOCAB_MOCK;
+  const READ = window.EAP_READING_MOCK;
+  const WRITE = window.EAP_WRITING_MOCK;
 
   function t(key, params) {
     if (typeof window.t === "function") return window.t(key, params);
@@ -351,7 +353,7 @@
     initAppPageHeader();
 
     const skill = getSkill();
-    if (!MOCK || !VOCAB) return;
+    if (!MOCK) return;
 
     const placement = MOCK.getPlacement();
     if (!placement) {
@@ -359,15 +361,32 @@
       return;
     }
 
-    if (skill !== "vocabulary") {
+    const levelId = placement.levelId;
+    const levelEl = document.getElementById("ssc-module-level");
+    if (levelEl) {
+      levelEl.textContent = MOCK.levelDisplay(levelId);
+      levelEl.className = `ssc-level-badge ssc-level-badge--${levelId}`;
+      levelEl.hidden = false;
+    }
+
+    if (skill === "vocabulary") {
+      if (!VOCAB) return;
+      initVocabulary(levelId);
+    } else if (skill === "reading") {
+      if (!window.EAP_MODULE_RW || !READ) return;
+      window.EAP_MODULE_RW.initReading(levelId, MOCK, renderTabs);
+    } else if (skill === "writing") {
+      if (!window.EAP_MODULE_RW || !WRITE) return;
+      window.EAP_MODULE_RW.initWriting(levelId, renderTabs);
+    } else {
       renderUnsupported(skill || "—");
       return;
     }
 
-    initVocabulary(placement.levelId);
-
     window.addEventListener("eap:langchange", () => {
-      initVocabulary(placement.levelId);
+      if (skill === "vocabulary" && VOCAB) initVocabulary(levelId);
+      else if (skill === "reading" && window.EAP_MODULE_RW) window.EAP_MODULE_RW.initReading(levelId, MOCK, renderTabs);
+      else if (skill === "writing" && window.EAP_MODULE_RW) window.EAP_MODULE_RW.initWriting(levelId, renderTabs);
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     });
   }

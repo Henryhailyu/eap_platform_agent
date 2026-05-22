@@ -531,6 +531,66 @@
   color: var(--eap-blue, #0071e3);
 }
 
+.ssc-passage-block {
+  margin-bottom: 1.25rem;
+}
+
+.ssc-sort-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.ssc-sort-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+}
+
+.ssc-sort-item__num {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--eap-teal, #0a7ea4);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ssc-sort-item__text {
+  flex: 1;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.ssc-sort-item__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ssc-sort-btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.875rem;
+  min-width: 2rem;
+}
+
+.ssc-sort-feedback {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--eap-teal, #0a7ea4);
+  min-height: 1.25rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ssc-module-card {
     transition: none;

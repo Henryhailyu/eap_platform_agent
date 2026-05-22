@@ -19,7 +19,8 @@
       icon: "📖",
       titleKey: "self_study_mod_reading",
       metaKey: "self_study_mod_reading_meta",
-      soon: true,
+      href: "student-self-study-module.html?skill=reading",
+      available: true,
     },
     {
       id: "listening",
@@ -41,7 +42,8 @@
       icon: "✍️",
       titleKey: "self_study_mod_writing",
       metaKey: "self_study_mod_writing_meta",
-      soon: true,
+      href: "student-self-study-module.html?skill=writing",
+      available: true,
     },
   ];
 
@@ -98,10 +100,22 @@
     gridEl.innerHTML = MODULES.map((mod) => {
       const locked = mod.locked || !hasPlacement;
       const levelLabel = levelId && MOCK ? MOCK.levelDisplay(levelId) : "—";
-      const vocabProgress =
-        mod.id === "vocabulary" && window.EAP_VOCAB_MOCK && levelId
-          ? window.EAP_VOCAB_MOCK.completionPercent(window.EAP_VOCAB_MOCK.ensureProgress(levelId))
-          : 0;
+      let modProgress = 0;
+      if (levelId) {
+        if (mod.id === "vocabulary" && window.EAP_VOCAB_MOCK) {
+          modProgress = window.EAP_VOCAB_MOCK.completionPercent(
+            window.EAP_VOCAB_MOCK.ensureProgress(levelId),
+          );
+        } else if (mod.id === "reading" && window.EAP_READING_MOCK) {
+          modProgress = window.EAP_READING_MOCK.completionPercent(
+            window.EAP_READING_MOCK.ensureProgress(levelId),
+          );
+        } else if (mod.id === "writing" && window.EAP_WRITING_MOCK) {
+          modProgress = window.EAP_WRITING_MOCK.completionPercent(
+            window.EAP_WRITING_MOCK.ensureProgress(levelId),
+          );
+        }
+      }
 
       if (locked) {
         return `
@@ -116,10 +130,10 @@
 
       if (mod.available && mod.href) {
         const tag =
-          vocabProgress >= 100
+          modProgress >= 100
             ? t("self_study_tag_complete")
-            : vocabProgress > 0
-              ? t("self_study_tag_continue", { pct: String(vocabProgress) })
+            : modProgress > 0
+              ? t("self_study_tag_continue", { pct: String(modProgress) })
               : `${t("self_study_tag_start")} · ${levelLabel}`;
         return `
           <a href="${mod.href}" class="ssc-module-card" role="listitem">
