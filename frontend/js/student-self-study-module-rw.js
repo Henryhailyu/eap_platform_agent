@@ -10,6 +10,11 @@
     return key;
   }
 
+  function managerMaterialsBlock(skill, levelId) {
+    const MAT = window.EAP_MANAGER_SSC_MATERIALS;
+    return MAT ? MAT.renderLearnBlock(skill, levelId) : "";
+  }
+
   function refreshStatus(store, levelId, completeMsgKey) {
     const p = store.ensureProgress(levelId);
     const pct = store.completionPercent(p);
@@ -109,6 +114,7 @@
     function renderLearn(root) {
       progress = READ.getProgress() || progress;
       root.innerHTML = `
+        ${managerMaterialsBlock("reading", levelId)}
         <div class="ssc-lesson-card">
           <h2 data-i18n="self_study_reading_learn_title">Reading strategy</h2>
           <p>${READ.lesson(pack)}</p>
@@ -263,6 +269,7 @@
     function renderLearn(root) {
       progress = WRITE.getProgress() || progress;
       root.innerHTML = `
+        ${managerMaterialsBlock("writing", levelId)}
         <div class="ssc-lesson-card">
           <h2 data-i18n="self_study_writing_learn_title">Writing focus</h2>
           <p>${WRITE.lesson(pack)}</p>

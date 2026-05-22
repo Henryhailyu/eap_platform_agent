@@ -9,6 +9,11 @@
     return key;
   }
 
+  function managerMaterialsBlock(skill, levelId) {
+    const MAT = window.EAP_MANAGER_SSC_MATERIALS;
+    return MAT ? MAT.renderLearnBlock(skill, levelId) : "";
+  }
+
   function refreshStatus(levelId) {
     const p = SPEAK.ensureProgress(levelId);
     const pct = SPEAK.completionPercent(p);
@@ -113,6 +118,7 @@
         .join("");
 
       root.innerHTML = `
+        ${managerMaterialsBlock("speaking", levelId)}
         <div class="ssc-lesson-card">
           <h2 data-i18n="self_study_speaking_learn_title">Speaking & discussion</h2>
           <p>${SPEAK.lesson(pack)}</p>

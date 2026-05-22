@@ -595,6 +595,33 @@ body.eap-wix .admin-member-list li {
   font-size: 0.9rem;
 }
 
+body.eap-wix .admin-mat-form {
+  margin-bottom: 1.25rem;
+}
+
+body.eap-wix .admin-mat-form__row {
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+body.eap-wix .admin-mat-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+body.eap-wix .admin-mat-suggest {
+  font-size: 0.875rem;
+  color: var(--wix-teal, #0a7ea4);
+  margin: 0.35rem 0 0;
+}
+
+body.eap-wix .admin-mat-suggest.hidden {
+  display: none;
+}
+
 body.eap-wix .eap-cal__nav-btn {
   border-radius: var(--wix-pill) !important;
 }

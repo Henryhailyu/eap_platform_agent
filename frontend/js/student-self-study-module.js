@@ -60,6 +60,11 @@
     });
   }
 
+  function managerMaterialsBlock(skill, levelId) {
+    const MAT = window.EAP_MANAGER_SSC_MATERIALS;
+    return MAT ? MAT.renderLearnBlock(skill, levelId) : "";
+  }
+
   function renderLearn(root, pack, progress) {
     const wordsHtml = pack.words
       .map(
@@ -73,6 +78,7 @@
       .join("");
 
     root.innerHTML = `
+      ${managerMaterialsBlock("vocabulary", progress.levelId)}
       <div class="ssc-lesson-card">
         <h2 data-i18n="self_study_vocab_learn_title">Today's vocabulary</h2>
         <p>${VOCAB.lessonText(pack)}</p>
