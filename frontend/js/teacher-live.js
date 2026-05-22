@@ -135,6 +135,7 @@
         </div>
         <div class="tlive-board__controls">
           <button type="button" class="btn-primary" id="tlive-launch-q">${escapeHtml(t("tlive_launch_question"))}</button>
+          <button type="button" class="btn-secondary" id="tlive-view-responses">${escapeHtml(t("tlive_view_responses"))}</button>
           <button type="button" class="btn-primary" id="tlive-roll-correct" ${state.winnerId ? "disabled" : ""}>${escapeHtml(t("tlive_board_roll_correct"))}</button>
           <div class="tlive-board__manual">
             <label for="tlive-roll-team" class="tlive-board__manual-label">${escapeHtml(t("tlive_board_manual_roll"))}</label>
@@ -149,14 +150,17 @@
     `;
 
     document.getElementById("tlive-launch-q")?.addEventListener("click", () => {
-      showInteractionPanel(q, state);
+      launchToStudents(q, window.__tliveBoard || state);
+    });
+
+    document.getElementById("tlive-view-responses")?.addEventListener("click", () => {
+      openResponsesModal(q, window.__tliveBoard || state);
     });
 
     document.getElementById("tlive-roll-correct")?.addEventListener("click", () => {
       const result = MOCK.processCorrectTeams(window.__tliveBoard || state, q);
       window.__tliveBoard = result.state;
       renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
-      showInteractionPanel(q, window.__tliveBoard);
     });
 
     document.getElementById("tlive-roll-dice")?.addEventListener("click", () => {
@@ -180,51 +184,97 @@
     });
   }
 
-  function showInteractionPanel(question, boardState) {
-    const MOCK = getMock();
-    const panel = document.getElementById("tlive-panel-right");
-    const body = document.getElementById("tlive-panel-body");
-    if (!MOCK || !panel || !body || !question) return;
-    panel.classList.remove("hidden");
+  function launchToStudents(question, boardState) {
+    window.__tliveLaunched = {
+      question,
+      boardState: boardState || null,
+      at: Date.now(),
+    };
+  }
 
+  function buildResponsesHtml(question, boardState) {
+    const MOCK = getMock();
+    if (!MOCK || !question) return "";
     const rows = MOCK.simulateResponses(question);
-    const hasBoard = !!boardState;
-    body.innerHTML = `
-      <p class="tlive-panel-q">${escapeHtml(MOCK.questionText(question))}</p>
-      <table class="tlive-responses-table">
-        <thead><tr>
-          <th>${escapeHtml(t("tlive_col_student"))}</th>
-          <th>${escapeHtml(t("tlive_col_team"))}</th>
-          <th>${escapeHtml(t("tlive_col_answer"))}</th>
-          <th>${escapeHtml(t("tlive_col_ok"))}</th>
-          <th>${escapeHtml(t("tlive_col_time"))}</th>
-        </tr></thead>
-        <tbody>
-          ${rows
-            .map((r) => {
-              const team = boardState?.teams?.find((x) => x.id === r.teamId);
-              const teamLabel = team ? MOCK.teamName(team) : r.teamId;
-              return `<tr class="${r.correct ? "tlive-resp--correct" : ""}">
-                <td>${escapeHtml(r.student)}</td>
-                <td><span class="tlive-resp-team" style="color:${team?.color || "#333"}">${escapeHtml(teamLabel)}</span></td>
-                <td>${escapeHtml(r.answer)}</td>
-                <td>${r.correct ? "✓" : "—"}</td>
-                <td>${r.timeSec}s</td>
-              </tr>`;
-            })
-            .join("")}
-        </tbody>
-      </table>
-      ${hasBoard ? `<button type="button" class="btn-primary tlive-panel-roll" id="tlive-panel-roll-correct">${escapeHtml(t("tlive_board_roll_correct"))}</button>` : ""}
+
+    return `
+      <p class="tlive-responses-modal__question">${escapeHtml(MOCK.questionText(question))}</p>
+      <div class="tlive-responses-modal__table-wrap">
+        <table class="tlive-responses-table tlive-responses-table--modal">
+          <thead><tr>
+            <th>${escapeHtml(t("tlive_col_student"))}</th>
+            <th>${escapeHtml(t("tlive_col_team"))}</th>
+            <th>${escapeHtml(t("tlive_col_answer"))}</th>
+            <th>${escapeHtml(t("tlive_col_ok"))}</th>
+            <th>${escapeHtml(t("tlive_col_time"))}</th>
+          </tr></thead>
+          <tbody>
+            ${rows
+              .map((r) => {
+                const team = boardState?.teams?.find((x) => x.id === r.teamId);
+                const teamLabel = team ? MOCK.teamName(team) : r.teamId;
+                return `<tr class="${r.correct ? "tlive-resp--correct" : ""}">
+                  <td>${escapeHtml(r.student)}</td>
+                  <td><span class="tlive-resp-team" style="color:${team?.color || "#333"}">${escapeHtml(teamLabel)}</span></td>
+                  <td class="tlive-resp-answer">${escapeHtml(r.answer)}</td>
+                  <td>${r.correct ? "✓" : "—"}</td>
+                  <td>${r.timeSec}s</td>
+                </tr>`;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>
       <p class="tlive-disclaimer">${escapeHtml(t("tlive_responses_mock"))}</p>
     `;
+  }
 
-    document.getElementById("tlive-panel-roll-correct")?.addEventListener("click", () => {
-      const result = MOCK.processCorrectTeams(window.__tliveBoard || boardState, question);
+  function hasBoardContext(boardState) {
+    return !!(boardState && boardState.teams);
+  }
+
+  function closeResponsesModal() {
+    const modal = document.getElementById("tlive-responses-modal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("hidden", "");
+    document.body.classList.remove("tlive-modal-open");
+  }
+
+  function openResponsesModal(question, boardState) {
+    const MOCK = getMock();
+    const modal = document.getElementById("tlive-responses-modal");
+    const body = document.getElementById("tlive-responses-modal-body");
+    const foot = document.getElementById("tlive-responses-modal-foot");
+    if (!MOCK || !modal || !body || !question) return;
+
+    const board = boardState !== undefined ? boardState : window.__tliveLaunched?.boardState;
+    body.innerHTML = buildResponsesHtml(question, board);
+
+    if (foot) {
+      foot.innerHTML = hasBoardContext(board)
+        ? `<button type="button" class="btn-primary" id="tlive-modal-roll-correct">${escapeHtml(t("tlive_board_roll_correct"))}</button>
+           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+        : `<button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`;
+    }
+
+    modal.classList.remove("hidden");
+    modal.removeAttribute("hidden");
+    document.body.classList.add("tlive-modal-open");
+    if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+
+    const MOCK = getMock();
+    document.getElementById("tlive-modal-roll-correct")?.addEventListener("click", () => {
+      if (!MOCK) return;
+      const result = MOCK.processCorrectTeams(window.__tliveBoard || board, question);
       window.__tliveBoard = result.state;
       renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
-      showInteractionPanel(question, window.__tliveBoard);
+      body.innerHTML = buildResponsesHtml(question, window.__tliveBoard);
+      if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     });
+    document.getElementById("tlive-modal-close-btn")?.addEventListener("click", closeResponsesModal);
+
+    document.getElementById("tlive-responses-modal-close")?.focus();
   }
 
   function getSavedGamesList() {
@@ -353,18 +403,21 @@
         else if (tool === "slides") renderWelcome(ctx);
         else if (tool === "poll" || tool === "quiz") {
           const q = MOCK.MOCK_QUESTIONS[0];
-          showInteractionPanel(q);
           const canvas = document.getElementById("tlive-canvas-inner");
           if (canvas) {
             canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
             canvas.innerHTML = `
-              <div class="tlive-question-box" style="max-width:32rem;width:100%">
+              <div class="tlive-question-box" style="max-width:40rem;width:100%">
                 <h2 style="color:#0A4D68;margin:0 0 0.75rem">${escapeHtml(t(tool === "quiz" ? "tlive_quiz_title" : "tlive_poll_title"))}</h2>
                 <p>${escapeHtml(MOCK.questionText(q))}</p>
-                <button type="button" class="btn-primary" id="tlive-launch-poll" style="margin-top:1rem">${escapeHtml(t("tlive_launch_question"))}</button>
+                <div class="tlive-board__controls" style="margin-top:1rem">
+                  <button type="button" class="btn-primary" id="tlive-launch-poll">${escapeHtml(t("tlive_launch_question"))}</button>
+                  <button type="button" class="btn-secondary" id="tlive-view-poll-responses">${escapeHtml(t("tlive_view_responses"))}</button>
+                </div>
               </div>
             `;
-            document.getElementById("tlive-launch-poll")?.addEventListener("click", () => showInteractionPanel(q));
+            document.getElementById("tlive-launch-poll")?.addEventListener("click", () => launchToStudents(q, null));
+            document.getElementById("tlive-view-poll-responses")?.addEventListener("click", () => openResponsesModal(q, null));
           }
         } else {
           const canvas = document.getElementById("tlive-canvas-inner");
@@ -378,8 +431,11 @@
   }
 
   function bindModal() {
-    document.getElementById("tlive-panel-close")?.addEventListener("click", () => {
-      document.getElementById("tlive-panel-right")?.classList.add("hidden");
+    const modal = document.getElementById("tlive-responses-modal");
+    document.getElementById("tlive-responses-modal-close")?.addEventListener("click", closeResponsesModal);
+    modal?.querySelector("[data-close-modal]")?.addEventListener("click", closeResponsesModal);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && modal && !modal.classList.contains("hidden")) closeResponsesModal();
     });
   }
 

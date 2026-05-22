@@ -78,16 +78,20 @@
                 <div id="tlive-canvas-inner" class="tlive-canvas__inner"></div>
               </section>
             </div>
-
-            <aside id="tlive-panel-right" class="tlive-panel-right hidden" aria-label="Student responses">
-              <div class="tlive-panel-right__head">
-                <span data-i18n="tlive_panel_responses">Student responses</span>
-                <button type="button" id="tlive-panel-close" class="btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem" aria-label="Close">×</button>
-              </div>
-              <div id="tlive-panel-body" class="tlive-panel-right__body"></div>
-            </aside>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="tlive-responses-modal" class="tlive-responses-modal hidden" role="dialog" aria-modal="true" aria-labelledby="tlive-responses-modal-title" hidden>
+      <div class="tlive-responses-modal__backdrop" data-close-modal aria-hidden="true"></div>
+      <div class="tlive-responses-modal__card">
+        <header class="tlive-responses-modal__head">
+          <h2 id="tlive-responses-modal-title" data-i18n="tlive_panel_responses">Student responses</h2>
+          <button type="button" id="tlive-responses-modal-close" class="tlive-float__close" aria-label="Close">×</button>
+        </header>
+        <div id="tlive-responses-modal-body" class="tlive-responses-modal__body"></div>
+        <footer id="tlive-responses-modal-foot" class="tlive-responses-modal__foot"></footer>
       </div>
     </div>
     <script src="js/i18n/en.js"></script>

@@ -527,6 +527,8 @@ window.EAP_STRINGS_EN = {
   "tlive_board_no_correct": "No correct answers this round — no moves.",
   "tlive_current_question": "Question",
   "tlive_launch_question": "Launch to students",
+  "tlive_view_responses": "View student results",
+  "tlive_close_modal": "Close",
   "tlive_next_question": "Next question",
   "tlive_award_point": "+1 step",
   "tlive_col_team": "Team",

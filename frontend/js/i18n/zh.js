@@ -527,6 +527,8 @@ window.EAP_STRINGS_ZH = {
   "tlive_board_no_correct": "本轮无正确答案 — 无人前进。",
   "tlive_current_question": "题目",
   "tlive_launch_question": "向学生发布",
+  "tlive_view_responses": "查看学生作答",
+  "tlive_close_modal": "关闭",
   "tlive_next_question": "下一题",
   "tlive_award_point": "+1 步",
   "tlive_col_team": "小组",
