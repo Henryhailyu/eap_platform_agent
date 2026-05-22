@@ -478,6 +478,7 @@ window.EAP_STRINGS_EN = {
   "tlive_tool_ai": "AI",
   "tlive_tool_soon": "This tool is coming in a later phase.",
   "tlive_saved_games": "Saved Games",
+  "tlive_games_canvas_lead": "Choose a game to run in the classroom display. Board Race is fully interactive in this demo.",
   "tlive_saved_games_hint": "Built-in demos plus games you save in Game Builder (this browser session).",
   "tlive_open_builder": "Open Game Builder",
   "tlive_board_race_title": "Board Race (demo)",

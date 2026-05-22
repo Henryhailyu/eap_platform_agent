@@ -116,23 +116,99 @@
     `;
   }
 
+  function getSavedGamesList() {
+    return MOCK.allSavedGames ? MOCK.allSavedGames() : MOCK.SAVED_GAMES;
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function bindGamePickers(root, onPick) {
+    if (!root) return;
+    root.querySelectorAll("[data-game]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-game");
+        if (id) onPick(id);
+      });
+    });
+  }
+
+  /** Main canvas view — always visible when Games tool is selected. */
+  function renderGamesLibrary() {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas) return;
+    const games = getSavedGamesList();
+    const builderHref = "teacher-game-builder.html" + (window.location.search || "");
+
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
+    canvas.innerHTML = `
+      <div class="tlive-games-panel">
+        <h2 class="tlive-games-panel__title">${escapeHtml(t("tlive_saved_games"))}</h2>
+        <p class="tlive-games-panel__lead">${escapeHtml(t("tlive_games_canvas_lead"))}</p>
+        <ul class="tlive-games-panel__list">
+          ${games
+            .map(
+              (g) => `
+            <li>
+              <button type="button" class="tlive-game-item tlive-games-panel__item" data-game="${escapeHtml(g.id)}">
+                <strong>${escapeHtml(MOCK.gameLabel(g, "name"))}</strong>
+                <span>${escapeHtml(MOCK.gameLabel(g, "desc"))}</span>
+              </button>
+            </li>`,
+            )
+            .join("")}
+        </ul>
+        <div class="tlive-games-panel__actions">
+          <a class="btn-primary" href="${escapeHtml(builderHref)}">${escapeHtml(t("tlive_open_builder"))}</a>
+        </div>
+        <p class="tlive-disclaimer">${escapeHtml(t("tlive_saved_games_hint"))}</p>
+      </div>
+    `;
+
+    bindGamePickers(canvas, (id) => {
+      closeGamesModal();
+      loadGame(id);
+    });
+  }
+
+  function ensureGamesModalPortal() {
+    const modal = document.getElementById("tlive-games-modal");
+    if (modal && modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+  }
+
+  function closeGamesModal() {
+    document.getElementById("tlive-games-modal")?.classList.add("hidden");
+  }
+
   function openGamesModal() {
+    ensureGamesModalPortal();
     const modal = document.getElementById("tlive-games-modal");
     const list = document.getElementById("tlive-games-list");
     if (!modal || !list) return;
-    const games = MOCK.allSavedGames ? MOCK.allSavedGames() : MOCK.SAVED_GAMES;
-    list.innerHTML = games.map(
-      (g) =>
-        `<li><button type="button" class="tlive-game-item" data-game="${g.id}"><strong>${MOCK.gameLabel(g, "name")}</strong><span>${MOCK.gameLabel(g, "desc")}</span></button></li>`,
-    ).join("");
+    const games = getSavedGamesList();
+    list.innerHTML = games
+      .map(
+        (g) =>
+          `<li><button type="button" class="tlive-game-item" data-game="${escapeHtml(g.id)}"><strong>${escapeHtml(MOCK.gameLabel(g, "name"))}</strong><span>${escapeHtml(MOCK.gameLabel(g, "desc"))}</span></button></li>`,
+      )
+      .join("");
     modal.classList.remove("hidden");
-    list.querySelectorAll(".tlive-game-item").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-game");
-        modal.classList.add("hidden");
-        loadGame(id);
-      });
+    bindGamePickers(list.parentElement, (id) => {
+      closeGamesModal();
+      loadGame(id);
     });
+  }
+
+  function showGamesTool() {
+    renderGamesLibrary();
+    openGamesModal();
   }
 
   function loadGame(gameId) {
@@ -162,7 +238,7 @@
       btn.addEventListener("click", () => {
         const tool = btn.getAttribute("data-tool");
         setActiveTool(tool);
-        if (tool === "games") openGamesModal();
+        if (tool === "games") showGamesTool();
         else if (tool === "slides") renderWelcome(ctx);
         else if (tool === "poll" || tool === "quiz") {
           const q = MOCK.MOCK_QUESTIONS[0];
@@ -191,11 +267,9 @@
   }
 
   function bindModal() {
-    document.getElementById("tlive-games-close")?.addEventListener("click", () => {
-      document.getElementById("tlive-games-modal")?.classList.add("hidden");
-    });
+    document.getElementById("tlive-games-close")?.addEventListener("click", closeGamesModal);
     document.getElementById("tlive-games-modal")?.addEventListener("click", (e) => {
-      if (e.target.id === "tlive-games-modal") e.target.classList.add("hidden");
+      if (e.target.id === "tlive-games-modal") closeGamesModal();
     });
     document.getElementById("tlive-panel-close")?.addEventListener("click", () => {
       document.getElementById("tlive-panel-right")?.classList.add("hidden");
@@ -231,6 +305,7 @@
       back.href = `teacher.html${q.toString() ? `?${q.toString()}` : ""}`;
     }
 
+    ensureGamesModalPortal();
     bindToolbar(ctx);
     bindModal();
     setActiveTool("slides");

@@ -478,6 +478,7 @@ window.EAP_STRINGS_ZH = {
   "tlive_tool_ai": "AI",
   "tlive_tool_soon": "该工具将在后续阶段推出。",
   "tlive_saved_games": "已保存游戏",
+  "tlive_games_canvas_lead": "选择要在课堂展示区运行的游戏。演示中棋盘竞赛可完整互动。",
   "tlive_saved_games_hint": "内置演示 + 在游戏生成器中保存的活动（本会话）。",
   "tlive_open_builder": "打开游戏生成器",
   "tlive_board_race_title": "棋盘竞赛（演示）",

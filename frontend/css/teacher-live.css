@@ -181,7 +181,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 10050;
   padding: 1rem;
 }
 
@@ -489,6 +489,42 @@
   color: var(--tlive-primary);
   font-weight: 600;
   font-size: 0.875rem;
+}
+
+.tlive-games-panel {
+  width: 100%;
+  max-width: 36rem;
+  text-align: left;
+}
+
+.tlive-games-panel__title {
+  margin: 0 0 0.35rem;
+  color: var(--tlive-primary);
+  font-size: 1.25rem;
+}
+
+.tlive-games-panel__lead {
+  margin: 0 0 1rem;
+  color: #6e6e73;
+  font-size: 0.9rem;
+}
+
+.tlive-games-panel__list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 1px solid rgba(10, 77, 104, 0.15);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.tlive-games-panel__item {
+  border-radius: 0;
+}
+
+.tlive-games-panel__actions {
+  margin-bottom: 0.75rem;
 }
 
 .tlive-games-modal__foot {
