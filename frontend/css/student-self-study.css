@@ -604,6 +604,51 @@
   min-height: 1.25rem;
 }
 
+.ssc-speak-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.ssc-speak-input {
+  width: 100%;
+  min-height: 8rem;
+  padding: 0.85rem 1rem;
+  font-size: 16px;
+  line-height: 1.5;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.ssc-speak-count {
+  font-size: 0.8125rem;
+  color: var(--eap-text-muted, #6e6e73);
+  margin: 0.5rem 0 1rem;
+}
+
+.ssc-speak-count--ok {
+  color: var(--eap-teal, #0a7ea4);
+  font-weight: 600;
+}
+
+.ssc-game-prompt {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  margin: 0.5rem 0 0;
+}
+
+.ssc-speak-feedback {
+  margin-top: 1.25rem;
+}
+
+.ssc-speak-feedback.hidden {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ssc-module-card {
     transition: none;

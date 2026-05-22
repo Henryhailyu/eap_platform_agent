@@ -442,5 +442,18 @@ window.EAP_STRINGS_ZH = {
   "self_study_listening_game_title": "讲座结构",
   "self_study_listening_game_hint": "按文字稿顺序排列讲座各部分。",
   "self_study_listening_game_done": "讲座结构完成，共检查 {attempts} 次。",
-  "self_study_listening_complete": "听力模块已完成 — 做得好！"
+  "self_study_listening_complete": "听力模块已完成 — 做得好！",
+  "self_study_speaking_learn_title": "口语与讨论",
+  "self_study_speaking_no_stt": "请打字作答 — 录音与语音转文字将在后续加入。",
+  "self_study_speaking_prompts": "练习提示",
+  "self_study_speaking_game_title": "讨论挑战",
+  "self_study_speaking_game_hint": "将口头回答打字提交。至少 {min} 词。",
+  "self_study_speaking_your_response": "你的回答",
+  "self_study_speaking_submit": "提交并查看反馈",
+  "self_study_speaking_word_count": "{n} / {min} 词",
+  "self_study_speaking_too_short": "请至少写 {min} 词。",
+  "self_study_speaking_mock_feedback": "练习反馈（演示）",
+  "self_study_speaking_feedback_note": "非 AI — 供自我检查的简单清单。",
+  "self_study_speaking_game_saved": "已保存回答（{words} 词）。",
+  "self_study_speaking_complete": "口语模块已完成 — 做得好！"
 };

@@ -8,6 +8,7 @@
   const READ = window.EAP_READING_MOCK;
   const WRITE = window.EAP_WRITING_MOCK;
   const LISTEN = window.EAP_LISTENING_MOCK;
+  const SPEAK = window.EAP_SPEAKING_MOCK;
 
   function t(key, params) {
     if (typeof window.t === "function") return window.t(key, params);
@@ -382,6 +383,9 @@
     } else if (skill === "listening") {
       if (!window.EAP_MODULE_LISTENING || !LISTEN) return;
       window.EAP_MODULE_LISTENING.initListening(levelId, renderTabs);
+    } else if (skill === "speaking") {
+      if (!window.EAP_MODULE_SPEAKING || !SPEAK) return;
+      window.EAP_MODULE_SPEAKING.initSpeaking(levelId, renderTabs);
     } else {
       renderUnsupported(skill || "—");
       return;
@@ -393,6 +397,8 @@
       else if (skill === "writing" && window.EAP_MODULE_RW) window.EAP_MODULE_RW.initWriting(levelId, renderTabs);
       else if (skill === "listening" && window.EAP_MODULE_LISTENING)
         window.EAP_MODULE_LISTENING.initListening(levelId, renderTabs);
+      else if (skill === "speaking" && window.EAP_MODULE_SPEAKING)
+        window.EAP_MODULE_SPEAKING.initSpeaking(levelId, renderTabs);
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     });
   }

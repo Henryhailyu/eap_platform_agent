@@ -442,5 +442,18 @@ window.EAP_STRINGS_EN = {
   "self_study_listening_game_title": "Lecture Structure",
   "self_study_listening_game_hint": "Order the lecture sections to match the script flow.",
   "self_study_listening_game_done": "Lecture Structure complete in {attempts} checks.",
-  "self_study_listening_complete": "Listening module complete — great work!"
+  "self_study_listening_complete": "Listening module complete — great work!",
+  "self_study_speaking_learn_title": "Speaking & discussion",
+  "self_study_speaking_no_stt": "Type your response — recording and speech-to-text coming later.",
+  "self_study_speaking_prompts": "Practice prompts",
+  "self_study_speaking_game_title": "Discussion Challenge",
+  "self_study_speaking_game_hint": "Type your spoken response as text. Minimum {min} words.",
+  "self_study_speaking_your_response": "Your response",
+  "self_study_speaking_submit": "Submit for feedback",
+  "self_study_speaking_word_count": "{n} / {min} words",
+  "self_study_speaking_too_short": "Please write at least {min} words.",
+  "self_study_speaking_mock_feedback": "Practice feedback (demo)",
+  "self_study_speaking_feedback_note": "Not AI — simple checklist for self-review.",
+  "self_study_speaking_game_saved": "Response saved ({words} words).",
+  "self_study_speaking_complete": "Speaking module complete — great work!"
 };

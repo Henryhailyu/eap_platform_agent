@@ -35,8 +35,8 @@
       icon: "🎤",
       titleKey: "self_study_mod_speaking",
       metaKey: "self_study_mod_speaking_meta",
-      soon: true,
-      locked: true,
+      href: "student-self-study-module.html?skill=speaking",
+      available: true,
     },
     {
       id: "writing",
@@ -118,6 +118,10 @@
         } else if (mod.id === "listening" && window.EAP_LISTENING_MOCK) {
           modProgress = window.EAP_LISTENING_MOCK.completionPercent(
             window.EAP_LISTENING_MOCK.ensureProgress(levelId),
+          );
+        } else if (mod.id === "speaking" && window.EAP_SPEAKING_MOCK) {
+          modProgress = window.EAP_SPEAKING_MOCK.completionPercent(
+            window.EAP_SPEAKING_MOCK.ensureProgress(levelId),
           );
         }
       }

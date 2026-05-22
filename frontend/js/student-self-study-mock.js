@@ -620,28 +620,19 @@
     const zh = isZh();
     const plans = {
       beginner: zh
-        ? ["词汇：学术词 + 配对", "阅读：主旨", "听力：讲座结构（文字稿）", "写作：摘要"]
+        ? ["词汇 · 阅读 · 听力 · 写作 · 口语：打字讨论挑战"]
         : [
-            "Vocabulary: words + matching",
-            "Reading: main idea",
-            "Listening: lecture structure (script)",
-            "Writing: summary",
+            "Vocabulary · Reading · Listening · Writing · Speaking: typed discussion",
           ],
       intermediate: zh
-        ? ["词汇：搭配", "阅读：论证排序", "听力：数据与转折", "写作：摘要任务"]
+        ? ["五模块均可练习 — 今日建议完成口语讨论挑战"]
         : [
-            "Vocabulary: collocations",
-            "Reading: Argument Sorting",
-            "Listening: data & contrast (script)",
-            "Writing: Summary Mission",
+            "All five modules available — try Speaking discussion challenge today",
           ],
       advanced: zh
-        ? ["词汇：评价用语", "阅读：综合", "听力：研究报告文字稿", "写作：引用摘要"]
+        ? ["五模块均可练习 — 复习口语评价性表达"]
         : [
-            "Vocabulary: evaluation language",
-            "Reading: synthesis",
-            "Listening: research talk script",
-            "Writing: citation summaries",
+            "All five modules available — review evaluative speaking language",
           ],
     };
     return plans[levelId] || plans.intermediate;
