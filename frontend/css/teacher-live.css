@@ -812,6 +812,171 @@ body.tlive-modal-open {
   }
 }
 
+/* Name wheel (wheelofnames-style) */
+.tlive-wheel-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 960px;
+  align-items: start;
+  text-align: left;
+}
+
+.tlive-wheel-sidebar {
+  padding: 1rem;
+  border-radius: 12px;
+  background: #fafbfc;
+  border: 1px solid rgba(10, 77, 104, 0.12);
+}
+
+.tlive-wheel-sidebar__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: var(--tlive-primary);
+}
+
+.tlive-wheel-sidebar__hint,
+.tlive-wheel-stage__lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+  line-height: 1.45;
+}
+
+.tlive-wheel-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.tlive-wheel-textarea {
+  width: 100%;
+  min-height: 10rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.tlive-wheel-file-row {
+  margin: 0.65rem 0;
+}
+
+.tlive-wheel-file-btn {
+  display: inline-block;
+  cursor: pointer;
+}
+
+.tlive-wheel-count {
+  margin: 0.35rem 0 0.65rem;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+}
+
+.tlive-wheel-sidebar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.65rem;
+}
+
+.tlive-wheel-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+  cursor: pointer;
+}
+
+.tlive-wheel-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tlive-wheel-stage__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  color: var(--tlive-primary);
+  align-self: flex-start;
+}
+
+.tlive-wheel-pointer-wrap {
+  position: relative;
+  width: min(100%, 500px);
+  margin: 0 auto 1rem;
+}
+
+.tlive-wheel-pointer {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-top: 26px solid var(--tlive-primary);
+  z-index: 3;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+.tlive-wheel-rotor {
+  display: flex;
+  justify-content: center;
+  transform: rotate(0deg);
+  will-change: transform;
+}
+
+.tlive-wheel-svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.tlive-wheel-spin-btn {
+  min-width: 10rem;
+  font-size: 1.05rem;
+  padding: 0.65rem 2rem;
+}
+
+.tlive-wheel-winner {
+  margin: 0.75rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--tlive-primary);
+  min-height: 1.75rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tlive-wheel-winner--show {
+  opacity: 1;
+}
+
+@media (max-width: 800px) {
+  .tlive-wheel-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tlive-wheel-stage__title {
+    align-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tlive-wheel-rotor {
+    transition: none !important;
+  }
+}
+
 /* Game Builder (L10–L12) */
 .tgb-page .tlive-topbar {
   align-items: flex-start;

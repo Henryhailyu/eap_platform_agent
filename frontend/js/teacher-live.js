@@ -696,6 +696,23 @@
     }
   }
 
+  function renderNameWheelTool(ctx) {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    const wheel = window.EAP_NAME_WHEEL;
+    if (!canvas || !wheel) {
+      showBootError(t("tlive_wheel_load_error"));
+      return;
+    }
+    clearLiveGameState();
+    window.__tliveWheelUnmount = null;
+    wheel.mount(canvas, {
+      className: ctx.className,
+      t,
+      escapeHtml,
+    });
+    if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+  }
+
   function bindToolbar(ctx) {
     document.querySelectorAll(".tlive-tool").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -707,6 +724,7 @@
         const tool = btn.getAttribute("data-tool");
         setActiveTool(tool);
         if (tool === "games") showGamesTool();
+        else if (tool === "wheel") renderNameWheelTool(ctx);
         else if (tool === "slides") renderWelcome(ctx);
         else if (tool === "poll" || tool === "quiz") {
           const q = MOCK.MOCK_QUESTIONS[0];
@@ -798,6 +816,8 @@
         renderMatchingRace(window.__tliveMatching);
       } else if (window.__tliveQuiz) {
         renderQuizBattle(window.__tliveQuiz);
+      } else if (tool === "wheel") {
+        renderNameWheelTool(ctx);
       } else if (tool === "slides") {
         renderWelcome(ctx);
       }
