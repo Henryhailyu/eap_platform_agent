@@ -105,6 +105,28 @@
     }));
   }
 
+  function readCustomSavedGames() {
+    try {
+      const raw = sessionStorage.getItem("eap_teacher_saved_games");
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /** Built-in demos + games saved from Game Builder (sessionStorage). */
+  function allSavedGames() {
+    const custom = readCustomSavedGames();
+    const builtinIds = new Set(SAVED_GAMES.map((g) => g.id));
+    const merged = [...SAVED_GAMES];
+    custom.forEach((g) => {
+      if (!builtinIds.has(g.id)) merged.push(g);
+    });
+    return merged;
+  }
+
   global.EAP_TEACHER_LIVE_MOCK = {
     SAVED_GAMES,
     MOCK_QUESTIONS,
@@ -115,5 +137,6 @@
     createBoardState,
     scoreBoardTeam,
     simulateResponses,
+    allSavedGames,
   };
 })();

@@ -120,7 +120,8 @@
     const modal = document.getElementById("tlive-games-modal");
     const list = document.getElementById("tlive-games-list");
     if (!modal || !list) return;
-    list.innerHTML = MOCK.SAVED_GAMES.map(
+    const games = MOCK.allSavedGames ? MOCK.allSavedGames() : MOCK.SAVED_GAMES;
+    list.innerHTML = games.map(
       (g) =>
         `<li><button type="button" class="tlive-game-item" data-game="${g.id}"><strong>${MOCK.gameLabel(g, "name")}</strong><span>${MOCK.gameLabel(g, "desc")}</span></button></li>`,
     ).join("");
@@ -135,7 +136,8 @@
   }
 
   function loadGame(gameId) {
-    const game = MOCK.SAVED_GAMES.find((g) => g.id === gameId);
+    const games = MOCK.allSavedGames ? MOCK.allSavedGames() : MOCK.SAVED_GAMES;
+    const game = games.find((g) => g.id === gameId);
     if (!game) return;
     setActiveTool("games");
     if (game.type === "board_race") {
