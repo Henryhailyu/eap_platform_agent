@@ -17,6 +17,28 @@
 
   const DEMO_NAMES = ["student1", "student2", "student3", "student4", "student5"];
 
+  /** Total spin animation duration (seconds). */
+  const SPIN_DURATION_S = 8;
+  /** Easing: rapid acceleration, long dramatic slowdown at the end. */
+  const SPIN_EASING = "cubic-bezier(0.06, 0.92, 0.12, 1)";
+  const MIN_EXTRA_TURNS = 10;
+  const MAX_EXTRA_TURNS_RANDOM = 8;
+
+  function spinTransitionCss() {
+    const reduced =
+      typeof global.matchMedia === "function" &&
+      global.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return "transform 1.2s ease-out";
+    return `transform ${SPIN_DURATION_S}s ${SPIN_EASING}`;
+  }
+
+  function spinDurationMs() {
+    const reduced =
+      typeof global.matchMedia === "function" &&
+      global.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return reduced ? 1300 : SPIN_DURATION_S * 1000;
+  }
+
   function secureRandomInt(max) {
     if (max <= 0) return 0;
     const buf = new Uint32Array(1);
@@ -118,11 +140,19 @@
       .replace(/"/g, "&quot;");
   }
 
-  function rotationForWinner(index, count) {
+  function rotationForWinner(index, count, currentDeg) {
     const slice = 360 / count;
     const mid = (index + 0.5) * slice;
-    const extra = 4 + secureRandomInt(3);
-    return extra * 360 + (360 - mid);
+    const extra =
+      typeof global.matchMedia === "function" &&
+      global.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? 2
+        : MIN_EXTRA_TURNS + secureRandomInt(MAX_EXTRA_TURNS_RANDOM);
+    const currentNorm = ((currentDeg % 360) + 360) % 360;
+    const targetMod = (360 - mid + 360) % 360;
+    let add = (targetMod - currentNorm + 360) % 360;
+    if (add < 90) add += 360;
+    return currentDeg + extra * 360 + add;
   }
 
   function winnerIndexFromRotation(names, rotationDeg) {
@@ -154,7 +184,7 @@
     function draw() {
       const rotor = container.querySelector(".tlive-wheel-rotor");
       if (rotor) {
-        rotor.style.transition = spinning ? "transform 4s cubic-bezier(0.2, 0.8, 0.2, 1)" : "none";
+        rotor.style.transition = spinning ? spinTransitionCss() : "none";
         rotor.style.transform = `rotate(${rotation}deg)`;
       }
       const svgWrap = container.querySelector(".tlive-wheel-svg-inner");
@@ -283,7 +313,7 @@
       container.querySelector("#tlive-wheel-spin")?.addEventListener("click", () => {
         if (spinning || names.length < 2) return;
         const winIdx = secureRandomInt(names.length);
-        const targetRot = rotationForWinner(winIdx, names.length);
+        const targetRot = rotationForWinner(winIdx, names.length, rotation);
         spinning = true;
         if (onSpinningChange) onSpinningChange(true);
         container.querySelector("#tlive-wheel-spin").disabled = true;
@@ -291,21 +321,12 @@
         const rotor = container.querySelector(".tlive-wheel-rotor");
         const svgInner = container.querySelector(".tlive-wheel-svg-inner");
         if (svgInner) svgInner.innerHTML = buildWheelSvg(names);
-        if (rotor) {
-          rotor.style.transition = "none";
-          rotor.style.transform = `rotate(${rotation}deg)`;
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              rotor.style.transition = "transform 4s cubic-bezier(0.2, 0.8, 0.2, 1)";
-              rotation = targetRot;
-              rotor.style.transform = `rotate(${rotation}deg)`;
-            });
-          });
-        } else {
-          rotation = targetRot;
-        }
+        let finished = false;
         const onEnd = () => {
+          if (finished) return;
+          finished = true;
           if (rotor) rotor.removeEventListener("transitionend", onEnd);
+          if (spinTimer) global.clearTimeout(spinTimer);
           spinning = false;
           if (onSpinningChange) onSpinningChange(false);
           container.querySelector("#tlive-wheel-spin").disabled = names.length < 2;
@@ -320,8 +341,25 @@
             draw();
           }
         };
-        if (rotor) rotor.addEventListener("transitionend", onEnd);
-        else onEnd();
+        let spinTimer = global.setTimeout(onEnd, spinDurationMs() + 150);
+        if (rotor) {
+          rotor.style.transition = "none";
+          rotor.style.transform = `rotate(${rotation}deg)`;
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              rotor.style.transition = spinTransitionCss();
+              rotation = targetRot;
+              rotor.style.transform = `rotate(${rotation}deg)`;
+              rotor.addEventListener("transitionend", (ev) => {
+                if (ev.propertyName !== "transform") return;
+                onEnd();
+              });
+            });
+          });
+        } else {
+          rotation = targetRot;
+          onEnd();
+        }
       });
 
       draw();
