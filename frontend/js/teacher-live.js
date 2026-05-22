@@ -263,7 +263,6 @@
     document.body.classList.add("tlive-modal-open");
     if (window.EAP_I18N) window.EAP_I18N.applyStatic();
 
-    const MOCK = getMock();
     document.getElementById("tlive-modal-roll-correct")?.addEventListener("click", () => {
       if (!MOCK) return;
       const result = MOCK.processCorrectTeams(window.__tliveBoard || board, question);
