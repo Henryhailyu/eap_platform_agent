@@ -98,57 +98,89 @@
     const q = MOCK.MOCK_QUESTIONS[questionIndex % MOCK.MOCK_QUESTIONS.length];
     if (!q) return;
 
-    canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
-    const teamsHtml = boardState.teams
-      .map(
-        (team, i) => `
-        <div class="tlive-board__team">
-          <h3>${escapeHtml(team.name)}</h3>
-          <div class="tlive-board__track"><div class="tlive-board__fill" style="width:${team.progress}%"></div></div>
-          <div class="tlive-board__score">${team.score}</div>
-          <button type="button" class="btn-secondary tlive-score-btn" data-team="${i}" style="margin-top:0.5rem;font-size:0.75rem">${escapeHtml(t("tlive_award_point"))}</button>
-        </div>
-      `,
-      )
+    const state = boardState || MOCK.createBoardState();
+    const opts = MOCK.questionOptions(q);
+    const lastEvent = MOCK.formatLastEvent(state, t);
+    const winnerTeam = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
+    const winnerBanner = winnerTeam
+      ? `<div class="tlive-board-winner" role="status">${escapeHtml(t("tlive_board_winner", { team: MOCK.teamName(winnerTeam) }))}</div>`
+      : "";
+
+    const teamOptions = state.teams
+      .map((team, i) => `<option value="${i}">${escapeHtml(MOCK.teamName(team))}</option>`)
       .join("");
 
-    const opts = MOCK.questionOptions(q);
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--board";
     canvas.innerHTML = `
-      <div class="tlive-board">
-        <h2 style="color:#0A4D68;margin:0 0 1rem">${escapeHtml(t("tlive_board_race_title"))}</h2>
-        <div class="tlive-board__teams">${teamsHtml}</div>
+      <div class="tlive-board tlive-board--race">
+        <header class="tlive-board__head">
+          <h2 class="tlive-board__title">${escapeHtml(t("tlive_board_race_title"))}</h2>
+          <p class="tlive-board__round">${escapeHtml(t("tlive_board_round", { round: String(state.round) }))}</p>
+        </header>
+        ${winnerBanner}
+        <div class="tlive-board__track-wrap">
+          ${MOCK.renderTrackMarkup(state, escapeHtml)}
+        </div>
+        <p class="tlive-board-legend">${escapeHtml(t("tlive_board_legend"))}</p>
+        <div class="tlive-board__lb-wrap">
+          ${MOCK.renderLeaderboardMarkup(state, escapeHtml, t)}
+        </div>
+        ${lastEvent ? `<p class="tlive-board-event" aria-live="polite">${escapeHtml(lastEvent)}</p>` : ""}
         <div class="tlive-question-box">
-          <p style="font-weight:600;margin:0 0 0.75rem">${escapeHtml(t("tlive_current_question"))}</p>
-          <p style="margin:0 0 0.75rem">${escapeHtml(MOCK.questionText(q))}</p>
-          <ol style="margin:0;padding-left:1.25rem;text-align:left">
+          <p class="tlive-question-box__label">${escapeHtml(t("tlive_current_question"))}</p>
+          <p class="tlive-question-box__text">${escapeHtml(MOCK.questionText(q))}</p>
+          <ol class="tlive-question-box__opts">
             ${opts.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}
           </ol>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+        <div class="tlive-board__controls">
           <button type="button" class="btn-primary" id="tlive-launch-q">${escapeHtml(t("tlive_launch_question"))}</button>
+          <button type="button" class="btn-primary" id="tlive-roll-correct" ${state.winnerId ? "disabled" : ""}>${escapeHtml(t("tlive_board_roll_correct"))}</button>
+          <div class="tlive-board__manual">
+            <label for="tlive-roll-team" class="tlive-board__manual-label">${escapeHtml(t("tlive_board_manual_roll"))}</label>
+            <select id="tlive-roll-team" ${state.winnerId ? "disabled" : ""}>${teamOptions}</select>
+            <button type="button" class="btn-secondary" id="tlive-roll-dice" ${state.winnerId ? "disabled" : ""}>${escapeHtml(t("tlive_board_roll_dice"))}</button>
+          </div>
           <button type="button" class="btn-secondary" id="tlive-next-q">${escapeHtml(t("tlive_next_question"))}</button>
+          <button type="button" class="btn-secondary" id="tlive-reset-board">${escapeHtml(t("tlive_board_reset"))}</button>
         </div>
         <p class="tlive-disclaimer">${escapeHtml(t("tlive_mock_disclaimer"))}</p>
       </div>
     `;
 
-    canvas.querySelectorAll(".tlive-score-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const i = parseInt(btn.getAttribute("data-team"), 10);
-        window.__tliveBoard = MOCK.scoreBoardTeam(window.__tliveBoard || MOCK.createBoardState(), i);
-        renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
-      });
+    document.getElementById("tlive-launch-q")?.addEventListener("click", () => {
+      showInteractionPanel(q, state);
     });
+
+    document.getElementById("tlive-roll-correct")?.addEventListener("click", () => {
+      const result = MOCK.processCorrectTeams(window.__tliveBoard || state, q);
+      window.__tliveBoard = result.state;
+      renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
+      showInteractionPanel(q, window.__tliveBoard);
+    });
+
+    document.getElementById("tlive-roll-dice")?.addEventListener("click", () => {
+      const sel = document.getElementById("tlive-roll-team");
+      const i = sel ? parseInt(sel.value, 10) : 0;
+      const roll = MOCK.rollDice();
+      window.__tliveBoard = MOCK.moveTeam(window.__tliveBoard || state, i, roll, "manual");
+      renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
+    });
+
     document.getElementById("tlive-next-q")?.addEventListener("click", () => {
       window.__tliveQuestionIndex = ((window.__tliveQuestionIndex || 0) + 1) % MOCK.MOCK_QUESTIONS.length;
-      renderBoardRace(window.__tliveBoard || MOCK.createBoardState(), window.__tliveQuestionIndex);
+      renderBoardRace(window.__tliveBoard || state, window.__tliveQuestionIndex);
     });
-    document.getElementById("tlive-launch-q")?.addEventListener("click", () => {
-      showInteractionPanel(q);
+
+    document.getElementById("tlive-reset-board")?.addEventListener("click", () => {
+      if (!window.confirm(t("tlive_board_reset_confirm"))) return;
+      window.__tliveBoard = MOCK.createBoardState();
+      window.__tliveQuestionIndex = 0;
+      renderBoardRace(window.__tliveBoard, 0);
     });
   }
 
-  function showInteractionPanel(question) {
+  function showInteractionPanel(question, boardState) {
     const MOCK = getMock();
     const panel = document.getElementById("tlive-panel-right");
     const body = document.getElementById("tlive-panel-body");
@@ -156,21 +188,43 @@
     panel.classList.remove("hidden");
 
     const rows = MOCK.simulateResponses(question);
+    const hasBoard = !!boardState;
     body.innerHTML = `
-      <p style="font-size:0.8125rem;margin:0 0 0.75rem">${escapeHtml(MOCK.questionText(question))}</p>
+      <p class="tlive-panel-q">${escapeHtml(MOCK.questionText(question))}</p>
       <table class="tlive-responses-table">
-        <thead><tr><th>${escapeHtml(t("tlive_col_student"))}</th><th>${escapeHtml(t("tlive_col_answer"))}</th><th>${escapeHtml(t("tlive_col_ok"))}</th><th>${escapeHtml(t("tlive_col_time"))}</th></tr></thead>
+        <thead><tr>
+          <th>${escapeHtml(t("tlive_col_student"))}</th>
+          <th>${escapeHtml(t("tlive_col_team"))}</th>
+          <th>${escapeHtml(t("tlive_col_answer"))}</th>
+          <th>${escapeHtml(t("tlive_col_ok"))}</th>
+          <th>${escapeHtml(t("tlive_col_time"))}</th>
+        </tr></thead>
         <tbody>
           ${rows
-            .map(
-              (r) =>
-                `<tr><td>${escapeHtml(r.student)}</td><td>${escapeHtml(r.answer)}</td><td>${r.correct ? "✓" : "—"}</td><td>${r.timeSec}s</td></tr>`,
-            )
+            .map((r) => {
+              const team = boardState?.teams?.find((x) => x.id === r.teamId);
+              const teamLabel = team ? MOCK.teamName(team) : r.teamId;
+              return `<tr class="${r.correct ? "tlive-resp--correct" : ""}">
+                <td>${escapeHtml(r.student)}</td>
+                <td><span class="tlive-resp-team" style="color:${team?.color || "#333"}">${escapeHtml(teamLabel)}</span></td>
+                <td>${escapeHtml(r.answer)}</td>
+                <td>${r.correct ? "✓" : "—"}</td>
+                <td>${r.timeSec}s</td>
+              </tr>`;
+            })
             .join("")}
         </tbody>
       </table>
+      ${hasBoard ? `<button type="button" class="btn-primary tlive-panel-roll" id="tlive-panel-roll-correct">${escapeHtml(t("tlive_board_roll_correct"))}</button>` : ""}
       <p class="tlive-disclaimer">${escapeHtml(t("tlive_responses_mock"))}</p>
     `;
+
+    document.getElementById("tlive-panel-roll-correct")?.addEventListener("click", () => {
+      const result = MOCK.processCorrectTeams(window.__tliveBoard || boardState, question);
+      window.__tliveBoard = result.state;
+      renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
+      showInteractionPanel(question, window.__tliveBoard);
+    });
   }
 
   function getSavedGamesList() {
