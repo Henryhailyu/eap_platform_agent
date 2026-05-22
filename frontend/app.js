@@ -275,6 +275,13 @@ function initStudentSelfStudyNavLink() {
   if (link) link.classList.remove("hidden");
 }
 
+/** Phase L2 — show Live Teaching entry when feature flag is on. */
+function initTeacherLiveNavLink() {
+  if (window.EAP_TEACHER_LIVE_ENABLED === false) return;
+  const link = document.getElementById("teacher-live-link");
+  if (link) link.classList.remove("hidden");
+}
+
 /**
  * Categories shown on teacher form and student filter (keep in sync with your course).
  * Used to build <select> options in JavaScript.
@@ -3271,6 +3278,7 @@ function initTeacherPage() {
 
     await ensureAcademicCalendarLoaded();
     initAppPageHeader();
+    initTeacherLiveNavLink();
 
   const form = document.getElementById("teacher-task-form");
   const typeSelect = document.getElementById("task-type");

@@ -10,3 +10,6 @@
 
 /** Student AI Self-Study Centre — set false to hide entry link and disable hub. */
 window.EAP_SELF_STUDY_ENABLED = true;
+
+/** Teacher Live Teaching Page — set false to hide entry link. */
+window.EAP_TEACHER_LIVE_ENABLED = true;

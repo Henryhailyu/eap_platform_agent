@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Teacher Live Teaching — EAP Platform" />
+    <title>Live Teaching — EAP Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,600;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/teacher-live.css" />
+  </head>
+  <body class="page-app eap-shell-active" data-page="teacher-live">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+        <a class="skip-link" href="#tlive-main">Skip to content</a>
+        <header class="site-header">
+          <div class="site-header__inner">
+            <a class="site-logo" href="teacher.html"
+              ><span data-i18n="brand">EAP Platform</span
+              ><span class="eap-build-badge" data-i18n="build_badge">Agent build</span></a
+            >
+            <div class="site-header__actions">
+              <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">中文</button>
+              <p class="site-welcome" id="header-welcome" aria-live="polite"><span data-i18n="welcome">Welcome,</span></p>
+              <button type="button" class="btn-logout" id="logout-btn" data-i18n="logout">Logout</button>
+            </div>
+          </div>
+        </header>
+
+        <div class="tlive-page" id="tlive-main">
+          <div class="tlive-topbar">
+            <div>
+              <a id="tlive-back" class="tlive-back" href="teacher.html" data-i18n="tlive_back_calendar">← Teaching calendar</a>
+              <h1 id="tlive-session-title">Live Teaching</h1>
+              <p id="tlive-session-meta" class="tlive-topbar__meta">—</p>
+            </div>
+          </div>
+
+          <div class="tlive-body">
+            <nav class="tlive-toolbar" aria-label="Classroom tools">
+              <button type="button" class="tlive-tool tlive-tool--active" data-tool="slides" title="Slides">
+                <span class="tlive-tool__icon" aria-hidden="true">📑</span>
+                <span data-i18n="tlive_tool_slides">Slides</span>
+              </button>
+              <button type="button" class="tlive-tool" data-tool="upload" title="Upload">
+                <span class="tlive-tool__icon" aria-hidden="true">📤</span>
+                <span data-i18n="tlive_tool_upload">Upload</span>
+              </button>
+              <button type="button" class="tlive-tool" data-tool="poll" title="Poll">
+                <span class="tlive-tool__icon" aria-hidden="true">📊</span>
+                <span data-i18n="tlive_tool_poll">Poll</span>
+              </button>
+              <button type="button" class="tlive-tool" data-tool="quiz" title="Quiz">
+                <span class="tlive-tool__icon" aria-hidden="true">❓</span>
+                <span data-i18n="tlive_tool_quiz">Quiz</span>
+              </button>
+              <button type="button" class="tlive-tool" data-tool="games" title="Games">
+                <span class="tlive-tool__icon" aria-hidden="true">🎮</span>
+                <span data-i18n="tlive_tool_games">Games</span>
+              </button>
+              <button type="button" class="tlive-tool" data-tool="timer" title="Timer">
+                <span class="tlive-tool__icon" aria-hidden="true">⏱</span>
+                <span data-i18n="tlive_tool_timer">Timer</span>
+              </button>
+              <button type="button" class="tlive-tool" data-tool="ai" title="AI">
+                <span class="tlive-tool__icon" aria-hidden="true">✨</span>
+                <span data-i18n="tlive_tool_ai">AI</span>
+              </button>
+            </nav>
+
+            <div class="tlive-canvas-wrap">
+              <section class="tlive-canvas" aria-label="Teaching display">
+                <div id="tlive-canvas-inner" class="tlive-canvas__inner"></div>
+              </section>
+            </div>
+
+            <aside id="tlive-panel-right" class="tlive-panel-right hidden" aria-label="Student responses">
+              <div class="tlive-panel-right__head">
+                <span data-i18n="tlive_panel_responses">Student responses</span>
+                <button type="button" id="tlive-panel-close" class="btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem" aria-label="Close">×</button>
+              </div>
+              <div id="tlive-panel-body" class="tlive-panel-right__body"></div>
+            </aside>
+          </div>
+        </div>
+
+        <div id="tlive-games-modal" class="tlive-float hidden" role="dialog" aria-modal="true" aria-labelledby="tlive-games-title">
+          <div class="tlive-float__card">
+            <div class="tlive-float__head">
+              <h2 id="tlive-games-title" data-i18n="tlive_saved_games">Saved Games</h2>
+              <button type="button" id="tlive-games-close" class="tlive-float__close" aria-label="Close">×</button>
+            </div>
+            <ul id="tlive-games-list" class="tlive-game-list"></ul>
+            <p style="padding:0.75rem 1.25rem;font-size:0.75rem;color:#6e6e73" data-i18n="tlive_saved_games_hint">
+              Mock library — AI game builder coming later.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+    <script src="js/teacher-live-mock.js"></script>
+    <script src="js/teacher-live.js"></script>
+  </body>
+</html>

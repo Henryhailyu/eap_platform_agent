@@ -1,0 +1,359 @@
+/**
+ * Teacher Live Teaching Page (Phase L — mock)
+ * Theme reference: #0A4D68 from design brief
+ */
+
+.btn-self-study-link {
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.75rem;
+  margin-right: 0.35rem;
+  white-space: nowrap;
+}
+
+.tlive-page {
+  --tlive-primary: #0a4d68;
+  --tlive-primary-light: rgba(10, 77, 104, 0.08);
+  min-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  background: #f0f2f5;
+}
+
+.tlive-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.tlive-topbar h1 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--tlive-primary);
+  margin: 0;
+}
+
+.tlive-topbar__meta {
+  font-size: 0.8125rem;
+  color: #6e6e73;
+  margin: 0.15rem 0 0;
+}
+
+.tlive-back {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--tlive-primary);
+  text-decoration: none;
+}
+
+.tlive-back:hover {
+  text-decoration: underline;
+}
+
+.tlive-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tlive-toolbar {
+  width: 76px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0;
+  gap: 0.35rem;
+  overflow-y: auto;
+}
+
+.tlive-tool {
+  width: 58px;
+  min-height: 58px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #666;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.tlive-tool__icon {
+  font-size: 1.25rem;
+}
+
+.tlive-tool:hover {
+  background: var(--tlive-primary-light);
+  color: var(--tlive-primary);
+}
+
+.tlive-tool--active {
+  background: var(--tlive-primary);
+  color: #fff;
+  border-color: var(--tlive-primary);
+}
+
+.tlive-canvas-wrap {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.tlive-canvas {
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tlive-canvas__inner {
+  flex: 1;
+  padding: 1.5rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.tlive-canvas__inner--left {
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.tlive-panel-right {
+  width: 280px;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tlive-panel-right.hidden {
+  display: none;
+}
+
+.tlive-panel-right__head {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--tlive-primary);
+}
+
+.tlive-panel-right__body {
+  padding: 0.75rem 1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.tlive-float {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.tlive-float.hidden {
+  display: none;
+}
+
+.tlive-float__card {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.tlive-float__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.tlive-float__head h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--tlive-primary);
+}
+
+.tlive-float__close {
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #666;
+  line-height: 1;
+}
+
+.tlive-game-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0;
+}
+
+.tlive-game-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.85rem 1.25rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.tlive-game-item:hover {
+  background: var(--tlive-primary-light);
+}
+
+.tlive-game-item strong {
+  display: block;
+  color: var(--tlive-primary);
+}
+
+.tlive-game-item span {
+  font-size: 0.8125rem;
+  color: #6e6e73;
+}
+
+.tlive-board {
+  width: 100%;
+  max-width: 720px;
+}
+
+.tlive-board__teams {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.tlive-board__team {
+  padding: 1rem;
+  border-radius: 10px;
+  background: var(--tlive-primary-light);
+  text-align: center;
+}
+
+.tlive-board__team h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--tlive-primary);
+}
+
+.tlive-board__track {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tlive-board__fill {
+  height: 100%;
+  background: var(--tlive-primary);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.tlive-board__score {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 0.35rem;
+}
+
+.tlive-question-box {
+  padding: 1.25rem;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 77, 104, 0.2);
+  background: #fafbfc;
+  margin-bottom: 1rem;
+}
+
+.tlive-responses-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.tlive-responses-table th,
+.tlive-responses-table td {
+  padding: 0.5rem 0.65rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: left;
+}
+
+.tlive-responses-table th {
+  color: #6e6e73;
+  font-weight: 600;
+}
+
+.tlive-disclaimer {
+  font-size: 0.75rem;
+  color: #6e6e73;
+  margin-top: 1rem;
+}
+
+@media (max-width: 900px) {
+  .tlive-panel-right {
+    position: fixed;
+    right: 0;
+    top: 60px;
+    bottom: 0;
+    z-index: 50;
+    margin: 0;
+    border-radius: 12px 0 0 12px;
+  }
+
+  .tlive-board__teams {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .tlive-toolbar {
+    width: 56px;
+  }
+
+  .tlive-tool {
+    width: 48px;
+    min-height: 48px;
+    font-size: 0.5625rem;
+  }
+}
