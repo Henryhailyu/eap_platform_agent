@@ -743,7 +743,637 @@ body.tlive-modal-open {
   font-size: 0.8125rem;
 }
 
+/* L17 — Treasure Hunt */
+.tlive-treasure-path {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 40rem;
+  width: 100%;
+}
+
+.tlive-treasure-clue {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 77, 104, 0.15);
+  background: #fff;
+}
+
+.tlive-treasure-clue--locked {
+  opacity: 0.72;
+  background: #f5f5f7;
+}
+
+.tlive-treasure-clue--open {
+  border-color: rgba(10, 126, 164, 0.35);
+  box-shadow: 0 2px 8px rgba(10, 126, 164, 0.08);
+}
+
+.tlive-treasure-clue__badge {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--tlive-primary);
+  min-width: 3.5rem;
+}
+
+.tlive-treasure-clue__text {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: #1d1d1f;
+}
+
+.tlive-treasure-chest {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 2px dashed rgba(10, 77, 104, 0.25);
+  background: rgba(255, 149, 0, 0.06);
+  margin-bottom: 1rem;
+  max-width: 40rem;
+}
+
+.tlive-treasure-chest--open {
+  border-style: solid;
+  border-color: rgba(255, 149, 0, 0.5);
+  background: rgba(255, 149, 0, 0.12);
+}
+
+.tlive-treasure-chest__icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.tlive-treasure-chest__label {
+  margin: 0;
+  font-weight: 600;
+  color: var(--tlive-primary);
+}
+
+.tlive-treasure-manual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  align-items: center;
+}
+
+.tlive-treasure-key-btn {
+  font-size: 0.8125rem;
+}
+
+/* L18 — Escape Room */
+.tlive-escape-password {
+  margin-bottom: 1rem;
+  max-width: 40rem;
+}
+
+.tlive-escape-password__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--tlive-primary);
+}
+
+.tlive-escape-password__slots {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tlive-escape-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 2.5rem;
+  padding: 0 0.5rem;
+  border-radius: 8px;
+  border: 2px solid rgba(10, 77, 104, 0.2);
+  background: #f5f5f7;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #6e6e73;
+}
+
+.tlive-escape-slot--open {
+  border-color: rgba(10, 126, 164, 0.45);
+  background: #fff;
+  color: var(--tlive-primary);
+}
+
+.tlive-escape-path {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 40rem;
+  width: 100%;
+}
+
+.tlive-escape-task {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 77, 104, 0.15);
+  background: #fff;
+}
+
+.tlive-escape-task--locked {
+  opacity: 0.78;
+  background: #f5f5f7;
+}
+
+.tlive-escape-task--done {
+  border-color: rgba(88, 86, 214, 0.35);
+  box-shadow: 0 2px 8px rgba(88, 86, 214, 0.08);
+}
+
+.tlive-escape-task__badge {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #5856d6;
+  min-width: 5.5rem;
+}
+
+.tlive-escape-task__text {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.tlive-escape-door {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 2px dashed rgba(88, 86, 214, 0.3);
+  background: rgba(88, 86, 214, 0.06);
+  margin-bottom: 1rem;
+  max-width: 40rem;
+}
+
+.tlive-escape-door--open {
+  border-style: solid;
+  border-color: rgba(88, 86, 214, 0.5);
+  background: rgba(88, 86, 214, 0.1);
+}
+
+.tlive-escape-door__icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.tlive-escape-door__label {
+  margin: 0;
+  font-weight: 600;
+  color: #5856d6;
+}
+
+.tlive-escape-manual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  align-items: center;
+}
+
+.tlive-escape-task-btn {
+  font-size: 0.8125rem;
+}
+
+/* L19 — Word Ladder */
+.tlive-ladder-family {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--tlive-primary);
+}
+
+.tlive-ladder-viz {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 28rem;
+  width: 100%;
+}
+
+.tlive-ladder-rung {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(10, 77, 104, 0.12);
+  background: #fff;
+}
+
+.tlive-ladder-rung--top {
+  border-color: rgba(52, 199, 89, 0.4);
+  background: rgba(52, 199, 89, 0.08);
+}
+
+.tlive-ladder-rung__num {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6e6e73;
+  text-align: center;
+}
+
+.tlive-ladder-rung__word {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: #1d1d1f;
+}
+
+.tlive-ladder-rung__teams {
+  display: flex;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tlive-ladder-team {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.tlive-ladder-manual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.tlive-ladder-climb-btn {
+  font-size: 0.8125rem;
+}
+
+.tlive-ladder-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.tlive-ladder-switch--active {
+  outline: 2px solid var(--tlive-primary);
+  outline-offset: 1px;
+}
+
+/* L20 — Sentence Builder */
+.tlive-sentence-puzzle {
+  margin-bottom: 1rem;
+  max-width: 44rem;
+  width: 100%;
+}
+
+.tlive-sentence-puzzle__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: var(--tlive-primary);
+}
+
+.tlive-sentence-puzzle__prompt {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: #6e6e73;
+  line-height: 1.45;
+}
+
+.tlive-sentence-chunks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.tlive-sentence-chunk {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(10, 77, 104, 0.2);
+  background: #fff;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  max-width: 100%;
+}
+
+.tlive-sentence-chunk__n {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: var(--tlive-primary);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tlive-sentence-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+  font-style: italic;
+}
+
+.tlive-sentence-answer {
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 199, 89, 0.35);
+  background: rgba(52, 199, 89, 0.08);
+}
+
+.tlive-sentence-answer__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #248a3d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tlive-sentence-answer__text {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: #1d1d1f;
+}
+
+.tlive-sentence-manual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  align-items: center;
+}
+
+.tlive-sentence-pt-btn {
+  font-size: 0.8125rem;
+}
+
+/* L21 — Argument Sorting */
+.tlive-argument-puzzle {
+  margin-bottom: 1rem;
+  max-width: 52rem;
+  width: 100%;
+}
+
+.tlive-argument-puzzle__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: var(--tlive-primary);
+}
+
+.tlive-argument-puzzle__prompt {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: #6e6e73;
+  line-height: 1.45;
+}
+
+.tlive-argument-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.tlive-argument-slots__heading,
+.tlive-argument-pool__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6e6e73;
+}
+
+.tlive-argument-slots ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tlive-argument-slot {
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px dashed rgba(10, 77, 104, 0.25);
+  background: #fafbfc;
+}
+
+.tlive-argument-slot--filled {
+  border-style: solid;
+  border-color: rgba(10, 126, 164, 0.35);
+  background: #fff;
+}
+
+.tlive-argument-slot__role {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--tlive-primary);
+  margin-bottom: 0.2rem;
+}
+
+.tlive-argument-slot__text {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #1d1d1f;
+}
+
+.tlive-argument-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.tlive-argument-card {
+  display: grid;
+  grid-template-columns: 1.5rem auto 1fr;
+  gap: 0.4rem;
+  align-items: start;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.tlive-argument-card__n {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: #5856d6;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tlive-argument-card__role {
+  font-weight: 700;
+  color: #5856d6;
+  font-size: 0.7rem;
+}
+
+.tlive-argument-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+  font-style: italic;
+}
+
+.tlive-argument-manual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  align-items: center;
+}
+
+.tlive-argument-pt-btn {
+  font-size: 0.8125rem;
+}
+
+/* L22 — Summary Mission */
+.tlive-summary-mission {
+  margin-bottom: 1rem;
+  max-width: 44rem;
+  width: 100%;
+}
+
+.tlive-summary-mission__title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--tlive-primary);
+}
+
+.tlive-summary-passage {
+  margin: 0 0 0.85rem;
+  padding: 0.85rem 1rem;
+  border-left: 3px solid var(--tlive-primary);
+  background: #fafbfc;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #1d1d1f;
+}
+
+.tlive-summary-steps {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tlive-summary-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  background: #f5f5f7;
+  color: #6e6e73;
+}
+
+.tlive-summary-step--current {
+  background: rgba(10, 126, 164, 0.1);
+  color: var(--tlive-primary);
+  font-weight: 600;
+}
+
+.tlive-summary-step--done {
+  background: rgba(52, 199, 89, 0.1);
+  color: #248a3d;
+}
+
+.tlive-summary-step__icon {
+  width: 1.25rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.tlive-summary-current-task {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.tlive-summary-final {
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(52, 199, 89, 0.35);
+  background: rgba(52, 199, 89, 0.08);
+  margin-top: 0.5rem;
+}
+
+.tlive-summary-final__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #248a3d;
+}
+
+.tlive-summary-final__text {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.tlive-summary-manual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  align-items: center;
+}
+
+.tlive-summary-step-btn {
+  font-size: 0.8125rem;
+}
+
 @media (max-width: 700px) {
+  .tlive-argument-layout {
+    grid-template-columns: 1fr;
+  }
+
   .tlive-match-board {
     grid-template-columns: 1fr;
   }
