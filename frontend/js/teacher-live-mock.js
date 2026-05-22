@@ -13,6 +13,10 @@
     "sentence-builder",
     "argument-sorting",
     "summary-mission",
+    "memory-card",
+    "hot-seat",
+    "debate-cards",
+    "ranking-challenge",
   ]);
 
   const SAVED_GAMES = [
@@ -95,6 +99,38 @@
       descEn: "Complete six summary steps — first team to finish the mission wins",
       descZh: "完成六步摘要任务 — 率先完成的小组获胜",
       type: "summary_mission",
+    },
+    {
+      id: "memory-card",
+      nameEn: "Memory Card Game",
+      nameZh: "记忆翻牌",
+      descEn: "Flip two cards — match word and definition to score",
+      descZh: "翻开两张牌 — 配对词汇与释义得分",
+      type: "memory_card",
+    },
+    {
+      id: "hot-seat",
+      nameEn: "Hot Seat",
+      nameZh: "热座猜词",
+      descEn: "Explain the word in English — the hot-seat team guesses",
+      descZh: "用英语描述词汇 — 热座小组猜词得分",
+      type: "hot_seat",
+    },
+    {
+      id: "debate-cards",
+      nameEn: "Debate Cards",
+      nameZh: "辩论卡",
+      descEn: "Draw claim, evidence & question cards — teams build a mini-debate",
+      descZh: "抽取主张、论据与提问卡 — 小组进行迷你辩论",
+      type: "debate_cards",
+    },
+    {
+      id: "ranking-challenge",
+      nameEn: "Ranking Challenge",
+      nameZh: "排序挑战",
+      descEn: "Rank items in the correct order — reveal the answer and score teams",
+      descZh: "将条目按正确顺序排列 — 揭晓答案并为小组计分",
+      type: "ranking_challenge",
     },
   ];
 
@@ -1935,6 +1971,1104 @@
       </div>`;
   }
 
+  const MEMORY_WIN_PAIRS = 6;
+
+  const DEBATE_CARD_TYPES = [
+    { key: "claim", labelEn: "Claim", labelZh: "主张", icon: "📌" },
+    { key: "evidence", labelEn: "Evidence", labelZh: "论据", icon: "📊" },
+    { key: "counter", labelEn: "Counterargument", labelZh: "反驳", icon: "⚡" },
+    { key: "example", labelEn: "Example", labelZh: "例证", icon: "💡" },
+    { key: "question", labelEn: "Question", labelZh: "提问", icon: "❓" },
+  ];
+
+  const DEBATE_TOPICS = [
+    {
+      id: "dt1",
+      titleEn: "AI literacy in EAP",
+      titleZh: "EAP 中的 AI 素养",
+      motionEn: "Universities should require explicit AI-literacy modules in first-year EAP.",
+      motionZh: "高校应在一年级 EAP 中设置明确的 AI 素养模块。",
+      cards: [
+        {
+          type: "claim",
+          textEn: "Students need guided practice to use generative AI without compromising academic integrity.",
+          textZh: "学生需要引导性练习，才能在不影响学术诚信的前提下使用生成式 AI。",
+        },
+        {
+          type: "evidence",
+          textEn: "A 2024 faculty survey reported that 41% of drafts showed unclear AI attribution.",
+          textZh: "2024 年一项教师调查显示，41% 的草稿存在 AI 引用不清的问题。",
+        },
+        {
+          type: "example",
+          textEn: "One cohort labelled AI-assisted paraphrases in appendices after week 5 training.",
+          textZh: "某班在第 5 周培训后，于附录中标注了 AI 辅助的转述内容。",
+        },
+        {
+          type: "counter",
+          textEn: "Mandatory modules may reduce time for core writing and reading skills.",
+          textZh: "必修模块可能挤占核心写作与阅读技能的时间。",
+        },
+        {
+          type: "question",
+          textEn: "How would you define “acceptable use” of AI in a take-home essay?",
+          textZh: "你会如何界定课外论文中 AI 的“可接受使用”？",
+        },
+        {
+          type: "claim",
+          textEn: "Transparent AI policies help international students navigate unfamiliar assessment norms.",
+          textZh: "透明的 AI 政策有助于国际学生理解陌生的评估规范。",
+        },
+        {
+          type: "evidence",
+          textEn: "Institutions with published AI rubrics saw fewer plagiarism hearings in pilot faculties.",
+          textZh: "公布 AI 评分细则的院校，在试点院系中减少了抄袭听证次数。",
+        },
+        {
+          type: "question",
+          textEn: "What safeguard would you add before allowing AI for brainstorming only?",
+          textZh: "若仅允许 AI 用于头脑风暴，你会增加什么保障措施？",
+        },
+        {
+          type: "counter",
+          textEn: "Rapid tool change makes fixed syllabi outdated within one term.",
+          textZh: "工具更新迅速，固定教学大纲可能一个学期就会过时。",
+        },
+        {
+          type: "example",
+          textEn: "Peer review worksheets asked students to flag AI-generated topic sentences.",
+          textZh: "同伴互评表要求学生标出 AI 生成的主题句。",
+        },
+      ],
+    },
+    {
+      id: "dt2",
+      titleEn: "Blended vs online writing",
+      titleZh: "混合式与在线写作教学",
+      motionEn: "Blended EAP classes support academic writing better than fully online formats.",
+      motionZh: "混合式 EAP 课堂比纯在线形式更有利于学术写作。",
+      cards: [
+        {
+          type: "claim",
+          textEn: "Synchronous feedback on thesis statements is harder to replicate asynchronously.",
+          textZh: "针对主旨句的同步反馈难以在异步环境中复制。",
+        },
+        {
+          type: "evidence",
+          textEn: "Hybrid groups scored 12% higher on structure rubrics in a semester pilot.",
+          textZh: "试点数据显示混合班在结构评分表上高出 12%。",
+        },
+        {
+          type: "example",
+          textEn: "Group B reorganised body paragraphs after a live writing clinic in week 8.",
+          textZh: "第 8 周，B 组在现场写作辅导后重组了主体段。",
+        },
+        {
+          type: "counter",
+          textEn: "Online modules offer flexibility for students with employment commitments.",
+          textZh: "在线模块为有工作的学生提供了灵活性。",
+        },
+        {
+          type: "question",
+          textEn: "Which element of blended learning would you keep if the budget were cut?",
+          textZh: "若预算削减，你会保留混合教学的哪一要素？",
+        },
+        {
+          type: "claim",
+          textEn: "Live discussion develops hedging language more effectively than forum posts.",
+          textZh: "现场讨论比论坛帖子更有效地培养模糊限制语。",
+        },
+        {
+          type: "evidence",
+          textEn: "Attendance in optional online workshops dropped below 30% after mid-term.",
+          textZh: "期中后，可选在线工作坊出席率降至 30% 以下。",
+        },
+        {
+          type: "question",
+          textEn: "How could you redesign one online task to increase peer interaction?",
+          textZh: "你会如何重新设计一项在线任务以提高同伴互动？",
+        },
+        {
+          type: "counter",
+          textEn: "Recorded lectures can be replayed, which benefits revision for exams.",
+          textZh: "录播讲座可反复观看，有利于考前复习。",
+        },
+        {
+          type: "example",
+          textEn: "Teams used breakout rooms to compare counterarguments before the seminar.",
+          textZh: "小组在研讨课前用分组讨论室比较反驳观点。",
+        },
+      ],
+    },
+  ];
+
+  const DEBATE_WIN_TARGET = 5;
+  const DEBATE_TOPIC_COUNT = DEBATE_TOPICS.length;
+
+  function debateTypeMeta(typeKey) {
+    return DEBATE_CARD_TYPES.find((t) => t.key === typeKey) || DEBATE_CARD_TYPES[0];
+  }
+
+  function debateTypeLabel(meta) {
+    return isZh() ? meta.labelZh : meta.labelEn;
+  }
+
+  function debateCardText(card) {
+    return isZh() ? card.textZh : card.textEn;
+  }
+
+  function debateTopicTitle(topic) {
+    return isZh() ? topic.titleZh : topic.titleEn;
+  }
+
+  function debateTopicMotion(topic) {
+    return isZh() ? topic.motionZh : topic.motionEn;
+  }
+
+  function getDebateTopic(state) {
+    return DEBATE_TOPICS[state.topicIndex % DEBATE_TOPIC_COUNT];
+  }
+
+  function buildDebateDeck(topic) {
+    return shuffleArr(
+      topic.cards.map((c, i) => ({
+        id: `${topic.id}-c${i}`,
+        type: c.type,
+        textEn: c.textEn,
+        textZh: c.textZh,
+      })),
+    );
+  }
+
+  function createDebateCardsState(topicIndex) {
+    const topic = DEBATE_TOPICS[topicIndex || 0];
+    return {
+      topicIndex: topicIndex || 0,
+      deck: buildDebateDeck(topic),
+      deckPos: 0,
+      currentCard: null,
+      activeTeamId: "A",
+      scores: { A: 0, B: 0, C: 0, D: 0 },
+      cardsPlayed: 0,
+      questionIndex: 0,
+      round: 1,
+      winnerId: null,
+      winTarget: DEBATE_WIN_TARGET,
+      teams: LIVE_TEAMS.map((x) => ({ ...x })),
+      lastEvent: null,
+    };
+  }
+
+  function setDebateActiveTeam(state, teamId) {
+    return { ...state, activeTeamId: teamId, lastEvent: null };
+  }
+
+  function drawDebateCard(state) {
+    if (state.winnerId) return state;
+    if (state.deckPos >= state.deck.length) {
+      return { ...state, lastEvent: { type: "empty" } };
+    }
+    const card = state.deck[state.deckPos];
+    const team = LIVE_TEAMS.find((t) => t.id === state.activeTeamId);
+    return {
+      ...state,
+      currentCard: card,
+      deckPos: state.deckPos + 1,
+      cardsPlayed: state.cardsPlayed + 1,
+      lastEvent: {
+        type: "draw",
+        teamId: state.activeTeamId,
+        cardType: card.type,
+        team: team ? teamName(team) : state.activeTeamId,
+      },
+    };
+  }
+
+  function discardDebateCard(state) {
+    return { ...state, currentCard: null, lastEvent: { type: "discard" } };
+  }
+
+  function awardDebatePoint(state, teamId, points) {
+    const next = { ...state, scores: { ...state.scores }, lastEvent: null };
+    if (next.winnerId) return next;
+    const add = points || 1;
+    next.scores[teamId] = (next.scores[teamId] || 0) + add;
+    next.lastEvent = { type: "point", teamId, points: add };
+    if (next.scores[teamId] >= next.winTarget) next.winnerId = teamId;
+    return next;
+  }
+
+  function nextDebateTopic(state) {
+    const nextIndex = (state.topicIndex + 1) % DEBATE_TOPIC_COUNT;
+    const topic = DEBATE_TOPICS[nextIndex];
+    return {
+      ...createDebateCardsState(nextIndex),
+      scores: { ...state.scores },
+      winnerId: state.winnerId,
+      round: state.round + 1,
+      lastEvent: { type: "topic", index: nextIndex, title: debateTopicTitle(topic) },
+    };
+  }
+
+  function processDebateResponses(state, question) {
+    let next = { ...state, scores: { ...state.scores } };
+    if (next.winnerId) return next;
+
+    const rows = simulateResponses(question);
+    const perTeam = {};
+    rows.forEach((r) => {
+      if (r.correct) perTeam[r.teamId] = (perTeam[r.teamId] || 0) + 1;
+    });
+
+    Object.keys(perTeam).forEach((teamId) => {
+      const count = perTeam[teamId] || 0;
+      for (let i = 0; i < count; i += 1) {
+        next = awardDebatePoint(next, teamId, 1);
+      }
+    });
+
+    next.lastEvent = { type: "batch", perTeam };
+    return next;
+  }
+
+  function getDebateRanking(state) {
+    return LIVE_TEAMS.map((team) => ({
+      ...team,
+      score: state.scores[team.id] || 0,
+    })).sort((a, b) => b.score - a.score);
+  }
+
+  function formatDebateEvent(state, tFn) {
+    const ev = state.lastEvent;
+    if (!ev) return "";
+    if (ev.type === "draw") {
+      const meta = debateTypeMeta(ev.cardType);
+      return tFn("tlive_debate_drawn", {
+        team: ev.team || ev.teamId,
+        type: debateTypeLabel(meta),
+      });
+    }
+    if (ev.type === "discard") return tFn("tlive_debate_discarded");
+    if (ev.type === "empty") return tFn("tlive_debate_deck_empty");
+    if (ev.type === "point") {
+      const team = LIVE_TEAMS.find((x) => x.id === ev.teamId);
+      return tFn("tlive_debate_point", {
+        team: team ? teamName(team) : ev.teamId,
+        pts: String(ev.points),
+      });
+    }
+    if (ev.type === "topic") return tFn("tlive_debate_next_topic", { title: ev.title || "" });
+    if (ev.type === "batch" && ev.perTeam) {
+      const parts = Object.keys(ev.perTeam).map((id) => {
+        const team = LIVE_TEAMS.find((x) => x.id === id);
+        return tFn("tlive_debate_batch", {
+          team: team ? teamName(team) : id,
+          pts: String(ev.perTeam[id]),
+        });
+      });
+      return parts.length ? parts.join(" · ") : tFn("tlive_board_no_correct");
+    }
+    return "";
+  }
+
+  function renderDebateCardsMarkup(state, tFn) {
+    const topic = getDebateTopic(state);
+    const remaining = Math.max(0, state.deck.length - state.deckPos);
+    const meta = state.currentCard ? debateTypeMeta(state.currentCard.type) : null;
+
+    const teamBtns = LIVE_TEAMS.map(
+      (team) =>
+        `<button type="button" class="btn-secondary tlive-debate-team-btn ${state.activeTeamId === team.id ? "tlive-debate-team-btn--active" : ""}" data-debate-team="${team.id}" style="border-color:${team.color}">${escapeHtmlTreasure(teamName(team))}${state.activeTeamId === team.id ? ` · ${escapeHtmlTreasure(tFn("tlive_debate_turn"))}` : ""}</button>`,
+    ).join("");
+
+    const awardBtns = LIVE_TEAMS.map(
+      (team) =>
+        `<button type="button" class="btn-secondary tlive-debate-pt-btn" data-debate-pt="${team.id}" ${state.winnerId || !state.currentCard ? "disabled" : ""} style="border-color:${team.color}">+1 ${escapeHtmlTreasure(teamName(team))}</button>`,
+    ).join("");
+
+    const legend = DEBATE_CARD_TYPES.map(
+      (t) =>
+        `<span class="tlive-debate-legend__item tlive-debate-legend__item--${t.key}"><span aria-hidden="true">${t.icon}</span> ${escapeHtmlTreasure(debateTypeLabel(t))}</span>`,
+    ).join("");
+
+    const cardBlock = state.currentCard
+      ? `<div class="tlive-debate-card tlive-debate-card--${state.currentCard.type}">
+          <span class="tlive-debate-card__type">${escapeHtmlTreasure(debateTypeLabel(meta))}</span>
+          <p class="tlive-debate-card__text">${escapeHtmlTreasure(debateCardText(state.currentCard))}</p>
+        </div>`
+      : `<div class="tlive-debate-card tlive-debate-card--empty">
+          <p class="tlive-debate-card__prompt">${escapeHtmlTreasure(tFn("tlive_debate_no_card"))}</p>
+        </div>`;
+
+    const topicNum = (state.topicIndex % DEBATE_TOPIC_COUNT) + 1;
+
+    return `<div class="tlive-debate-play">
+      <p class="tlive-debate-help">${escapeHtmlTreasure(tFn("tlive_debate_help"))}</p>
+      <p class="tlive-debate-stats">${escapeHtmlTreasure(tFn("tlive_debate_topic_n", { n: String(topicNum), total: String(DEBATE_TOPIC_COUNT) }))} · ${escapeHtmlTreasure(tFn("tlive_debate_deck_left", { n: String(remaining) }))}</p>
+      <div class="tlive-debate-motion">
+        <p class="tlive-debate-motion__label">${escapeHtmlTreasure(tFn("tlive_debate_motion"))}</p>
+        <p class="tlive-debate-motion__text">${escapeHtmlTreasure(debateTopicMotion(topic))}</p>
+      </div>
+      <div class="tlive-debate-legend">${legend}</div>
+      <div class="tlive-debate-teams">${teamBtns}</div>
+      ${cardBlock}
+      <div class="tlive-debate-manual">
+        <button type="button" class="btn-primary" id="tlive-debate-draw" ${state.winnerId || remaining === 0 ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_debate_draw_btn"))}</button>
+        <button type="button" class="btn-secondary" id="tlive-debate-discard" ${!state.currentCard || state.winnerId ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_debate_discard_btn"))}</button>
+        <button type="button" class="btn-secondary" id="tlive-debate-next-topic" ${state.winnerId ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_debate_next_topic_btn"))}</button>
+      </div>
+      <p class="tlive-debate-award-label">${escapeHtmlTreasure(tFn("tlive_debate_award_label"))}</p>
+      <div class="tlive-debate-points">${awardBtns}</div>
+    </div>`;
+  }
+
+  const RANKING_SETS = [
+    {
+      id: "rk1",
+      kindEn: "Process steps",
+      kindZh: "流程步骤",
+      titleEn: "Stages of a short research project",
+      titleZh: "短期研究项目阶段",
+      promptEn: "Teams discuss the correct order from first to last. Reveal when ready.",
+      promptZh: "小组讨论从先到后的正确顺序。准备好后揭晓答案。",
+      items: [
+        {
+          rank: 1,
+          textEn: "Choose a focused research question and search strategy.",
+          textZh: "确定聚焦的研究问题与检索策略。",
+        },
+        {
+          rank: 2,
+          textEn: "Read and annotate key sources; note gaps in the literature.",
+          textZh: "阅读并标注关键文献；记录研究空白。",
+        },
+        {
+          rank: 3,
+          textEn: "Draft an outline with claim, reasons, and evidence slots.",
+          textZh: "起草含主张、理由与论据槽位的大纲。",
+        },
+        {
+          rank: 4,
+          textEn: "Write the first draft with in-text citations.",
+          textZh: "撰写初稿并加入文内引用。",
+        },
+        {
+          rank: 5,
+          textEn: "Revise for structure, hedging, and reference list accuracy.",
+          textZh: "修改结构、模糊限制语与参考文献准确性。",
+        },
+      ],
+    },
+    {
+      id: "rk2",
+      kindEn: "Paragraph order",
+      kindZh: "段落顺序",
+      titleEn: "Body paragraph moves in an essay",
+      titleZh: "论文主体段落的展开顺序",
+      promptEn: "Rank these moves from opening the paragraph to closing it.",
+      promptZh: "将这些段落展开步骤从段首到段尾排序。",
+      items: [
+        {
+          rank: 1,
+          textEn: "Topic sentence states the paragraph’s main claim.",
+          textZh: "主题句陈述该段主要主张。",
+        },
+        {
+          rank: 2,
+          textEn: "Explain or define key terms the reader needs.",
+          textZh: "解释或界定读者需要的关键术语。",
+        },
+        {
+          rank: 3,
+          textEn: "Present evidence (data, citation, or example).",
+          textZh: "呈现论据（数据、引用或例证）。",
+        },
+        {
+          rank: 4,
+          textEn: "Link back to the thesis and preview the next point.",
+          textZh: "回扣论文主旨并引出下一点。",
+        },
+      ],
+    },
+    {
+      id: "rk3",
+      kindEn: "Importance ranking",
+      kindZh: "重要性排序",
+      titleEn: "Factors when choosing a study design",
+      titleZh: "选择研究设计时的考量因素",
+      promptEn: "Rank from most important to least important for a first-year EAP cohort.",
+      promptZh: "针对一年级 EAP 班级，按从最重要到最不重要排序。",
+      items: [
+        {
+          rank: 1,
+          textEn: "Ethical approval and participant consent procedures.",
+          textZh: "伦理审批与参与者知情同意程序。",
+        },
+        {
+          rank: 2,
+          textEn: "Alignment between research question and method.",
+          textZh: "研究问题与方法的一致性。",
+        },
+        {
+          rank: 3,
+          textEn: "Feasibility within the term timeline and resources.",
+          textZh: "学期时间与资源范围内的可行性。",
+        },
+        {
+          rank: 4,
+          textEn: "Potential for generalisation beyond the sample.",
+          textZh: "样本结果向更大范围推广的可能性。",
+        },
+        {
+          rank: 5,
+          textEn: "Novelty compared with prior studies in the field.",
+          textZh: "相对领域内已有研究的新颖性。",
+        },
+      ],
+    },
+  ];
+
+  const RANKING_WIN_TARGET = 4;
+  const RANKING_SET_COUNT = RANKING_SETS.length;
+
+  function getRankingSet(state) {
+    return RANKING_SETS[state.setIndex % RANKING_SET_COUNT];
+  }
+
+  function rankingSetTitle(set) {
+    return isZh() ? set.titleZh : set.titleEn;
+  }
+
+  function rankingSetKind(set) {
+    return isZh() ? set.kindZh : set.kindEn;
+  }
+
+  function rankingSetPrompt(set) {
+    return isZh() ? set.promptZh : set.promptEn;
+  }
+
+  function rankingItemText(item) {
+    return isZh() ? item.textZh : item.textEn;
+  }
+
+  function buildRankingDisplayOrder(itemCount) {
+    const order = [];
+    for (let i = 0; i < itemCount; i += 1) order.push(i);
+    return shuffleArr(order);
+  }
+
+  function createRankingChallengeState(setIndex) {
+    const set = RANKING_SETS[setIndex || 0];
+    return {
+      setIndex: setIndex || 0,
+      displayOrder: buildRankingDisplayOrder(set.items.length),
+      orderRevealed: false,
+      scores: { A: 0, B: 0, C: 0, D: 0 },
+      questionIndex: 0,
+      round: 1,
+      winnerId: null,
+      winTarget: RANKING_WIN_TARGET,
+      teams: LIVE_TEAMS.map((x) => ({ ...x })),
+      lastEvent: null,
+    };
+  }
+
+  function revealRankingOrder(state) {
+    return { ...state, orderRevealed: true, lastEvent: { type: "reveal" } };
+  }
+
+  function nextRankingSet(state) {
+    const nextIndex = (state.setIndex + 1) % RANKING_SET_COUNT;
+    const set = RANKING_SETS[nextIndex];
+    return {
+      ...createRankingChallengeState(nextIndex),
+      scores: { ...state.scores },
+      winnerId: state.winnerId,
+      round: state.round + 1,
+      lastEvent: { type: "next", index: nextIndex, title: rankingSetTitle(set) },
+    };
+  }
+
+  function reshuffleRankingDisplay(state) {
+    const set = getRankingSet(state);
+    return {
+      ...state,
+      displayOrder: buildRankingDisplayOrder(set.items.length),
+      orderRevealed: false,
+      lastEvent: { type: "shuffle" },
+    };
+  }
+
+  function awardRankingPoint(state, teamId, points) {
+    const next = { ...state, scores: { ...state.scores }, lastEvent: null };
+    if (next.winnerId) return next;
+    const add = points || 1;
+    next.scores[teamId] = (next.scores[teamId] || 0) + add;
+    next.lastEvent = { type: "point", teamId, points: add };
+    if (next.scores[teamId] >= next.winTarget) next.winnerId = teamId;
+    return next;
+  }
+
+  function processRankingResponses(state, question) {
+    let next = { ...state, scores: { ...state.scores } };
+    if (next.winnerId) return next;
+
+    const rows = simulateResponses(question);
+    const perTeam = {};
+    rows.forEach((r) => {
+      if (r.correct) perTeam[r.teamId] = (perTeam[r.teamId] || 0) + 1;
+    });
+
+    Object.keys(perTeam).forEach((teamId) => {
+      const count = perTeam[teamId] || 0;
+      for (let i = 0; i < count; i += 1) {
+        next = awardRankingPoint(next, teamId, 1);
+      }
+    });
+
+    next.lastEvent = { type: "batch", perTeam };
+    if (Object.keys(perTeam).length) next = revealRankingOrder(next);
+    return next;
+  }
+
+  function getRankChallengeRanking(state) {
+    return LIVE_TEAMS.map((team) => ({
+      ...team,
+      score: state.scores[team.id] || 0,
+    })).sort((a, b) => b.score - a.score);
+  }
+
+  function formatRankingEvent(state, tFn) {
+    const ev = state.lastEvent;
+    if (!ev) return "";
+    if (ev.type === "reveal") return tFn("tlive_ranking_revealed");
+    if (ev.type === "shuffle") return tFn("tlive_ranking_shuffled");
+    if (ev.type === "next") return tFn("tlive_ranking_next_set", { title: ev.title || "" });
+    if (ev.type === "point") {
+      const team = LIVE_TEAMS.find((x) => x.id === ev.teamId);
+      return tFn("tlive_ranking_point", {
+        team: team ? teamName(team) : ev.teamId,
+        pts: String(ev.points),
+      });
+    }
+    if (ev.type === "batch" && ev.perTeam) {
+      const parts = Object.keys(ev.perTeam).map((id) => {
+        const team = LIVE_TEAMS.find((x) => x.id === id);
+        return tFn("tlive_ranking_batch", {
+          team: team ? teamName(team) : id,
+          pts: String(ev.perTeam[id]),
+        });
+      });
+      return parts.length ? parts.join(" · ") : tFn("tlive_board_no_correct");
+    }
+    return "";
+  }
+
+  function renderRankingChallengeMarkup(state, tFn) {
+    const set = getRankingSet(state);
+    const items = set.items;
+    const labels = "ABCDEFGHIJ".split("");
+
+    const shuffledList = state.displayOrder
+      .map((itemIdx, pos) => {
+        const item = items[itemIdx];
+        const label = labels[pos] || String(pos + 1);
+        return `<li class="tlive-ranking-item">
+          <span class="tlive-ranking-item__label">${escapeHtmlTreasure(label)}</span>
+          <p class="tlive-ranking-item__text">${escapeHtmlTreasure(rankingItemText(item))}</p>
+        </li>`;
+      })
+      .join("");
+
+    const correctList = [...items]
+      .sort((a, b) => a.rank - b.rank)
+      .map(
+        (item) =>
+          `<li class="tlive-ranking-answer__row">
+            <span class="tlive-ranking-answer__n">${item.rank}</span>
+            <span class="tlive-ranking-answer__text">${escapeHtmlTreasure(rankingItemText(item))}</span>
+          </li>`,
+      )
+      .join("");
+
+    const answerBlock = state.orderRevealed
+      ? `<div class="tlive-ranking-answer" role="status">
+          <p class="tlive-ranking-answer__heading">${escapeHtmlTreasure(tFn("tlive_ranking_correct"))}</p>
+          <ol class="tlive-ranking-answer__list">${correctList}</ol>
+        </div>`
+      : `<p class="tlive-ranking-hidden">${escapeHtmlTreasure(tFn("tlive_ranking_hidden"))}</p>`;
+
+    const awardBtns = LIVE_TEAMS.map(
+      (team) =>
+        `<button type="button" class="btn-secondary tlive-ranking-pt-btn" data-ranking-pt="${team.id}" ${state.winnerId || !state.orderRevealed ? "disabled" : ""} style="border-color:${team.color}">+1 ${escapeHtmlTreasure(teamName(team))}</button>`,
+    ).join("");
+
+    const setNum = (state.setIndex % RANKING_SET_COUNT) + 1;
+
+    return `<div class="tlive-ranking-play">
+      <p class="tlive-ranking-help">${escapeHtmlTreasure(tFn("tlive_ranking_help"))}</p>
+      <p class="tlive-ranking-stats">${escapeHtmlTreasure(tFn("tlive_ranking_set_n", { n: String(setNum), total: String(RANKING_SET_COUNT) }))} · ${escapeHtmlTreasure(rankingSetKind(set))}</p>
+      <h3 class="tlive-ranking-title">${escapeHtmlTreasure(rankingSetTitle(set))}</h3>
+      <p class="tlive-ranking-prompt">${escapeHtmlTreasure(rankingSetPrompt(set))}</p>
+      <p class="tlive-ranking-shuffle-label">${escapeHtmlTreasure(tFn("tlive_ranking_shown"))}</p>
+      <ol class="tlive-ranking-list">${shuffledList}</ol>
+      ${answerBlock}
+      <div class="tlive-ranking-manual">
+        <button type="button" class="btn-primary" id="tlive-ranking-reveal" ${state.orderRevealed || state.winnerId ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_ranking_reveal_btn"))}</button>
+        <button type="button" class="btn-secondary" id="tlive-ranking-shuffle" ${state.winnerId ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_ranking_shuffle_btn"))}</button>
+        <button type="button" class="btn-secondary" id="tlive-ranking-next-set" ${state.winnerId ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_ranking_next_set_btn"))}</button>
+      </div>
+      <p class="tlive-ranking-award-label">${escapeHtmlTreasure(tFn("tlive_ranking_award_label"))}</p>
+      <div class="tlive-ranking-points">${awardBtns}</div>
+    </div>`;
+  }
+
+  const HOT_SEAT_WORDS = [
+    {
+      id: "hs1",
+      wordEn: "hypothesis",
+      wordZh: "hypothesis",
+      clueEn: "A testable explanation you can check with evidence.",
+      clueZh: "可用证据检验的解释。",
+      forbiddenEn: ["hypothesis", "theory", "guess"],
+      forbiddenZh: ["hypothesis", "理论", "猜测"],
+    },
+    {
+      id: "hs2",
+      wordEn: "mitigate",
+      wordZh: "mitigate",
+      clueEn: "To make a problem or risk less serious.",
+      clueZh: "使问题或风险变得不那么严重。",
+      forbiddenEn: ["mitigate", "reduce", "lessen"],
+      forbiddenZh: ["mitigate", "减少", "减轻"],
+    },
+    {
+      id: "hs3",
+      wordEn: "framework",
+      wordZh: "framework",
+      clueEn: "A structure that organises ideas or research.",
+      clueZh: "组织观点或研究的结构。",
+      forbiddenEn: ["framework", "structure", "model"],
+      forbiddenZh: ["framework", "结构", "模型"],
+    },
+    {
+      id: "hs4",
+      wordEn: "implication",
+      wordZh: "implication",
+      clueEn: "A possible consequence or meaning that follows from something.",
+      clueZh: "由某事引出的可能影响或含义。",
+      forbiddenEn: ["implication", "consequence", "meaning"],
+      forbiddenZh: ["implication", "后果", "含义"],
+    },
+    {
+      id: "hs5",
+      wordEn: "coherent",
+      wordZh: "coherent",
+      clueEn: "Logical and easy to follow from start to finish.",
+      clueZh: "从头到尾逻辑清楚、易于理解。",
+      forbiddenEn: ["coherent", "logical", "clear"],
+      forbiddenZh: ["coherent", "逻辑", "清楚"],
+    },
+    {
+      id: "hs6",
+      wordEn: "collocation",
+      wordZh: "collocation",
+      clueEn: "Words that naturally appear together in academic English.",
+      clueZh: "学术英语中常一起出现的词语搭配。",
+      forbiddenEn: ["collocation", "phrase", "combination"],
+      forbiddenZh: ["collocation", "短语", "组合"],
+    },
+    {
+      id: "hs7",
+      wordEn: "subsequently",
+      wordZh: "subsequently",
+      clueEn: "Happening after something else in time or order.",
+      clueZh: "在时间上或顺序上发生在另一件事之后。",
+      forbiddenEn: ["subsequently", "after", "then"],
+      forbiddenZh: ["subsequently", "之后", "然后"],
+    },
+    {
+      id: "hs8",
+      wordEn: "significant",
+      wordZh: "significant",
+      clueEn: "Large or important enough to matter in your analysis.",
+      clueZh: "足够大或重要，值得在分析中讨论。",
+      forbiddenEn: ["significant", "important", "major"],
+      forbiddenZh: ["significant", "重要", "主要"],
+    },
+  ];
+
+  const HOT_SEAT_WIN_TARGET = 5;
+
+  function hotSeatWordEntry(state) {
+    return HOT_SEAT_WORDS[state.wordIndex % HOT_SEAT_WORDS.length];
+  }
+
+  function hotSeatWordText(entry) {
+    return isZh() ? entry.wordZh : entry.wordEn;
+  }
+
+  function hotSeatClueText(entry) {
+    return isZh() ? entry.clueZh : entry.clueEn;
+  }
+
+  function hotSeatForbidden(entry) {
+    return isZh() ? entry.forbiddenZh : entry.forbiddenEn;
+  }
+
+  function createHotSeatState() {
+    return {
+      wordIndex: 0,
+      hotSeatTeamId: "A",
+      wordRevealed: false,
+      scores: { A: 0, B: 0, C: 0, D: 0 },
+      questionIndex: 0,
+      round: 1,
+      winnerId: null,
+      winTarget: HOT_SEAT_WIN_TARGET,
+      teams: LIVE_TEAMS.map((x) => ({ ...x })),
+      lastEvent: null,
+      timerSec: 60,
+    };
+  }
+
+  function setHotSeatTeam(state, teamId) {
+    return { ...state, hotSeatTeamId: teamId, lastEvent: null };
+  }
+
+  function revealHotSeatWord(state) {
+    return { ...state, wordRevealed: true, lastEvent: { type: "reveal" } };
+  }
+
+  function hideHotSeatWord(state) {
+    return { ...state, wordRevealed: false, lastEvent: null };
+  }
+
+  function nextHotSeatWord(state) {
+    const next = {
+      ...state,
+      wordIndex: (state.wordIndex + 1) % HOT_SEAT_WORDS.length,
+      wordRevealed: false,
+      round: state.round + 1,
+      lastEvent: { type: "next" },
+    };
+    return next;
+  }
+
+  function awardHotSeatGuess(state, teamId) {
+    const next = { ...state, scores: { ...state.scores }, lastEvent: null };
+    if (next.winnerId || teamId === next.hotSeatTeamId) return next;
+    const add = 1;
+    next.scores[teamId] = (next.scores[teamId] || 0) + add;
+    next.lastEvent = { type: "guess", teamId };
+    if (next.scores[teamId] >= next.winTarget) next.winnerId = teamId;
+    return next;
+  }
+
+  function processHotSeatResponses(state, question) {
+    let next = { ...state, scores: { ...state.scores } };
+    if (next.winnerId) return next;
+
+    const rows = simulateResponses(question);
+    const perTeam = {};
+    rows.forEach((r) => {
+      if (r.correct && r.teamId !== next.hotSeatTeamId) {
+        perTeam[r.teamId] = (perTeam[r.teamId] || 0) + 1;
+      }
+    });
+
+    Object.keys(perTeam).forEach((teamId) => {
+      const count = perTeam[teamId] || 0;
+      for (let i = 0; i < count; i += 1) {
+        next = awardHotSeatGuess(next, teamId);
+      }
+    });
+
+    next.lastEvent = { type: "batch", perTeam };
+    return next;
+  }
+
+  function getHotSeatRanking(state) {
+    return LIVE_TEAMS.map((team) => ({
+      ...team,
+      score: state.scores[team.id] || 0,
+    })).sort((a, b) => b.score - a.score);
+  }
+
+  function formatHotSeatEvent(state, tFn) {
+    const ev = state.lastEvent;
+    if (!ev) return "";
+    if (ev.type === "reveal") return tFn("tlive_hotseat_revealed");
+    if (ev.type === "next") return tFn("tlive_hotseat_next_word");
+    if (ev.type === "guess") {
+      const team = LIVE_TEAMS.find((x) => x.id === ev.teamId);
+      return tFn("tlive_hotseat_guess", { team: team ? teamName(team) : ev.teamId });
+    }
+    if (ev.type === "batch" && ev.perTeam) {
+      const parts = Object.keys(ev.perTeam).map((id) => {
+        const team = LIVE_TEAMS.find((x) => x.id === id);
+        return tFn("tlive_hotseat_batch", {
+          team: team ? teamName(team) : id,
+          pts: String(ev.perTeam[id]),
+        });
+      });
+      return parts.length ? parts.join(" · ") : tFn("tlive_board_no_correct");
+    }
+    return "";
+  }
+
+  function renderHotSeatMarkup(state, tFn) {
+    const entry = hotSeatWordEntry(state);
+    const hotTeam = LIVE_TEAMS.find((t) => t.id === state.hotSeatTeamId);
+    const wordLabel = state.wordRevealed
+      ? escapeHtmlTreasure(hotSeatWordText(entry))
+      : escapeHtmlTreasure(tFn("tlive_hotseat_hidden"));
+    const forbidden = hotSeatForbidden(entry)
+      .map((w) => `<span class="tlive-hotseat-forbidden__tag">${escapeHtmlTreasure(w)}</span>`)
+      .join("");
+
+    const teamBtns = LIVE_TEAMS.map(
+      (team) =>
+        `<button type="button" class="btn-secondary tlive-hotseat-team-btn ${state.hotSeatTeamId === team.id ? "tlive-hotseat-team-btn--hot" : ""}" data-hotseat-team="${team.id}" style="border-color:${team.color}">${escapeHtmlTreasure(teamName(team))}${state.hotSeatTeamId === team.id ? ` · ${escapeHtmlTreasure(tFn("tlive_hotseat_on_seat"))}` : ""}</button>`,
+    ).join("");
+
+    const awardBtns = LIVE_TEAMS.filter((team) => team.id !== state.hotSeatTeamId)
+      .map(
+        (team) =>
+          `<button type="button" class="btn-secondary tlive-hotseat-guess-btn" data-hotseat-guess="${team.id}" ${state.winnerId ? "disabled" : ""} style="border-color:${team.color}">+1 ${escapeHtmlTreasure(teamName(team))}</button>`,
+      )
+      .join("");
+
+    const progress = tFn("tlive_hotseat_word_progress", {
+      n: String(state.wordIndex + 1),
+      total: String(HOT_SEAT_WORDS.length),
+    });
+
+    return `<div class="tlive-hotseat-play">
+      <p class="tlive-hotseat-help">${escapeHtmlTreasure(tFn("tlive_hotseat_help"))}</p>
+      <p class="tlive-hotseat-stats">${escapeHtmlTreasure(progress)} · ${escapeHtmlTreasure(tFn("tlive_hotseat_timer", { sec: String(state.timerSec) }))}</p>
+      <div class="tlive-hotseat-teams">${teamBtns}</div>
+      <div class="tlive-hotseat-word ${state.wordRevealed ? "tlive-hotseat-word--revealed" : ""}" role="status">
+        <p class="tlive-hotseat-word__label">${escapeHtmlTreasure(tFn("tlive_hotseat_target"))}</p>
+        <p class="tlive-hotseat-word__text">${wordLabel}</p>
+        ${hotTeam ? `<p class="tlive-hotseat-word__seat">${escapeHtmlTreasure(tFn("tlive_hotseat_seat_team", { team: teamName(hotTeam) }))}</p>` : ""}
+      </div>
+      <div class="tlive-hotseat-clue">
+        <p class="tlive-hotseat-clue__label">${escapeHtmlTreasure(tFn("tlive_hotseat_clue"))}</p>
+        <p class="tlive-hotseat-clue__text">${escapeHtmlTreasure(hotSeatClueText(entry))}</p>
+      </div>
+      <div class="tlive-hotseat-forbidden">
+        <p class="tlive-hotseat-forbidden__label">${escapeHtmlTreasure(tFn("tlive_hotseat_forbidden"))}</p>
+        <div class="tlive-hotseat-forbidden__tags">${forbidden}</div>
+      </div>
+      <div class="tlive-hotseat-manual">
+        <button type="button" class="btn-primary" id="tlive-hotseat-reveal" ${state.wordRevealed || state.winnerId ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_hotseat_reveal_btn"))}</button>
+        <button type="button" class="btn-secondary" id="tlive-hotseat-hide" ${!state.wordRevealed || state.winnerId ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_hotseat_hide_btn"))}</button>
+        <button type="button" class="btn-secondary" id="tlive-hotseat-next-word" ${state.winnerId ? "disabled" : ""}>${escapeHtmlTreasure(tFn("tlive_hotseat_next_word_btn"))}</button>
+      </div>
+      <p class="tlive-hotseat-award-label">${escapeHtmlTreasure(tFn("tlive_hotseat_award_label"))}</p>
+      <div class="tlive-hotseat-guesses">${awardBtns}</div>
+    </div>`;
+  }
+
+  function memoryCardText(card) {
+    return isZh() ? card.textZh : card.textEn;
+  }
+
+  function buildMemoryDeck() {
+    const raw = [];
+    MATCHING_PAIRS.forEach((p) => {
+      raw.push({ pairId: p.id, side: "term", textEn: p.term, textZh: p.term });
+      raw.push({ pairId: p.id, side: "def", textEn: p.defEn, textZh: p.defZh });
+    });
+    return shuffleArr(
+      raw.map((r, i) => ({
+        id: `mem-${i}`,
+        pairId: r.pairId,
+        side: r.side,
+        textEn: r.textEn,
+        textZh: r.textZh,
+        faceUp: false,
+        matched: false,
+        matchedBy: null,
+      })),
+    );
+  }
+
+  function createMemoryCardState() {
+    return {
+      cards: buildMemoryDeck(),
+      selectedTeam: "A",
+      scores: { A: 0, B: 0, C: 0, D: 0 },
+      questionIndex: 0,
+      round: 1,
+      winnerId: null,
+      winTarget: MEMORY_WIN_PAIRS,
+      teams: LIVE_TEAMS.map((x) => ({ ...x })),
+      lastEvent: null,
+    };
+  }
+
+  function memoryOpenCount(cards) {
+    return cards.filter((c) => c.faceUp && !c.matched).length;
+  }
+
+  function tryMemoryCardFlip(state, cardIndex) {
+    const cards = state.cards.map((c) => ({ ...c }));
+    const card = cards[cardIndex];
+    if (!card || card.matched || state.winnerId) {
+      return { state, ok: false };
+    }
+
+    const open = memoryOpenCount(cards);
+    if (open >= 2 && !card.faceUp) {
+      return { state, ok: false };
+    }
+
+    if (card.faceUp) {
+      card.faceUp = false;
+      return {
+        state: { ...state, cards, lastEvent: { type: "hide" } },
+        ok: true,
+      };
+    }
+
+    card.faceUp = true;
+    const openNow = cards.filter((c) => c.faceUp && !c.matched);
+
+    if (openNow.length < 2) {
+      return {
+        state: { ...state, cards, lastEvent: { type: "flip" } },
+        ok: true,
+      };
+    }
+
+    const [a, b] = openNow;
+    if (a.pairId === b.pairId && a.id !== b.id) {
+      a.matched = true;
+      b.matched = true;
+      a.matchedBy = state.selectedTeam;
+      b.matchedBy = state.selectedTeam;
+      const scores = { ...state.scores };
+      scores[state.selectedTeam] = (scores[state.selectedTeam] || 0) + 1;
+      let winnerId = state.winnerId;
+      if (scores[state.selectedTeam] >= state.winTarget) winnerId = state.selectedTeam;
+      return {
+        state: {
+          ...state,
+          cards,
+          scores,
+          winnerId,
+          lastEvent: { type: "match", teamId: state.selectedTeam },
+        },
+        ok: true,
+        matched: true,
+      };
+    }
+
+    openNow.forEach((c) => {
+      c.faceUp = false;
+    });
+    return {
+      state: { ...state, cards, lastEvent: { type: "miss" } },
+      ok: true,
+    };
+  }
+
+  function awardMemoryPair(state, teamId, pairs) {
+    const next = { ...state, scores: { ...state.scores }, lastEvent: null };
+    if (next.winnerId) return next;
+    const add = pairs || 1;
+    next.scores[teamId] = (next.scores[teamId] || 0) + add;
+    next.lastEvent = { type: "award", teamId, pairs: add };
+    if (next.scores[teamId] >= next.winTarget) next.winnerId = teamId;
+    return next;
+  }
+
+  function processMemoryResponses(state, question) {
+    let next = { ...state, scores: { ...state.scores } };
+    if (next.winnerId) return next;
+
+    const rows = simulateResponses(question);
+    const perTeam = {};
+    rows.forEach((r) => {
+      if (r.correct) perTeam[r.teamId] = (perTeam[r.teamId] || 0) + 1;
+    });
+
+    Object.keys(perTeam).forEach((teamId) => {
+      next = awardMemoryPair(next, teamId, perTeam[teamId]);
+    });
+
+    next.lastEvent = { type: "batch", perTeam };
+    return next;
+  }
+
+  function getMemoryRanking(state) {
+    return LIVE_TEAMS.map((team) => ({
+      ...team,
+      score: state.scores[team.id] || 0,
+    })).sort((a, b) => b.score - a.score);
+  }
+
+  function formatMemoryEvent(state, tFn) {
+    const ev = state.lastEvent;
+    if (!ev) return "";
+    if (ev.type === "match") {
+      const team = LIVE_TEAMS.find((x) => x.id === ev.teamId);
+      return tFn("tlive_memory_match", { team: team ? teamName(team) : ev.teamId });
+    }
+    if (ev.type === "miss") return tFn("tlive_memory_miss");
+    if (ev.type === "award") {
+      const team = LIVE_TEAMS.find((x) => x.id === ev.teamId);
+      return tFn("tlive_memory_award", { team: team ? teamName(team) : ev.teamId });
+    }
+    if (ev.type === "batch" && ev.perTeam) {
+      const parts = Object.keys(ev.perTeam).map((id) => {
+        const team = LIVE_TEAMS.find((x) => x.id === id);
+        return tFn("tlive_memory_batch", {
+          team: team ? teamName(team) : id,
+          pairs: String(ev.perTeam[id]),
+        });
+      });
+      return parts.length ? parts.join(" · ") : tFn("tlive_board_no_correct");
+    }
+    return "";
+  }
+
+  function renderMemoryCardMarkup(state, tFn) {
+    const cells = state.cards
+      .map((card, i) => {
+        const show = card.matched || card.faceUp;
+        const team = card.matchedBy ? LIVE_TEAMS.find((t) => t.id === card.matchedBy) : null;
+        const label = show
+          ? escapeHtmlTreasure(memoryCardText(card))
+          : "?";
+        const sideLabel =
+          card.side === "term"
+            ? tFn("tlive_memory_term")
+            : tFn("tlive_memory_def");
+        return `<button type="button" class="tlive-memory-card ${card.matched ? "tlive-memory-card--matched" : ""} ${card.faceUp && !card.matched ? "tlive-memory-card--open" : ""}" data-memory-card="${i}" ${card.matched || state.winnerId ? "disabled" : ""} style="${team && card.matched ? `border-color:${team.color}` : ""}">
+          <span class="tlive-memory-card__side">${show ? escapeHtmlTreasure(sideLabel) : ""}</span>
+          <span class="tlive-memory-card__text">${label}</span>
+        </button>`;
+      })
+      .join("");
+
+    const teamBtns = LIVE_TEAMS.map(
+      (team) =>
+        `<button type="button" class="btn-secondary tlive-memory-team-btn ${state.selectedTeam === team.id ? "tlive-memory-team-btn--active" : ""}" data-memory-team="${team.id}" style="border-color:${team.color}">${escapeHtmlTreasure(teamName(team))}</button>`,
+    ).join("");
+
+    const matched = state.cards.filter((c) => c.matched).length / 2;
+
+    return `<div class="tlive-memory-play">
+      <p class="tlive-memory-help">${escapeHtmlTreasure(tFn("tlive_memory_help"))}</p>
+      <p class="tlive-memory-stats">${escapeHtmlTreasure(tFn("tlive_memory_pairs_found", { n: String(matched), total: String(MATCHING_PAIRS.length) }))}</p>
+      <div class="tlive-memory-teams">${teamBtns}</div>
+      <div class="tlive-memory-grid">${cells}</div>
+    </div>`;
+  }
+
   function formatQuizEvent(state, tFn) {
     const ev = state.lastEvent;
     if (!ev) return "";
@@ -2091,5 +3225,58 @@
     getSummaryRanking,
     formatSummaryEvent,
     renderSummaryMissionMarkup,
+    MEMORY_WIN_PAIRS,
+    createMemoryCardState,
+    tryMemoryCardFlip,
+    awardMemoryPair,
+    processMemoryResponses,
+    getMemoryRanking,
+    formatMemoryEvent,
+    renderMemoryCardMarkup,
+    memoryCardText,
+    DEBATE_CARD_TYPES,
+    DEBATE_TOPICS,
+    DEBATE_WIN_TARGET,
+    DEBATE_TOPIC_COUNT,
+    createDebateCardsState,
+    getDebateTopic,
+    debateTopicTitle,
+    debateTopicMotion,
+    setDebateActiveTeam,
+    drawDebateCard,
+    discardDebateCard,
+    awardDebatePoint,
+    nextDebateTopic,
+    processDebateResponses,
+    getDebateRanking,
+    formatDebateEvent,
+    renderDebateCardsMarkup,
+    RANKING_SETS,
+    RANKING_WIN_TARGET,
+    RANKING_SET_COUNT,
+    createRankingChallengeState,
+    getRankingSet,
+    rankingSetTitle,
+    revealRankingOrder,
+    nextRankingSet,
+    reshuffleRankingDisplay,
+    awardRankingPoint,
+    processRankingResponses,
+    getRankChallengeRanking,
+    formatRankingEvent,
+    renderRankingChallengeMarkup,
+    HOT_SEAT_WORDS,
+    HOT_SEAT_WIN_TARGET,
+    createHotSeatState,
+    hotSeatWordEntry,
+    setHotSeatTeam,
+    revealHotSeatWord,
+    hideHotSeatWord,
+    nextHotSeatWord,
+    awardHotSeatGuess,
+    processHotSeatResponses,
+    getHotSeatRanking,
+    formatHotSeatEvent,
+    renderHotSeatMarkup,
   };
 })(typeof window !== "undefined" ? window : globalThis);

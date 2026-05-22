@@ -16,10 +16,10 @@
     { id: "sentence-builder", nameEn: "Sentence Builder", nameZh: "句子构建", type: "sentence_builder", icon: "🧩" },
     { id: "argument-sorting", nameEn: "Argument Sorting", nameZh: "论证排序", type: "argument_sorting", icon: "📋" },
     { id: "summary-mission", nameEn: "Summary Mission", nameZh: "摘要任务", type: "summary_mission", icon: "📝" },
-    { id: "memory-card", nameEn: "Memory Card Game", nameZh: "记忆翻牌", type: "placeholder", icon: "🃏" },
-    { id: "hot-seat", nameEn: "Hot Seat", nameZh: "热座猜词", type: "placeholder", icon: "💺" },
-    { id: "debate-cards", nameEn: "Debate Cards", nameZh: "辩论卡", type: "placeholder", icon: "🗣" },
-    { id: "ranking-challenge", nameEn: "Ranking Challenge", nameZh: "排序挑战", type: "placeholder", icon: "📊" },
+    { id: "memory-card", nameEn: "Memory Card Game", nameZh: "记忆翻牌", type: "memory_card", icon: "🃏" },
+    { id: "hot-seat", nameEn: "Hot Seat", nameZh: "热座猜词", type: "hot_seat", icon: "💺" },
+    { id: "debate-cards", nameEn: "Debate Cards", nameZh: "辩论卡", type: "debate_cards", icon: "🗣" },
+    { id: "ranking-challenge", nameEn: "Ranking Challenge", nameZh: "排序挑战", type: "ranking_challenge", icon: "📊" },
     { id: "spin-wheel", nameEn: "Spin Wheel", nameZh: "转盘", type: "placeholder", icon: "🎡" },
   ];
 
