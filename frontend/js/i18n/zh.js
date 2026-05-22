@@ -478,7 +478,7 @@ window.EAP_STRINGS_ZH = {
   "tlive_tool_ai": "AI",
   "tlive_tool_soon": "该工具将在后续阶段推出。",
   "tlive_saved_games": "已保存游戏",
-  "tlive_games_canvas_lead": "选择要在课堂展示区运行的游戏。演示中棋盘竞赛可完整互动。",
+  "tlive_games_canvas_lead": "点击游戏在此展示区运行。您保存的游戏可删除。演示中棋盘竞赛可完整互动。",
   "tlive_saved_games_hint": "内置演示 + 在游戏生成器中保存的活动（本会话）。",
   "tlive_open_builder": "打开游戏生成器",
   "tlive_board_race_title": "棋盘竞赛（演示）",
@@ -519,5 +519,9 @@ window.EAP_STRINGS_ZH = {
   "tgb_preview_title": "预览并保存",
   "tgb_regenerate": "重新生成",
   "tgb_save": "保存到库",
-  "tgb_saved_ok": "已保存 — 打开现场教学 → 游戏 即可在课堂上使用。"
+  "tgb_saved_btn": "已保存",
+  "tgb_saved_ok": "已保存 — 打开现场教学 → 游戏 即可在课堂上使用。",
+  "tlive_delete_game": "删除",
+  "tlive_delete_confirm": "从库中移除此已保存游戏？",
+  "tlive_game_deleted": "已从库中移除该游戏。"
 };

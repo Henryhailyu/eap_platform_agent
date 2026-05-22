@@ -2,6 +2,8 @@
  * Teacher Live Teaching — mock games & student responses (Phase L).
  */
 (function (global) {
+  const BUILTIN_GAME_IDS = new Set(["board-race", "vocab-bingo", "matching-race"]);
+
   const SAVED_GAMES = [
     {
       id: "board-race",
@@ -116,6 +118,25 @@
     }
   }
 
+  function writeCustomSavedGames(games) {
+    try {
+      sessionStorage.setItem("eap_teacher_saved_games", JSON.stringify(games));
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function isCustomGame(game) {
+    return !!(game && game.id && !BUILTIN_GAME_IDS.has(game.id));
+  }
+
+  function deleteCustomGame(gameId) {
+    if (!gameId || BUILTIN_GAME_IDS.has(gameId)) return false;
+    const next = readCustomSavedGames().filter((g) => g.id !== gameId);
+    writeCustomSavedGames(next);
+    return true;
+  }
+
   /** Built-in demos + games saved from Game Builder (sessionStorage). */
   function allSavedGames() {
     const custom = readCustomSavedGames();
@@ -138,5 +159,8 @@
     scoreBoardTeam,
     simulateResponses,
     allSavedGames,
+    isCustomGame,
+    deleteCustomGame,
+    BUILTIN_GAME_IDS,
   };
 })(typeof window !== "undefined" ? window : globalThis);

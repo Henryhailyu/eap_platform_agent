@@ -478,7 +478,7 @@ window.EAP_STRINGS_EN = {
   "tlive_tool_ai": "AI",
   "tlive_tool_soon": "This tool is coming in a later phase.",
   "tlive_saved_games": "Saved Games",
-  "tlive_games_canvas_lead": "Choose a game to run in the classroom display. Board Race is fully interactive in this demo.",
+  "tlive_games_canvas_lead": "Click a game to run it in this display. Use Delete on your own saved games. Board Race is fully interactive in this demo.",
   "tlive_saved_games_hint": "Built-in demos plus games you save in Game Builder (this browser session).",
   "tlive_open_builder": "Open Game Builder",
   "tlive_board_race_title": "Board Race (demo)",
@@ -519,5 +519,9 @@ window.EAP_STRINGS_EN = {
   "tgb_preview_title": "Preview & save",
   "tgb_regenerate": "Regenerate",
   "tgb_save": "Save to library",
-  "tgb_saved_ok": "Saved — open Live Teaching → Games to use it in class."
+  "tgb_saved_btn": "Saved",
+  "tgb_saved_ok": "Saved — open Live Teaching → Games to use it in class.",
+  "tlive_delete_game": "Delete",
+  "tlive_delete_confirm": "Remove this saved game from your library?",
+  "tlive_game_deleted": "Game removed from library."
 };

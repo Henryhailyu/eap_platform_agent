@@ -59,6 +59,22 @@
     return game;
   }
 
+  function deleteCustomGame(gameId) {
+    const live = global.EAP_TEACHER_LIVE_MOCK;
+    if (live && typeof live.deleteCustomGame === "function") {
+      return live.deleteCustomGame(gameId);
+    }
+    const next = readCustomGames().filter((g) => g.id !== gameId);
+    writeCustomGames(next);
+    return true;
+  }
+
+  function isCustomGame(game) {
+    const live = global.EAP_TEACHER_LIVE_MOCK;
+    if (live && typeof live.isCustomGame === "function") return live.isCustomGame(game);
+    return !!(game && game.id);
+  }
+
   function mockGeneratePreview(templateId, topic, className) {
     const tpl = GAME_TEMPLATES.find((t) => t.id === templateId) || GAME_TEMPLATES[0];
     const zh = isZh();
@@ -120,6 +136,7 @@
       className: draft.className,
       previewHtml: draft.previewHtml,
       savedAt: new Date().toISOString(),
+      custom: true,
     };
   }
 
@@ -129,6 +146,8 @@
     tplLabel,
     readCustomGames,
     saveCustomGame,
+    deleteCustomGame,
+    isCustomGame,
     mockGeneratePreview,
     buildGameFromDraft,
   };

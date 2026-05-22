@@ -519,8 +519,55 @@
   background: #fff;
 }
 
-.tlive-games-panel__item {
+.tlive-games-panel__row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.tlive-games-panel__row:last-child {
+  border-bottom: none;
+}
+
+.tlive-games-panel__row .tlive-games-panel__item {
+  flex: 1;
   border-radius: 0;
+  border-bottom: none;
+}
+
+.tlive-game-delete {
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.65rem;
+  color: #b42318;
+  border-color: rgba(180, 35, 24, 0.35);
+}
+
+.tlive-game-delete:hover {
+  background: rgba(180, 35, 24, 0.08);
+}
+
+.tlive-games-toast,
+.tlive-game-list-toast {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--tlive-primary);
+  margin: 0 0 0.75rem;
+}
+
+.tlive-games-toast.hidden,
+.tlive-game-list-toast.hidden {
+  display: none;
+}
+
+.tgb-save-btn--saved {
+  background: #6e6e73 !important;
+  border-color: #6e6e73 !important;
+  cursor: default;
+  opacity: 0.95;
 }
 
 .tlive-games-panel__actions {

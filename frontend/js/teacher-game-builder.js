@@ -32,6 +32,23 @@
 
   let selectedTemplateId = null;
   let currentPreviewHtml = "";
+  let lastSavedGameId = null;
+
+  function setSaveButtonState(saved) {
+    const btn = document.getElementById("tgb-save");
+    if (!btn) return;
+    if (saved) {
+      btn.textContent = t("tgb_saved_btn");
+      btn.disabled = true;
+      btn.setAttribute("aria-disabled", "true");
+      btn.classList.add("tgb-save-btn--saved");
+    } else {
+      btn.textContent = t("tgb_save");
+      btn.disabled = false;
+      btn.removeAttribute("aria-disabled");
+      btn.classList.remove("tgb-save-btn--saved");
+    }
+  }
 
   function showStep(step) {
     ["templates", "design", "preview"].forEach((s) => {
@@ -78,6 +95,10 @@
     currentPreviewHtml = MOCK.mockGeneratePreview(selectedTemplateId, topic, className);
     const box = document.getElementById("tgb-preview-box");
     if (box) box.innerHTML = currentPreviewHtml;
+    lastSavedGameId = null;
+    setSaveButtonState(false);
+    const msg = document.getElementById("tgb-save-msg");
+    if (msg) msg.classList.add("hidden");
     showStep("preview");
   }
 
@@ -93,6 +114,8 @@
       previewHtml: currentPreviewHtml,
     });
     MOCK.saveCustomGame(game);
+    lastSavedGameId = game.id;
+    setSaveButtonState(true);
     const msg = document.getElementById("tgb-save-msg");
     if (msg) {
       msg.textContent = t("tgb_saved_ok");
