@@ -571,6 +571,177 @@ body.tlive-modal-open {
   width: 100%;
 }
 
+/* L15 — Vocabulary Bingo */
+.tlive-bingo-clue {
+  padding: 1rem 1.15rem;
+  border-radius: 10px;
+  background: var(--tlive-primary-light);
+  border: 1px solid rgba(10, 77, 104, 0.15);
+  margin-bottom: 0.75rem;
+}
+
+.tlive-bingo-clue__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--tlive-primary);
+}
+
+.tlive-bingo-clue__text {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.tlive-bingo-clue__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+}
+
+.tlive-bingo-teams,
+.tlive-team-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tlive-team-pick {
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 2px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  cursor: pointer;
+}
+
+.tlive-team-pick--active {
+  border-color: var(--team-color, var(--tlive-primary));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--team-color, #0a4d68) 25%, transparent);
+  font-weight: 600;
+}
+
+.tlive-bingo-help {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+}
+
+.tlive-bingo-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+  max-width: 32rem;
+  margin: 0 auto 1rem;
+}
+
+.tlive-bingo-cell {
+  aspect-ratio: 1;
+  min-height: 3.5rem;
+  padding: 0.35rem;
+  border-radius: 8px;
+  border: 1px solid rgba(10, 77, 104, 0.2);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.tlive-bingo-cell--free {
+  background: rgba(10, 126, 164, 0.12);
+  font-weight: 600;
+}
+
+.tlive-bingo-cell__term {
+  font-weight: 600;
+  word-break: break-word;
+  text-align: center;
+}
+
+.tlive-bingo-cell__marks {
+  display: flex;
+  gap: 0.15rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tlive-bingo-mark {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* L15 — Matching Race */
+.tlive-match-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  max-width: 52rem;
+  width: 100%;
+  margin: 0 auto 1rem;
+}
+
+.tlive-match-col h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--tlive-primary);
+}
+
+.tlive-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tlive-match-item {
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.tlive-match-item--def {
+  font-size: 0.8125rem;
+}
+
+.tlive-match-item--selected {
+  outline: 2px solid var(--tlive-primary);
+  outline-offset: 1px;
+}
+
+.tlive-match-item--done {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.tlive-match-item__team {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 700px) {
+  .tlive-match-board {
+    grid-template-columns: 1fr;
+  }
+
+  .tlive-bingo-grid {
+    max-width: 100%;
+  }
+}
+
 .tlive-question-box {
   padding: 1.25rem;
   border-radius: 10px;

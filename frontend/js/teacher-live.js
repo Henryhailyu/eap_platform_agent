@@ -276,6 +276,186 @@
     document.getElementById("tlive-responses-modal-close")?.focus();
   }
 
+  function clearLiveGameState() {
+    window.__tliveBoard = null;
+    window.__tliveBingo = null;
+    window.__tliveMatching = null;
+    window.__tliveQuestionIndex = 0;
+  }
+
+  function renderVocabBingo(state) {
+    const MOCK = getMock();
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!MOCK || !canvas) return;
+
+    const clue = MOCK.bingoClue(state);
+    const cell = clue.cell;
+    const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
+
+    const teamBtns = state.teams
+      .map(
+        (team) =>
+          `<button type="button" class="tlive-team-pick${state.selectedTeam === team.id ? " tlive-team-pick--active" : ""}" data-team-pick="${team.id}" style="--team-color:${team.color}">${escapeHtml(MOCK.teamName(team))}</button>`,
+      )
+      .join("");
+
+    const grid = state.cells
+      .map((c) => {
+        const marks = state.teams
+          .filter((team) => c.marks[team.id])
+          .map((team) => `<span class="tlive-bingo-mark" style="background:${team.color}"></span>`)
+          .join("");
+        const label = c.free ? t("tlive_bingo_free") : c.term;
+        return `<button type="button" class="tlive-bingo-cell${c.free ? " tlive-bingo-cell--free" : ""}" data-bingo-cell="${c.index}" ${state.winnerId ? "disabled" : ""}>
+          <span class="tlive-bingo-cell__term">${escapeHtml(label)}</span>
+          <span class="tlive-bingo-cell__marks">${marks}</span>
+        </button>`;
+      })
+      .join("");
+
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--board";
+    canvas.innerHTML = `
+      <div class="tlive-board tlive-bingo">
+        <header class="tlive-board__head">
+          <h2 class="tlive-board__title">${escapeHtml(t("tlive_bingo_title"))}</h2>
+        </header>
+        ${winner ? `<div class="tlive-board-winner" role="status">${escapeHtml(t("tlive_board_winner", { team: MOCK.teamName(winner) }))}</div>` : ""}
+        <div class="tlive-bingo-clue">
+          <p class="tlive-bingo-clue__label">${escapeHtml(t("tlive_bingo_clue"))} (${clue.index + 1}/${clue.total})</p>
+          <p class="tlive-bingo-clue__text">${escapeHtml(MOCK.termDef(cell))}</p>
+          <p class="tlive-bingo-clue__hint">${escapeHtml(t("tlive_bingo_term_hint", { term: cell.term }))}</p>
+        </div>
+        <div class="tlive-bingo-teams">${teamBtns}</div>
+        <p class="tlive-bingo-help">${escapeHtml(t("tlive_bingo_help"))}</p>
+        <div class="tlive-bingo-grid" role="grid">${grid}</div>
+        <div class="tlive-board__controls">
+          <button type="button" class="btn-secondary" id="tlive-bingo-next-clue">${escapeHtml(t("tlive_bingo_next_clue"))}</button>
+          <button type="button" class="btn-secondary" id="tlive-bingo-reset">${escapeHtml(t("tlive_board_reset"))}</button>
+        </div>
+        <p class="tlive-disclaimer">${escapeHtml(t("tlive_mock_disclaimer"))}</p>
+      </div>
+    `;
+
+    canvas.querySelectorAll("[data-team-pick]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        window.__tliveBingo = { ...window.__tliveBingo, selectedTeam: btn.getAttribute("data-team-pick") };
+        renderVocabBingo(window.__tliveBingo);
+      });
+    });
+
+    canvas.querySelectorAll("[data-bingo-cell]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = parseInt(btn.getAttribute("data-bingo-cell"), 10);
+        window.__tliveBingo = MOCK.markBingoCell(window.__tliveBingo, idx, window.__tliveBingo.selectedTeam);
+        renderVocabBingo(window.__tliveBingo);
+      });
+    });
+
+    document.getElementById("tlive-bingo-next-clue")?.addEventListener("click", () => {
+      window.__tliveBingo = MOCK.advanceBingoClue(window.__tliveBingo);
+      renderVocabBingo(window.__tliveBingo);
+    });
+
+    document.getElementById("tlive-bingo-reset")?.addEventListener("click", () => {
+      if (!window.confirm(t("tlive_board_reset_confirm"))) return;
+      window.__tliveBingo = MOCK.createBingoState();
+      renderVocabBingo(window.__tliveBingo);
+    });
+  }
+
+  function renderMatchingRace(state) {
+    const MOCK = getMock();
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!MOCK || !canvas) return;
+
+    const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
+    const matchedIds = new Set(Object.keys(state.matched));
+
+    const teamBtns = state.teams
+      .map(
+        (team) =>
+          `<button type="button" class="tlive-team-pick${state.selectedTeam === team.id ? " tlive-team-pick--active" : ""}" data-team-pick="${team.id}" style="--team-color:${team.color}">${escapeHtml(MOCK.teamName(team))} · ${state.scores[team.id] || 0}</button>`,
+      )
+      .join("");
+
+    const terms = state.pairs
+      .map((p) => {
+        const done = matchedIds.has(p.id);
+        const sel = state.selectedTerm === p.id;
+        return `<button type="button" class="tlive-match-item${done ? " tlive-match-item--done" : ""}${sel ? " tlive-match-item--selected" : ""}" data-match-term="${p.id}" ${done || state.winnerId ? "disabled" : ""}>${escapeHtml(p.term)}</button>`;
+      })
+      .join("");
+
+    const defs = state.defs
+      .map((d) => {
+        const done = matchedIds.has(d.pairId);
+        const team = state.teams.find((x) => x.id === state.matched[d.pairId]);
+        return `<button type="button" class="tlive-match-item tlive-match-item--def${done ? " tlive-match-item--done" : ""}" data-match-def="${d.id}" ${done || state.winnerId ? "disabled" : ""}>
+          ${escapeHtml(MOCK.matchingDefText(d))}
+          ${team ? `<span class="tlive-match-item__team" style="color:${team.color}">${escapeHtml(MOCK.teamName(team))}</span>` : ""}
+        </button>`;
+      })
+      .join("");
+
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--board";
+    canvas.innerHTML = `
+      <div class="tlive-board tlive-matching">
+        <header class="tlive-board__head">
+          <h2 class="tlive-board__title">${escapeHtml(t("tlive_matching_title"))}</h2>
+          <p class="tlive-board__round">${escapeHtml(t("tlive_matching_goal", { n: String(state.winTarget) }))}</p>
+        </header>
+        ${winner ? `<div class="tlive-board-winner" role="status">${escapeHtml(t("tlive_board_winner", { team: MOCK.teamName(winner) }))}</div>` : ""}
+        <div class="tlive-bingo-teams">${teamBtns}</div>
+        <p class="tlive-bingo-help">${escapeHtml(t("tlive_matching_help"))}</p>
+        <div class="tlive-match-board">
+          <div class="tlive-match-col">
+            <h3>${escapeHtml(t("tlive_matching_terms"))}</h3>
+            <div class="tlive-match-list">${terms}</div>
+          </div>
+          <div class="tlive-match-col">
+            <h3>${escapeHtml(t("tlive_matching_defs"))}</h3>
+            <div class="tlive-match-list">${defs}</div>
+          </div>
+        </div>
+        <div class="tlive-board__controls">
+          <button type="button" class="btn-secondary" id="tlive-matching-reset">${escapeHtml(t("tlive_board_reset"))}</button>
+        </div>
+        <p class="tlive-disclaimer">${escapeHtml(t("tlive_mock_disclaimer"))}</p>
+      </div>
+    `;
+
+    canvas.querySelectorAll("[data-team-pick]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        window.__tliveMatching = { ...window.__tliveMatching, selectedTeam: btn.getAttribute("data-team-pick") };
+        renderMatchingRace(window.__tliveMatching);
+      });
+    });
+
+    canvas.querySelectorAll("[data-match-term]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        window.__tliveMatching = { ...window.__tliveMatching, selectedTerm: btn.getAttribute("data-match-term") };
+        renderMatchingRace(window.__tliveMatching);
+      });
+    });
+
+    canvas.querySelectorAll("[data-match-def]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const defId = btn.getAttribute("data-match-def");
+        const termId = window.__tliveMatching.selectedTerm;
+        if (!termId) return;
+        const result = MOCK.tryMatchingPair(window.__tliveMatching, termId, defId);
+        window.__tliveMatching = result.state;
+        renderMatchingRace(window.__tliveMatching);
+      });
+    });
+
+    document.getElementById("tlive-matching-reset")?.addEventListener("click", () => {
+      if (!window.confirm(t("tlive_board_reset_confirm"))) return;
+      window.__tliveMatching = MOCK.createMatchingState();
+      renderMatchingRace(window.__tliveMatching);
+    });
+  }
+
   function getSavedGamesList() {
     const MOCK = getMock();
     if (!MOCK) return [];
@@ -371,10 +551,21 @@
     const game = games.find((g) => g.id === gameId);
     if (!game) return;
     setActiveTool("games");
-    if (game.type === "board_race") {
+    clearLiveGameState();
+    if (game.type === "board_race" || game.id === "board-race") {
       window.__tliveBoard = MOCK.createBoardState();
       window.__tliveQuestionIndex = 0;
       renderBoardRace(window.__tliveBoard, 0);
+      return;
+    }
+    if (game.type === "vocab_bingo" || game.id === "vocab-bingo") {
+      window.__tliveBingo = MOCK.createBingoState();
+      renderVocabBingo(window.__tliveBingo);
+      return;
+    }
+    if (game.type === "matching_race" || game.id === "matching-race") {
+      window.__tliveMatching = MOCK.createMatchingState();
+      renderMatchingRace(window.__tliveMatching);
       return;
     }
     const canvas = document.getElementById("tlive-canvas-inner");
@@ -480,9 +671,17 @@
     window.addEventListener("eap:langchange", () => {
       const active = document.querySelector(".tlive-tool--active");
       const tool = active ? active.getAttribute("data-tool") : "slides";
-      if (tool === "games" && !window.__tliveBoard) renderGamesLibrary();
-      else if (window.__tliveBoard) renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
-      else if (tool === "slides") renderWelcome(ctx);
+      if (tool === "games" && !window.__tliveBoard && !window.__tliveBingo && !window.__tliveMatching) {
+        renderGamesLibrary();
+      } else if (window.__tliveBoard) {
+        renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
+      } else if (window.__tliveBingo) {
+        renderVocabBingo(window.__tliveBingo);
+      } else if (window.__tliveMatching) {
+        renderMatchingRace(window.__tliveMatching);
+      } else if (tool === "slides") {
+        renderWelcome(ctx);
+      }
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
       initPageChrome();
     });

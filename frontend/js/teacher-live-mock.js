@@ -17,17 +17,17 @@
       id: "vocab-bingo",
       nameEn: "Vocabulary Bingo",
       nameZh: "词汇 Bingo",
-      descEn: "Academic vocabulary grid — mock preview",
-      descZh: "学术词汇格子 — 演示预览",
-      type: "placeholder",
+      descEn: "5×5 academic word grid — first line wins",
+      descZh: "5×5 学术词汇格 — 先连成一线者胜",
+      type: "vocab_bingo",
     },
     {
       id: "matching-race",
       nameEn: "Matching Race",
       nameZh: "配对竞赛",
-      descEn: "Match terms to definitions — mock preview",
-      descZh: "术语与释义配对 — 演示预览",
-      type: "placeholder",
+      descEn: "Race to match terms and definitions by team",
+      descZh: "小组抢答配对术语与释义",
+      type: "matching_race",
     },
   ];
 
@@ -380,6 +380,190 @@
     return true;
   }
 
+  const BINGO_TERMS = [
+    { term: "analyze", defEn: "examine in detail", defZh: "详细分析" },
+    { term: "evidence", defEn: "facts supporting a claim", defZh: "支持论点的证据" },
+    { term: "mitigate", defEn: "make less severe", defZh: "减轻、缓和" },
+    { term: "hypothesis", defEn: "a testable explanation", defZh: "可检验的假设" },
+    { term: "framework", defEn: "structure for understanding", defZh: "理解框架" },
+    { term: "implication", defEn: "a possible effect or meaning", defZh: "可能影响或含义" },
+    { term: "coherent", defEn: "logical and consistent", defZh: "连贯一致的" },
+    { term: "collocation", defEn: "natural word combination", defZh: "词语自然搭配" },
+    { term: "subsequently", defEn: "after that; later", defZh: "随后；之后" },
+    { term: "significant", defEn: "important; noticeable", defZh: "重要的；显著的" },
+    { term: "methodology", defEn: "system of methods used", defZh: "所用方法体系" },
+    { term: "paraphrase", defEn: "express in different words", defZh: "改写表达" },
+    { term: "synthesis", defEn: "combine ideas into a whole", defZh: "综合整合" },
+    { term: "validity", defEn: "soundness of reasoning or data", defZh: "论证或数据的有效性" },
+    { term: "variable", defEn: "factor that can change", defZh: "可变因素" },
+    { term: "correlation", defEn: "relationship between factors", defZh: "因素间相关关系" },
+    { term: "constraint", defEn: "limit or restriction", defZh: "限制条件" },
+    { term: "empirical", defEn: "based on observation or data", defZh: "基于观察或数据的" },
+    { term: "inference", defEn: "conclusion from evidence", defZh: "根据证据推断" },
+    { term: "nuance", defEn: "subtle difference in meaning", defZh: "含义的细微差别" },
+    { term: "premise", defEn: "a starting assumption", defZh: "前提假设" },
+    { term: "rationale", defEn: "reasoning behind a decision", defZh: "决策背后的理由" },
+    { term: "scope", defEn: "range covered by a study", defZh: "研究涵盖范围" },
+    { term: "trend", defEn: "general direction of change", defZh: "变化的总趋势" },
+  ];
+
+  const BINGO_LINES = (() => {
+    const lines = [];
+    for (let r = 0; r < 5; r += 1) lines.push([0, 1, 2, 3, 4].map((c) => r * 5 + c));
+    for (let c = 0; c < 5; c += 1) lines.push([0, 1, 2, 3, 4].map((r) => r * 5 + c));
+    lines.push([0, 6, 12, 18, 24]);
+    lines.push([4, 8, 12, 16, 20]);
+    return lines;
+  })();
+
+  const MATCHING_PAIRS = [
+    { id: "p1", term: "conduct research", defEn: "carry out a study", defZh: "开展研究" },
+    { id: "p2", term: "mitigate", defEn: "make less severe", defZh: "减轻、缓和" },
+    { id: "p3", term: "hypothesis", defEn: "testable explanation", defZh: "可检验的假设" },
+    { id: "p4", term: "implication", defEn: "possible effect or meaning", defZh: "可能影响或含义" },
+    { id: "p5", term: "framework", defEn: "structure for understanding", defZh: "理解框架" },
+    { id: "p6", term: "paraphrase", defEn: "express in different words", defZh: "改写表达" },
+    { id: "p7", term: "empirical", defEn: "based on observation or data", defZh: "基于观察或数据" },
+    { id: "p8", term: "validity", defEn: "soundness of reasoning", defZh: "论证的有效性" },
+  ];
+
+  const LIVE_TEAMS = [
+    { id: "A", name: "Team A", nameZh: "A 组", color: TEAM_COLORS[0] },
+    { id: "B", name: "Team B", nameZh: "B 组", color: TEAM_COLORS[1] },
+    { id: "C", name: "Team C", nameZh: "C 组", color: TEAM_COLORS[2] },
+    { id: "D", name: "Team D", nameZh: "D 组", color: TEAM_COLORS[3] },
+  ];
+
+  function shuffleArr(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function termDef(item) {
+    return isZh() ? item.defZh : item.defEn;
+  }
+
+  function createBingoState() {
+    const cells = [];
+    let termIdx = 0;
+    for (let i = 0; i < 25; i += 1) {
+      if (i === 12) {
+        cells.push({
+          index: i,
+          free: true,
+          term: "FREE",
+          termZh: "免费",
+          defEn: "Free space — counts for all teams",
+          defZh: "免费格 — 所有小组均算标记",
+          marks: { A: true, B: true, C: true, D: true },
+        });
+      } else {
+        const t = BINGO_TERMS[termIdx];
+        termIdx += 1;
+        cells.push({
+          index: i,
+          free: false,
+          term: t.term,
+          termZh: t.term,
+          defEn: t.defEn,
+          defZh: t.defZh,
+          marks: { A: false, B: false, C: false, D: false },
+        });
+      }
+    }
+    return {
+      cells,
+      clueIndex: 0,
+      selectedTeam: "A",
+      winnerId: null,
+      teams: LIVE_TEAMS.map((x) => ({ ...x })),
+    };
+  }
+
+  function bingoClue(state) {
+    const nonFree = state.cells.filter((c) => !c.free);
+    const idx = state.clueIndex % nonFree.length;
+    const cell = nonFree[idx];
+    return { cell, index: idx, total: nonFree.length };
+  }
+
+  function markBingoCell(state, cellIndex, teamId) {
+    const next = {
+      ...state,
+      cells: state.cells.map((c) => ({ ...c, marks: { ...c.marks } })),
+    };
+    const cell = next.cells[cellIndex];
+    if (!cell || next.winnerId) return next;
+    if (!cell.free) cell.marks[teamId] = true;
+
+    for (let t = 0; t < LIVE_TEAMS.length; t += 1) {
+      const team = LIVE_TEAMS[t].id;
+      const hasLine = BINGO_LINES.some((line) =>
+        line.every((i) => next.cells[i].marks[team]),
+      );
+      if (hasLine) {
+        next.winnerId = team;
+        break;
+      }
+    }
+    return next;
+  }
+
+  function advanceBingoClue(state) {
+    const nonFree = state.cells.filter((c) => !c.free);
+    return { ...state, clueIndex: (state.clueIndex + 1) % nonFree.length };
+  }
+
+  function createMatchingState() {
+    const defs = shuffleArr(
+      MATCHING_PAIRS.map((p) => ({
+        id: `d-${p.id}`,
+        pairId: p.id,
+        textEn: p.defEn,
+        textZh: p.defZh,
+      })),
+    );
+    return {
+      pairs: MATCHING_PAIRS.map((p) => ({ ...p })),
+      defs,
+      matched: {},
+      scores: { A: 0, B: 0, C: 0, D: 0 },
+      selectedTerm: null,
+      selectedTeam: "A",
+      winnerId: null,
+      winTarget: 6,
+      teams: LIVE_TEAMS.map((x) => ({ ...x })),
+    };
+  }
+
+  function matchingDefText(d) {
+    return isZh() ? d.textZh : d.textEn;
+  }
+
+  function tryMatchingPair(state, termId, defId) {
+    const next = {
+      ...state,
+      matched: { ...state.matched },
+      scores: { ...state.scores },
+    };
+    const def = next.defs.find((d) => d.id === defId);
+    if (!def || next.matched[def.pairId] || next.winnerId) {
+      return { state: next, ok: false };
+    }
+    if (def.pairId !== termId) {
+      return { state: { ...next, selectedTerm: null }, ok: false };
+    }
+    next.matched[termId] = next.selectedTeam;
+    next.scores[next.selectedTeam] = (next.scores[next.selectedTeam] || 0) + 1;
+    next.selectedTerm = null;
+    if (next.scores[next.selectedTeam] >= next.winTarget) next.winnerId = next.selectedTeam;
+    return { state: next, ok: true };
+  }
+
   /** Built-in demos + games saved from Game Builder (sessionStorage). */
   function allSavedGames() {
     const custom = readCustomSavedGames();
@@ -418,5 +602,15 @@
     isCustomGame,
     deleteCustomGame,
     BUILTIN_GAME_IDS,
+    LIVE_TEAMS,
+    createBingoState,
+    bingoClue,
+    markBingoCell,
+    advanceBingoClue,
+    termDef,
+    createMatchingState,
+    tryMatchingPair,
+    matchingDefText,
+    MATCHING_PAIRS,
   };
 })(typeof window !== "undefined" ? window : globalThis);
