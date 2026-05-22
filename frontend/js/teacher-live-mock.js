@@ -139,4 +139,4 @@
     simulateResponses,
     allSavedGames,
   };
-})();
+})(typeof window !== "undefined" ? window : globalThis);

@@ -132,4 +132,4 @@
     mockGeneratePreview,
     buildGameFromDraft,
   };
-})();
+})(typeof window !== "undefined" ? window : globalThis);
