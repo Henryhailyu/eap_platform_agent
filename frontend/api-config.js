@@ -7,3 +7,6 @@
  * Open http://127.0.0.1:5051/ui/index.html for local dev (cookies + session work).
  */
 // window.EAP_API_BASE = "http://127.0.0.1:5051";
+
+/** Student AI Self-Study Centre — set false to hide entry link and disable hub. */
+window.EAP_SELF_STUDY_ENABLED = true;

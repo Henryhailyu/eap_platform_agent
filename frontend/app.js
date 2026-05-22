@@ -268,6 +268,13 @@ function initAppPageHeader() {
   }
 }
 
+/** Phase S1 — show AI Self-Study entry when feature flag is on. */
+function initStudentSelfStudyNavLink() {
+  if (window.EAP_SELF_STUDY_ENABLED === false) return;
+  const link = document.getElementById("student-self-study-link");
+  if (link) link.classList.remove("hidden");
+}
+
 /**
  * Categories shown on teacher form and student filter (keep in sync with your course).
  * Used to build <select> options in JavaScript.
@@ -6045,6 +6052,7 @@ function initStudentPage() {
 
     await ensureAcademicCalendarLoaded();
     initAppPageHeader();
+    initStudentSelfStudyNavLink();
 
   /*
     ----- Student class scope (Phase C3) -----
