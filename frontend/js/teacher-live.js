@@ -2393,8 +2393,8 @@
 
     void (async () => {
       try {
-        if (typeof validatePageSessionOrFallback !== "function") return;
-        const sessionUser = await validatePageSessionOrFallback("teacher");
+        if (typeof validateSatelliteSessionOrGate !== "function") return;
+        const sessionUser = await validateSatelliteSessionOrGate("teacher");
         if (!sessionUser) return;
         if (typeof initAppPageHeader === "function") initAppPageHeader();
         initPageChrome();

@@ -310,6 +310,28 @@ async function bootStudentSatellitePage(pageId, afterReady) {
 }
 
 /**
+ * Teacher/student live satellite pages — show role gate instead of bouncing to the other calendar.
+ */
+async function validateSatelliteSessionOrGate(expectedRole) {
+  const result = await ensurePageRole(expectedRole);
+  if (result.ok) {
+    saveUserToSession(result.user);
+    return result.user;
+  }
+  if (result.reason === "wrong_role" && result.user) {
+    saveUserToSession(result.user);
+    renderWrongRoleGate(result.user.role);
+    return null;
+  }
+  if (result.redirect) {
+    window.location.replace(result.redirect);
+    return null;
+  }
+  window.location.replace(hostedUiPageUrl("index.html"));
+  return null;
+}
+
+/**
  * Categories shown on teacher form and student filter (keep in sync with your course).
  * Used to build <select> options in JavaScript.
  */
@@ -1605,10 +1627,32 @@ async function ensurePageRole(expectedRole) {
 /**
  * Show wrong-role message on satellite pages (student self-study, live join, etc.).
  */
+function showLoginNextRoleMismatch(serverUser, nextParam) {
+  const next = String(nextParam || "").trim().toLowerCase();
+  const needsStudent = /^student(-live|\.html|-self-study)/i.test(next);
+  const needsTeacher = /^teacher(-live|\.html|-game-builder)/i.test(next);
+  let el = null;
+  let msgKey = "";
+  if (needsStudent && serverUser.role !== "student") {
+    el = document.getElementById("student-login-error");
+    msgKey = "login_next_need_student";
+  } else if (needsTeacher && serverUser.role !== "teacher") {
+    el = document.getElementById("teacher-login-error");
+    msgKey = "login_next_need_teacher";
+  }
+  if (el && msgKey) {
+    el.textContent = t(msgKey);
+    el.classList.remove("hidden");
+  }
+}
+
 function renderWrongRoleGate(actualRole) {
   const main =
     document.getElementById("main") ||
     document.getElementById("slive-main") ||
+    document.getElementById("tlive-main") ||
+    document.querySelector(".tgb-main") ||
+    document.querySelector(".tlive-page") ||
     document.querySelector(".ssc-main");
   if (!main) {
     window.location.replace(roleHomeUrl(actualRole));
@@ -1625,8 +1669,9 @@ function renderWrongRoleGate(actualRole) {
     <section class="eap-role-gate" role="alert">
       <h1>${escapeHtml(t("role_gate_title"))}</h1>
       <p>${escapeHtml(
-        actualRole === "teacher" ? t("role_gate_signed_in_teacher") : t("role_gate_signed_in_other"),
+        actualRole === "teacher" ? t("role_gate_signed_in_teacher") : t("role_gate_signed_in_student"),
       )}</p>
+      <p class="eap-role-gate__hint">${escapeHtml(t("role_gate_one_browser"))}</p>
       <div class="eap-role-gate__actions">
         <a class="btn-primary" href="${escapeHtml(homeUrl)}">${escapeHtml(homeLabel)}</a>
         <button type="button" class="btn-secondary" id="eap-role-gate-logout">${escapeHtml(t("logout"))}</button>
@@ -1657,9 +1702,15 @@ function initLoginPage() {
       (serverUser.role === "teacher" || serverUser.role === "student" || serverUser.role === "admin")
     ) {
       saveUserToSession(serverUser);
+      const nextParam = new URLSearchParams(window.location.search).get("next");
       const nextUrl = loginNextRedirectUrl(serverUser.role);
       if (nextUrl) {
         window.location.replace(nextUrl);
+        return;
+      }
+      /* Do not bounce away when ?next= targets the other role (e.g. student-live while teacher cookie). */
+      if (nextParam && String(nextParam).trim()) {
+        showLoginNextRoleMismatch(serverUser, nextParam);
         return;
       }
       if (serverUser.role === "teacher") {

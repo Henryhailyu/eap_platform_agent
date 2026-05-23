@@ -257,6 +257,12 @@
       return typeof getLoggedInUser === "function" ? getLoggedInUser() : null;
     }
 
+    if (typeof validateSatelliteSessionOrGate === "function") {
+      const user = await validateSatelliteSessionOrGate("student");
+      if (user) return user;
+      return null;
+    }
+
     const result = await ensurePageRole("student");
     if (result.ok) return result.user;
 

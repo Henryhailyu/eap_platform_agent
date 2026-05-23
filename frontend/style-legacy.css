@@ -924,6 +924,12 @@ body.page-landing .btn-primary:active:not(:disabled) {
   color: #444;
 }
 
+.eap-role-gate__hint {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: #666;
+}
+
 .eap-role-gate__actions {
   display: flex;
   flex-wrap: wrap;
