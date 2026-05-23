@@ -1536,6 +1536,20 @@ body.tlive-modal-open {
   color: #0a4d68;
 }
 
+.slive-sync-status {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--eap-muted, #6e6e73);
+}
+
+.slive-sync-status[data-state="live"] {
+  color: var(--eap-teal, #0a7ea4);
+}
+
+.slive-sync-status[data-state="listening"] {
+  color: var(--eap-muted, #6e6e73);
+}
+
 .slive-meta {
   margin: 0.25rem 0 0;
   font-size: 0.9375rem;

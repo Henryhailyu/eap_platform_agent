@@ -159,14 +159,75 @@
     code: "",
     teamId: null,
     launchId: null,
+    payloadFingerprint: "",
     pollAbort: null,
     polling: false,
+    lastSyncAt: 0,
   };
+
+  function formatSyncTime(ts) {
+    const d = new Date(ts || Date.now());
+    try {
+      const lang = window.EAP_I18N && window.EAP_I18N.getLang() === "zh" ? "zh-CN" : "en-GB";
+      return d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    } catch (_) {
+      return d.toLocaleTimeString();
+    }
+  }
+
+  function payloadFingerprint(data) {
+    if (!data) return "";
+    const q = data.question;
+    if (!q) return `wait:${data.session_code || state.code || ""}`;
+    const opts = Array.isArray(q.optionsEn) ? q.optionsEn.join("\x1e") : "";
+    return [
+      data.launch_id != null ? String(data.launch_id) : "",
+      normalizeGameType(q.gameType),
+      q.textEn || q.textZh || "",
+      opts,
+    ].join("|");
+  }
+
+  function updateSyncStatus(data, opts) {
+    const el = document.getElementById("slive-sync-status");
+    if (!el) return;
+    state.lastSyncAt = Date.now();
+    if (opts && opts.manual) {
+      el.textContent = t("slive_sync_updated", { time: formatSyncTime(state.lastSyncAt) });
+      el.dataset.state = "updated";
+    } else if (data && data.question) {
+      el.textContent = t("slive_sync_live");
+      el.dataset.state = "live";
+    } else {
+      el.textContent = t("slive_sync_waiting");
+      el.dataset.state = "waiting";
+    }
+    el.classList.remove("hidden");
+  }
+
+  function setSyncListening() {
+    const el = document.getElementById("slive-sync-status");
+    if (!el) return;
+    el.textContent = t("slive_sync_listening");
+    el.dataset.state = "listening";
+    el.classList.remove("hidden");
+  }
+
+  function ensurePollRunning() {
+    if (!state.code || state.polling) return;
+    void startPoll();
+  }
 
   function formatLiveError(err) {
     const code = err && err.code;
     const status = err && err.httpStatus;
     const msg = (err && err.message) || "";
+    if (status === 401 || /not logged in/i.test(msg)) {
+      return t("slive_login_required");
+    }
+    if (status === 403 || /wrong role|forbidden|student only/i.test(msg)) {
+      return t("slive_wrong_role");
+    }
     if (code === "live_not_found" || status === 404 || msg === "Session not found") {
       return t("slive_session_not_found", { code: state.code });
     }
@@ -174,6 +235,14 @@
       return t("slive_api_restart");
     }
     return msg || String(err);
+  }
+
+  function showLiveError(err) {
+    const status = err && err.httpStatus;
+    const msg = (err && err.message) || "";
+    const wrongRole =
+      status === 403 || /wrong role|forbidden|student only|signed in as a teacher/i.test(msg);
+    showError(formatLiveError(err), { showLogout: wrongRole });
   }
 
   function showError(msg, opts) {
@@ -291,20 +360,25 @@
         code: data.session_code || state.code,
       });
     }
-    if (data.launch_id !== state.launchId) {
+    const fp = payloadFingerprint(data);
+    const contentChanged = fp !== state.payloadFingerprint;
+    if (data.launch_id !== state.launchId || contentChanged) {
       state.launchId = data.launch_id;
+      state.payloadFingerprint = fp;
       const sentEl = document.getElementById("slive-sent");
       if (sentEl) sentEl.classList.add("hidden");
     }
     renderQuestion(data);
+    updateSyncStatus(data);
   }
 
-  async function refreshOnce() {
+  async function refreshOnce(manual) {
     const api = window.EAP_LIVE_TEACHING_API;
     if (!api || !state.code) return;
     showError("");
     const data = await api.studentJoin(state.code);
     applyJoinPayload(data);
+    if (manual) updateSyncStatus(data, { manual: true });
   }
 
   function stopPoll() {
@@ -320,6 +394,7 @@
     if (!api || !state.code) return;
     stopPoll();
     state.polling = true;
+    setSyncListening();
 
     const fallbackMs = api.FALLBACK_POLL_MS || 4000;
 
@@ -340,7 +415,7 @@
         applyJoinPayload(data);
       } catch (err) {
         if (err && err.name === "AbortError") break;
-        showError(formatLiveError(err));
+        showLiveError(err);
         await new Promise((r) => window.setTimeout(r, fallbackMs));
       } finally {
         if (state.pollAbort === controller) state.pollAbort = null;
@@ -421,7 +496,9 @@
     }
 
     document.getElementById("slive-refresh")?.addEventListener("click", () => {
-      void refreshOnce().catch((err) => showError(formatLiveError(err)));
+      void refreshOnce(true)
+        .then(() => ensurePollRunning())
+        .catch((err) => showLiveError(err));
     });
 
     document.getElementById("slive-logout-btn")?.addEventListener("click", () => {
@@ -436,20 +513,22 @@
         await refreshOnce();
         void startPoll();
       } catch (err) {
-        showError(formatLiveError(err));
+        showLiveError(err);
       }
     })();
 
     window.addEventListener("beforeunload", stopPoll);
     window.addEventListener("pageshow", () => {
       if (!state.code) return;
-      void refreshOnce().catch((err) => showError(formatLiveError(err)));
+      void refreshOnce()
+        .then(() => ensurePollRunning())
+        .catch((err) => showLiveError(err));
     });
     document.addEventListener("visibilitychange", () => {
-      if (!state.code || !state.polling) return;
-      if (!document.hidden) {
-        void refreshOnce().catch(() => {});
-      }
+      if (!state.code || document.hidden) return;
+      void refreshOnce()
+        .then(() => ensurePollRunning())
+        .catch(() => {});
     });
 
     window.addEventListener("eap:langchange", () => {
