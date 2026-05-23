@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Join live class — EAP Platform" />
+    <title>Live class — EAP Platform</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/teacher-live.css" />
+  </head>
+  <body class="page-app eap-shell-active" data-page="student-live">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+        <main class="slive-page" id="slive-main">
+          <header class="slive-head">
+            <a class="tlive-back" href="student.html" data-i18n="slive_back">← Student home</a>
+            <h1 data-i18n="slive_title">Live class</h1>
+            <p id="slive-meta" class="slive-meta">—</p>
+          </header>
+
+          <p id="slive-error" class="slive-error hidden" role="alert"></p>
+          <p id="slive-logout-hint" class="slive-logout-hint hidden">
+            <button type="button" class="btn-secondary" id="slive-logout-btn" data-i18n="slive_logout">Log out</button>
+          </p>
+
+          <section id="slive-code-pick" class="slive-card hidden">
+            <h2 data-i18n="slive_enter_code_title">Session code</h2>
+            <p class="slive-help" data-i18n="slive_enter_code_help">
+              Enter the 6-character code your teacher shows on Live Teaching, or open the link they shared.
+            </p>
+            <form id="slive-code-form" class="slive-code-form">
+              <label class="visually-hidden" for="slive-code-input" data-i18n="slive_enter_code_label">Code</label>
+              <input
+                id="slive-code-input"
+                class="slive-code-input"
+                type="text"
+                maxlength="6"
+                autocapitalize="characters"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="ABC123"
+              />
+              <button type="submit" class="btn-primary" data-i18n="slive_enter_code_btn">Join session</button>
+            </form>
+          </section>
+
+          <section id="slive-team-pick" class="slive-card hidden">
+            <h2 data-i18n="slive_pick_team">Your team</h2>
+            <p class="slive-help" data-i18n="slive_pick_team_help">Choose your group before answering.</p>
+            <div id="slive-teams" class="slive-teams"></div>
+          </section>
+
+          <section id="slive-wait" class="slive-card">
+            <p data-i18n="slive_wait">Waiting for the teacher to launch a question…</p>
+            <button type="button" class="btn-secondary" id="slive-refresh" data-i18n="slive_refresh">Refresh</button>
+          </section>
+
+          <section id="slive-question" class="slive-card hidden">
+            <h2 id="slive-question-text" class="slive-question-text"></h2>
+            <div id="slive-options" class="slive-options" role="group"></div>
+            <p id="slive-sent" class="slive-sent hidden" role="status"></p>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="js/pilot-wake.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+    <script src="js/live-teaching-api.js"></script>
+    <script src="js/student-live.js"></script>
+  </body>
+</html>

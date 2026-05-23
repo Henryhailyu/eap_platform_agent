@@ -264,10 +264,9 @@
     if (redirectIfDisabled()) return;
     if (typeof redirectFilePageToHostedUi === "function" && redirectFilePageToHostedUi()) return;
 
-    const sessionUser = await validatePageSessionOrFallback("student");
-    if (!sessionUser) return;
+    const ready = await bootStudentSatellitePage(PAGE, () => {});
+    if (!ready) return;
 
-    initAppPageHeader();
     bindRetakeFromQuery();
 
     const existing = MOCK.getPlacement();

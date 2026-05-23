@@ -184,18 +184,102 @@
     });
   }
 
-  function launchToStudents(question, boardState) {
+  function getLiveApi() {
+    return window.EAP_LIVE_TEACHING_API || null;
+  }
+
+  function liveSessionActive() {
+    return !!(window.__tliveLiveSession && window.__tliveLiveSession.code);
+  }
+
+  function updateSessionJoinBanner() {
+    const el = document.getElementById("tlive-session-join");
+    const codeEl = document.getElementById("tlive-session-code");
+    const linkEl = document.getElementById("tlive-join-link");
+    const sess = window.__tliveLiveSession;
+    if (!el) return;
+    if (!sess || !sess.code) {
+      el.classList.add("hidden");
+      el.setAttribute("hidden", "");
+      return;
+    }
+    el.classList.remove("hidden");
+    el.removeAttribute("hidden");
+    if (codeEl) codeEl.textContent = sess.code;
+    if (linkEl) {
+      linkEl.href = sess.join_path || `student-live.html?code=${encodeURIComponent(sess.code)}`;
+      linkEl.textContent = sess.join_url || linkEl.href;
+    }
+  }
+
+  async function ensureLiveSession(ctx) {
+    const api = getLiveApi();
+    if (!api) return false;
+    if (window.__tliveLiveSession && window.__tliveLiveSession.code) {
+      updateSessionJoinBanner();
+      return true;
+    }
+    try {
+      const data = await api.createSession(ctx.className, ctx.date);
+      window.__tliveLiveSession = {
+        code: data.session_code,
+        join_url: data.join_url,
+        join_path: data.join_path,
+        class_name: data.class_name,
+        launchId: null,
+        useLive: true,
+      };
+      updateSessionJoinBanner();
+      return true;
+    } catch (_) {
+      window.__tliveLiveSession = { useLive: false };
+      return false;
+    }
+  }
+
+  async function launchToStudents(question, boardState) {
     window.__tliveLaunched = {
       question,
       boardState: boardState || null,
       at: Date.now(),
     };
+    const api = getLiveApi();
+    const sess = window.__tliveLiveSession;
+    if (!api || !sess || !sess.code || !question) return;
+    try {
+      const data = await api.launchQuestion(sess.code, question);
+      sess.launchId = data.launch_id;
+      sess.useLive = true;
+    } catch (_) {
+      sess.useLive = false;
+    }
   }
 
-  function buildResponsesHtml(question, boardState) {
+  async function fetchResponseRows(question, boardState) {
+    const MOCK = getMock();
+    if (!MOCK || !question) return { rows: [], live: false };
+
+    const sess = window.__tliveLiveSession;
+    const api = getLiveApi();
+    if (api && sess && sess.code && sess.launchId) {
+      try {
+        const data = await api.fetchResponses(sess.code, sess.launchId);
+        return { rows: data.responses || [], live: true, count: data.count || 0 };
+      } catch (_) {
+        /* fall through to mock */
+      }
+    }
+
+    return { rows: MOCK.simulateResponses(question), live: false, count: 0 };
+  }
+
+  async function buildResponsesHtml(question, boardState) {
     const MOCK = getMock();
     if (!MOCK || !question) return "";
-    const rows = MOCK.simulateResponses(question);
+    const { rows, live, count } = await fetchResponseRows(question, boardState);
+    const disclaimer = live
+      ? t("tlive_responses_live", { n: String(count) })
+      : t("tlive_responses_mock");
 
     return `
       <p class="tlive-responses-modal__question">${escapeHtml(MOCK.questionText(question))}</p>
@@ -209,23 +293,25 @@
             <th>${escapeHtml(t("tlive_col_time"))}</th>
           </tr></thead>
           <tbody>
-            ${rows
-              .map((r) => {
-                const team = boardState?.teams?.find((x) => x.id === r.teamId);
-                const teamLabel = team ? MOCK.teamName(team) : r.teamId;
-                return `<tr class="${r.correct ? "tlive-resp--correct" : ""}">
+            ${rows.length
+              ? rows
+                  .map((r) => {
+                    const team = boardState?.teams?.find((x) => x.id === r.teamId);
+                    const teamLabel = team ? MOCK.teamName(team) : r.teamId;
+                    return `<tr class="${r.correct ? "tlive-resp--correct" : ""}">
                   <td>${escapeHtml(r.student)}</td>
                   <td><span class="tlive-resp-team" style="color:${team?.color || "#333"}">${escapeHtml(teamLabel)}</span></td>
                   <td class="tlive-resp-answer">${escapeHtml(r.answer)}</td>
                   <td>${r.correct ? "✓" : "—"}</td>
                   <td>${r.timeSec}s</td>
                 </tr>`;
-              })
-              .join("")}
+                  })
+                  .join("")
+              : `<tr><td colspan="5">${escapeHtml(t("tlive_responses_empty"))}</td></tr>`}
           </tbody>
         </table>
       </div>
-      <p class="tlive-disclaimer">${escapeHtml(t("tlive_responses_mock"))}</p>
+      <p class="tlive-disclaimer">${escapeHtml(disclaimer)}</p>
     `;
   }
 
@@ -236,12 +322,16 @@
   function closeResponsesModal() {
     const modal = document.getElementById("tlive-responses-modal");
     if (!modal) return;
+    if (modal._tlivePollId) {
+      window.clearInterval(modal._tlivePollId);
+      modal._tlivePollId = null;
+    }
     modal.classList.add("hidden");
     modal.setAttribute("hidden", "");
     document.body.classList.remove("tlive-modal-open");
   }
 
-  function openResponsesModal(question, boardState) {
+  async function openResponsesModal(question, boardState) {
     const MOCK = getMock();
     const modal = document.getElementById("tlive-responses-modal");
     const body = document.getElementById("tlive-responses-modal-body");
@@ -249,7 +339,13 @@
     if (!MOCK || !modal || !body || !question) return;
 
     const board = boardState !== undefined ? boardState : window.__tliveLaunched?.boardState;
-    body.innerHTML = buildResponsesHtml(question, board);
+
+    async function paintBody() {
+      body.innerHTML = await buildResponsesHtml(question, board);
+      if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+    }
+
+    await paintBody();
 
     if (foot) {
       const rankingMode = window.__tliveRanking && !window.__tliveRanking.winnerId;
@@ -355,8 +451,7 @@
       const result = MOCK.processCorrectTeams(window.__tliveBoard || board, question);
       window.__tliveBoard = result.state;
       renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
-      body.innerHTML = buildResponsesHtml(question, window.__tliveBoard);
-      if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+      void paintBody();
     });
 
     document.getElementById("tlive-modal-quiz-award")?.addEventListener("click", () => {
@@ -436,6 +531,15 @@
       openResponsesModal(question, null);
     });
     document.getElementById("tlive-modal-close-btn")?.addEventListener("click", closeResponsesModal);
+
+    if (modal._tlivePollId) {
+      window.clearInterval(modal._tlivePollId);
+    }
+    if (liveSessionActive() && window.__tliveLiveSession.launchId) {
+      modal._tlivePollId = window.setInterval(() => {
+        void paintBody();
+      }, 2500);
+    }
 
     document.getElementById("tlive-responses-modal-close")?.focus();
   }
@@ -2144,6 +2248,12 @@
         renderSummaryMission(window.__tliveSummary);
       } else if (window.__tliveMemory) {
         renderMemoryCard(window.__tliveMemory);
+      } else if (window.__tliveHotSeat) {
+        renderHotSeat(window.__tliveHotSeat);
+      } else if (window.__tliveDebate) {
+        renderDebateCards(window.__tliveDebate);
+      } else if (window.__tliveRanking) {
+        renderRankingChallenge(window.__tliveRanking);
       } else if (tool === "wheel") {
         renderNameWheelTool(ctx);
       } else if (tool === "slides") {
@@ -2160,6 +2270,7 @@
         if (!sessionUser) return;
         if (typeof initAppPageHeader === "function") initAppPageHeader();
         initPageChrome();
+        await ensureLiveSession(ctx);
       } catch (_) {
         showBootError(t("tlive_boot_session_hint"));
       }

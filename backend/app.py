@@ -533,6 +533,10 @@ def init_database():
     migrate_users_add_password_hash(conn)
     migrate_users_add_is_authorized(conn)
 
+    from live_teaching import init_live_teaching_tables
+
+    init_live_teaching_tables(conn)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS classes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -6700,6 +6704,10 @@ def admin_set_teacher_authorized(user_id):
 
 # Create database tables when app loads (before first request)
 init_database()
+
+from live_teaching import register_live_teaching_routes
+
+register_live_teaching_routes(app)
 
 # Start the Flask server
 if __name__ == "__main__":

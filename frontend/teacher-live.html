@@ -38,6 +38,14 @@
               <a id="tlive-back" class="tlive-back" href="teacher.html" data-i18n="tlive_back_calendar">← Teaching calendar</a>
               <h1 id="tlive-session-title">Live Teaching</h1>
               <p id="tlive-session-meta" class="tlive-topbar__meta">—</p>
+              <div id="tlive-session-join" class="tlive-session-join hidden" hidden>
+                <p class="tlive-session-join__label" data-i18n="tlive_join_label">Students join at:</p>
+                <p class="tlive-session-join__code">
+                  <span data-i18n="tlive_join_code">Code</span>
+                  <strong id="tlive-session-code">——</strong>
+                </p>
+                <a id="tlive-join-link" class="tlive-session-join__link" href="student-live.html" target="_blank" rel="noopener"></a>
+              </div>
             </div>
           </div>
 
@@ -104,6 +112,7 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="app.js"></script>
+    <script src="js/live-teaching-api.js"></script>
     <script src="js/teacher-live-mock.js"></script>
     <script src="js/teacher-name-wheel.js"></script>
     <script src="js/teacher-live.js"></script>

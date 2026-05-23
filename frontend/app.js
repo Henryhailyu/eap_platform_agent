@@ -226,7 +226,7 @@ function getLoggedInUser() {
 function requireRole(expectedRole) {
   const user = getLoggedInUser();
   if (!user || user.role !== expectedRole) {
-    window.location.replace("index.html");
+    window.location.replace(roleHomeUrl(user && user.role ? user.role : ""));
     return false;
   }
   return true;
@@ -275,11 +275,38 @@ function initStudentSelfStudyNavLink() {
   if (link) link.classList.remove("hidden");
 }
 
+/** Phase L27 — student live class join link. */
+function initStudentLiveNavLink() {
+  if (window.EAP_TEACHER_LIVE_ENABLED === false) return;
+  const link = document.getElementById("student-live-link");
+  if (link) link.classList.remove("hidden");
+}
+
 /** Phase L2 — show Live Teaching entry when feature flag is on. */
 function initTeacherLiveNavLink() {
   if (window.EAP_TEACHER_LIVE_ENABLED === false) return;
   const link = document.getElementById("teacher-live-link");
-  if (link) link.classList.remove("hidden");
+  if (link) {
+    link.classList.remove("hidden");
+    link.classList.add("btn-live-nav");
+  }
+}
+
+/** Student satellite pages (self-study, placement, modules). */
+async function bootStudentSatellitePage(pageId, afterReady) {
+  if (document.body.getAttribute("data-page") !== pageId) return false;
+  const result = await ensurePageRole("student");
+  if (!result.ok) {
+    if (result.reason === "wrong_role") {
+      renderWrongRoleGate(result.user.role);
+      return false;
+    }
+    if (result.redirect) window.location.replace(result.redirect);
+    return false;
+  }
+  initAppPageHeader();
+  if (typeof afterReady === "function") afterReady(result.user);
+  return true;
 }
 
 /**
@@ -456,31 +483,18 @@ async function fetchCurrentSessionUser() {
  * When the API is up but there is no Flask session, do not trust local eap_user alone (strict flags need cookies).
  */
 async function validatePageSessionOrFallback(expectedRole) {
-  const local = getLoggedInUser();
-  const serverUser = await fetchCurrentSessionUser();
-
-  if (serverUser) {
-    if (serverUser.role !== expectedRole) {
-      authStorageRemoveAll();
-      window.location.replace("index.html");
-      return null;
-    }
-    saveUserToSession(serverUser);
-    return serverUser;
-  }
-
-  if (await isApiReachable()) {
-    authStorageRemoveAll();
-    window.location.replace("index.html");
+  const result = await ensurePageRole(expectedRole);
+  if (result.ok) return result.user;
+  if (result.reason === "wrong_role" && result.redirect) {
+    saveUserToSession(result.user);
+    window.location.replace(result.redirect);
     return null;
   }
-
-  if (local && local.role === expectedRole) {
-    return local;
+  if (result.redirect) {
+    window.location.replace(result.redirect);
+    return null;
   }
-
-  authStorageRemoveAll();
-  window.location.replace("index.html");
+  window.location.replace(hostedUiPageUrl("index.html"));
   return null;
 }
 
@@ -1493,6 +1507,13 @@ function setupRoleLoginCard(config) {
         return;
       }
 
+      const nextAfterLogin = loginNextRedirectUrl(expectedRole);
+      if (nextAfterLogin) {
+        saveUserToSession(data.user);
+        window.location.href = nextAfterLogin;
+        return;
+      }
+
       saveUserToSession(data.user);
       window.location.href = successUrl;
     } catch (err) {
@@ -1510,6 +1531,110 @@ function setupRoleLoginCard(config) {
       submitBtn.textContent = idleLabel;
     }
   });
+}
+
+function roleHomeUrl(role) {
+  if (role === "teacher") return hostedUiPageUrl("teacher.html");
+  if (role === "student") return hostedUiPageUrl("student.html");
+  if (role === "admin") return hostedUiPageUrl("admin.html");
+  return hostedUiPageUrl("index.html");
+}
+
+function loginNextRedirectUrl(role) {
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (!next || typeof next !== "string") return null;
+  const trimmed = next.trim();
+  if (!trimmed || trimmed.includes("..")) return null;
+  if (role === "student" && !/^student(-live|\.html|-self-study)/i.test(trimmed)) {
+    return null;
+  }
+  if (role === "teacher" && !/^teacher(-live|\.html|-game-builder)/i.test(trimmed)) {
+    return null;
+  }
+  if (typeof hostedUiPageUrl === "function") {
+    return trimmed.startsWith("http") ? trimmed : hostedUiPageUrl(trimmed);
+  }
+  return trimmed;
+}
+
+function loginUrlWithNext(nextPath) {
+  const next = encodeURIComponent(nextPath || "");
+  return hostedUiPageUrl(`index.html?next=${next}`);
+}
+
+/**
+ * Phase L27: shared role check for student/teacher satellite pages.
+ * Returns { ok, user } or { ok: false, reason, redirect?, user? }.
+ */
+async function ensurePageRole(expectedRole) {
+  const serverUser = await fetchCurrentSessionUser();
+
+  if (serverUser) {
+    if (serverUser.role !== expectedRole) {
+      return {
+        ok: false,
+        reason: "wrong_role",
+        user: serverUser,
+        redirect: roleHomeUrl(serverUser.role),
+      };
+    }
+    saveUserToSession(serverUser);
+    return { ok: true, user: serverUser };
+  }
+
+  if (await isApiReachable()) {
+    const path =
+      typeof window !== "undefined" && window.location.pathname
+        ? `${window.location.pathname.split("/").pop() || ""}${window.location.search || ""}`
+        : "";
+    return {
+      ok: false,
+      reason: "login_required",
+      redirect: loginUrlWithNext(path),
+    };
+  }
+
+  const local = getLoggedInUser();
+  if (local && local.role === expectedRole) {
+    return { ok: true, user: local };
+  }
+
+  return { ok: false, reason: "login_required", redirect: hostedUiPageUrl("index.html") };
+}
+
+/**
+ * Show wrong-role message on satellite pages (student self-study, live join, etc.).
+ */
+function renderWrongRoleGate(actualRole) {
+  const main =
+    document.getElementById("main") ||
+    document.getElementById("slive-main") ||
+    document.querySelector(".ssc-main");
+  if (!main) {
+    window.location.replace(roleHomeUrl(actualRole));
+    return;
+  }
+  const homeLabel =
+    actualRole === "teacher"
+      ? t("nav_go_teacher_home")
+      : actualRole === "student"
+        ? t("nav_go_student_home")
+        : t("nav_go_login");
+  const homeUrl = roleHomeUrl(actualRole);
+  main.innerHTML = `
+    <section class="eap-role-gate" role="alert">
+      <h1>${escapeHtml(t("role_gate_title"))}</h1>
+      <p>${escapeHtml(
+        actualRole === "teacher" ? t("role_gate_signed_in_teacher") : t("role_gate_signed_in_other"),
+      )}</p>
+      <div class="eap-role-gate__actions">
+        <a class="btn-primary" href="${escapeHtml(homeUrl)}">${escapeHtml(homeLabel)}</a>
+        <button type="button" class="btn-secondary" id="eap-role-gate-logout">${escapeHtml(t("logout"))}</button>
+      </div>
+    </section>
+  `;
+  document.getElementById("eap-role-gate-logout")?.addEventListener("click", () => logoutAndGoHome());
+  if (window.EAP_I18N) window.EAP_I18N.applyStatic();
 }
 
 function initLoginPage() {
@@ -1532,6 +1657,11 @@ function initLoginPage() {
       (serverUser.role === "teacher" || serverUser.role === "student" || serverUser.role === "admin")
     ) {
       saveUserToSession(serverUser);
+      const nextUrl = loginNextRedirectUrl(serverUser.role);
+      if (nextUrl) {
+        window.location.replace(nextUrl);
+        return;
+      }
       if (serverUser.role === "teacher") {
         window.location.replace(hostedUiPageUrl("teacher.html"));
       } else if (serverUser.role === "student") {
@@ -6061,6 +6191,7 @@ function initStudentPage() {
     await ensureAcademicCalendarLoaded();
     initAppPageHeader();
     initStudentSelfStudyNavLink();
+    initStudentLiveNavLink();
 
   /*
     ----- Student class scope (Phase C3) -----

@@ -257,10 +257,8 @@
     if (redirectIfDisabled()) return;
     if (typeof redirectFilePageToHostedUi === "function" && redirectFilePageToHostedUi()) return;
 
-    const sessionUser = await validatePageSessionOrFallback("student");
-    if (!sessionUser) return;
-
-    initAppPageHeader();
+    const ready = await bootStudentSatellitePage(PAGE, () => {});
+    if (!ready) return;
 
     const placement = MOCK ? MOCK.getPlacement() : null;
     const bannerEl = document.getElementById("ssc-placement-banner");

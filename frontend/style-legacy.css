@@ -884,6 +884,52 @@ body.page-landing .btn-primary:active:not(:disabled) {
   flex-wrap: wrap;
 }
 
+.btn-self-study-link,
+.btn-live-nav {
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.75rem;
+  margin-right: 0.35rem;
+  white-space: nowrap;
+}
+
+.btn-live-nav {
+  border-color: #0a4d68;
+  color: #0a4d68;
+  font-weight: 600;
+}
+
+.btn-live-nav:hover,
+.btn-live-nav:focus-visible {
+  background: rgba(10, 77, 104, 0.08);
+}
+
+.eap-role-gate {
+  max-width: 36rem;
+  margin: 2.5rem auto;
+  padding: 2rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.eap-role-gate h1 {
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+}
+
+.eap-role-gate p {
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
+  color: #444;
+}
+
+.eap-role-gate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
 .site-welcome {
   margin: 0;
   font-size: 0.9375rem;

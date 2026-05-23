@@ -3,11 +3,50 @@
  * Theme reference: #0A4D68 from design brief
  */
 
-.btn-self-study-link {
+.btn-self-study-link,
+.btn-live-nav {
   font-size: 0.8125rem;
   padding: 0.4rem 0.75rem;
   margin-right: 0.35rem;
   white-space: nowrap;
+}
+
+.btn-live-nav {
+  border-color: #0a4d68;
+  color: #0a4d68;
+  font-weight: 600;
+}
+
+.btn-live-nav:hover,
+.btn-live-nav:focus-visible {
+  background: rgba(10, 77, 104, 0.08);
+}
+
+.eap-role-gate {
+  max-width: 36rem;
+  margin: 2.5rem auto;
+  padding: 2rem;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.eap-role-gate h1 {
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+}
+
+.eap-role-gate p {
+  margin: 0 0 1.25rem;
+  line-height: 1.5;
+  color: #444;
+}
+
+.eap-role-gate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
 }
 
 .tlive-page {
@@ -1432,6 +1471,137 @@ body.tlive-modal-open {
 
 .tlive-summary-step-btn {
   font-size: 0.8125rem;
+}
+
+/* L27 — Live session join + student live page */
+.tlive-session-join {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(10, 126, 164, 0.08);
+  border: 1px solid rgba(10, 77, 104, 0.18);
+  max-width: 36rem;
+}
+
+.tlive-session-join__label {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+}
+
+.tlive-session-join__code {
+  margin: 0 0 0.35rem;
+  font-size: 1.125rem;
+}
+
+.tlive-session-join__code strong {
+  font-size: 1.35rem;
+  letter-spacing: 0.12em;
+  color: var(--tlive-primary);
+}
+
+.tlive-session-join__link {
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+.slive-page {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2rem;
+}
+
+.slive-head h1 {
+  margin: 0.35rem 0 0;
+  font-size: 1.5rem;
+  color: #0a4d68;
+}
+
+.slive-meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.9375rem;
+  color: #6e6e73;
+}
+
+.slive-error {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(255, 59, 48, 0.1);
+  color: #c41e14;
+  margin-bottom: 0.5rem;
+}
+
+.slive-logout-hint {
+  margin: 0 0 1rem;
+}
+
+.slive-card {
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(10, 77, 104, 0.15);
+  margin-bottom: 1rem;
+}
+
+.slive-help {
+  margin: 0 0 0.65rem;
+  font-size: 0.875rem;
+  color: #6e6e73;
+}
+
+.slive-code-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.slive-code-input {
+  font: inherit;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  width: 8.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgba(10, 77, 104, 0.25);
+  border-radius: 8px;
+}
+
+.slive-teams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.slive-team-btn--active {
+  outline: 2px solid var(--tlive-primary);
+  outline-offset: 1px;
+  font-weight: 600;
+}
+
+.slive-question-text {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+  line-height: 1.45;
+}
+
+.slive-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.slive-opt-btn {
+  text-align: left;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.slive-sent {
+  margin: 0.75rem 0 0;
+  font-weight: 600;
+  color: #248a3d;
 }
 
 /* L26 — Ranking Challenge */
