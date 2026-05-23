@@ -226,7 +226,11 @@ function getLoggedInUser() {
 function requireRole(expectedRole) {
   const user = getLoggedInUser();
   if (!user || user.role !== expectedRole) {
-    window.location.replace(roleHomeUrl(user && user.role ? user.role : ""));
+    if (user && user.role) {
+      renderWrongRoleGate(user.role);
+    } else {
+      window.location.replace(hostedUiPageUrl("index.html"));
+    }
     return false;
   }
   return true;
@@ -309,26 +313,9 @@ async function bootStudentSatellitePage(pageId, afterReady) {
   return true;
 }
 
-/**
- * Teacher/student live satellite pages — show role gate instead of bouncing to the other calendar.
- */
+/** Live / game-builder pages — same gate behaviour as calendar pages. */
 async function validateSatelliteSessionOrGate(expectedRole) {
-  const result = await ensurePageRole(expectedRole);
-  if (result.ok) {
-    saveUserToSession(result.user);
-    return result.user;
-  }
-  if (result.reason === "wrong_role" && result.user) {
-    saveUserToSession(result.user);
-    renderWrongRoleGate(result.user.role);
-    return null;
-  }
-  if (result.redirect) {
-    window.location.replace(result.redirect);
-    return null;
-  }
-  window.location.replace(hostedUiPageUrl("index.html"));
-  return null;
+  return validatePageSessionOrFallback(expectedRole);
 }
 
 /**
@@ -506,10 +493,13 @@ async function fetchCurrentSessionUser() {
  */
 async function validatePageSessionOrFallback(expectedRole) {
   const result = await ensurePageRole(expectedRole);
-  if (result.ok) return result.user;
-  if (result.reason === "wrong_role" && result.redirect) {
+  if (result.ok) {
     saveUserToSession(result.user);
-    window.location.replace(result.redirect);
+    return result.user;
+  }
+  if (result.reason === "wrong_role" && result.user) {
+    saveUserToSession(result.user);
+    renderWrongRoleGate(result.user.role);
     return null;
   }
   if (result.redirect) {
@@ -1723,19 +1713,10 @@ function initLoginPage() {
       return;
     }
 
-    const existing = getLoggedInUser();
-    if (existing && existing.role === "teacher") {
-      window.location.replace(hostedUiPageUrl("teacher.html"));
-      return;
-    }
-    if (existing && existing.role === "student") {
-      window.location.replace(hostedUiPageUrl("student.html"));
-      return;
-    }
-    if (existing && existing.role === "admin") {
-      window.location.replace(hostedUiPageUrl("admin.html"));
-      return;
-    }
+    /*
+      Do not auto-redirect from localStorage alone — it fights the Flask session cookie
+      and sends teachers to student.html (or vice versa) when roles are mixed in one browser.
+    */
 
     setupRoleLoginCard({
       form: studentForm,
