@@ -136,8 +136,18 @@
       <h3 class="ssc-ai-coach-panel__term">${escapeHtml(explanation.term)}</h3>
       <p class="ssc-ai-coach-panel__def">${escapeHtml(def)}</p>
       ${
+        explanation.word_root
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_ai_word_root")}:</strong> ${escapeHtml(explanation.word_root)}</p>`
+          : ""
+      }
+      ${
         explanation.collocation
           ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_ai_collocation")}:</strong> ${escapeHtml(explanation.collocation)}</p>`
+          : ""
+      }
+      ${
+        explanation.derived_words
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_ai_derived")}:</strong> ${escapeHtml(explanation.derived_words)}</p>`
           : ""
       }
       ${

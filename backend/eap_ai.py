@@ -128,9 +128,13 @@ def vocabulary_explain(
     level: str = "beginner",
     lang: str = "en",
     provider: str | None = None,
+    system_prompt: str | None = None,
+    json_keys: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     """Generate a structured vocabulary explanation for self-study (Phase K2)."""
     import json
+
+    from self_study_ai_prompts import DEFAULT_VOCABULARY_SYSTEM_PROMPT, VOCABULARY_JSON_KEYS
 
     cleaned = " ".join(str(term or "").split()).strip()
     if not cleaned or len(cleaned) > 80:
@@ -140,15 +144,9 @@ def vocabulary_explain(
     if lvl not in _VOCAB_LEVELS:
         lvl = "beginner"
     ui_lang = "zh" if str(lang or "en").strip().lower().startswith("zh") else "en"
+    keys = json_keys or VOCABULARY_JSON_KEYS
+    prompt = (system_prompt or DEFAULT_VOCABULARY_SYSTEM_PROMPT).strip()
 
-    system_prompt = (
-        "You are an EAP vocabulary coach for IELTS-aligned university prep. "
-        "Return ONLY valid JSON with exactly these keys: "
-        "definition_en, definition_zh, example_en, example_zh, collocation, "
-        "memory_tip_en, memory_tip_zh. "
-        "Keep each value concise (1–2 short sentences). Use academic register. "
-        "Collocation should be one natural phrase using the word."
-    )
     user_prompt = (
         f"Explain the word '{cleaned}' for a {lvl}-level EAP student. "
         f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}."
@@ -158,10 +156,10 @@ def vocabulary_explain(
     response = client.chat.completions.create(
         model=profile["model"],
         messages=[
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": prompt},
             {"role": "user", "content": user_prompt},
         ],
-        max_tokens=700,
+        max_tokens=900,
         temperature=0.35,
         response_format={"type": "json_object"},
     )
@@ -179,16 +177,12 @@ def vocabulary_explain(
     def pick(key: str) -> str:
         return str(payload.get(key) or "").strip()
 
-    return {
+    result: dict[str, Any] = {
         "term": cleaned,
         "level": lvl,
         "provider": profile["id"],
         "model": profile["model"],
-        "definition_en": pick("definition_en"),
-        "definition_zh": pick("definition_zh"),
-        "example_en": pick("example_en"),
-        "example_zh": pick("example_zh"),
-        "collocation": pick("collocation"),
-        "memory_tip_en": pick("memory_tip_en"),
-        "memory_tip_zh": pick("memory_tip_zh"),
     }
+    for key in keys:
+        result[key] = pick(key)
+    return result

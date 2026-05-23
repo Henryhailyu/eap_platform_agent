@@ -648,6 +648,56 @@ body.eap-wix .admin-mat-form__actions {
   margin-top: 0.5rem;
 }
 
+body.eap-wix .admin-ai-prompt {
+  width: 100%;
+  min-height: 12rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--wix-card-border, rgba(0, 0, 0, 0.12));
+  resize: vertical;
+}
+
+body.eap-wix .admin-ai-form__row {
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+body.eap-wix .admin-ai-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
+body.eap-wix .admin-ai-preview-block {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--wix-card-border, rgba(0, 0, 0, 0.08));
+}
+
+body.eap-wix .admin-ai-preview-block__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+body.eap-wix .admin-ai-preview {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(10, 126, 164, 0.2);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+body.eap-wix .admin-ai-preview__title {
+  margin: 0 0 0.5rem;
+  color: var(--wix-teal, #0a7ea4);
+}
+
 body.eap-wix .admin-mat-suggest {
   font-size: 0.875rem;
   color: var(--wix-teal, #0a7ea4);

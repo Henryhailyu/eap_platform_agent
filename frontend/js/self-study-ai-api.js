@@ -55,8 +55,63 @@
     return data.explanation;
   }
 
+  async function listAdminPrompts() {
+    const response = await fetchFn()(`${API_BASE}/api/admin/self-study/ai/prompts`, {
+      credentials: "include",
+      headers: authHeaders(),
+    });
+    return readJson(response);
+  }
+
+  async function getAdminPrompt(module) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/admin/self-study/ai/prompts/${encodeURIComponent(module)}`,
+      { credentials: "include", headers: authHeaders() },
+    );
+    return readJson(response);
+  }
+
+  async function saveAdminPrompt(module, systemPrompt) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/admin/self-study/ai/prompts/${encodeURIComponent(module)}`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ system_prompt: systemPrompt }),
+      },
+    );
+    return readJson(response);
+  }
+
+  async function resetAdminPrompt(module) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/admin/self-study/ai/prompts/${encodeURIComponent(module)}`,
+      { method: "DELETE", credentials: "include", headers: authHeaders() },
+    );
+    return readJson(response);
+  }
+
+  async function previewAdminPrompt(module, payload) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/admin/self-study/ai/prompts/${encodeURIComponent(module)}/preview`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload || {}),
+      },
+    );
+    return readJson(response);
+  }
+
   global.EAP_SELF_STUDY_AI = {
     getStatus,
     explainVocabulary,
+    listAdminPrompts,
+    getAdminPrompt,
+    saveAdminPrompt,
+    resetAdminPrompt,
+    previewAdminPrompt,
   };
 })(typeof window !== "undefined" ? window : globalThis);

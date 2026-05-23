@@ -45,6 +45,15 @@ from api_errors import (
 )
 from auth_v1 import get_bearer_token_from_header, issue_access_token, verify_access_token
 from eap_config import config, setup_logging, validate_production_config
+from self_study_ai_prompts import (
+    VOCABULARY_JSON_KEYS,
+    default_prompt,
+    get_prompt,
+    list_prompts,
+    normalize_module,
+    reset_prompt,
+    save_prompt,
+)
 
 try:
     from eap_ai import ai_is_configured, ai_ping, ai_public_status, vocabulary_explain
@@ -680,6 +689,18 @@ def init_database():
         """
     )
 
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS self_study_ai_prompts (
+            module TEXT PRIMARY KEY,
+            system_prompt TEXT NOT NULL,
+            is_default INTEGER NOT NULL DEFAULT 1,
+            updated_by TEXT,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
     seed_default_users(conn)
     ensure_e1_demo_users(conn)
     seed_academic_calendar(conn)
@@ -688,6 +709,9 @@ def init_database():
     seed_default_class_memberships(conn)
     seed_task_templates(conn)
     backfill_calendar_tasks_title_zh(conn)
+    from self_study_ai_prompts import seed_default_prompts
+
+    seed_default_prompts(conn)
 
     conn.commit()
     conn.close()
@@ -7044,9 +7068,9 @@ def student_self_study_vocabulary_explain():
     if err is not None:
         conn.close()
         return err
-    conn.close()
 
     if not vocabulary_explain or not ai_is_configured or not ai_is_configured():
+        conn.close()
         return jsonify({"error": "AI study coach is not available"}), 503
 
     body = request.get_json(silent=True) or {}
@@ -7054,14 +7078,127 @@ def student_self_study_vocabulary_explain():
     level = str(body.get("level") or "beginner").strip().lower()
     lang = str(body.get("lang") or "en").strip().lower()
     if not term:
+        conn.close()
         return jsonify({"error": "term is required"}), 400
 
     try:
-        result = vocabulary_explain(term, level=level, lang=lang)
+        prompt_row = get_prompt(conn, "vocabulary")
+        result = vocabulary_explain(
+            term,
+            level=level,
+            lang=lang,
+            system_prompt=prompt_row["system_prompt"],
+            json_keys=VOCABULARY_JSON_KEYS,
+        )
+        conn.close()
+        return jsonify({"explanation": result})
+    except ValueError as exc:
+        conn.close()
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001 — provider errors for student UI
+        conn.close()
+        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+
+
+@app.route("/api/admin/self-study/ai/prompts", methods=["GET"])
+def admin_self_study_ai_prompts_list():
+    """Phase K2b: list manager AI prompts for all self-study modules."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+    prompts = list_prompts(conn)
+    conn.close()
+    return jsonify({"prompts": prompts, "json_keys": list(VOCABULARY_JSON_KEYS)})
+
+
+@app.route("/api/admin/self-study/ai/prompts/<module>", methods=["GET", "PUT", "DELETE"])
+def admin_self_study_ai_prompt(module):
+    """Phase K2b: read, save, or reset one module AI system prompt."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    try:
+        mod = normalize_module(module)
+    except ValueError:
+        conn.close()
+        return jsonify({"error": "Invalid module"}), 400
+
+    if request.method == "GET":
+        payload = get_prompt(conn, mod)
+        conn.close()
+        return jsonify({"prompt": payload, "default_prompt": default_prompt(mod)})
+
+    actor = get_current_authenticated_user(conn)
+    username = str(actor["username"] or "").strip() if actor else ""
+
+    if request.method == "DELETE":
+        payload = reset_prompt(conn, mod, username)
+        conn.close()
+        return jsonify({"prompt": payload})
+
+    body = request.get_json(silent=True) or {}
+    text = str(body.get("system_prompt") or "").strip()
+    if not text:
+        conn.close()
+        return jsonify({"error": "system_prompt is required"}), 400
+    try:
+        payload = save_prompt(conn, mod, text, username)
+    except ValueError as exc:
+        conn.close()
+        return jsonify({"error": str(exc)}), 400
+    conn.close()
+    return jsonify({"prompt": payload})
+
+
+@app.route("/api/admin/self-study/ai/prompts/<module>/preview", methods=["POST"])
+def admin_self_study_ai_prompt_preview(module):
+    """Phase K2b: preview AI output with current or draft prompt (manager only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    try:
+        mod = normalize_module(module)
+    except ValueError:
+        conn.close()
+        return jsonify({"error": "Invalid module"}), 400
+
+    if mod != "vocabulary":
+        conn.close()
+        return jsonify({"error": "Preview is available for vocabulary only in this release"}), 400
+
+    if not vocabulary_explain or not ai_is_configured or not ai_is_configured():
+        conn.close()
+        return jsonify({"error": "AI not configured"}), 503
+
+    body = request.get_json(silent=True) or {}
+    term = str(body.get("term") or "analyze").strip()
+    level = str(body.get("level") or "beginner").strip().lower()
+    lang = str(body.get("lang") or "en").strip().lower()
+    draft = str(body.get("system_prompt") or "").strip()
+    prompt_row = get_prompt(conn, mod)
+    conn.close()
+    system_prompt = draft or prompt_row["system_prompt"]
+
+    try:
+        result = vocabulary_explain(
+            term,
+            level=level,
+            lang=lang,
+            system_prompt=system_prompt,
+            json_keys=VOCABULARY_JSON_KEYS,
+        )
         return jsonify({"explanation": result})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-    except Exception as exc:  # noqa: BLE001 — provider errors for student UI
+    except Exception as exc:  # noqa: BLE001
         return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
 
 

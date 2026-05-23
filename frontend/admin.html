@@ -244,6 +244,47 @@
             <p id="admin-mat-empty" class="admin-empty hidden" data-i18n="admin_mat_empty">No self-study materials yet.</p>
           </section>
 
+          <section class="content-section admin-panel" aria-labelledby="admin-ai-heading">
+            <h2 id="admin-ai-heading" class="section-heading" data-i18n="admin_ai_heading">AI study coach instructions</h2>
+            <p class="admin-panel__hint" data-i18n="admin_ai_hint">
+              Set the system prompt for each self-study module. Students receive answers in the same JSON format (vocabulary: root, collocation, derived words, examples, memory tips).
+            </p>
+            <p id="admin-ai-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            <div class="admin-inline-form admin-ai-form__row">
+              <div class="field">
+                <label for="admin-ai-module" data-i18n="admin_mat_module">Skill module</label>
+                <select id="admin-ai-module"></select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="admin-ai-prompt" data-i18n="admin_ai_prompt_label">AI system instruction</label>
+              <textarea id="admin-ai-prompt" class="admin-ai-prompt" rows="10" spellcheck="false"></textarea>
+            </div>
+            <div class="admin-ai-form__actions">
+              <button type="button" class="btn-primary" id="admin-ai-save-btn" data-i18n="admin_ai_save">Save instruction</button>
+              <button type="button" class="btn-secondary" id="admin-ai-reset-btn" data-i18n="admin_ai_reset">Reset to default</button>
+            </div>
+            <div class="admin-ai-preview-block">
+              <h3 class="admin-ai-preview-block__title" data-i18n="admin_ai_preview_title">Preview (vocabulary)</h3>
+              <div class="admin-inline-form admin-ai-form__row">
+                <div class="field">
+                  <label for="admin-ai-preview-term" data-i18n="admin_ai_preview_term">Sample word</label>
+                  <input id="admin-ai-preview-term" type="text" value="analyze" maxlength="80" />
+                </div>
+                <div class="field">
+                  <label for="admin-ai-preview-level" data-i18n="admin_mat_level">Level</label>
+                  <select id="admin-ai-preview-level">
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-secondary" id="admin-ai-preview-btn" data-i18n="admin_ai_preview_btn">Run preview</button>
+              </div>
+              <div id="admin-ai-preview" class="admin-ai-preview hidden" aria-live="polite"></div>
+            </div>
+          </section>
+
           <section class="content-section admin-panel" aria-labelledby="admin-students-heading">
             <h2 id="admin-students-heading" class="section-heading" data-i18n="admin_students_heading">
               Students
@@ -276,6 +317,8 @@
     <script src="js/manager-self-study-materials-mock.js"></script>
     <script src="app.js"></script>
     <script src="js/self-study-materials-api.js"></script>
+    <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-materials.js"></script>
+    <script src="js/admin-self-study-ai-prompts.js"></script>
   </body>
 </html>
