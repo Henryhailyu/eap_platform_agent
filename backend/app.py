@@ -47,8 +47,10 @@ from auth_v1 import get_bearer_token_from_header, issue_access_token, verify_acc
 from eap_config import config, setup_logging, validate_production_config
 from self_study_ai_prompts import (
     VOCABULARY_JSON_KEYS,
+    coach_modules_with_api,
     default_prompt,
     get_prompt,
+    json_keys_for_module,
     list_prompts,
     normalize_module,
     reset_prompt,
@@ -56,11 +58,12 @@ from self_study_ai_prompts import (
 )
 
 try:
-    from eap_ai import ai_is_configured, ai_ping, ai_public_status, vocabulary_explain
+    from eap_ai import ai_is_configured, ai_ping, ai_public_status, module_coach_reply, vocabulary_explain
 except ImportError:
     ai_is_configured = None  # type: ignore[assignment,misc]
     ai_ping = None  # type: ignore[assignment,misc]
     ai_public_status = None  # type: ignore[assignment,misc]
+    module_coach_reply = None  # type: ignore[assignment,misc]
     vocabulary_explain = None  # type: ignore[assignment,misc]
 
 setup_logging()
@@ -7056,8 +7059,58 @@ def student_self_study_ai_status():
             "available": bool(status.get("enabled") and status.get("configured")),
             "active_provider": status.get("active_provider"),
             "model": status.get("model"),
+            "coach_modules": sorted(coach_modules_with_api()),
         }
     )
+
+
+@app.route("/api/student/self-study/ai/coach/<module>", methods=["POST"])
+def student_self_study_ai_coach(module):
+    """Phase K2c: generic self-study AI coach (reading, etc.) using manager prompts."""
+    try:
+        mod = normalize_module(module)
+    except ValueError:
+        return jsonify({"error": "Invalid module"}), 400
+
+    if mod not in coach_modules_with_api() or mod == "vocabulary":
+        return jsonify({"error": "Use vocabulary-explain for vocabulary"}), 400
+
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "student")
+    if err is not None:
+        conn.close()
+        return err
+
+    if not module_coach_reply or not ai_is_configured or not ai_is_configured():
+        conn.close()
+        return jsonify({"error": "AI study coach is not available"}), 503
+
+    body = request.get_json(silent=True) or {}
+    text = str(body.get("text") or body.get("passage") or "").strip()
+    level = str(body.get("level") or "beginner").strip().lower()
+    lang = str(body.get("lang") or "en").strip().lower()
+    if not text:
+        conn.close()
+        return jsonify({"error": "text is required"}), 400
+
+    try:
+        prompt_row = get_prompt(conn, mod)
+        result = module_coach_reply(
+            mod,
+            text,
+            level=level,
+            lang=lang,
+            system_prompt=prompt_row["system_prompt"],
+            json_keys=json_keys_for_module(mod),
+        )
+        conn.close()
+        return jsonify({"coach": result})
+    except ValueError as exc:
+        conn.close()
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        conn.close()
+        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
 
 
 @app.route("/api/student/self-study/ai/vocabulary-explain", methods=["POST"])
@@ -7110,7 +7163,13 @@ def admin_self_study_ai_prompts_list():
         return guard
     prompts = list_prompts(conn)
     conn.close()
-    return jsonify({"prompts": prompts, "json_keys": list(VOCABULARY_JSON_KEYS)})
+    return jsonify(
+        {
+            "prompts": prompts,
+            "json_keys": {mod: list(json_keys_for_module(mod)) for mod in sorted(coach_modules_with_api())},
+            "coach_modules": sorted(coach_modules_with_api()),
+        }
+    )
 
 
 @app.route("/api/admin/self-study/ai/prompts/<module>", methods=["GET", "PUT", "DELETE"])
@@ -7170,32 +7229,50 @@ def admin_self_study_ai_prompt_preview(module):
         conn.close()
         return jsonify({"error": "Invalid module"}), 400
 
-    if mod != "vocabulary":
-        conn.close()
-        return jsonify({"error": "Preview is available for vocabulary only in this release"}), 400
-
-    if not vocabulary_explain or not ai_is_configured or not ai_is_configured():
+    if not ai_is_configured or not ai_is_configured():
         conn.close()
         return jsonify({"error": "AI not configured"}), 503
 
+    if mod not in coach_modules_with_api():
+        conn.close()
+        return jsonify({"error": "Preview not available for this module yet"}), 400
+
     body = request.get_json(silent=True) or {}
-    term = str(body.get("term") or "analyze").strip()
     level = str(body.get("level") or "beginner").strip().lower()
     lang = str(body.get("lang") or "en").strip().lower()
     draft = str(body.get("system_prompt") or "").strip()
     prompt_row = get_prompt(conn, mod)
     conn.close()
     system_prompt = draft or prompt_row["system_prompt"]
+    keys = json_keys_for_module(mod)
 
     try:
-        result = vocabulary_explain(
-            term,
+        if mod == "vocabulary":
+            if not vocabulary_explain:
+                return jsonify({"error": "AI module not available"}), 503
+            term = str(body.get("term") or "analyze").strip()
+            result = vocabulary_explain(
+                term,
+                level=level,
+                lang=lang,
+                system_prompt=system_prompt,
+                json_keys=keys or VOCABULARY_JSON_KEYS,
+            )
+            return jsonify({"explanation": result, "coach": result})
+        if not module_coach_reply:
+            return jsonify({"error": "AI module not available"}), 503
+        text = str(body.get("text") or body.get("passage") or "").strip()
+        if not text:
+            return jsonify({"error": "text or passage is required for reading preview"}), 400
+        result = module_coach_reply(
+            mod,
+            text,
             level=level,
             lang=lang,
             system_prompt=system_prompt,
-            json_keys=VOCABULARY_JSON_KEYS,
+            json_keys=keys,
         )
-        return jsonify({"explanation": result})
+        return jsonify({"coach": result, "explanation": result})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001

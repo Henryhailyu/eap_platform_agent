@@ -121,45 +121,30 @@ def ai_ping(provider: str | None = None) -> dict[str, Any]:
 
 
 _VOCAB_LEVELS = frozenset({"beginner", "intermediate", "advanced"})
+_MAX_COACH_TEXT = 4000
 
 
-def vocabulary_explain(
-    term: str,
-    level: str = "beginner",
-    lang: str = "en",
+def _coach_json_reply(
+    system_prompt: str,
+    user_prompt: str,
+    json_keys: tuple[str, ...],
     provider: str | None = None,
-    system_prompt: str | None = None,
-    json_keys: tuple[str, ...] | None = None,
+    max_tokens: int = 900,
+    extra_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Generate a structured vocabulary explanation for self-study (Phase K2)."""
     import json
 
-    from self_study_ai_prompts import DEFAULT_VOCABULARY_SYSTEM_PROMPT, VOCABULARY_JSON_KEYS
-
-    cleaned = " ".join(str(term or "").split()).strip()
-    if not cleaned or len(cleaned) > 80:
-        raise ValueError("term must be 1–80 characters")
-
-    lvl = str(level or "beginner").strip().lower()
-    if lvl not in _VOCAB_LEVELS:
-        lvl = "beginner"
-    ui_lang = "zh" if str(lang or "en").strip().lower().startswith("zh") else "en"
-    keys = json_keys or VOCABULARY_JSON_KEYS
-    prompt = (system_prompt or DEFAULT_VOCABULARY_SYSTEM_PROMPT).strip()
-
-    user_prompt = (
-        f"Explain the word '{cleaned}' for a {lvl}-level EAP student. "
-        f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}."
-    )
+    if not json_keys:
+        raise ValueError("json_keys required")
 
     client, profile = get_openai_client(provider)
     response = client.chat.completions.create(
         model=profile["model"],
         messages=[
-            {"role": "system", "content": prompt},
+            {"role": "system", "content": system_prompt.strip()},
             {"role": "user", "content": user_prompt},
         ],
-        max_tokens=900,
+        max_tokens=max_tokens,
         temperature=0.35,
         response_format={"type": "json_object"},
     )
@@ -178,11 +163,90 @@ def vocabulary_explain(
         return str(payload.get(key) or "").strip()
 
     result: dict[str, Any] = {
-        "term": cleaned,
-        "level": lvl,
         "provider": profile["id"],
         "model": profile["model"],
     }
-    for key in keys:
+    if extra_meta:
+        result.update(extra_meta)
+    for key in json_keys:
         result[key] = pick(key)
     return result
+
+
+def module_coach_reply(
+    module: str,
+    text: str,
+    level: str = "beginner",
+    lang: str = "en",
+    system_prompt: str | None = None,
+    json_keys: tuple[str, ...] | None = None,
+    provider: str | None = None,
+) -> dict[str, Any]:
+    """Generic self-study coach reply using manager system prompt (Phase K2c)."""
+    from self_study_ai_prompts import default_prompt, json_keys_for_module, normalize_module
+
+    mod = normalize_module(module)
+    keys = json_keys or json_keys_for_module(mod)
+    if not keys:
+        raise ValueError(f"module '{mod}' has no JSON schema")
+
+    cleaned = " ".join(str(text or "").split())
+    if not cleaned:
+        raise ValueError("text is required")
+    if len(cleaned) > _MAX_COACH_TEXT:
+        cleaned = cleaned[:_MAX_COACH_TEXT]
+
+    lvl = str(level or "beginner").strip().lower()
+    if lvl not in _VOCAB_LEVELS:
+        lvl = "beginner"
+    ui_lang = "zh" if str(lang or "en").strip().lower().startswith("zh") else "en"
+    prompt = (system_prompt or default_prompt(mod)).strip()
+
+    if mod == "vocabulary":
+        user_prompt = (
+            f"Explain the word '{cleaned}' for a {lvl}-level EAP student. "
+            f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}."
+        )
+        meta = {"term": cleaned, "level": lvl, "module": mod}
+    elif mod == "reading":
+        user_prompt = (
+            f"Analyse this reading passage for a {lvl}-level EAP student. "
+            f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}.\n\n"
+            f"Passage:\n{cleaned}"
+        )
+        meta = {"level": lvl, "module": mod, "passage_preview": cleaned[:160]}
+    else:
+        user_prompt = (
+            f"Coach this {mod} self-study content for a {lvl}-level EAP student. "
+            f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}.\n\n"
+            f"Content:\n{cleaned}"
+        )
+        meta = {"level": lvl, "module": mod}
+
+    return _coach_json_reply(prompt, user_prompt, keys, provider=provider, extra_meta=meta)
+
+
+def vocabulary_explain(
+    term: str,
+    level: str = "beginner",
+    lang: str = "en",
+    provider: str | None = None,
+    system_prompt: str | None = None,
+    json_keys: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
+    """Generate a structured vocabulary explanation for self-study (Phase K2)."""
+    from self_study_ai_prompts import VOCABULARY_JSON_KEYS
+
+    cleaned = " ".join(str(term or "").split()).strip()
+    if not cleaned or len(cleaned) > 80:
+        raise ValueError("term must be 1–80 characters")
+
+    return module_coach_reply(
+        "vocabulary",
+        cleaned,
+        level=level,
+        lang=lang,
+        system_prompt=system_prompt,
+        json_keys=json_keys or VOCABULARY_JSON_KEYS,
+        provider=provider,
+    )

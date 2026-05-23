@@ -10,6 +10,69 @@
     return key;
   }
 
+  function isZh() {
+    return !!(window.EAP_I18N && window.EAP_I18N.getLang() === "zh");
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function aiCoachAvailable() {
+    return !!(window.EAP_SELF_STUDY_AI && typeof window.EAP_SELF_STUDY_AI.coachModule === "function");
+  }
+
+  function renderReadingCoach(explanation) {
+    const zh = isZh();
+    const summary = zh ? explanation.summary_zh || explanation.summary_en : explanation.summary_en;
+    const keyIdea = zh ? explanation.key_idea_zh || explanation.key_idea_en : explanation.key_idea_en;
+    const vocabTip = zh ? explanation.vocabulary_tip_zh || explanation.vocabulary_tip_en : explanation.vocabulary_tip_en;
+    return `
+      ${summary ? `<p class="ssc-ai-coach-panel__def">${escapeHtml(summary)}</p>` : ""}
+      ${
+        keyIdea
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_reading_ai_key_idea")}:</strong> ${escapeHtml(keyIdea)}</p>`
+          : ""
+      }
+      ${
+        vocabTip
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_reading_ai_vocab_tip")}:</strong> ${escapeHtml(vocabTip)}</p>`
+          : ""
+      }
+    `;
+  }
+
+  function bindReadingAiCoach(root, levelId, passageText) {
+    const panel = root.querySelector("#ssc-ai-coach-panel");
+    const btn = root.querySelector("#ssc-reading-ai-btn");
+    const AI = window.EAP_SELF_STUDY_AI;
+    if (!panel || !btn || !AI) return;
+
+    btn.addEventListener("click", async () => {
+      const text = passageText || "";
+      if (!text) return;
+      panel.classList.remove("hidden");
+      panel.innerHTML = `<p class="ssc-ai-coach-panel__loading">${t("self_study_ai_loading")}</p>`;
+      btn.disabled = true;
+      try {
+        const coach = await AI.coachModule("reading", text, levelId, isZh() ? "zh" : "en");
+        panel.innerHTML = `
+          <h3 class="ssc-ai-coach-panel__term">${t("self_study_reading_ai_title")}</h3>
+          ${renderReadingCoach(coach)}
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (_) {
+        panel.innerHTML = `<p class="ssc-ai-coach-panel__error" role="alert">${t("self_study_ai_error")}</p>`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   function managerMaterialsBlock(skill, levelId) {
     const MAT = window.EAP_MANAGER_SSC_MATERIALS;
     return MAT ? MAT.renderLearnBlock(skill, levelId) : "";
@@ -113,13 +176,31 @@
 
     function renderLearn(root) {
       progress = READ.getProgress() || progress;
+      const passageText = READ.passage(pack);
+      const aiOn = aiCoachAvailable();
       root.innerHTML = `
         ${managerMaterialsBlock("reading", levelId)}
+        ${
+          aiOn
+            ? `<div class="ssc-ai-coach-banner">
+          <p class="ssc-ai-coach-banner__label">${t("self_study_ai_coach_label")}</p>
+          <p class="ssc-ai-coach-banner__hint">${t("self_study_reading_ai_hint")}</p>
+        </div>`
+            : ""
+        }
         <div class="ssc-lesson-card">
           <h2 data-i18n="self_study_reading_learn_title">Reading strategy</h2>
-          <p>${READ.lesson(pack)}</p>
+          <p>${escapeHtml(READ.lesson(pack))}</p>
         </div>
-        <div class="ssc-question-card__passage ssc-passage-block">${READ.passage(pack)}</div>
+        <div class="ssc-question-card__passage ssc-passage-block">${escapeHtml(passageText)}</div>
+        ${
+          aiOn
+            ? `<div class="ssc-placement-actions">
+          <button type="button" class="btn-secondary" id="ssc-reading-ai-btn">${t("self_study_reading_ai_btn")}</button>
+        </div>
+        <section id="ssc-ai-coach-panel" class="ssc-ai-coach-panel hidden" aria-live="polite"></section>`
+            : ""
+        }
         <div class="ssc-placement-actions">
           <button type="button" class="btn-primary" id="ssc-learn-done">${progress.learnDone ? t("self_study_vocab_learn_reviewed") : t("self_study_vocab_mark_learn")}</button>
         </div>
@@ -130,6 +211,9 @@
         progress = refreshStatus(READ, levelId, "self_study_reading_complete");
         renderLearn(root);
       });
+      if (aiOn) {
+        bindReadingAiCoach(root, levelId, passageText);
+      }
     }
 
     function renderPractice(root) {

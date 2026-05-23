@@ -267,9 +267,13 @@
             <div class="admin-ai-preview-block">
               <h3 class="admin-ai-preview-block__title" data-i18n="admin_ai_preview_title">Preview (vocabulary)</h3>
               <div class="admin-inline-form admin-ai-form__row">
-                <div class="field">
-                  <label for="admin-ai-preview-term" data-i18n="admin_ai_preview_term">Sample word</label>
+                <div class="field admin-ai-preview-vocab">
+                  <label for="admin-ai-preview-term" data-i18n="admin_ai_preview_vocab">Sample word (vocabulary)</label>
                   <input id="admin-ai-preview-term" type="text" value="analyze" maxlength="80" />
+                </div>
+                <div class="field admin-ai-preview-reading hidden">
+                  <label for="admin-ai-preview-passage" data-i18n="admin_ai_preview_passage">Sample passage (reading)</label>
+                  <textarea id="admin-ai-preview-passage" class="admin-ai-passage" rows="4" spellcheck="false">Online learning helps students review materials at their own pace. However, without a study plan, students may fall behind.</textarea>
                 </div>
                 <div class="field">
                   <label for="admin-ai-preview-level" data-i18n="admin_mat_level">Level</label>

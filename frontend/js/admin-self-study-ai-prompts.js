@@ -1,5 +1,5 @@
 /**
- * Manager centre — self-study AI prompt configuration (Phase K2b).
+ * Manager centre — self-study AI prompt configuration (Phase K2b–K2c).
  */
 (function () {
   const AI = () => window.EAP_SELF_STUDY_AI;
@@ -27,12 +27,6 @@
       .replace(/"/g, "&quot;");
   }
 
-  function moduleLabel(id) {
-    const api = MAT();
-    if (api && typeof api.moduleLabel === "function") return api.moduleLabel(id);
-    return id;
-  }
-
   function populateModules(sel, selected) {
     const api = MAT();
     if (!sel || !api || !api.MODULES) return;
@@ -43,8 +37,39 @@
     }).join("");
   }
 
-  function renderPreview(panel, explanation) {
-    if (!panel || !explanation) return;
+  function syncPreviewFields(mod) {
+    const isReading = mod === "reading";
+    document.querySelectorAll(".admin-ai-preview-vocab").forEach((el) => {
+      el.classList.toggle("hidden", isReading);
+    });
+    document.querySelectorAll(".admin-ai-preview-reading").forEach((el) => {
+      el.classList.toggle("hidden", !isReading);
+    });
+  }
+
+  function renderPreview(panel, mod, payload) {
+    if (!panel || !payload) return;
+    panel.classList.remove("hidden");
+
+    if (mod === "reading") {
+      const rows = [
+        ["summary_en", t("self_study_reading_ai_title")],
+        ["key_idea_en", t("self_study_reading_ai_key_idea")],
+        ["vocabulary_tip_en", t("self_study_reading_ai_vocab_tip")],
+      ];
+      panel.innerHTML = `
+        <h4 class="admin-ai-preview__title">${t("self_study_reading_ai_title")}</h4>
+        ${rows
+          .map(([key, label]) => {
+            const val = payload[key];
+            if (!val) return "";
+            return `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(val)}</p>`;
+          })
+          .join("")}
+      `;
+      return;
+    }
+
     const rows = [
       ["definition_en", "Definition"],
       ["word_root", t("self_study_ai_word_root")],
@@ -53,12 +78,11 @@
       ["example_en", t("self_study_ai_example")],
       ["memory_tip_en", t("self_study_ai_memory_tip")],
     ];
-    panel.classList.remove("hidden");
     panel.innerHTML = `
-      <h4 class="admin-ai-preview__title">${escapeHtml(explanation.term || "—")}</h4>
+      <h4 class="admin-ai-preview__title">${escapeHtml(payload.term || "—")}</h4>
       ${rows
         .map(([key, label]) => {
-          const val = explanation[key];
+          const val = payload[key];
           if (!val) return "";
           return `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(val)}</p>`;
         })
@@ -69,8 +93,7 @@
   async function loadPrompt(module) {
     const api = AI();
     if (!api) return null;
-    const data = await api.getAdminPrompt(module);
-    return data;
+    return api.getAdminPrompt(module);
   }
 
   async function initAdminSelfStudyAiPrompts() {
@@ -82,9 +105,11 @@
     if (!modSel || !promptEl || !AI()) return;
 
     populateModules(modSel, "vocabulary");
+    syncPreviewFields(modSel.value || "vocabulary");
 
     async function refreshPrompt() {
       const mod = modSel.value || "vocabulary";
+      syncPreviewFields(mod);
       setStatus(statusEl, "", false);
       if (previewPanel) {
         previewPanel.classList.add("hidden");
@@ -130,17 +155,23 @@
 
     document.getElementById("admin-ai-preview-btn")?.addEventListener("click", async () => {
       const mod = modSel.value || "vocabulary";
-      const term = (document.getElementById("admin-ai-preview-term")?.value || "analyze").trim();
       const level = document.getElementById("admin-ai-preview-level")?.value || "beginner";
+      const lang = window.EAP_I18N && window.EAP_I18N.getLang() === "zh" ? "zh" : "en";
+      const body = {
+        level,
+        lang,
+        system_prompt: promptEl.value.trim(),
+      };
+      if (mod === "reading") {
+        body.text = (document.getElementById("admin-ai-preview-passage")?.value || "").trim();
+      } else {
+        body.term = (document.getElementById("admin-ai-preview-term")?.value || "analyze").trim();
+      }
       setStatus(statusEl, t("admin_ai_previewing"), false);
       try {
-        const data = await AI().previewAdminPrompt(mod, {
-          term,
-          level,
-          lang: window.EAP_I18N && window.EAP_I18N.getLang() === "zh" ? "zh" : "en",
-          system_prompt: promptEl.value.trim(),
-        });
-        renderPreview(previewPanel, data.explanation);
+        const data = await AI().previewAdminPrompt(mod, body);
+        const payload = data.coach || data.explanation;
+        renderPreview(previewPanel, mod, payload);
         setStatus(statusEl, t("admin_ai_preview_ok"), false);
       } catch (err) {
         if (previewPanel) previewPanel.classList.add("hidden");

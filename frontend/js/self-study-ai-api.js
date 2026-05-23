@@ -55,6 +55,24 @@
     return data.explanation;
   }
 
+  async function coachModule(module, text, level, lang) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/student/self-study/ai/coach/${encodeURIComponent(module || "reading")}`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          text: text || "",
+          level: level || "beginner",
+          lang: lang || "en",
+        }),
+      },
+    );
+    const data = await readJson(response);
+    return data.coach;
+  }
+
   async function listAdminPrompts() {
     const response = await fetchFn()(`${API_BASE}/api/admin/self-study/ai/prompts`, {
       credentials: "include",
@@ -108,6 +126,7 @@
   global.EAP_SELF_STUDY_AI = {
     getStatus,
     explainVocabulary,
+    coachModule,
     listAdminPrompts,
     getAdminPrompt,
     saveAdminPrompt,

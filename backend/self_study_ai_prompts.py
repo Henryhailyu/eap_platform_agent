@@ -19,6 +19,62 @@ VOCABULARY_JSON_KEYS = (
     "memory_tip_zh",
 )
 
+READING_JSON_KEYS = (
+    "summary_en",
+    "summary_zh",
+    "key_idea_en",
+    "key_idea_zh",
+    "vocabulary_tip_en",
+    "vocabulary_tip_zh",
+)
+
+LISTENING_JSON_KEYS = (
+    "gist_en",
+    "gist_zh",
+    "note_taking_tip_en",
+    "note_taking_tip_zh",
+    "key_phrases",
+)
+
+SPEAKING_JSON_KEYS = (
+    "feedback_en",
+    "feedback_zh",
+    "fluency_tip_en",
+    "fluency_tip_zh",
+    "sample_phrase_en",
+    "sample_phrase_zh",
+)
+
+WRITING_JSON_KEYS = (
+    "feedback_en",
+    "feedback_zh",
+    "structure_tip_en",
+    "structure_tip_zh",
+    "language_tip_en",
+    "language_tip_zh",
+)
+
+MODULE_JSON_KEYS: dict[str, tuple[str, ...]] = {
+    "vocabulary": VOCABULARY_JSON_KEYS,
+    "reading": READING_JSON_KEYS,
+    "listening": LISTENING_JSON_KEYS,
+    "speaking": SPEAKING_JSON_KEYS,
+    "writing": WRITING_JSON_KEYS,
+}
+
+
+DEFAULT_READING_SYSTEM_PROMPT = (
+    "You are an EAP reading coach for IELTS-aligned university prep. "
+    "Return ONLY valid JSON with exactly these keys: "
+    + ", ".join(READING_JSON_KEYS)
+    + ". "
+    "Field rules: "
+    "summary_en/zh — 2–3 sentence summary of the passage; "
+    "key_idea_en/zh — one sentence main idea; "
+    "vocabulary_tip_en/zh — 2–3 useful academic words/phrases from the passage with brief gloss. "
+    "Use academic register suited to the student's level."
+)
+
 DEFAULT_VOCABULARY_SYSTEM_PROMPT = (
     "You are an EAP vocabulary coach for IELTS-aligned university prep. "
     "Return ONLY valid JSON with exactly these keys: "
@@ -36,11 +92,7 @@ DEFAULT_VOCABULARY_SYSTEM_PROMPT = (
 
 DEFAULT_MODULE_PROMPTS: dict[str, str] = {
     "vocabulary": DEFAULT_VOCABULARY_SYSTEM_PROMPT,
-    "reading": (
-        "You are an EAP reading coach. Return ONLY valid JSON with keys: "
-        "summary_en, summary_zh, key_idea_en, key_idea_zh, vocabulary_tip_en, vocabulary_tip_zh. "
-        "Keep answers concise and academic."
-    ),
+    "reading": DEFAULT_READING_SYSTEM_PROMPT,
     "listening": (
         "You are an EAP listening coach. Return ONLY valid JSON with keys: "
         "gist_en, gist_zh, note_taking_tip_en, note_taking_tip_zh, key_phrases. "
@@ -68,6 +120,16 @@ def normalize_module(module: str | None) -> str:
     if mod not in SELF_STUDY_AI_MODULES:
         raise ValueError("invalid module")
     return mod
+
+
+def coach_modules_with_api() -> frozenset[str]:
+    """Modules with a student-facing AI coach route in this release."""
+    return frozenset({"vocabulary", "reading"})
+
+
+def json_keys_for_module(module: str) -> tuple[str, ...]:
+    mod = normalize_module(module)
+    return MODULE_JSON_KEYS.get(mod, ())
 
 
 def default_prompt(module: str) -> str:
