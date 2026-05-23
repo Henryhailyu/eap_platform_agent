@@ -1617,6 +1617,42 @@ async function ensurePageRole(expectedRole) {
 /**
  * Show wrong-role message on satellite pages (student self-study, live join, etc.).
  */
+function showLoggedInSessionBanner(serverUser) {
+  const main = document.getElementById("login-main");
+  if (!main || !serverUser) return;
+
+  const homeUrl = roleHomeUrl(serverUser.role);
+  const homeLabel =
+    serverUser.role === "teacher"
+      ? t("login_continue_teacher")
+      : serverUser.role === "student"
+        ? t("login_continue_student")
+        : t("login_continue_admin");
+  const name = serverUser.full_name || serverUser.username || t("welcome");
+
+  let banner = document.getElementById("eap-login-session-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "eap-login-session-banner";
+    banner.className = "eap-login-session-banner";
+    banner.setAttribute("role", "status");
+    main.insertBefore(banner, main.firstChild);
+  }
+
+  banner.innerHTML = `
+    <p class="eap-login-session-banner__text">${escapeHtml(
+      t("login_already_signed_in", { name: String(name) }),
+    )}</p>
+    <p class="eap-login-session-banner__hint">${escapeHtml(t("login_switch_role_hint"))}</p>
+    <div class="eap-login-session-banner__actions">
+      <a class="btn-primary" href="${escapeHtml(homeUrl)}">${escapeHtml(homeLabel)}</a>
+      <button type="button" class="btn-secondary" id="eap-login-session-logout">${escapeHtml(t("logout"))}</button>
+    </div>
+  `;
+  document.getElementById("eap-login-session-logout")?.addEventListener("click", () => logoutAndGoHome());
+  if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+}
+
 function showLoginNextRoleMismatch(serverUser, nextParam) {
   const next = String(nextParam || "").trim().toLowerCase();
   const needsStudent = /^student(-live|\.html|-self-study)/i.test(next);
@@ -1701,16 +1737,9 @@ function initLoginPage() {
       /* Do not bounce away when ?next= targets the other role (e.g. student-live while teacher cookie). */
       if (nextParam && String(nextParam).trim()) {
         showLoginNextRoleMismatch(serverUser, nextParam);
-        return;
-      }
-      if (serverUser.role === "teacher") {
-        window.location.replace(hostedUiPageUrl("teacher.html"));
-      } else if (serverUser.role === "student") {
-        window.location.replace(hostedUiPageUrl("student.html"));
       } else {
-        window.location.replace(hostedUiPageUrl("admin.html"));
+        showLoggedInSessionBanner(serverUser);
       }
-      return;
     }
 
     /*

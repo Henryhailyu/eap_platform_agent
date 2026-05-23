@@ -156,6 +156,42 @@ body.eap-wix .wix-login-grid {
   margin-bottom: 3rem;
 }
 
+body.eap-wix .eap-login-session-banner {
+  max-width: 42rem;
+  margin: 0 auto 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--wix-radius);
+  background: rgba(10, 126, 164, 0.08);
+  border: 1px solid rgba(10, 126, 164, 0.22);
+  text-align: center;
+}
+
+body.eap-wix .eap-login-session-banner__text {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+  color: var(--wix-text);
+}
+
+body.eap-wix .eap-login-session-banner__hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.9rem;
+  color: var(--wix-text-muted, #555);
+  line-height: 1.45;
+}
+
+body.eap-wix .eap-login-session-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+body.eap-wix .eap-login-session-banner__actions .btn-primary,
+body.eap-wix .eap-login-session-banner__actions .btn-secondary {
+  width: auto;
+  min-width: 10rem;
+}
+
 body.eap-wix .login-card {
   background: var(--wix-card) !important;
   border: 1px solid var(--wix-card-border) !important;
