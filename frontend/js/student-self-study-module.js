@@ -15,6 +15,18 @@
     return key;
   }
 
+  function isZh() {
+    return !!(window.EAP_I18N && window.EAP_I18N.getLang() === "zh");
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   function redirectIfDisabled() {
     if (window.EAP_SELF_STUDY_ENABLED === false) {
       window.location.replace("student.html");
@@ -66,12 +78,18 @@
   }
 
   function renderLearn(root, pack, progress) {
+    const aiAvailable = !!(window.EAP_SELF_STUDY_AI && typeof window.EAP_SELF_STUDY_AI.explainVocabulary === "function");
     const wordsHtml = pack.words
       .map(
         (w) => `
         <article class="ssc-word-card">
-          <h3 class="ssc-word-card__term">${w.term}</h3>
-          <p class="ssc-word-card__def">${VOCAB.wordDef(w)}</p>
+          <h3 class="ssc-word-card__term">${escapeHtml(w.term)}</h3>
+          <p class="ssc-word-card__def">${escapeHtml(VOCAB.wordDef(w))}</p>
+          ${
+            aiAvailable
+              ? `<button type="button" class="btn-secondary ssc-ai-explain-btn" data-term="${escapeHtml(w.term)}">${t("self_study_ai_explain_btn")}</button>`
+              : ""
+          }
         </article>
       `,
       )
@@ -79,11 +97,20 @@
 
     root.innerHTML = `
       ${managerMaterialsBlock("vocabulary", progress.levelId)}
+      ${
+        aiAvailable
+          ? `<div class="ssc-ai-coach-banner">
+        <p class="ssc-ai-coach-banner__label">${t("self_study_ai_coach_label")}</p>
+        <p class="ssc-ai-coach-banner__hint">${t("self_study_ai_coach_hint")}</p>
+      </div>`
+          : ""
+      }
       <div class="ssc-lesson-card">
         <h2 data-i18n="self_study_vocab_learn_title">Today's vocabulary</h2>
-        <p>${VOCAB.lessonText(pack)}</p>
+        <p>${escapeHtml(VOCAB.lessonText(pack))}</p>
       </div>
       <div class="ssc-word-grid">${wordsHtml}</div>
+      <section id="ssc-ai-coach-panel" class="ssc-ai-coach-panel hidden" aria-live="polite"></section>
       <div class="ssc-placement-actions">
         <button type="button" class="btn-primary" id="ssc-learn-done-btn">${progress.learnDone ? t("self_study_vocab_learn_reviewed") : t("self_study_vocab_mark_learn")}</button>
       </div>
@@ -93,6 +120,65 @@
     document.getElementById("ssc-learn-done-btn")?.addEventListener("click", () => {
       VOCAB.markLearnDone(progress.levelId);
       refreshVocabularyModule(progress.levelId);
+    });
+
+    if (aiAvailable) {
+      bindVocabularyAiCoach(root, progress.levelId);
+    }
+  }
+
+  function renderAiExplanation(explanation) {
+    const zh = isZh();
+    const def = zh ? explanation.definition_zh || explanation.definition_en : explanation.definition_en;
+    const example = zh ? explanation.example_zh || explanation.example_en : explanation.example_en;
+    const tip = zh ? explanation.memory_tip_zh || explanation.memory_tip_en : explanation.memory_tip_en;
+    return `
+      <h3 class="ssc-ai-coach-panel__term">${escapeHtml(explanation.term)}</h3>
+      <p class="ssc-ai-coach-panel__def">${escapeHtml(def)}</p>
+      ${
+        explanation.collocation
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_ai_collocation")}:</strong> ${escapeHtml(explanation.collocation)}</p>`
+          : ""
+      }
+      ${
+        example
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_ai_example")}:</strong> ${escapeHtml(example)}</p>`
+          : ""
+      }
+      ${
+        tip
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_ai_memory_tip")}:</strong> ${escapeHtml(tip)}</p>`
+          : ""
+      }
+    `;
+  }
+
+  function bindVocabularyAiCoach(root, levelId) {
+    const panel = root.querySelector("#ssc-ai-coach-panel");
+    const AI = window.EAP_SELF_STUDY_AI;
+    if (!panel || !AI) return;
+
+    root.querySelectorAll(".ssc-ai-explain-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const term = btn.getAttribute("data-term") || "";
+        if (!term) return;
+        panel.classList.remove("hidden");
+        panel.innerHTML = `<p class="ssc-ai-coach-panel__loading">${t("self_study_ai_loading")}</p>`;
+        root.querySelectorAll(".ssc-ai-explain-btn").forEach((b) => {
+          b.disabled = true;
+        });
+        try {
+          const explanation = await AI.explainVocabulary(term, levelId, isZh() ? "zh" : "en");
+          panel.innerHTML = renderAiExplanation(explanation);
+          panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        } catch (_) {
+          panel.innerHTML = `<p class="ssc-ai-coach-panel__error" role="alert">${t("self_study_ai_error")}</p>`;
+        } finally {
+          root.querySelectorAll(".ssc-ai-explain-btn").forEach((b) => {
+            b.disabled = false;
+          });
+        }
+      });
     });
   }
 

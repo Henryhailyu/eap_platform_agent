@@ -46,6 +46,14 @@ from api_errors import (
 from auth_v1 import get_bearer_token_from_header, issue_access_token, verify_access_token
 from eap_config import config, setup_logging, validate_production_config
 
+try:
+    from eap_ai import ai_is_configured, ai_ping, ai_public_status, vocabulary_explain
+except ImportError:
+    ai_is_configured = None  # type: ignore[assignment,misc]
+    ai_ping = None  # type: ignore[assignment,misc]
+    ai_public_status = None  # type: ignore[assignment,misc]
+    vocabulary_explain = None  # type: ignore[assignment,misc]
+
 setup_logging()
 validate_production_config()
 
@@ -123,6 +131,7 @@ def health_check():
             "membership_enforced": EAP_ENFORCE_MEMBERSHIP,
             "pilot_mode": config.IS_PILOT,
             "public_url": config.PUBLIC_URL,
+            "ai": ai_public_status() if ai_public_status else {"enabled": False, "configured": False},
         }
     )
 
@@ -6963,6 +6972,97 @@ def student_self_study_materials():
     materials = _self_study_materials_for_student(conn, module, level)
     conn.close()
     return jsonify({"materials": materials})
+
+
+@app.route("/api/admin/ai/status", methods=["GET"])
+def admin_ai_status():
+    """Phase K2: safe AI configuration status (manager only; no secrets)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+    conn.close()
+    if not ai_public_status:
+        return jsonify({"error": "AI module not available"}), 503
+    return jsonify(ai_public_status())
+
+
+@app.route("/api/admin/ai/ping", methods=["POST"])
+def admin_ai_ping():
+    """Phase K2: run one minimal completion to verify API key (manager only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+    conn.close()
+    if not ai_is_configured or not ai_ping:
+        return jsonify({"error": "AI not configured", "status": ai_public_status()}), 503
+    if not ai_is_configured():
+        return jsonify({"error": "AI not enabled or key missing", "status": ai_public_status()}), 503
+    body = request.get_json(silent=True) or {}
+    provider = (body.get("provider") or "").strip() or None
+    if provider and not ai_is_configured(provider):
+        return jsonify(
+            {"error": f"Provider '{provider}' is not configured", "status": ai_public_status()}
+        ), 503
+    try:
+        result = ai_ping(provider)
+        code = 200 if result.get("ok") else 502
+        return jsonify(result), code
+    except Exception as exc:  # noqa: BLE001 — surface provider errors to admin only
+        return jsonify({"ok": False, "error": str(exc), "status": ai_public_status()}), 502
+
+
+@app.route("/api/student/self-study/ai/status", methods=["GET"])
+def student_self_study_ai_status():
+    """Phase K2: safe AI availability for student self-study (no secrets)."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "student")
+    if err is not None:
+        conn.close()
+        return err
+    conn.close()
+    if not ai_public_status:
+        return jsonify({"available": False, "reason": "ai_module_missing"})
+    status = ai_public_status()
+    return jsonify(
+        {
+            "available": bool(status.get("enabled") and status.get("configured")),
+            "active_provider": status.get("active_provider"),
+            "model": status.get("model"),
+        }
+    )
+
+
+@app.route("/api/student/self-study/ai/vocabulary-explain", methods=["POST"])
+def student_self_study_vocabulary_explain():
+    """Phase K2: AI vocabulary coach — structured explain for one term."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "student")
+    if err is not None:
+        conn.close()
+        return err
+    conn.close()
+
+    if not vocabulary_explain or not ai_is_configured or not ai_is_configured():
+        return jsonify({"error": "AI study coach is not available"}), 503
+
+    body = request.get_json(silent=True) or {}
+    term = str(body.get("term") or "").strip()
+    level = str(body.get("level") or "beginner").strip().lower()
+    lang = str(body.get("lang") or "en").strip().lower()
+    if not term:
+        return jsonify({"error": "term is required"}), 400
+
+    try:
+        result = vocabulary_explain(term, level=level, lang=lang)
+        return jsonify({"explanation": result})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001 — provider errors for student UI
+        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
 
 
 # Create database tables when app loads (before first request)

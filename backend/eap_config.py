@@ -13,6 +13,32 @@ import sys
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+def _load_local_env_file() -> None:
+    """Load backend/.env when variables are not already set (local dev; file is gitignored)."""
+    env_path = os.path.join(_BASE_DIR, ".env")
+    if not os.path.isfile(env_path):
+        return
+    try:
+        with open(env_path, encoding="utf-8") as handle:
+            for raw in handle:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                if not key or key in os.environ:
+                    continue
+                val = value.strip()
+                if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+                    val = val[1:-1]
+                os.environ[key] = val
+    except OSError as exc:
+        logging.getLogger("eap.config").warning("Could not read %s: %s", env_path, exc)
+
+
+_load_local_env_file()
+
+
 def _env_bool(name: str, default: str = "0") -> bool:
     return os.environ.get(name, default).strip().lower() in ("1", "true", "yes")
 
@@ -106,6 +132,17 @@ class EapConfig:
 
     # Phase I2a: Bearer access_token lifetime for /api/v1/auth/* (seconds).
     TOKEN_TTL_SECONDS: int = int(os.environ.get("EAP_TOKEN_TTL_SECONDS", str(7 * 24 * 3600)))
+
+    # Phase K2 — AI (OpenAI-compatible; keys never stored in source code).
+    AI_ENABLED: bool = _env_bool("EAP_AI_ENABLED")
+    AI_PROVIDER: str = (os.environ.get("EAP_AI_PROVIDER") or "deepseek").strip().lower()
+    AI_MODEL: str = (os.environ.get("EAP_AI_MODEL") or "deepseek-chat").strip()
+    OPENAI_API_KEY: str = (os.environ.get("EAP_OPENAI_API_KEY") or "").strip()
+    OPENAI_BASE_URL: str = (os.environ.get("EAP_OPENAI_BASE_URL") or "").strip().rstrip("/")
+    OPENAI_MODEL: str = (os.environ.get("EAP_OPENAI_MODEL") or "gpt-4o-mini").strip()
+    DEEPSEEK_API_KEY: str = (os.environ.get("EAP_DEEPSEEK_API_KEY") or "").strip()
+    DEEPSEEK_BASE_URL: str = (os.environ.get("EAP_DEEPSEEK_BASE_URL") or "https://api.deepseek.com").strip().rstrip("/")
+    DEEPSEEK_MODEL: str = (os.environ.get("EAP_DEEPSEEK_MODEL") or "deepseek-chat").strip()
 
 
 config = EapConfig()

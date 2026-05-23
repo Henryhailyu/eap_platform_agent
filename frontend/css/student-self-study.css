@@ -550,6 +550,74 @@
   line-height: 1.4;
 }
 
+.ssc-ai-explain-btn {
+  margin-top: 0.65rem;
+  width: 100%;
+  font-size: 0.8125rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.ssc-ai-coach-banner {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: rgba(10, 126, 164, 0.08);
+  border: 1px solid rgba(10, 126, 164, 0.18);
+}
+
+.ssc-ai-coach-banner__label {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--eap-teal, #0a7ea4);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ssc-ai-coach-banner__hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--eap-text, #1d1d1f);
+  line-height: 1.45;
+}
+
+.ssc-ai-coach-panel {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(0, 113, 227, 0.2);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+}
+
+.ssc-ai-coach-panel__term {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  color: var(--eap-blue, #0071e3);
+}
+
+.ssc-ai-coach-panel__def {
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+
+.ssc-ai-coach-panel__meta {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--eap-text, #1d1d1f);
+}
+
+.ssc-ai-coach-panel__loading {
+  margin: 0;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-ai-coach-panel__error {
+  margin: 0;
+  color: #b42318;
+}
+
 .ssc-game-header {
   margin-bottom: 1rem;
 }
