@@ -214,6 +214,10 @@
                 <label for="admin-mat-notes" data-i18n="admin_mat_notes">Notes for students (optional)</label>
                 <textarea id="admin-mat-notes" rows="3" maxlength="500"></textarea>
               </div>
+              <div class="field">
+                <label for="admin-mat-unit" data-i18n="admin_mat_unit">Unit (optional)</label>
+                <input id="admin-mat-unit" type="text" maxlength="120" placeholder="e.g. Unit 3" />
+              </div>
               <p id="admin-mat-suggest-hint" class="admin-mat-suggest hidden" role="status"></p>
               <div class="admin-mat-form__actions">
                 <button type="button" class="btn-secondary" id="admin-mat-suggest-btn" data-i18n="admin_mat_suggest">
@@ -271,6 +275,7 @@
     <script src="api-config.js"></script>
     <script src="js/manager-self-study-materials-mock.js"></script>
     <script src="app.js"></script>
+    <script src="js/self-study-materials-api.js"></script>
     <script src="js/admin-self-study-materials.js"></script>
   </body>
 </html>

@@ -441,6 +441,10 @@
     })();
 
     window.addEventListener("beforeunload", stopPoll);
+    window.addEventListener("pageshow", () => {
+      if (!state.code) return;
+      void refreshOnce().catch((err) => showError(formatLiveError(err)));
+    });
     document.addEventListener("visibilitychange", () => {
       if (!state.code || !state.polling) return;
       if (!document.hidden) {

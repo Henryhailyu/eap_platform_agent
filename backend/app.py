@@ -220,6 +220,9 @@ ALLOWED_UPLOAD_EXTENSIONS = frozenset(
 # Homework uploads: smaller allowlist than teaching materials (no ppt/mp3/mp4 here).
 ALLOWED_HOMEWORK_EXTENSIONS = frozenset({"pdf", "doc", "docx", "txt", "jpg", "png"})
 
+# Phase K1 — self-study manager uploads (no AI ingestion yet).
+ALLOWED_SELF_STUDY_MATERIAL_EXTENSIONS = frozenset({"pdf", "doc", "docx", "txt"})
+
 
 def get_db_connection():
     """
@@ -255,6 +258,14 @@ def allowed_homework_extension(filename):
         return False
     ext = filename.rsplit(".", 1)[-1].lower()
     return ext in ALLOWED_HOMEWORK_EXTENSIONS
+
+
+def allowed_self_study_material_extension(filename):
+    """Phase K1: PDF / Word / TXT only for self-study materials."""
+    if not filename or "." not in filename:
+        return False
+    ext = filename.rsplit(".", 1)[-1].lower()
+    return ext in ALLOWED_SELF_STUDY_MATERIAL_EXTENSIONS
 
 
 def migrate_calendar_tasks_add_file_columns(conn):
@@ -636,6 +647,26 @@ def init_database():
         CREATE TABLE IF NOT EXISTS academic_calendar_notes (
             date TEXT PRIMARY KEY,
             label TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS self_study_materials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            title_zh TEXT,
+            module TEXT NOT NULL,
+            level TEXT NOT NULL DEFAULT 'all',
+            format TEXT NOT NULL,
+            unit_label TEXT,
+            file_path TEXT,
+            file_name TEXT,
+            url TEXT,
+            notes TEXT,
+            text_snippet TEXT,
+            uploaded_by TEXT,
+            created_at TEXT NOT NULL
         )
         """
     )
@@ -2071,6 +2102,7 @@ def api_v1_upload_contract():
         {
             "homework_extensions": sorted(ALLOWED_HOMEWORK_EXTENSIONS),
             "teacher_material_extensions": sorted(ALLOWED_UPLOAD_EXTENSIONS),
+            "self_study_material_extensions": sorted(ALLOWED_SELF_STUDY_MATERIAL_EXTENSIONS),
             "max_bytes_recommended": 16 * 1024 * 1024,
             "wechat_upload_limit_bytes": 10 * 1024 * 1024,
             "homework_field_name": "file",
@@ -6711,6 +6743,226 @@ def admin_set_teacher_authorized(user_id):
     ).fetchone()
     conn.close()
     return jsonify(user_public_dict(updated))
+
+
+SELF_STUDY_MODULES = frozenset({"vocabulary", "reading", "listening", "speaking", "writing"})
+SELF_STUDY_LEVELS = frozenset({"all", "beginner", "intermediate", "advanced"})
+SELF_STUDY_FORMATS = frozenset({"pdf", "doc", "ppt", "txt", "url"})
+
+
+def self_study_material_row_to_dict(row):
+    """JSON shape aligned with Phase S7 mock + K1 file URLs."""
+    file_path = str(row["file_path"] or "").strip()
+    file_url = f"/uploads/{os.path.basename(file_path)}" if file_path else ""
+    created_at = row["created_at"]
+    try:
+        from datetime import datetime
+
+        created_ms = int(
+            datetime.fromisoformat(str(created_at).replace("Z", "+00:00")).timestamp() * 1000
+        )
+    except (TypeError, ValueError, OSError):
+        created_ms = 0
+    return {
+        "id": str(row["id"]),
+        "title": row["title"] or "",
+        "titleZh": row["title_zh"] or "",
+        "module": row["module"] or "vocabulary",
+        "level": row["level"] or "all",
+        "format": row["format"] or "pdf",
+        "unitLabel": row["unit_label"] or "",
+        "fileName": row["file_name"] or "",
+        "fileUrl": file_url,
+        "url": row["url"] or "",
+        "notes": row["notes"] or "",
+        "textSnippet": row["text_snippet"] or "",
+        "createdAt": created_ms,
+    }
+
+
+def _self_study_materials_for_student(conn, module, level):
+    mod = str(module or "").strip().lower()
+    lvl = str(level or "beginner").strip().lower()
+    if mod not in SELF_STUDY_MODULES:
+        return []
+    rows = conn.execute(
+        """
+        SELECT id, title, title_zh, module, level, format, unit_label,
+               file_path, file_name, url, notes, text_snippet, uploaded_by, created_at
+        FROM self_study_materials
+        WHERE module = ? AND (level = 'all' OR level = ?)
+        ORDER BY datetime(created_at) DESC, id DESC
+        """,
+        (mod, lvl),
+    ).fetchall()
+    return [self_study_material_row_to_dict(r) for r in rows]
+
+
+@app.route("/api/admin/self-study/materials", methods=["GET", "POST"])
+def admin_self_study_materials():
+    """Phase K1: manager upload/list self-study materials (PDF/Word/TXT; url metadata)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    if request.method == "GET":
+        rows = conn.execute(
+            """
+            SELECT id, title, title_zh, module, level, format, unit_label,
+                   file_path, file_name, url, notes, text_snippet, uploaded_by, created_at
+            FROM self_study_materials
+            ORDER BY datetime(created_at) DESC, id DESC
+            """
+        ).fetchall()
+        conn.close()
+        return jsonify({"materials": [self_study_material_row_to_dict(r) for r in rows]})
+
+    ensure_uploads_directory()
+    actor = get_current_authenticated_user(conn)
+    uploaded_by = str(actor["username"] or "").strip() if actor else ""
+
+    title = str(request.form.get("title") or "").strip()
+    if not title:
+        conn.close()
+        return jsonify({"error": "title is required"}), 400
+
+    module = str(request.form.get("module") or "vocabulary").strip().lower()
+    level = str(request.form.get("level") or "all").strip().lower()
+    fmt = str(request.form.get("format") or "pdf").strip().lower()
+    if module not in SELF_STUDY_MODULES:
+        conn.close()
+        return jsonify({"error": "invalid module"}), 400
+    if level not in SELF_STUDY_LEVELS:
+        conn.close()
+        return jsonify({"error": "invalid level"}), 400
+    if fmt not in SELF_STUDY_FORMATS:
+        conn.close()
+        return jsonify({"error": "invalid format"}), 400
+
+    unit_label = str(request.form.get("unit_label") or request.form.get("unit") or "").strip()[:120]
+    title_zh = str(request.form.get("title_zh") or request.form.get("titleZh") or "").strip()[:120]
+    notes = str(request.form.get("notes") or "").strip()[:500]
+    url = str(request.form.get("url") or "").strip()[:2048]
+    text_snippet = str(request.form.get("text_snippet") or request.form.get("textSnippet") or "").strip()[
+        :4000
+    ]
+
+    stored_name = None
+    display_name = ""
+    if fmt == "url":
+        if not url:
+            conn.close()
+            return jsonify({"error": "url is required for web link format"}), 400
+    else:
+        if "file" not in request.files:
+            conn.close()
+            return jsonify({"error": 'Missing form part named "file"'}), 400
+        upload = request.files["file"]
+        if upload is None or upload.filename is None or upload.filename.strip() == "":
+            conn.close()
+            return jsonify({"error": "No file selected"}), 400
+        if not allowed_self_study_material_extension(upload.filename):
+            conn.close()
+            return jsonify({"error": "File type not allowed. Allowed: pdf, doc, docx, txt"}), 400
+        ext = upload.filename.rsplit(".", 1)[-1].lower()
+        stored_name = f"{uuid.uuid4().hex}.{ext}"
+        dest_abs = os.path.join(UPLOAD_DIR, stored_name)
+        display_name = os.path.basename(upload.filename.strip())[:512]
+        try:
+            upload.save(dest_abs)
+            if ext == "txt" and not text_snippet:
+                with open(dest_abs, "r", encoding="utf-8", errors="replace") as fh:
+                    text_snippet = fh.read(4000)
+        except OSError:
+            conn.close()
+            return jsonify({"error": "Could not save uploaded file"}), 500
+
+    now = utc_now_iso()
+    cur = conn.execute(
+        """
+        INSERT INTO self_study_materials
+            (title, title_zh, module, level, format, unit_label,
+             file_path, file_name, url, notes, text_snippet, uploaded_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            title,
+            title_zh or None,
+            module,
+            level,
+            fmt,
+            unit_label or None,
+            stored_name,
+            display_name or None,
+            url or None,
+            notes or None,
+            text_snippet or None,
+            uploaded_by or None,
+            now,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        """
+        SELECT id, title, title_zh, module, level, format, unit_label,
+               file_path, file_name, url, notes, text_snippet, uploaded_by, created_at
+        FROM self_study_materials WHERE id = ?
+        """,
+        (cur.lastrowid,),
+    ).fetchone()
+    conn.close()
+    return jsonify({"material": self_study_material_row_to_dict(row)}), 201
+
+
+@app.route("/api/admin/self-study/materials/<int:material_id>", methods=["DELETE"])
+def admin_self_study_material_delete(material_id):
+    """Phase K1: remove one self-study material row and its upload file."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    row = conn.execute(
+        "SELECT id, file_path FROM self_study_materials WHERE id = ?",
+        (material_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "Material not found"}), 404
+
+    file_path = str(row["file_path"] or "").strip()
+    if file_path:
+        full = os.path.join(UPLOAD_DIR, os.path.basename(file_path))
+        if os.path.isfile(full):
+            try:
+                os.remove(full)
+            except OSError:
+                pass
+
+    conn.execute("DELETE FROM self_study_materials WHERE id = ?", (material_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/api/student/self-study/materials", methods=["GET"])
+def student_self_study_materials():
+    """Phase K1: list materials for one skill module and student placement level."""
+    module = request.args.get("module") or request.args.get("skill")
+    level = request.args.get("level") or "beginner"
+
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "student")
+    if err is not None:
+        conn.close()
+        return err
+
+    materials = _self_study_materials_for_student(conn, module, level)
+    conn.close()
+    return jsonify({"materials": materials})
 
 
 # Create database tables when app loads (before first request)

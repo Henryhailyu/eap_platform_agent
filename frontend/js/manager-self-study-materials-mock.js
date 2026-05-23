@@ -45,13 +45,53 @@
       .replace(/"/g, "&quot;");
   }
 
-  function readAll() {
+  const serverCache = {};
+
+  function readLocalAll() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
+    }
+  }
+
+  function readAll() {
+    const keys = Object.keys(serverCache);
+    if (keys.length) {
+      return keys.reduce((acc, k) => acc.concat(serverCache[k] || []), []);
+    }
+    return readLocalAll();
+  }
+
+  function resolveFileUrl(path) {
+    if (!path) return "";
+    if (/^https?:\/\//i.test(path)) return path;
+    const base =
+      (global.EAP_API_BASE && String(global.EAP_API_BASE).trim()) ||
+      (global.location && global.location.origin) ||
+      "";
+    const root = String(base).replace(/\/$/, "");
+    const rel = path.startsWith("/") ? path : `/${path}`;
+    return `${root}${rel}`;
+  }
+
+  async function refreshForModule(moduleId, studentLevelId) {
+    const api = global.EAP_SELF_STUDY_MATERIALS_API;
+    if (!api || typeof api.listStudentMaterials !== "function") {
+      delete serverCache[moduleId];
+      return readLocalAll().filter(
+        (item) => item.module === moduleId && matchesStudentLevel(item.level, studentLevelId),
+      );
+    }
+    try {
+      const items = await api.listStudentMaterials(moduleId, studentLevelId);
+      serverCache[moduleId] = items;
+      return items;
+    } catch (_) {
+      delete serverCache[moduleId];
+      return listForStudent(moduleId, studentLevelId);
     }
   }
 
@@ -108,13 +148,18 @@
   }
 
   function listForStudent(moduleId, studentLevelId) {
+    if (serverCache[moduleId]) {
+      return serverCache[moduleId]
+        .slice()
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
     return readAll()
       .filter((item) => item.module === moduleId && matchesStudentLevel(item.level, studentLevelId))
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }
 
   function addMaterial(payload) {
-    const items = readAll();
+    const items = readLocalAll();
     const item = {
       id: `mat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title: String(payload.title || "").trim(),
@@ -135,7 +180,7 @@
   }
 
   function removeMaterial(id) {
-    const before = readAll();
+    const before = readLocalAll();
     const next = before.filter((x) => x.id !== id);
     writeAll(next);
     return next.length < before.length;
@@ -160,11 +205,18 @@
           .map((label) => `<span class="ssc-mat-tag">${escapeHtml(label)}</span>`)
           .join("");
 
-        const meta = item.fileName
-          ? `<p class="ssc-mat-card__file">${escapeHtml(item.fileName)}</p>`
-          : item.url
-            ? `<p class="ssc-mat-card__file"><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.url)}</a></p>`
+        const unit =
+          item.unitLabel || item.unit_label
+            ? `<p class="ssc-mat-card__unit">${escapeHtml(item.unitLabel || item.unit_label)}</p>`
             : "";
+
+        const meta = item.fileUrl
+          ? `<p class="ssc-mat-card__file"><a class="ssc-mat-card__download" href="${escapeHtml(resolveFileUrl(item.fileUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.fileName || t("self_study_mat_download"))}</a></p>`
+          : item.fileName
+            ? `<p class="ssc-mat-card__file">${escapeHtml(item.fileName)}</p>`
+            : item.url
+              ? `<p class="ssc-mat-card__file"><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.url)}</a></p>`
+              : "";
 
         const notes = item.notes
           ? `<p class="ssc-mat-card__notes">${escapeHtml(item.notes)}</p>`
@@ -178,6 +230,7 @@
           <article class="ssc-mat-card">
             <h3 class="ssc-mat-card__title">${escapeHtml(displayTitle(item))}</h3>
             <div class="ssc-mat-card__tags">${tags}</div>
+            ${unit}
             ${meta}
             ${notes}
             ${snippet}
@@ -202,6 +255,7 @@
     FORMATS,
     readAll,
     listForStudent,
+    refreshForModule,
     suggestTags,
     addMaterial,
     removeMaterial,
@@ -210,6 +264,7 @@
     formatLabel,
     displayTitle,
     renderLearnBlock,
+    resolveFileUrl,
     escapeHtml,
   };
 })(typeof window !== "undefined" ? window : globalThis);

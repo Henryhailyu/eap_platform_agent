@@ -2594,6 +2594,13 @@
         showBootError(t("tlive_boot_session_hint"));
       }
     })();
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) return;
+      void liveTeacherContext().then((user) => {
+        if (user && typeof initAppPageHeader === "function") initAppPageHeader();
+      });
+    });
   }
 
   if (document.readyState === "loading") {

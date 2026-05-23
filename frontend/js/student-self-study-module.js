@@ -368,6 +368,11 @@
     }
 
     const levelId = placement.levelId;
+    const MAT = window.EAP_MANAGER_SSC_MATERIALS;
+    if (MAT && typeof MAT.refreshForModule === "function") {
+      await MAT.refreshForModule(skill, levelId);
+    }
+
     const levelEl = document.getElementById("ssc-module-level");
     if (levelEl) {
       levelEl.textContent = MOCK.levelDisplay(levelId);
