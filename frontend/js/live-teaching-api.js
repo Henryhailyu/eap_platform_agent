@@ -15,6 +15,22 @@
   const WAIT_TIMEOUT_SEC = 25;
   const FALLBACK_POLL_MS = 4000;
 
+  function authHeaders(extra) {
+    if (typeof global.EAP_getAuthHeaders === "function") {
+      return global.EAP_getAuthHeaders(extra);
+    }
+    return extra && typeof extra === "object" ? { ...extra } : {};
+  }
+
+  function liveFetch(url, options) {
+    const opts = { ...(options || {}), credentials: CREDENTIALS };
+    opts.headers = authHeaders(opts.headers);
+    if (typeof global.EAP_fetch === "function") {
+      return global.EAP_fetch(url, opts);
+    }
+    return fetch(url, opts);
+  }
+
   async function parseJson(response) {
     const contentType = (response.headers.get("content-type") || "").toLowerCase();
     const data =
@@ -51,9 +67,8 @@
     const opts = options && typeof options === "object" ? options : {};
     const body = { class_name: className, date: date || "" };
     if (opts.teacher_username) body.teacher_username = opts.teacher_username;
-    const response = await fetch(`${API_BASE}/api/teacher/live/sessions`, {
+    const response = await liveFetch(`${API_BASE}/api/teacher/live/sessions`, {
       method: "POST",
-      credentials: CREDENTIALS,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -65,21 +80,22 @@
     const opts = options && typeof options === "object" ? options : {};
     const body = { question };
     if (opts.teacher_username) body.teacher_username = opts.teacher_username;
-    const response = await fetch(`${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/launch`, {
-      method: "POST",
-      credentials: CREDENTIALS,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const response = await liveFetch(
+      `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/launch`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
     return parseJson(response);
   }
 
   async function fetchResponses(sessionCode, launchId) {
     const code = String(sessionCode || "").trim().toUpperCase();
     const q = launchId != null ? `?launch_id=${encodeURIComponent(String(launchId))}` : "";
-    const response = await fetch(
+    const response = await liveFetch(
       `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/responses${q}`,
-      { credentials: CREDENTIALS },
     );
     return parseJson(response);
   }
@@ -90,18 +106,16 @@
       launch_id: launchId,
       since_count: sinceCount != null ? sinceCount : 0,
     });
-    const response = await fetch(
+    const response = await liveFetch(
       `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/responses/wait?${qs}`,
-      { credentials: CREDENTIALS, signal },
+      { signal },
     );
     return parseJson(response);
   }
 
   async function studentJoin(sessionCode) {
     const code = String(sessionCode || "").trim().toUpperCase();
-    const response = await fetch(`${API_BASE}/api/student/live/join/${encodeURIComponent(code)}`, {
-      credentials: CREDENTIALS,
-    });
+    const response = await liveFetch(`${API_BASE}/api/student/live/join/${encodeURIComponent(code)}`);
     return parseJson(response);
   }
 
@@ -110,20 +124,19 @@
     const qs = waitQuery({
       launch_id: launchId != null ? launchId : "",
     });
-    const response = await fetch(
+    const response = await liveFetch(
       `${API_BASE}/api/student/live/join/${encodeURIComponent(code)}/wait?${qs}`,
-      { credentials: CREDENTIALS, signal },
+      { signal },
     );
     return parseJson(response);
   }
 
   async function studentRespond(sessionCode, teamId, answerIndex) {
     const code = String(sessionCode || "").trim().toUpperCase();
-    const response = await fetch(
+    const response = await liveFetch(
       `${API_BASE}/api/student/live/join/${encodeURIComponent(code)}/respond`,
       {
         method: "POST",
-        credentials: CREDENTIALS,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ team_id: teamId, answer_index: answerIndex }),
       },

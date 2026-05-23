@@ -1254,23 +1254,22 @@ def get_current_session_user(conn):
 
 def get_current_authenticated_user(conn):
     """
-    Phase I2b: session user, or Bearer token user (same columns as get_current_session_user).
+    Phase I2b: Bearer token (when Authorization header is sent), else Flask session.
 
-    Session wins when both are present. Returns None when unauthenticated or unauthorized.
+  When the browser sends Authorization, the token wins so each tab can keep its own
+  role while a shared session cookie may reflect the most recent login in another tab.
     """
+    token = get_bearer_token_from_header(request.headers.get("Authorization"))
+    if token:
+        uid = verify_access_token(token)
+        if uid is not None:
+            row = load_user_by_id_for_auth(conn, uid)
+            if row is not None and user_is_authorized(row):
+                return row
     user = get_current_session_user(conn)
     if user is not None:
         return user
-    token = get_bearer_token_from_header(request.headers.get("Authorization"))
-    if not token:
-        return None
-    uid = verify_access_token(token)
-    if uid is None:
-        return None
-    row = load_user_by_id_for_auth(conn, uid)
-    if row is None or not user_is_authorized(row):
-        return None
-    return row
+    return None
 
 
 def get_effective_actor_role(conn):
@@ -2021,7 +2020,16 @@ def login():
     session["username"] = row["username"]
     session["role"] = row["role"]
 
-    return jsonify({"success": True, "user": login_user_public_dict(row)})
+    token, expires_in = issue_access_token(int(row["id"]))
+    return jsonify(
+        {
+            "success": True,
+            "user": login_user_public_dict(row),
+            "access_token": token,
+            "expires_in": expires_in,
+            "token_type": "Bearer",
+        }
+    )
 
 
 @app.route("/api/v1/auth/login", methods=["POST"])

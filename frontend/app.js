@@ -189,6 +189,8 @@ function apiUnreachableMessage() {
  * Other pages can read it with getLoggedInUser().
  */
 const SESSION_USER_KEY = "eap_user";
+/** Per-tab Bearer token — allows teacher + student tabs in the same browser. */
+const ACCESS_TOKEN_KEY = "eap_access_token";
 
 /**
  * sessionStorage (built into the browser):
@@ -213,7 +215,46 @@ function authStorageGet() {
 
 function authStorageRemoveAll() {
   sessionStorage.removeItem(SESSION_USER_KEY);
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(SESSION_USER_KEY);
+}
+
+function getAccessToken() {
+  try {
+    return sessionStorage.getItem(ACCESS_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveAccessToken(token) {
+  if (!token) return;
+  try {
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, String(token));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Merge Authorization: Bearer when this tab has a token (see get_current_authenticated_user). */
+function getAuthHeaders(extraHeaders) {
+  const headers =
+    extraHeaders && typeof extraHeaders === "object" ? { ...extraHeaders } : {};
+  const token = getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+function eapFetch(url, options) {
+  const opts = { ...(options || {}) };
+  opts.credentials = EAP_FETCH_CREDENTIALS;
+  opts.headers = getAuthHeaders(opts.headers);
+  return fetch(url, opts);
+}
+
+if (typeof window !== "undefined") {
+  window.EAP_getAuthHeaders = getAuthHeaders;
+  window.EAP_fetch = eapFetch;
 }
 
 /** Read the logged-in user object, or null if missing / invalid JSON. */
@@ -254,7 +295,7 @@ function logoutAndGoHome() {
   const dest = typeof hostedUiPageUrl === "function" ? hostedUiPageUrl("index.html") : "index.html";
   fetch(`${API_BASE}/api/logout`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
     credentials: EAP_FETCH_CREDENTIALS,
     keepalive: true,
   }).catch(() => {});
@@ -296,6 +337,75 @@ function initStudentLiveNavLink() {
   if (window.EAP_TEACHER_LIVE_ENABLED === false) return;
   const link = document.getElementById("student-live-link");
   if (link) link.classList.remove("hidden");
+  bindStudentLiveNavLink();
+}
+
+/**
+ * Satellite nav links — verify Flask session role before navigation (one role per browser).
+ */
+function bindRoleGuardedNavLink(link, expectedRole, defaultHref) {
+  if (!link || link.dataset.eapRoleNavBound === "1") return;
+  link.dataset.eapRoleNavBound = "1";
+
+  link.addEventListener("click", async (ev) => {
+    const rawHref = link.getAttribute("href") || defaultHref;
+    const dest =
+      typeof hostedUiPageUrl === "function" ? hostedUiPageUrl(rawHref) : rawHref;
+
+    if (typeof fetchCurrentSessionUser !== "function") return;
+
+    ev.preventDefault();
+    const server = await fetchCurrentSessionUser();
+
+    if (server && server.role === expectedRole) {
+      saveUserToSession(server);
+      window.location.href = dest;
+      return;
+    }
+
+    if (server && server.role) {
+      saveUserToSession(server);
+      if (typeof renderWrongRoleGate === "function") {
+        renderWrongRoleGate(server.role);
+      }
+      initAppPageHeader();
+      return;
+    }
+
+    const loginPath = String(rawHref || defaultHref).split("?")[0] || defaultHref;
+    const loginDest =
+      typeof loginUrlWithNext === "function"
+        ? loginUrlWithNext(loginPath)
+        : `index.html?next=${encodeURIComponent(loginPath)}`;
+    window.location.href = loginDest;
+  });
+}
+
+function bindStudentLiveNavLink() {
+  bindRoleGuardedNavLink(
+    document.getElementById("student-live-link"),
+    "student",
+    "student-live.html",
+  );
+}
+
+function bindTeacherLiveNavLink() {
+  document.querySelectorAll("#teacher-live-link, #tgb-open-live, a.tlive-back").forEach((link) => {
+    bindRoleGuardedNavLink(link, "teacher", "teacher-live.html");
+  });
+}
+
+/** Clear server cookie + local user before a new role login (one role per browser). */
+async function clearAuthBeforeRoleLogin() {
+  authStorageRemoveAll();
+  try {
+    await eapFetch(`${API_BASE}/api/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (_) {
+    /* offline — login will still replace session when API is up */
+  }
 }
 
 /** Phase L2 — show Live Teaching entry when feature flag is on. */
@@ -306,6 +416,7 @@ function initTeacherLiveNavLink() {
     link.classList.remove("hidden");
     link.classList.add("btn-live-nav");
   }
+  bindTeacherLiveNavLink();
 }
 
 /** Student satellite pages (self-study, placement, modules). */
@@ -477,7 +588,7 @@ async function readJsonOrError(response) {
 async function fetchCurrentSessionUser() {
   let response;
   try {
-    response = await fetch(`${API_BASE}/api/me`, { credentials: EAP_FETCH_CREDENTIALS });
+    response = await eapFetch(`${API_BASE}/api/me`);
   } catch {
     return null;
   }
@@ -529,7 +640,7 @@ async function validatePageSessionOrFallback(expectedRole) {
 async function apiGet(path) {
   let response;
   try {
-    response = await fetch(`${API_BASE}${path}`, { credentials: EAP_FETCH_CREDENTIALS });
+    response = await eapFetch(`${API_BASE}${path}`);
   } catch (err) {
     throw new Error(apiUnreachableMessage());
   }
@@ -548,7 +659,7 @@ async function apiGet(path) {
 async function apiPost(path, bodyObject) {
   let response;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await eapFetch(`${API_BASE}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(bodyObject),
@@ -572,7 +683,7 @@ async function apiPost(path, bodyObject) {
 async function apiCopyTask(taskId, bodyObject) {
   let response;
   try {
-    response = await fetch(`${API_BASE}/api/tasks/${taskId}/copy`, {
+    response = await eapFetch(`${API_BASE}/api/tasks/${taskId}/copy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(bodyObject),
@@ -596,7 +707,7 @@ async function apiCopyTask(taskId, bodyObject) {
 async function apiPut(path) {
   let response;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await eapFetch(`${API_BASE}${path}`, {
       method: "PUT",
       credentials: EAP_FETCH_CREDENTIALS,
     });
@@ -616,7 +727,7 @@ async function apiPut(path) {
 async function apiDelete(path) {
   let response;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await eapFetch(`${API_BASE}${path}`, {
       method: "DELETE",
       credentials: EAP_FETCH_CREDENTIALS,
     });
@@ -639,7 +750,7 @@ async function apiDelete(path) {
 async function apiPostFeedbackFiles(submissionId, formData) {
   let response;
   try {
-    response = await fetch(`${API_BASE}/api/submissions/${submissionId}/feedback-files`, {
+    response = await eapFetch(`${API_BASE}/api/submissions/${submissionId}/feedback-files`, {
       method: "POST",
       body: formData,
       credentials: EAP_FETCH_CREDENTIALS,
@@ -660,7 +771,7 @@ async function apiPostFeedbackFiles(submissionId, formData) {
 async function apiPutJson(path, bodyObject) {
   let response;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await eapFetch(`${API_BASE}${path}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(bodyObject),
@@ -685,7 +796,7 @@ async function apiPutJson(path, bodyObject) {
 async function apiPutFeedbackFormData(submissionId, formData) {
   let response;
   try {
-    response = await fetch(`${API_BASE}/api/submissions/${submissionId}/feedback`, {
+    response = await eapFetch(`${API_BASE}/api/submissions/${submissionId}/feedback`, {
       method: "PUT",
       body: formData,
       credentials: EAP_FETCH_CREDENTIALS,
@@ -715,7 +826,7 @@ async function apiUploadTaskFile(taskId, file) {
 
   let response;
   try {
-    response = await fetch(`${API_BASE}/api/tasks/${taskId}/upload`, {
+    response = await eapFetch(`${API_BASE}/api/tasks/${taskId}/upload`, {
       method: "POST",
       body: formData,
       credentials: EAP_FETCH_CREDENTIALS,
@@ -744,7 +855,7 @@ async function apiUploadTaskFile(taskId, file) {
 async function apiSubmitHomework(taskId, formData) {
   let response;
   try {
-    response = await fetch(`${API_BASE}/api/tasks/${taskId}/submit`, {
+    response = await eapFetch(`${API_BASE}/api/tasks/${taskId}/submit`, {
       method: "POST",
       body: formData,
       credentials: EAP_FETCH_CREDENTIALS,
@@ -769,7 +880,7 @@ async function apiSubmitHomework(taskId, formData) {
 async function apiPutRevisionFormData(submissionId, formData) {
   let response;
   try {
-    response = await fetch(`${API_BASE}/api/submissions/${submissionId}/revision`, {
+    response = await eapFetch(`${API_BASE}/api/submissions/${submissionId}/revision`, {
       method: "PUT",
       body: formData,
       credentials: EAP_FETCH_CREDENTIALS,
@@ -1503,6 +1614,8 @@ function setupRoleLoginCard(config) {
     submitBtn.textContent = t("signing_in");
 
     try {
+      await clearAuthBeforeRoleLogin();
+
       const response = await fetch(`${API_BASE}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1531,6 +1644,8 @@ function setupRoleLoginCard(config) {
         errorEl.classList.remove("hidden");
         return;
       }
+
+      if (data.access_token) saveAccessToken(data.access_token);
 
       const nextAfterLogin = loginNextRedirectUrl(expectedRole);
       if (nextAfterLogin) {
@@ -3476,6 +3591,7 @@ function initTeacherPage() {
   if (redirectFilePageToHostedUi()) return;
 
   bindPageHeaderLogout();
+  initTeacherLiveNavLink();
 
   void (async () => {
     const sessionUser = await validatePageSessionOrFallback("teacher");
@@ -3484,7 +3600,6 @@ function initTeacherPage() {
     saveUserToSession(sessionUser);
     await ensureAcademicCalendarLoaded();
     initAppPageHeader();
-    initTeacherLiveNavLink();
 
   const form = document.getElementById("teacher-task-form");
   const typeSelect = document.getElementById("task-type");
@@ -6261,6 +6376,7 @@ function initStudentPage() {
   if (redirectFilePageToHostedUi()) return;
 
   bindPageHeaderLogout();
+  initStudentLiveNavLink();
 
   void (async () => {
     try {
@@ -6271,7 +6387,6 @@ function initStudentPage() {
       await ensureAcademicCalendarLoaded();
       initAppPageHeader();
       initStudentSelfStudyNavLink();
-      initStudentLiveNavLink();
     } catch (err) {
       console.error("Student page boot failed:", err);
       const hero = document.querySelector(".page-hero--student-compact");

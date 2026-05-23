@@ -9,7 +9,7 @@ window.EAP_STRINGS_ZH = {
   "role_gate_signed_in_teacher": "您当前以教师身份登录。请先退出，再以学生身份登录使用本页；或在学生设备的无痕窗口中打开。",
   "role_gate_signed_in_student": "您当前以学生身份登录。请先退出，再以教师身份登录使用本页；或为另一角色使用无痕窗口。",
   "role_gate_signed_in_other": "当前账号无法打开此页面。请退出后使用正确身份登录。",
-  "role_gate_one_browser": "同一浏览器同时只能保持一种身份。请先点击下方「退出登录」，用正确身份重新登录，再打开现场教学或加入现场课。",
+  "role_gate_one_browser": "此页面需要另一种身份。请先退出登录，在本标签页用正确身份重新登录，再打开现场教学或加入现场课。提示：可在两个标签页分别登录教师和学生，各登录一次即可。",
   "login_next_need_student": "您当前以教师身份登录。请先退出，再以学生身份登录后打开该链接。",
   "login_next_need_teacher": "您当前以学生身份登录。请先退出，再以教师身份登录后打开该链接。",
   "login_already_signed_in": "您已以 {name} 的身份登录。",

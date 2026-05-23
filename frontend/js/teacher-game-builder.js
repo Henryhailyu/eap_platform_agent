@@ -144,6 +144,7 @@
       if (ctx.className) q.set("class_name", ctx.className);
       if (ctx.date) q.set("date", ctx.date);
       liveLink.href = `teacher-live.html${q.toString() ? `?${q.toString()}` : ""}`;
+      if (typeof bindTeacherLiveNavLink === "function") bindTeacherLiveNavLink();
     }
   }
 

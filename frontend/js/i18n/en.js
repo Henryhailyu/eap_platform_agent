@@ -9,7 +9,7 @@ window.EAP_STRINGS_EN = {
   "role_gate_signed_in_teacher": "You are signed in as a teacher. Log out, then sign in as a student to use this page — or open it in a private window on a student device.",
   "role_gate_signed_in_student": "You are signed in as a student. Log out, then sign in as a teacher to use this page — or use a private window for the other role.",
   "role_gate_signed_in_other": "You are signed in with an account that cannot open this page. Log out and sign in with the correct role.",
-  "role_gate_one_browser": "Only one role can be active in this browser at a time. Click Log out below, sign in with the correct role, then open Live teaching or Join live class again.",
+  "role_gate_one_browser": "This page needs a different role. Log out, sign in with the correct role on this tab, then open Live teaching or Join live class again. Tip: you can keep teacher and student in two tabs — sign in once in each tab.",
   "login_next_need_student": "You are signed in as a teacher. Log out, then sign in as a student to open that link.",
   "login_next_need_teacher": "You are signed in as a student. Log out, then sign in as a teacher to open that link.",
   "login_already_signed_in": "You are already signed in as {name}.",

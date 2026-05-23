@@ -49,13 +49,8 @@
       });
     }
 
-    const welcomeEl = document.getElementById("header-welcome");
-    if (welcomeEl && typeof getLoggedInUser === "function") {
-      const user = getLoggedInUser();
-      if (user) {
-        const name = user.full_name || user.username || "User";
-        welcomeEl.textContent = t("welcome_user", { name });
-      }
+    if (typeof initAppPageHeader === "function") {
+      initAppPageHeader();
     }
   }
 
@@ -234,17 +229,18 @@
     }
   }
 
+  /** Live API requires a valid Flask teacher session — do not trust local eap_user alone. */
   async function liveTeacherContext() {
-    if (typeof fetchCurrentSessionUser === "function") {
-      const server = await fetchCurrentSessionUser();
-      if (server && server.role === "teacher") {
-        if (typeof saveUserToSession === "function") saveUserToSession(server);
-        return server;
-      }
-      if (server && server.role) return null;
+    if (typeof fetchCurrentSessionUser !== "function") return null;
+    const server = await fetchCurrentSessionUser();
+    if (server && server.role === "teacher") {
+      if (typeof saveUserToSession === "function") saveUserToSession(server);
+      return server;
     }
-    const local = typeof getLoggedInUser === "function" ? getLoggedInUser() : null;
-    if (local && local.role === "teacher") return local;
+    if (server && server.role && typeof authStorageRemoveAll === "function") {
+      authStorageRemoveAll();
+      if (typeof initAppPageHeader === "function") initAppPageHeader();
+    }
     return null;
   }
 
@@ -290,6 +286,14 @@
   async function ensureLiveSession(ctx) {
     const api = getLiveApi();
     if (!api) return false;
+
+    const teacherAuth = await liveTeacherContext();
+    if (!teacherAuth) {
+      clearPersistedLiveSession();
+      window.__tliveLiveSession = null;
+      return false;
+    }
+
     if (window.__tliveLiveSession && window.__tliveLiveSession.code) {
       updateSessionJoinBanner();
       return true;
@@ -309,12 +313,9 @@
       return true;
     }
 
-    const teacher = await liveTeacherContext();
-    if (!teacher) return false;
-
     try {
       const data = await api.createSession(ctx.className, ctx.date, {
-        teacher_username: teacher.username,
+        teacher_username: teacherAuth.username,
       });
       window.__tliveLiveSession = {
         code: data.session_code,
@@ -405,6 +406,8 @@
 
     const teacher = await liveTeacherContext();
     if (!teacher) {
+      if (typeof authStorageRemoveAll === "function") authStorageRemoveAll();
+      if (typeof initAppPageHeader === "function") initAppPageHeader();
       updateLaunchStatus(t("tlive_launch_fail_login"), false);
       return false;
     }
@@ -438,6 +441,14 @@
     } catch (err) {
       sess.useLive = false;
       const status = err && err.httpStatus;
+      if (status === 401 || /not logged in/i.test((err && err.message) || "")) {
+        clearPersistedLiveSession();
+        window.__tliveLiveSession = null;
+        if (typeof authStorageRemoveAll === "function") authStorageRemoveAll();
+        if (typeof initAppPageHeader === "function") initAppPageHeader();
+        updateLaunchStatus(t("tlive_launch_fail_login"), false);
+        return false;
+      }
       if (status === 404 || (err && err.code === "live_not_found")) {
         clearPersistedLiveSession();
         window.__tliveLiveSession = null;
@@ -2571,9 +2582,14 @@
         if (typeof validateSatelliteSessionOrGate !== "function") return;
         const sessionUser = await validateSatelliteSessionOrGate("teacher");
         if (!sessionUser) return;
-        if (typeof initAppPageHeader === "function") initAppPageHeader();
-        else initPageChrome();
-        await ensureLiveSession(ctx);
+        initPageChrome();
+        const liveReady = await ensureLiveSession(ctx);
+        if (!liveReady && typeof fetchCurrentSessionUser === "function") {
+          const me = await fetchCurrentSessionUser();
+          if (!me) {
+            updateLaunchStatus(t("tlive_launch_fail_login"), false);
+          }
+        }
       } catch (_) {
         showBootError(t("tlive_boot_session_hint"));
       }
