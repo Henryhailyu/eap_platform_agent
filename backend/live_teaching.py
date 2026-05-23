@@ -1,13 +1,19 @@
 """
-Live Teaching — teacher sessions and student responses (Phase L27).
+Live Teaching — teacher sessions and student responses (Phase L27–L28).
 
 Tables: live_sessions, live_launches, live_responses.
 Routes registered via register_live_teaching_routes(app) from app.py.
+
+L28: long-poll wait endpoints (Render-friendly; no WebSocket required).
 """
 import json
 import random
 import string
+import time
 from datetime import datetime, timezone
+
+_WAIT_POLL_SEC = 0.45
+_WAIT_MAX_SEC = 25
 
 
 def utc_now_iso():
@@ -89,6 +95,92 @@ def _question_payload(launch_row):
         return json.loads(launch_row["question_json"])
     except (TypeError, json.JSONDecodeError):
         return None
+
+
+def _clamp_wait_timeout(raw):
+    try:
+        sec = float(raw)
+    except (TypeError, ValueError):
+        sec = _WAIT_MAX_SEC
+    return max(1.0, min(sec, _WAIT_MAX_SEC))
+
+
+def _wait_until(predicate, timeout_sec):
+    """Block up to timeout_sec; return True when predicate() is truthy."""
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(_WAIT_POLL_SEC)
+    return predicate()
+
+
+def _student_join_payload(conn, sess, student_username):
+    lid = sess["active_launch_id"]
+    question = None
+    launched_at = None
+    if lid:
+        launch = _launch_row(conn, lid)
+        question = _question_payload(launch)
+        launched_at = launch["launched_at"] if launch else None
+
+    return {
+        "session_code": sess["session_code"],
+        "class_name": sess["class_name"],
+        "student_username": student_username,
+        "active": question is not None,
+        "launch_id": lid,
+        "launched_at": launched_at,
+        "question": question,
+    }
+
+
+def _teacher_responses_payload(conn, sess, launch_id):
+    lid = launch_id or sess["active_launch_id"]
+    if not lid:
+        return {"launch_id": None, "responses": [], "count": 0, "question": None}
+
+    launch = _launch_row(conn, lid)
+    if not launch or launch["session_id"] != sess["id"]:
+        return None
+
+    rows = conn.execute(
+        """
+        SELECT student_username, team_id, answer_index, answer_text,
+               correct, submitted_at
+        FROM live_responses
+        WHERE launch_id = ?
+        ORDER BY submitted_at ASC
+        """,
+        (lid,),
+    ).fetchall()
+
+    launched_at = launch["launched_at"]
+    out = []
+    for r in rows:
+        try:
+            launched_dt = datetime.fromisoformat(launched_at.replace("Z", "+00:00"))
+            submitted_dt = datetime.fromisoformat(r["submitted_at"].replace("Z", "+00:00"))
+            time_sec = max(0, int((submitted_dt - launched_dt).total_seconds()))
+        except (ValueError, TypeError):
+            time_sec = 0
+        out.append(
+            {
+                "student": r["student_username"],
+                "teamId": r["team_id"],
+                "answer": r["answer_text"] or "",
+                "answerIndex": r["answer_index"],
+                "correct": bool(r["correct"]),
+                "timeSec": time_sec,
+            }
+        )
+
+    return {
+        "launch_id": lid,
+        "question": _question_payload(launch),
+        "responses": out,
+        "count": len(out),
+    }
 
 
 def register_live_teaching_routes(app):
@@ -241,53 +333,66 @@ def register_live_teaching_routes(app):
                 if err is not None:
                     return err
 
-            lid = launch_id or sess["active_launch_id"]
-            if not lid:
-                return jsonify({"launch_id": None, "responses": [], "count": 0})
-
-            launch = _launch_row(conn, lid)
-            if not launch or launch["session_id"] != sess["id"]:
+            payload = _teacher_responses_payload(conn, sess, launch_id)
+            if payload is None:
                 return jsonify({"error": "Launch not found"}), 404
+            return jsonify(payload)
+        finally:
+            conn.close()
 
-            rows = conn.execute(
-                """
-                SELECT student_username, team_id, answer_index, answer_text,
-                       correct, submitted_at
-                FROM live_responses
-                WHERE launch_id = ?
-                ORDER BY submitted_at ASC
-                """,
-                (lid,),
-            ).fetchall()
+    @app.route("/api/teacher/live/sessions/<session_code>/responses/wait", methods=["GET"])
+    def teacher_live_responses_wait(session_code):
+        from app import (
+            enforce_teacher_class_access_if_enabled,
+            get_db_connection,
+            get_effective_teacher_username,
+            require_session_role_if_enabled,
+            should_enforce_membership,
+            should_require_session_identity,
+        )
 
-            launched_at = launch["launched_at"]
-            out = []
-            for r in rows:
-                try:
-                    launched_dt = datetime.fromisoformat(launched_at.replace("Z", "+00:00"))
-                    submitted_dt = datetime.fromisoformat(r["submitted_at"].replace("Z", "+00:00"))
-                    time_sec = max(0, int((submitted_dt - launched_dt).total_seconds()))
-                except (ValueError, TypeError):
-                    time_sec = 0
-                out.append(
-                    {
-                        "student": r["student_username"],
-                        "teamId": r["team_id"],
-                        "answer": r["answer_text"] or "",
-                        "answerIndex": r["answer_index"],
-                        "correct": bool(r["correct"]),
-                        "timeSec": time_sec,
-                    }
+        launch_id = request.args.get("launch_id", type=int)
+        since_count = request.args.get("since_count", default=0, type=int)
+        timeout_sec = _clamp_wait_timeout(request.args.get("timeout", type=float))
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            teacher_username = get_effective_teacher_username(conn, request.args.get("teacher_username"))
+            if should_require_session_identity() or should_enforce_membership():
+                if not teacher_username:
+                    return jsonify({"error": "teacher_username is required"}), 400
+                err = enforce_teacher_class_access_if_enabled(
+                    conn, teacher_username, sess["class_name"]
                 )
+                if err is not None:
+                    return err
 
-            return jsonify(
-                {
-                    "launch_id": lid,
-                    "question": _question_payload(launch),
-                    "responses": out,
-                    "count": len(out),
-                }
-            )
+            lid = launch_id or sess["active_launch_id"]
+            session_id = sess["id"]
+
+            def count_changed():
+                if not lid:
+                    return False
+                row = conn.execute(
+                    "SELECT COUNT(*) AS c FROM live_responses WHERE launch_id = ?",
+                    (lid,),
+                ).fetchone()
+                return int(row["c"] if row else 0) > since_count
+
+            _wait_until(count_changed, timeout_sec)
+            payload = _teacher_responses_payload(conn, sess, launch_id)
+            if payload is None:
+                return jsonify({"error": "Launch not found"}), 404
+            payload["waited"] = True
+            return jsonify(payload)
         finally:
             conn.close()
 
@@ -307,25 +412,51 @@ def register_live_teaching_routes(app):
             if err is not None:
                 return err
 
-            lid = sess["active_launch_id"]
-            question = None
-            launched_at = None
-            if lid:
-                launch = _launch_row(conn, lid)
-                question = _question_payload(launch)
-                launched_at = launch["launched_at"] if launch else None
+            return jsonify(_student_join_payload(conn, sess, student_username))
+        finally:
+            conn.close()
 
-            return jsonify(
-                {
-                    "session_code": sess["session_code"],
-                    "class_name": sess["class_name"],
-                    "student_username": student_username,
-                    "active": question is not None,
-                    "launch_id": lid,
-                    "launched_at": launched_at,
-                    "question": question,
-                }
+    @app.route("/api/student/live/join/<session_code>/wait", methods=["GET"])
+    def student_live_wait(session_code):
+        from app import get_db_connection, resolve_student_with_optional_enforcement
+
+        since_launch_id = request.args.get("launch_id", type=int)
+        timeout_sec = _clamp_wait_timeout(request.args.get("timeout", type=float))
+
+        conn = get_db_connection()
+        try:
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            student_username, err = resolve_student_with_optional_enforcement(
+                conn, request.args.get("student_username"), sess["class_name"]
             )
+            if err is not None:
+                return err
+
+            session_id = sess["id"]
+
+            def launch_changed():
+                row = conn.execute(
+                    "SELECT active_launch_id FROM live_sessions WHERE id = ?",
+                    (session_id,),
+                ).fetchone()
+                current = row["active_launch_id"] if row else None
+                return current != since_launch_id
+
+            _wait_until(launch_changed, timeout_sec)
+            fresh = conn.execute(
+                """
+                SELECT id, session_code, class_name, teacher_username, session_date,
+                       created_at, active_launch_id
+                FROM live_sessions WHERE id = ?
+                """,
+                (session_id,),
+            ).fetchone()
+            payload = _student_join_payload(conn, fresh, student_username)
+            payload["waited"] = True
+            return jsonify(payload)
         finally:
             conn.close()
 

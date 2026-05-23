@@ -1,10 +1,9 @@
 /**
- * Student Live — join teacher session and submit poll/quiz answers (Phase L27).
+ * Student Live — join teacher session and submit poll/quiz answers (Phase L27–L28).
  */
 (function () {
   const PAGE = "student-live";
   const TEAM_KEY = "eap_live_team_id";
-  const POLL_MS = 3500;
 
   function t(key, vars) {
     if (window.EAP_I18N && typeof window.EAP_I18N.t === "function") {
@@ -62,7 +61,8 @@
     code: "",
     teamId: null,
     launchId: null,
-    pollTimer: null,
+    pollAbort: null,
+    polling: false,
   };
 
   function showError(msg, opts) {
@@ -170,41 +170,72 @@
     });
   }
 
-  async function refresh() {
-    const api = window.EAP_LIVE_TEACHING_API;
-    if (!api || !state.code) return;
-    try {
-      showError("");
-      const data = await api.studentJoin(state.code);
-      const meta = document.getElementById("slive-meta");
-      if (meta) {
-        meta.textContent = t("slive_meta", {
-          class: data.class_name || "—",
-          code: data.session_code || state.code,
-        });
-      }
-      if (data.launch_id !== state.launchId) {
-        state.launchId = data.launch_id;
-        const sentEl = document.getElementById("slive-sent");
-        if (sentEl) sentEl.classList.add("hidden");
-      }
-      renderQuestion(data);
-    } catch (err) {
-      showError(err.message || String(err));
+  function applyJoinPayload(data) {
+    const meta = document.getElementById("slive-meta");
+    if (meta) {
+      meta.textContent = t("slive_meta", {
+        class: data.class_name || "—",
+        code: data.session_code || state.code,
+      });
     }
+    if (data.launch_id !== state.launchId) {
+      state.launchId = data.launch_id;
+      const sentEl = document.getElementById("slive-sent");
+      if (sentEl) sentEl.classList.add("hidden");
+    }
+    renderQuestion(data);
   }
 
-  function startPoll() {
-    stopPoll();
-    state.pollTimer = window.setInterval(() => {
-      void refresh();
-    }, POLL_MS);
+  async function refreshOnce() {
+    const api = window.EAP_LIVE_TEACHING_API;
+    if (!api || !state.code) return;
+    showError("");
+    const data = await api.studentJoin(state.code);
+    applyJoinPayload(data);
   }
 
   function stopPoll() {
-    if (state.pollTimer) {
-      window.clearInterval(state.pollTimer);
-      state.pollTimer = null;
+    state.polling = false;
+    if (state.pollAbort) {
+      state.pollAbort.abort();
+      state.pollAbort = null;
+    }
+  }
+
+  async function startPoll() {
+    const api = window.EAP_LIVE_TEACHING_API;
+    if (!api || !state.code) return;
+    stopPoll();
+    state.polling = true;
+
+    const fallbackMs = api.FALLBACK_POLL_MS || 4000;
+
+    while (state.polling) {
+      const controller = new AbortController();
+      state.pollAbort = controller;
+      const hidden = typeof document !== "undefined" && document.hidden;
+      try {
+        showError("");
+        let data;
+        if (hidden) {
+          data = await api.studentJoin(state.code);
+        } else if (typeof api.studentJoinWait === "function") {
+          data = await api.studentJoinWait(state.code, state.launchId, controller.signal);
+        } else {
+          data = await api.studentJoin(state.code);
+        }
+        applyJoinPayload(data);
+      } catch (err) {
+        if (err && err.name === "AbortError") break;
+        showError(err.message || String(err));
+        await new Promise((r) => window.setTimeout(r, fallbackMs));
+      } finally {
+        if (state.pollAbort === controller) state.pollAbort = null;
+      }
+      if (!state.polling) break;
+      if (hidden) {
+        await new Promise((r) => window.setTimeout(r, fallbackMs));
+      }
     }
   }
 
@@ -271,7 +302,7 @@
     }
 
     document.getElementById("slive-refresh")?.addEventListener("click", () => {
-      void refresh();
+      void refreshOnce().catch((err) => showError(err.message || String(err)));
     });
 
     document.getElementById("slive-logout-btn")?.addEventListener("click", () => {
@@ -283,17 +314,24 @@
       try {
         const user = await ensureStudentSession();
         if (!user) return;
-        await refresh();
-        startPoll();
+        await refreshOnce();
+        void startPoll();
       } catch (err) {
         showError(err.message || String(err));
       }
     })();
 
     window.addEventListener("beforeunload", stopPoll);
+    document.addEventListener("visibilitychange", () => {
+      if (!state.code || !state.polling) return;
+      if (!document.hidden) {
+        void refreshOnce().catch(() => {});
+      }
+    });
+
     window.addEventListener("eap:langchange", () => {
       renderTeamPick();
-      void refresh();
+      void refreshOnce().catch(() => {});
     });
   }
 

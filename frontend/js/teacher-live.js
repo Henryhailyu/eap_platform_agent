@@ -255,15 +255,23 @@
     }
   }
 
-  async function fetchResponseRows(question, boardState) {
+  async function fetchResponseRows(question, boardState, opts) {
     const MOCK = getMock();
-    if (!MOCK || !question) return { rows: [], live: false };
+    if (!MOCK || !question) return { rows: [], live: false, count: 0 };
 
     const sess = window.__tliveLiveSession;
     const api = getLiveApi();
     if (api && sess && sess.code && sess.launchId) {
       try {
-        const data = await api.fetchResponses(sess.code, sess.launchId);
+        const sinceCount = opts && opts.sinceCount != null ? opts.sinceCount : 0;
+        const useWait =
+          opts &&
+          opts.wait &&
+          typeof api.fetchResponsesWait === "function" &&
+          !(typeof document !== "undefined" && document.hidden);
+        const data = useWait
+          ? await api.fetchResponsesWait(sess.code, sess.launchId, sinceCount, opts.signal)
+          : await api.fetchResponses(sess.code, sess.launchId);
         return { rows: data.responses || [], live: true, count: data.count || 0 };
       } catch (_) {
         /* fall through to mock */
@@ -273,10 +281,10 @@
     return { rows: MOCK.simulateResponses(question), live: false, count: 0 };
   }
 
-  async function buildResponsesHtml(question, boardState) {
+  async function buildResponsesHtml(question, boardState, fetchOpts) {
     const MOCK = getMock();
     if (!MOCK || !question) return "";
-    const { rows, live, count } = await fetchResponseRows(question, boardState);
+    const { rows, live, count } = await fetchResponseRows(question, boardState, fetchOpts);
     const disclaimer = live
       ? t("tlive_responses_live", { n: String(count) })
       : t("tlive_responses_mock");
@@ -322,6 +330,11 @@
   function closeResponsesModal() {
     const modal = document.getElementById("tlive-responses-modal");
     if (!modal) return;
+    modal._tlivePollStop = true;
+    if (modal._tlivePollAbort) {
+      modal._tlivePollAbort.abort();
+      modal._tlivePollAbort = null;
+    }
     if (modal._tlivePollId) {
       window.clearInterval(modal._tlivePollId);
       modal._tlivePollId = null;
@@ -340,12 +353,73 @@
 
     const board = boardState !== undefined ? boardState : window.__tliveLaunched?.boardState;
 
-    async function paintBody() {
-      body.innerHTML = await buildResponsesHtml(question, board);
+    modal._tlivePollStop = false;
+    modal._tliveLastCount = 0;
+
+    async function paintBody(fetchOpts) {
+      const result = await fetchResponseRows(question, board, fetchOpts);
+      modal._tliveLastCount = result.count || 0;
+      const MOCK = getMock();
+      const { rows, live, count } = result;
+      const disclaimer = live
+        ? t("tlive_responses_live", { n: String(count) })
+        : t("tlive_responses_mock");
+      body.innerHTML = `
+      <p class="tlive-responses-modal__question">${escapeHtml(MOCK.questionText(question))}</p>
+      <div class="tlive-responses-modal__table-wrap">
+        <table class="tlive-responses-table tlive-responses-table--modal">
+          <thead><tr>
+            <th>${escapeHtml(t("tlive_col_student"))}</th>
+            <th>${escapeHtml(t("tlive_col_team"))}</th>
+            <th>${escapeHtml(t("tlive_col_answer"))}</th>
+            <th>${escapeHtml(t("tlive_col_ok"))}</th>
+            <th>${escapeHtml(t("tlive_col_time"))}</th>
+          </tr></thead>
+          <tbody>
+            ${rows.length
+              ? rows
+                  .map((r) => {
+                    const team = board?.teams?.find((x) => x.id === r.teamId);
+                    const teamLabel = team ? MOCK.teamName(team) : r.teamId;
+                    return `<tr class="${r.correct ? "tlive-resp--correct" : ""}">
+                  <td>${escapeHtml(r.student)}</td>
+                  <td><span class="tlive-resp-team" style="color:${team?.color || "#333"}">${escapeHtml(teamLabel)}</span></td>
+                  <td class="tlive-resp-answer">${escapeHtml(r.answer)}</td>
+                  <td>${r.correct ? "✓" : "—"}</td>
+                  <td>${r.timeSec}s</td>
+                </tr>`;
+                  })
+                  .join("")
+              : `<tr><td colspan="5">${escapeHtml(t("tlive_responses_empty"))}</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      <p class="tlive-disclaimer">${escapeHtml(disclaimer)}</p>
+    `;
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     }
 
     await paintBody();
+
+    async function pollResponsesLive() {
+      const fallbackMs =
+        (getLiveApi() && getLiveApi().FALLBACK_POLL_MS) || 4000;
+      while (!modal._tlivePollStop && !modal.hasAttribute("hidden")) {
+        const controller = new AbortController();
+        modal._tlivePollAbort = controller;
+        try {
+          await paintBody({
+            wait: true,
+            sinceCount: modal._tliveLastCount,
+            signal: controller.signal,
+          });
+        } catch (_) {
+          await new Promise((r) => window.setTimeout(r, fallbackMs));
+        } finally {
+          if (modal._tlivePollAbort === controller) modal._tlivePollAbort = null;
+        }
+      }
+    }
 
     if (foot) {
       const rankingMode = window.__tliveRanking && !window.__tliveRanking.winnerId;
@@ -532,13 +606,8 @@
     });
     document.getElementById("tlive-modal-close-btn")?.addEventListener("click", closeResponsesModal);
 
-    if (modal._tlivePollId) {
-      window.clearInterval(modal._tlivePollId);
-    }
     if (liveSessionActive() && window.__tliveLiveSession.launchId) {
-      modal._tlivePollId = window.setInterval(() => {
-        void paintBody();
-      }, 2500);
+      void pollResponsesLive();
     }
 
     document.getElementById("tlive-responses-modal-close")?.focus();

@@ -1,5 +1,5 @@
 /**
- * Live Teaching API — teacher sessions & student responses (Phase L27).
+ * Live Teaching API — teacher sessions & student responses (Phase L27–L28).
  */
 (function (global) {
   const API_BASE = (function resolveApiBase() {
@@ -12,6 +12,8 @@
   })();
 
   const CREDENTIALS = "include";
+  const WAIT_TIMEOUT_SEC = 25;
+  const FALLBACK_POLL_MS = 4000;
 
   async function parseJson(response) {
     const data = await response.json().catch(() => ({}));
@@ -20,6 +22,19 @@
       throw new Error(msg);
     }
     return data;
+  }
+
+  function waitQuery(extra) {
+    const params = new URLSearchParams();
+    params.set("timeout", String(WAIT_TIMEOUT_SEC));
+    if (extra) {
+      Object.keys(extra).forEach((key) => {
+        const val = extra[key];
+        if (val == null || val === "") return;
+        params.set(key, String(val));
+      });
+    }
+    return params.toString();
   }
 
   async function createSession(className, date) {
@@ -53,11 +68,36 @@
     return parseJson(response);
   }
 
+  async function fetchResponsesWait(sessionCode, launchId, sinceCount, signal) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const qs = waitQuery({
+      launch_id: launchId,
+      since_count: sinceCount != null ? sinceCount : 0,
+    });
+    const response = await fetch(
+      `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/responses/wait?${qs}`,
+      { credentials: CREDENTIALS, signal },
+    );
+    return parseJson(response);
+  }
+
   async function studentJoin(sessionCode) {
     const code = String(sessionCode || "").trim().toUpperCase();
     const response = await fetch(`${API_BASE}/api/student/live/join/${encodeURIComponent(code)}`, {
       credentials: CREDENTIALS,
     });
+    return parseJson(response);
+  }
+
+  async function studentJoinWait(sessionCode, launchId, signal) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const qs = waitQuery({
+      launch_id: launchId != null ? launchId : "",
+    });
+    const response = await fetch(
+      `${API_BASE}/api/student/live/join/${encodeURIComponent(code)}/wait?${qs}`,
+      { credentials: CREDENTIALS, signal },
+    );
     return parseJson(response);
   }
 
@@ -77,10 +117,14 @@
 
   global.EAP_LIVE_TEACHING_API = {
     API_BASE,
+    WAIT_TIMEOUT_SEC,
+    FALLBACK_POLL_MS,
     createSession,
     launchQuestion,
     fetchResponses,
+    fetchResponsesWait,
     studentJoin,
+    studentJoinWait,
     studentRespond,
   };
 })(typeof window !== "undefined" ? window : globalThis);
