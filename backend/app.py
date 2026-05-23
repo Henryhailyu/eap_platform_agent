@@ -89,10 +89,13 @@ def root_redirect():
     return redirect("/ui/index.html", code=302)
 
 
-@app.route("/ui/")
-@app.route("/ui/<path:filename>")
+@app.route("/ui/", methods=["GET", "HEAD", "POST"])
+@app.route("/ui/<path:filename>", methods=["GET", "HEAD", "POST"])
 def serve_ui(filename="index.html"):
     """Serve frontend HTML/CSS/JS from ../frontend (same host/port as /api/*)."""
+    if request.method == "POST":
+        target = request.path if request.path else "/ui/index.html"
+        return redirect(target, code=303)
     if not filename or str(filename).endswith("/"):
         filename = "index.html"
     safe = os.path.normpath(str(filename)).lstrip(os.sep)

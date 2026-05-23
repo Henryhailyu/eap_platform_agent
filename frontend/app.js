@@ -1717,72 +1717,69 @@ function initLoginPage() {
   if (redirectFilePageToHostedUi()) return;
 
   /*
-    index.html layout/CSS handles hero motion. This file only wires the two forms to
-    POST /api/login — do not change IDs without updating setupRoleLoginCard() configs below.
+    Wire login forms immediately so Enter/submit never POSTs to index.html (405) while
+    /api/me is still loading. Session banner runs after fetch completes.
   */
+  setupRoleLoginCard({
+    form: studentForm,
+    errorEl: document.getElementById("student-login-error"),
+    submitBtn: document.getElementById("student-login-submit"),
+    usernameInput: document.getElementById("student-username"),
+    passwordInput: document.getElementById("student-password"),
+    expectedRole: "student",
+    wrongRoleMessage: "This account is not a student account.",
+    successUrl: hostedUiPageUrl("student.html"),
+    submitLabelIdle: t("login_student_btn"),
+  });
+
+  setupRoleLoginCard({
+    form: teacherForm,
+    errorEl: document.getElementById("teacher-login-error"),
+    submitBtn: document.getElementById("teacher-login-submit"),
+    usernameInput: document.getElementById("teacher-username"),
+    passwordInput: document.getElementById("teacher-password"),
+    expectedRole: "teacher",
+    wrongRoleMessage: "This account is not a teacher account.",
+    successUrl: hostedUiPageUrl("teacher.html"),
+    submitLabelIdle: t("login_teacher_btn"),
+  });
+
+  if (adminForm) {
+    setupRoleLoginCard({
+      form: adminForm,
+      errorEl: document.getElementById("admin-login-error"),
+      submitBtn: document.getElementById("admin-login-submit"),
+      usernameInput: document.getElementById("admin-username"),
+      passwordInput: document.getElementById("admin-password"),
+      expectedRole: "admin",
+      wrongRoleMessage: t("login_wrong_role_admin"),
+      successUrl: hostedUiPageUrl("admin.html"),
+      submitLabelIdle: t("login_admin_btn"),
+    });
+  }
 
   void (async () => {
-    const serverUser = await fetchCurrentSessionUser();
-    if (
-      serverUser &&
-      (serverUser.role === "teacher" || serverUser.role === "student" || serverUser.role === "admin")
-    ) {
-      saveUserToSession(serverUser);
-      const nextParam = new URLSearchParams(window.location.search).get("next");
-      const nextUrl = loginNextRedirectUrl(serverUser.role);
-      if (nextUrl) {
-        window.location.replace(nextUrl);
-        return;
+    try {
+      const serverUser = await fetchCurrentSessionUser();
+      if (
+        serverUser &&
+        (serverUser.role === "teacher" || serverUser.role === "student" || serverUser.role === "admin")
+      ) {
+        saveUserToSession(serverUser);
+        const nextParam = new URLSearchParams(window.location.search).get("next");
+        const nextUrl = loginNextRedirectUrl(serverUser.role);
+        if (nextUrl) {
+          window.location.replace(nextUrl);
+          return;
+        }
+        if (nextParam && String(nextParam).trim()) {
+          showLoginNextRoleMismatch(serverUser, nextParam);
+        } else {
+          showLoggedInSessionBanner(serverUser);
+        }
       }
-      /* Do not bounce away when ?next= targets the other role (e.g. student-live while teacher cookie). */
-      if (nextParam && String(nextParam).trim()) {
-        showLoginNextRoleMismatch(serverUser, nextParam);
-      } else {
-        showLoggedInSessionBanner(serverUser);
-      }
-    }
-
-    /*
-      Do not auto-redirect from localStorage alone — it fights the Flask session cookie
-      and sends teachers to student.html (or vice versa) when roles are mixed in one browser.
-    */
-
-    setupRoleLoginCard({
-      form: studentForm,
-      errorEl: document.getElementById("student-login-error"),
-      submitBtn: document.getElementById("student-login-submit"),
-      usernameInput: document.getElementById("student-username"),
-      passwordInput: document.getElementById("student-password"),
-      expectedRole: "student",
-      wrongRoleMessage: "This account is not a student account.",
-      successUrl: hostedUiPageUrl("student.html"),
-      submitLabelIdle: t("login_student_btn"),
-    });
-
-    setupRoleLoginCard({
-      form: teacherForm,
-      errorEl: document.getElementById("teacher-login-error"),
-      submitBtn: document.getElementById("teacher-login-submit"),
-      usernameInput: document.getElementById("teacher-username"),
-      passwordInput: document.getElementById("teacher-password"),
-      expectedRole: "teacher",
-      wrongRoleMessage: "This account is not a teacher account.",
-      successUrl: hostedUiPageUrl("teacher.html"),
-      submitLabelIdle: t("login_teacher_btn"),
-    });
-
-    if (adminForm) {
-      setupRoleLoginCard({
-        form: adminForm,
-        errorEl: document.getElementById("admin-login-error"),
-        submitBtn: document.getElementById("admin-login-submit"),
-        usernameInput: document.getElementById("admin-username"),
-        passwordInput: document.getElementById("admin-password"),
-        expectedRole: "admin",
-        wrongRoleMessage: t("login_wrong_role_admin"),
-        successUrl: hostedUiPageUrl("admin.html"),
-        submitLabelIdle: t("login_admin_btn"),
-      });
+    } catch (_) {
+      /* Forms still work; banner is optional */
     }
   })();
 }
