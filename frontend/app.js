@@ -57,6 +57,15 @@ function eapLocale() {
   return undefined;
 }
 
+/** Escape text for safe HTML template literals (role gates, banners). */
+function escapeHtml(text) {
+  return String(text == null ? "" : text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 const TASK_CATEGORY_I18N = {
   "Classroom Learning": "cat_classroom",
   Vocabulary: "cat_vocab",
@@ -241,34 +250,37 @@ function requireRole(expectedRole) {
  * (Teachers/students use the Logout button in the header.)
  */
 function logoutAndGoHome() {
+  authStorageRemoveAll();
+  const dest = typeof hostedUiPageUrl === "function" ? hostedUiPageUrl("index.html") : "index.html";
   fetch(`${API_BASE}/api/logout`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: EAP_FETCH_CREDENTIALS,
-  })
-    .catch(() => {
-      /* Offline or server stopped — still clear client session */
-    })
-    .finally(() => {
-      authStorageRemoveAll();
-      window.location.href = "index.html";
-    });
+    keepalive: true,
+  }).catch(() => {});
+  window.location.replace(dest);
 }
 
-/** Fills “Welcome, …” and wires the Logout button (run after requireRole passes). */
+/** Wire header Logout once (safe to call on every app page boot). */
+function bindPageHeaderLogout() {
+  const logoutBtn = document.getElementById("logout-btn");
+  if (!logoutBtn || logoutBtn.dataset.eapLogoutBound === "1") return;
+  logoutBtn.dataset.eapLogoutBound = "1";
+  logoutBtn.type = "button";
+  logoutBtn.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    logoutAndGoHome();
+  });
+}
+
+/** Fills “Welcome, …” and ensures Logout is wired. */
 function initAppPageHeader() {
+  bindPageHeaderLogout();
   const welcomeEl = document.getElementById("header-welcome");
   const user = getLoggedInUser();
   if (welcomeEl && user) {
     const name = user.full_name || user.username || "User";
     welcomeEl.textContent = t("welcome_user", { name });
-  }
-
-  const logoutBtn = document.getElementById("logout-btn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
-      logoutAndGoHome();
-    });
   }
 }
 
@@ -500,6 +512,7 @@ async function validatePageSessionOrFallback(expectedRole) {
   if (result.reason === "wrong_role" && result.user) {
     saveUserToSession(result.user);
     renderWrongRoleGate(result.user.role);
+    initAppPageHeader();
     return null;
   }
   if (result.redirect) {
@@ -1861,6 +1874,8 @@ function renderAdminStudentsTable(students, tbody, emptyEl) {
 function initAdminPage() {
   if (document.body.getAttribute("data-page") !== "admin") return;
   if (redirectFilePageToHostedUi()) return;
+
+  bindPageHeaderLogout();
 
   void (async () => {
     const sessionUser = await validatePageSessionOrFallback("admin");
@@ -3460,10 +3475,13 @@ function initTeacherPage() {
 
   if (redirectFilePageToHostedUi()) return;
 
+  bindPageHeaderLogout();
+
   void (async () => {
     const sessionUser = await validatePageSessionOrFallback("teacher");
     if (!sessionUser) return;
 
+    saveUserToSession(sessionUser);
     await ensureAcademicCalendarLoaded();
     initAppPageHeader();
     initTeacherLiveNavLink();
@@ -6242,14 +6260,31 @@ function initStudentPage() {
 
   if (redirectFilePageToHostedUi()) return;
 
-  void (async () => {
-    const sessionUser = await validatePageSessionOrFallback("student");
-    if (!sessionUser) return;
+  bindPageHeaderLogout();
 
-    await ensureAcademicCalendarLoaded();
-    initAppPageHeader();
-    initStudentSelfStudyNavLink();
-    initStudentLiveNavLink();
+  void (async () => {
+    try {
+      const sessionUser = await validatePageSessionOrFallback("student");
+      if (!sessionUser) return;
+
+      saveUserToSession(sessionUser);
+      await ensureAcademicCalendarLoaded();
+      initAppPageHeader();
+      initStudentSelfStudyNavLink();
+      initStudentLiveNavLink();
+    } catch (err) {
+      console.error("Student page boot failed:", err);
+      const hero = document.querySelector(".page-hero--student-compact");
+      if (hero) {
+        const p = document.createElement("p");
+        p.className = "page-error";
+        p.setAttribute("role", "alert");
+        p.textContent = err && err.message ? err.message : "Could not load student page.";
+        hero.appendChild(p);
+      }
+      initAppPageHeader();
+      return;
+    }
 
   /*
     ----- Student class scope (Phase C3) -----

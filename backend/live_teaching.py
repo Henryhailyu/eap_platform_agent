@@ -1,5 +1,5 @@
 """
-Live Teaching — teacher sessions and student responses (Phase L27–L28).
+Live Teaching — teacher sessions and student responses (Phase L27–L29).
 
 Tables: live_sessions, live_launches, live_responses.
 Routes registered via register_live_teaching_routes(app) from app.py.

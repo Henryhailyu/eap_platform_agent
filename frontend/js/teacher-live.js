@@ -150,7 +150,12 @@
     `;
 
     document.getElementById("tlive-launch-q")?.addEventListener("click", () => {
-      launchToStudents(q, window.__tliveBoard || state);
+      const board = window.__tliveBoard || state;
+      launchToStudents(
+        q,
+        board,
+        liveLaunchMeta("board_race", { round: board && board.round != null ? board.round : 1 }),
+      );
     });
 
     document.getElementById("tlive-view-responses")?.addEventListener("click", () => {
@@ -188,6 +193,76 @@
     return window.EAP_LIVE_TEACHING_API || null;
   }
 
+  const LIVE_SESSION_STORAGE_KEY = "eap_teacher_live_session_v1";
+
+  function loadPersistedLiveSession(ctx) {
+    try {
+      const raw = sessionStorage.getItem(LIVE_SESSION_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.code) return null;
+      const className = (ctx && ctx.className) || "EAP047";
+      if (parsed.class_name && parsed.class_name !== className) return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function persistLiveSession(sess) {
+    if (!sess || !sess.code) return;
+    try {
+      sessionStorage.setItem(
+        LIVE_SESSION_STORAGE_KEY,
+        JSON.stringify({
+          code: sess.code,
+          class_name: sess.class_name,
+          join_url: sess.join_url,
+          join_path: sess.join_path,
+        }),
+      );
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function clearPersistedLiveSession() {
+    try {
+      sessionStorage.removeItem(LIVE_SESSION_STORAGE_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  async function liveTeacherContext() {
+    if (typeof fetchCurrentSessionUser === "function") {
+      const server = await fetchCurrentSessionUser();
+      if (server && server.role === "teacher") {
+        if (typeof saveUserToSession === "function") saveUserToSession(server);
+        return server;
+      }
+      if (server && server.role) return null;
+    }
+    const local = typeof getLoggedInUser === "function" ? getLoggedInUser() : null;
+    if (local && local.role === "teacher") return local;
+    return null;
+  }
+
+  function launchErrorMessage(err) {
+    const msg = (err && err.message) || "";
+    const status = err && err.httpStatus;
+    if (/not logged in/i.test(msg) || status === 401) {
+      return t("tlive_launch_fail_login");
+    }
+    if (/wrong role/i.test(msg) || status === 403) {
+      return t("tlive_launch_fail_wrong_role");
+    }
+    if (/session not found/i.test(msg) || status === 404 || (err && err.code === "live_not_found")) {
+      return t("tlive_launch_fail_session");
+    }
+    return t("tlive_launch_fail_generic");
+  }
+
   function liveSessionActive() {
     return !!(window.__tliveLiveSession && window.__tliveLiveSession.code);
   }
@@ -219,8 +294,28 @@
       updateSessionJoinBanner();
       return true;
     }
+
+    const persisted = loadPersistedLiveSession(ctx);
+    if (persisted && persisted.code) {
+      window.__tliveLiveSession = {
+        code: persisted.code,
+        join_url: persisted.join_url,
+        join_path: persisted.join_path,
+        class_name: persisted.class_name || ctx.className,
+        launchId: null,
+        useLive: true,
+      };
+      updateSessionJoinBanner();
+      return true;
+    }
+
+    const teacher = await liveTeacherContext();
+    if (!teacher) return false;
+
     try {
-      const data = await api.createSession(ctx.className, ctx.date);
+      const data = await api.createSession(ctx.className, ctx.date, {
+        teacher_username: teacher.username,
+      });
       window.__tliveLiveSession = {
         code: data.session_code,
         join_url: data.join_url,
@@ -229,6 +324,7 @@
         launchId: null,
         useLive: true,
       };
+      persistLiveSession(window.__tliveLiveSession);
       updateSessionJoinBanner();
       return true;
     } catch (_) {
@@ -250,6 +346,28 @@
     };
   }
 
+  /** Phase L29 — attach game type + classroom context for student live UI. */
+  function buildLaunchPayload(question, launchMeta) {
+    const base = normalizeQuestionForLaunch(question);
+    if (!base) return null;
+    const meta = launchMeta && typeof launchMeta === "object" ? launchMeta : {};
+    const gameType = String(meta.gameType || "poll")
+      .trim()
+      .toLowerCase()
+      .replace(/-/g, "_");
+    const out = { ...base, gameType: gameType || "poll" };
+    if (meta.context && typeof meta.context === "object") {
+      out.context = meta.context;
+    }
+    return out;
+  }
+
+  function liveLaunchMeta(gameType, context) {
+    const meta = { gameType: gameType || "poll" };
+    if (context && typeof context === "object") meta.context = context;
+    return meta;
+  }
+
   function updateLaunchStatus(message, isOk) {
     const el = document.getElementById("tlive-launch-status");
     if (!el) return;
@@ -266,8 +384,8 @@
     el.classList.toggle("tlive-launch-status--err", !isOk);
   }
 
-  async function launchToStudents(question, boardState) {
-    const payload = normalizeQuestionForLaunch(question);
+  async function launchToStudents(question, boardState, launchMeta) {
+    const payload = buildLaunchPayload(question, launchMeta);
     if (!payload || !payload.optionsEn.length) {
       updateLaunchStatus(t("tlive_launch_fail_no_question"), false);
       return false;
@@ -285,9 +403,17 @@
       return false;
     }
 
+    const teacher = await liveTeacherContext();
+    if (!teacher) {
+      updateLaunchStatus(t("tlive_launch_fail_login"), false);
+      return false;
+    }
+    if (typeof initAppPageHeader === "function") initAppPageHeader();
+
+    const ctx = contextFromUrl();
     let sess = window.__tliveLiveSession;
     if (!sess || !sess.code) {
-      const ok = await ensureLiveSession(contextFromUrl());
+      const ok = await ensureLiveSession(ctx);
       if (!ok) {
         updateLaunchStatus(t("tlive_launch_fail_no_session"), false);
         return false;
@@ -295,21 +421,38 @@
       sess = window.__tliveLiveSession;
     }
 
-    try {
+    const launchOpts = { teacher_username: teacher.username };
+
+    async function postLaunch(code) {
       updateLaunchStatus(t("tlive_launch_sending"), false);
-      const data = await api.launchQuestion(sess.code, payload);
+      const data = await api.launchQuestion(code, payload, launchOpts);
       sess.launchId = data.launch_id;
       sess.useLive = true;
+      persistLiveSession(sess);
       updateLaunchStatus(t("tlive_launch_ok"), true);
       return true;
+    }
+
+    try {
+      return await postLaunch(sess.code);
     } catch (err) {
       sess.useLive = false;
-      const msg = (err && err.message) || "";
-      if (/not logged in/i.test(msg)) {
-        updateLaunchStatus(t("tlive_launch_fail_login"), false);
-      } else {
-        updateLaunchStatus(t("tlive_launch_fail_generic"), false);
+      const status = err && err.httpStatus;
+      if (status === 404 || (err && err.code === "live_not_found")) {
+        clearPersistedLiveSession();
+        window.__tliveLiveSession = null;
+        const ok = await ensureLiveSession(ctx);
+        if (ok && window.__tliveLiveSession && window.__tliveLiveSession.code) {
+          sess = window.__tliveLiveSession;
+          try {
+            return await postLaunch(sess.code);
+          } catch (retryErr) {
+            updateLaunchStatus(launchErrorMessage(retryErr), false);
+            return false;
+          }
+        }
       }
+      updateLaunchStatus(launchErrorMessage(err), false);
       return false;
     }
   }
@@ -755,7 +898,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-quiz-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-quiz-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("quiz_battle", { round: state.round })),
+    );
 
     document.getElementById("tlive-quiz-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -861,7 +1006,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-treasure-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-treasure-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("treasure_hunt", { round: state.round })),
+    );
 
     document.getElementById("tlive-treasure-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -971,7 +1118,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-escape-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-escape-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("escape_room", { round: state.round })),
+    );
 
     document.getElementById("tlive-escape-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -1088,7 +1237,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-ladder-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-ladder-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("word_ladder", { round: state.round })),
+    );
 
     document.getElementById("tlive-ladder-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -1199,7 +1350,17 @@
       </div>
     `;
 
-    document.getElementById("tlive-sentence-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-sentence-launch")?.addEventListener("click", () => {
+      const st = window.__tliveSentence || state;
+      launchToStudents(
+        q,
+        null,
+        liveLaunchMeta("sentence_builder", {
+          puzzleIndex: st && st.puzzleIndex != null ? st.puzzleIndex : 0,
+          puzzleTotal: 3,
+        }),
+      );
+    });
 
     document.getElementById("tlive-sentence-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -1311,7 +1472,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-argument-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-argument-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("argument_sorting", { round: state.round })),
+    );
 
     document.getElementById("tlive-argument-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -1427,7 +1590,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-summary-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-summary-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("summary_mission", { round: state.round })),
+    );
 
     document.getElementById("tlive-summary-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -1532,7 +1697,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-ranking-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-ranking-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("ranking_challenge", { round: state.round })),
+    );
 
     document.getElementById("tlive-ranking-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -1632,7 +1799,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-debate-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-debate-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("debate_cards", { round: state.round })),
+    );
 
     document.getElementById("tlive-debate-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -1739,7 +1908,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-hotseat-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-hotseat-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("hot_seat")),
+    );
 
     document.getElementById("tlive-hotseat-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -1841,7 +2012,9 @@
       </div>
     `;
 
-    document.getElementById("tlive-memory-launch")?.addEventListener("click", () => launchToStudents(q, null));
+    document.getElementById("tlive-memory-launch")?.addEventListener("click", () =>
+      launchToStudents(q, null, liveLaunchMeta("memory_card", { round: state.round })),
+    );
 
     document.getElementById("tlive-memory-view-resp")?.addEventListener("click", () => openResponsesModal(q, null));
 
@@ -2274,7 +2447,9 @@
                 </div>
               </div>
             `;
-            document.getElementById("tlive-launch-poll")?.addEventListener("click", () => launchToStudents(q, null));
+            document.getElementById("tlive-launch-poll")?.addEventListener("click", () =>
+              launchToStudents(q, null, liveLaunchMeta(tool === "quiz" ? "quiz" : "poll")),
+            );
             document.getElementById("tlive-view-poll-responses")?.addEventListener("click", () => openResponsesModal(q, null));
           }
         } else {
@@ -2397,7 +2572,7 @@
         const sessionUser = await validateSatelliteSessionOrGate("teacher");
         if (!sessionUser) return;
         if (typeof initAppPageHeader === "function") initAppPageHeader();
-        initPageChrome();
+        else initPageChrome();
         await ensureLiveSession(ctx);
       } catch (_) {
         showBootError(t("tlive_boot_session_hint"));

@@ -1509,12 +1509,13 @@ body.tlive-modal-open {
 
 .tlive-session-join__code {
   margin: 0 0 0.35rem;
-  font-size: 1.125rem;
+  font-size: 0.9375rem;
 }
 
 .tlive-session-join__code strong {
-  font-size: 1.35rem;
-  letter-spacing: 0.12em;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   color: var(--tlive-primary);
 }
 
@@ -1576,14 +1577,16 @@ body.tlive-modal-open {
 
 .slive-code-input {
   font: inherit;
-  font-size: 1.125rem;
+  font-size: 0.75rem !important;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  width: 8.5rem;
-  padding: 0.5rem 0.65rem;
+  width: 7.25rem;
+  max-width: 100%;
+  padding: 0.45rem 0.55rem;
   border: 1px solid rgba(10, 77, 104, 0.25);
   border-radius: 8px;
+  box-sizing: border-box;
 }
 
 .slive-teams {
@@ -1596,6 +1599,37 @@ body.tlive-modal-open {
   outline: 2px solid var(--tlive-primary);
   outline-offset: 1px;
   font-weight: 600;
+}
+
+.slive-game-badge {
+  display: inline-block;
+  margin: 0 0 0.35rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #0a4d68;
+  background: rgba(10, 77, 104, 0.08);
+  border: 1px solid rgba(10, 77, 104, 0.18);
+  border-radius: 999px;
+}
+
+.slive-game-context {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0a7ea4;
+}
+
+.slive-game-prompt {
+  margin: 0 0 0.65rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: #6e6e73;
+}
+
+.slive-question--game .slive-opt-btn {
+  font-size: 0.9375rem;
 }
 
 .slive-question-text {

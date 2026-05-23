@@ -1,5 +1,5 @@
 /**
- * Live Teaching API — teacher sessions & student responses (Phase L27–L28).
+ * Live Teaching API — teacher sessions & student responses (Phase L27–L29).
  */
 (function (global) {
   const API_BASE = (function resolveApiBase() {
@@ -47,23 +47,29 @@
     return params.toString();
   }
 
-  async function createSession(className, date) {
+  async function createSession(className, date, options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const body = { class_name: className, date: date || "" };
+    if (opts.teacher_username) body.teacher_username = opts.teacher_username;
     const response = await fetch(`${API_BASE}/api/teacher/live/sessions`, {
       method: "POST",
       credentials: CREDENTIALS,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_name: className, date: date || "" }),
+      body: JSON.stringify(body),
     });
     return parseJson(response);
   }
 
-  async function launchQuestion(sessionCode, question) {
+  async function launchQuestion(sessionCode, question, options) {
     const code = String(sessionCode || "").trim().toUpperCase();
+    const opts = options && typeof options === "object" ? options : {};
+    const body = { question };
+    if (opts.teacher_username) body.teacher_username = opts.teacher_username;
     const response = await fetch(`${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/launch`, {
       method: "POST",
       credentials: CREDENTIALS,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify(body),
     });
     return parseJson(response);
   }

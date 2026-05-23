@@ -1,5 +1,5 @@
 /**
- * Student Live — join teacher session and submit poll/quiz answers (Phase L27–L28).
+ * Student Live — join teacher session and submit poll/quiz answers (Phase L27–L29).
  */
 (function () {
   const PAGE = "student-live";
@@ -38,6 +38,104 @@
     const opts = zh ? q.optionsZh : q.optionsEn;
     if (opts && opts.length) return opts;
     return zh ? q.optionsEn : q.optionsZh;
+  }
+
+  function normalizeGameType(raw) {
+    const tpe = String(raw || "poll")
+      .trim()
+      .toLowerCase()
+      .replace(/-/g, "_");
+    return /^[a-z0-9_]+$/.test(tpe) ? tpe : "poll";
+  }
+
+  function gameI18nKey(gameType, suffix) {
+    return `slive_game_${normalizeGameType(gameType)}${suffix ? `_${suffix}` : ""}`;
+  }
+
+  function gameLabel(q) {
+    const type = normalizeGameType(q && q.gameType);
+    const key = gameI18nKey(type);
+    const label = t(key);
+    return label !== key ? label : t("slive_game_poll");
+  }
+
+  function gameStudentPrompt(q) {
+    const type = normalizeGameType(q && q.gameType);
+    const key = gameI18nKey(type, "prompt");
+    const msg = t(key);
+    return msg !== key ? msg : t("slive_game_poll_prompt");
+  }
+
+  function formatGameContext(q) {
+    const c = q && q.context;
+    if (!c || typeof c !== "object") return "";
+    const type = normalizeGameType(q.gameType);
+    if (type === "board_race" && c.round != null) {
+      return t("slive_ctx_round", { round: String(c.round) });
+    }
+    if (c.round != null && type !== "poll" && type !== "quiz") {
+      return t("slive_ctx_round", { round: String(c.round) });
+    }
+    if (type === "sentence_builder" && c.puzzleIndex != null) {
+      return t("slive_ctx_puzzle", {
+        n: String(Number(c.puzzleIndex) + 1),
+        total: String(c.puzzleTotal != null ? c.puzzleTotal : 3),
+      });
+    }
+    return "";
+  }
+
+  function renderGameChrome(q) {
+    const badge = document.getElementById("slive-game-badge");
+    const prompt = document.getElementById("slive-game-prompt");
+    const ctxEl = document.getElementById("slive-game-context");
+    const card = document.getElementById("slive-question");
+    if (!badge || !prompt || !ctxEl) return;
+
+    const type = normalizeGameType(q && q.gameType);
+    badge.textContent = gameLabel(q);
+    badge.classList.remove("hidden");
+    badge.removeAttribute("aria-hidden");
+    badge.dataset.gameType = type;
+
+    const ctxText = formatGameContext(q);
+    if (ctxText) {
+      ctxEl.textContent = ctxText;
+      ctxEl.classList.remove("hidden");
+      ctxEl.removeAttribute("aria-hidden");
+    } else {
+      ctxEl.textContent = "";
+      ctxEl.classList.add("hidden");
+      ctxEl.setAttribute("aria-hidden", "true");
+    }
+
+    const promptText = gameStudentPrompt(q);
+    if (promptText) {
+      prompt.textContent = promptText;
+      prompt.classList.remove("hidden");
+      prompt.removeAttribute("aria-hidden");
+    } else {
+      prompt.textContent = "";
+      prompt.classList.add("hidden");
+      prompt.setAttribute("aria-hidden", "true");
+    }
+
+    if (card) {
+      card.classList.remove("slive-question--poll", "slive-question--game");
+      card.classList.add(type === "poll" || type === "quiz" ? "slive-question--poll" : "slive-question--game");
+    }
+  }
+
+  function clearGameChrome() {
+    ["slive-game-badge", "slive-game-prompt", "slive-game-context"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = "";
+      el.classList.add("hidden");
+      el.setAttribute("aria-hidden", "true");
+    });
+    const card = document.getElementById("slive-question");
+    if (card) card.classList.remove("slive-question--poll", "slive-question--game");
   }
 
   function getTeamId() {
@@ -135,6 +233,7 @@
     if (!q) {
       wait.classList.remove("hidden");
       card.classList.add("hidden");
+      clearGameChrome();
       if (sentEl) sentEl.classList.add("hidden");
       return;
     }
@@ -142,6 +241,7 @@
     wait.classList.add("hidden");
     card.classList.remove("hidden");
     if (sentEl) sentEl.classList.add("hidden");
+    renderGameChrome(q);
     textEl.textContent = questionText(q);
     const opts = questionOptions(q);
     optsEl.innerHTML = opts
