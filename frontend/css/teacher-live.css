@@ -1474,6 +1474,24 @@ body.tlive-modal-open {
 }
 
 /* L27 — Live session join + student live page */
+.tlive-launch-status {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.tlive-launch-status--ok {
+  background: rgba(52, 199, 89, 0.12);
+  color: #1a7a34;
+}
+
+.tlive-launch-status--err {
+  background: rgba(255, 59, 48, 0.1);
+  color: #c41e14;
+}
+
 .tlive-session-join {
   margin-top: 0.65rem;
   padding: 0.65rem 0.85rem;

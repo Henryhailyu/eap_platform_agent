@@ -16,10 +16,20 @@
   const FALLBACK_POLL_MS = 4000;
 
   async function parseJson(response) {
-    const data = await response.json().catch(() => ({}));
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+    const data =
+      contentType.includes("application/json") ? await response.json().catch(() => ({})) : {};
     if (!response.ok) {
+      if (response.status === 404 && !data.error) {
+        const err = new Error("LIVE_ROUTE_OR_SESSION_NOT_FOUND");
+        err.code = "live_not_found";
+        err.httpStatus = 404;
+        throw err;
+      }
       const msg = data.error || data.message || `HTTP ${response.status}`;
-      throw new Error(msg);
+      const err = new Error(msg);
+      err.httpStatus = response.status;
+      throw err;
     }
     return data;
   }

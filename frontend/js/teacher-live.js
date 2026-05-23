@@ -237,21 +237,80 @@
     }
   }
 
+  function normalizeQuestionForLaunch(question) {
+    if (!question || typeof question !== "object") return null;
+    const optionsEn = Array.isArray(question.optionsEn) ? question.optionsEn : [];
+    const optionsZh = Array.isArray(question.optionsZh) ? question.optionsZh : [];
+    return {
+      textEn: String(question.textEn || "").trim(),
+      textZh: String(question.textZh || "").trim(),
+      optionsEn,
+      optionsZh: optionsZh.length ? optionsZh : optionsEn,
+      correctIndex: Number.isInteger(question.correctIndex) ? question.correctIndex : 0,
+    };
+  }
+
+  function updateLaunchStatus(message, isOk) {
+    const el = document.getElementById("tlive-launch-status");
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.classList.add("hidden");
+      el.hidden = true;
+      return;
+    }
+    el.textContent = message;
+    el.classList.remove("hidden");
+    el.hidden = false;
+    el.classList.toggle("tlive-launch-status--ok", !!isOk);
+    el.classList.toggle("tlive-launch-status--err", !isOk);
+  }
+
   async function launchToStudents(question, boardState) {
+    const payload = normalizeQuestionForLaunch(question);
+    if (!payload || !payload.optionsEn.length) {
+      updateLaunchStatus(t("tlive_launch_fail_no_question"), false);
+      return false;
+    }
+
     window.__tliveLaunched = {
-      question,
+      question: payload,
       boardState: boardState || null,
       at: Date.now(),
     };
+
     const api = getLiveApi();
-    const sess = window.__tliveLiveSession;
-    if (!api || !sess || !sess.code || !question) return;
+    if (!api) {
+      updateLaunchStatus(t("tlive_launch_fail_no_api"), false);
+      return false;
+    }
+
+    let sess = window.__tliveLiveSession;
+    if (!sess || !sess.code) {
+      const ok = await ensureLiveSession(contextFromUrl());
+      if (!ok) {
+        updateLaunchStatus(t("tlive_launch_fail_no_session"), false);
+        return false;
+      }
+      sess = window.__tliveLiveSession;
+    }
+
     try {
-      const data = await api.launchQuestion(sess.code, question);
+      updateLaunchStatus(t("tlive_launch_sending"), false);
+      const data = await api.launchQuestion(sess.code, payload);
       sess.launchId = data.launch_id;
       sess.useLive = true;
-    } catch (_) {
+      updateLaunchStatus(t("tlive_launch_ok"), true);
+      return true;
+    } catch (err) {
       sess.useLive = false;
+      const msg = (err && err.message) || "";
+      if (/not logged in/i.test(msg)) {
+        updateLaunchStatus(t("tlive_launch_fail_login"), false);
+      } else {
+        updateLaunchStatus(t("tlive_launch_fail_generic"), false);
+      }
+      return false;
     }
   }
 

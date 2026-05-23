@@ -65,6 +65,19 @@
     polling: false,
   };
 
+  function formatLiveError(err) {
+    const code = err && err.code;
+    const status = err && err.httpStatus;
+    const msg = (err && err.message) || "";
+    if (code === "live_not_found" || status === 404 || msg === "Session not found") {
+      return t("slive_session_not_found", { code: state.code });
+    }
+    if (msg === "LIVE_ROUTE_OR_SESSION_NOT_FOUND") {
+      return t("slive_api_restart");
+    }
+    return msg || String(err);
+  }
+
   function showError(msg, opts) {
     const el = document.getElementById("slive-error");
     const hint = document.getElementById("slive-logout-hint");
@@ -227,7 +240,7 @@
         applyJoinPayload(data);
       } catch (err) {
         if (err && err.name === "AbortError") break;
-        showError(err.message || String(err));
+        showError(formatLiveError(err));
         await new Promise((r) => window.setTimeout(r, fallbackMs));
       } finally {
         if (state.pollAbort === controller) state.pollAbort = null;
@@ -302,7 +315,7 @@
     }
 
     document.getElementById("slive-refresh")?.addEventListener("click", () => {
-      void refreshOnce().catch((err) => showError(err.message || String(err)));
+      void refreshOnce().catch((err) => showError(formatLiveError(err)));
     });
 
     document.getElementById("slive-logout-btn")?.addEventListener("click", () => {
@@ -317,7 +330,7 @@
         await refreshOnce();
         void startPoll();
       } catch (err) {
-        showError(err.message || String(err));
+        showError(formatLiveError(err));
       }
     })();
 
