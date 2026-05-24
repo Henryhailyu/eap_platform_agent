@@ -33,7 +33,7 @@ import uuid
 from calendar import monthrange
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify, redirect, request, send_from_directory, abort, session
+from flask import Flask, jsonify, redirect, request, send_from_directory, abort, session, Response
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -58,11 +58,19 @@ from self_study_ai_prompts import (
 )
 
 try:
-    from eap_ai import ai_is_configured, ai_ping, ai_public_status, module_coach_reply, vocabulary_explain
+    from eap_ai import (
+        ai_is_configured,
+        ai_ping,
+        ai_public_status,
+        generate_teaching_page_html,
+        module_coach_reply,
+        vocabulary_explain,
+    )
 except ImportError:
     ai_is_configured = None  # type: ignore[assignment,misc]
     ai_ping = None  # type: ignore[assignment,misc]
     ai_public_status = None  # type: ignore[assignment,misc]
+    generate_teaching_page_html = None  # type: ignore[assignment,misc]
     module_coach_reply = None  # type: ignore[assignment,misc]
     vocabulary_explain = None  # type: ignore[assignment,misc]
 
@@ -699,6 +707,23 @@ def init_database():
             system_prompt TEXT NOT NULL,
             is_default INTEGER NOT NULL DEFAULT 1,
             updated_by TEXT,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS teacher_teaching_pages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            class_name TEXT,
+            task_id INTEGER,
+            topic TEXT,
+            source_text TEXT,
+            html_content TEXT NOT NULL,
+            teacher_username TEXT NOT NULL,
+            created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
         """
@@ -7277,6 +7302,198 @@ def admin_self_study_ai_prompt_preview(module):
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+
+
+# --- Phase K3: Teacher AI HTML teaching pages ---
+
+from teacher_teaching_pages import MAX_SOURCE_TEXT, MAX_TITLE, row_to_dict as teaching_page_row_to_dict
+
+
+@app.route("/api/teacher/teaching-pages/ai/status", methods=["GET"])
+def teacher_teaching_pages_ai_status():
+    """Phase K3: AI availability for lesson generator (teacher)."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+    conn.close()
+    if not ai_public_status:
+        return jsonify({"available": False, "reason": "ai_module_missing"})
+    status = ai_public_status()
+    return jsonify(
+        {
+            "available": bool(status.get("enabled") and status.get("configured")),
+            "active_provider": status.get("active_provider"),
+            "model": status.get("model"),
+        }
+    )
+
+
+@app.route("/api/teacher/teaching-pages/generate", methods=["POST"])
+def teacher_teaching_pages_generate():
+    """Phase K3: generate HTML teaching page preview (not saved until POST /teaching-pages)."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+    conn.close()
+
+    if not generate_teaching_page_html or not ai_is_configured or not ai_is_configured():
+        return jsonify({"error": "AI lesson generator is not available"}), 503
+
+    body = request.get_json(silent=True) or {}
+    topic = str(body.get("topic") or body.get("title") or "").strip()
+    source_text = str(body.get("source_text") or body.get("sourceText") or "").strip()
+    level = str(body.get("level") or "intermediate").strip().lower()
+    lang = str(body.get("lang") or "en").strip().lower()
+    custom_instructions = str(body.get("instructions") or body.get("custom_instructions") or "").strip()
+
+    if not topic:
+        return jsonify({"error": "topic is required"}), 400
+
+    try:
+        result = generate_teaching_page_html(
+            topic,
+            source_text=source_text,
+            level=level,
+            lang=lang,
+            custom_instructions=custom_instructions,
+        )
+        return jsonify({"page": result})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+
+
+@app.route("/api/teacher/teaching-pages", methods=["GET", "POST"])
+def teacher_teaching_pages_collection():
+    """Phase K3: list or save teacher HTML teaching pages."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+
+    actor = get_current_authenticated_user(conn)
+    teacher = str(actor["username"] or "").strip() if actor else ""
+
+    if request.method == "GET":
+        rows = conn.execute(
+            """
+            SELECT id, title, class_name, task_id, topic, source_text, html_content,
+                   teacher_username, created_at, updated_at
+            FROM teacher_teaching_pages
+            WHERE teacher_username = ?
+            ORDER BY datetime(updated_at) DESC, id DESC
+            """,
+            (teacher,),
+        ).fetchall()
+        conn.close()
+        return jsonify({"pages": [teaching_page_row_to_dict(r) for r in rows]})
+
+    body = request.get_json(silent=True) or {}
+    title = str(body.get("title") or "").strip()
+    html_content = str(body.get("html_content") or body.get("html") or "").strip()
+    if not title or len(title) > MAX_TITLE:
+        conn.close()
+        return jsonify({"error": "title is required (max 200 chars)"}), 400
+    if not html_content:
+        conn.close()
+        return jsonify({"error": "html_content is required"}), 400
+
+    class_name = str(body.get("class_name") or body.get("className") or "").strip()[:80]
+    topic = str(body.get("topic") or title).strip()[:MAX_TITLE]
+    source_text = str(body.get("source_text") or "").strip()[:MAX_SOURCE_TEXT]
+    task_id = body.get("task_id")
+    task_id_val = None
+    if task_id is not None and str(task_id).strip().isdigit():
+        task_id_val = int(task_id)
+
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    cur = conn.execute(
+        """
+        INSERT INTO teacher_teaching_pages
+            (title, class_name, task_id, topic, source_text, html_content, teacher_username, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (title, class_name or None, task_id_val, topic, source_text or None, html_content, teacher, now, now),
+    )
+    conn.commit()
+    row = conn.execute(
+        """
+        SELECT id, title, class_name, task_id, topic, source_text, html_content,
+               teacher_username, created_at, updated_at
+        FROM teacher_teaching_pages WHERE id = ?
+        """,
+        (cur.lastrowid,),
+    ).fetchone()
+    conn.close()
+    return jsonify({"page": teaching_page_row_to_dict(row)}), 201
+
+
+@app.route("/api/teacher/teaching-pages/<int:page_id>", methods=["GET", "DELETE"])
+def teacher_teaching_page_detail(page_id):
+    """Phase K3: fetch or delete one teaching page."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+
+    actor = get_current_authenticated_user(conn)
+    teacher = str(actor["username"] or "").strip() if actor else ""
+
+    row = conn.execute(
+        """
+        SELECT id, title, class_name, task_id, topic, source_text, html_content,
+               teacher_username, created_at, updated_at
+        FROM teacher_teaching_pages WHERE id = ?
+        """,
+        (page_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+    if str(row["teacher_username"] or "") != teacher:
+        conn.close()
+        return jsonify({"error": "Forbidden"}), 403
+
+    if request.method == "DELETE":
+        conn.execute("DELETE FROM teacher_teaching_pages WHERE id = ?", (page_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+
+    conn.close()
+    return jsonify({"page": teaching_page_row_to_dict(row)})
+
+
+@app.route("/api/teacher/teaching-pages/<int:page_id>/view", methods=["GET"])
+def teacher_teaching_page_view(page_id):
+    """Phase K3: render saved HTML in browser (teacher session required)."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+
+    actor = get_current_authenticated_user(conn)
+    teacher = str(actor["username"] or "").strip() if actor else ""
+
+    row = conn.execute(
+        "SELECT html_content, teacher_username FROM teacher_teaching_pages WHERE id = ?",
+        (page_id,),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return jsonify({"error": "Not found"}), 404
+    if str(row["teacher_username"] or "") != teacher:
+        return jsonify({"error": "Forbidden"}), 403
+
+    return Response(row["html_content"], mimetype="text/html; charset=utf-8")
 
 
 # Create database tables when app loads (before first request)

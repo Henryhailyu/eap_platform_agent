@@ -390,8 +390,8 @@ function bindStudentLiveNavLink() {
 }
 
 function bindTeacherLiveNavLink() {
-  document.querySelectorAll("#teacher-live-link, #tgb-open-live, a.tlive-back").forEach((link) => {
-    bindRoleGuardedNavLink(link, "teacher", "teacher-live.html");
+  document.querySelectorAll("#teacher-live-link, #teacher-lesson-ai-link, #tgb-open-live, a.tlive-back").forEach((link) => {
+    bindRoleGuardedNavLink(link, "teacher", link.getAttribute("href") || "teacher-live.html");
   });
 }
 
@@ -416,6 +416,8 @@ function initTeacherLiveNavLink() {
     link.classList.remove("hidden");
     link.classList.add("btn-live-nav");
   }
+  const lessonLink = document.getElementById("teacher-lesson-ai-link");
+  if (lessonLink) lessonLink.classList.remove("hidden");
   bindTeacherLiveNavLink();
 }
 

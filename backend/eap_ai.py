@@ -271,3 +271,75 @@ def vocabulary_explain(
         json_keys=json_keys or VOCABULARY_JSON_KEYS,
         provider=provider,
     )
+
+
+_MAX_TEACHING_SOURCE = 6000
+
+
+def generate_teaching_page_html(
+    topic: str,
+    source_text: str = "",
+    level: str = "intermediate",
+    lang: str = "en",
+    custom_instructions: str = "",
+    system_prompt: str | None = None,
+    provider: str | None = None,
+) -> dict[str, Any]:
+    """Generate a self-contained HTML teaching page for classroom use (Phase K3)."""
+    from teacher_teaching_pages import (
+        DEFAULT_TEACHING_PAGE_SYSTEM_PROMPT,
+        MAX_SOURCE_TEXT,
+        normalize_level,
+        sanitize_teaching_html,
+    )
+
+    cleaned_topic = " ".join(str(topic or "").split()).strip()
+    if not cleaned_topic or len(cleaned_topic) > 200:
+        raise ValueError("topic must be 1–200 characters")
+
+    source = str(source_text or "").strip()
+    if len(source) > MAX_SOURCE_TEXT:
+        source = source[:MAX_SOURCE_TEXT]
+
+    lvl = normalize_level(level)
+    ui_lang = "zh" if str(lang or "en").strip().lower().startswith("zh") else "en"
+    prompt = (system_prompt or DEFAULT_TEACHING_PAGE_SYSTEM_PROMPT).strip()
+    extra = str(custom_instructions or "").strip()[:800]
+
+    user_parts = [
+        f"Create an EAP teaching page.",
+        f"Lesson topic: {cleaned_topic}",
+        f"Student level: {lvl}",
+        f"Primary UI language for headings and instructions: {'Chinese' if ui_lang == 'zh' else 'English'}.",
+        "Teaching content body may mix EN with brief zh glosses if UI language is Chinese.",
+    ]
+    if source:
+        user_parts.append(f"Source material (adapt — do not copy verbatim if copyrighted):\n{source}")
+    if extra:
+        user_parts.append(f"Teacher instructions:\n{extra}")
+    user_prompt = "\n\n".join(user_parts)
+
+    client, profile = get_openai_client(provider)
+    response = client.chat.completions.create(
+        model=profile["model"],
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=4096,
+        temperature=0.45,
+    )
+    raw = ""
+    if response.choices:
+        raw = (response.choices[0].message.content or "").strip()
+    if not raw:
+        raise RuntimeError("Empty AI response")
+
+    html = sanitize_teaching_html(raw)
+    return {
+        "html": html,
+        "title": cleaned_topic,
+        "level": lvl,
+        "provider": profile["id"],
+        "model": profile["model"],
+    }

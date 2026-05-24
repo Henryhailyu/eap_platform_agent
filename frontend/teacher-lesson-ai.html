@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="AI Lesson Builder — EAP Platform" />
+    <title>AI Lesson Builder — EAP Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,600;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/teacher-live.css" />
+    <link rel="stylesheet" href="css/teacher-lesson-ai.css" />
+  </head>
+  <body class="page-app eap-shell-active" data-page="teacher-lesson-ai">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+        <header class="site-header">
+          <div class="site-header__inner">
+            <a class="site-logo" href="teacher.html"
+              ><span data-i18n="brand">EAP Platform</span
+              ><span class="eap-build-badge" data-i18n="build_badge">Agent build</span></a
+            >
+            <div class="site-header__actions">
+              <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">中文</button>
+              <p class="site-welcome" id="header-welcome" aria-live="polite"><span data-i18n="welcome">Welcome,</span></p>
+              <button type="button" class="btn-logout" id="logout-btn" data-i18n="logout">Logout</button>
+            </div>
+          </div>
+        </header>
+
+        <div class="tlive-page tla-page">
+          <div class="tlive-topbar">
+            <div>
+              <a id="tla-back-live" class="tlive-back" href="teacher-live.html" data-i18n="tla_back_live">← Live teaching</a>
+              <h1 data-i18n="tla_title">AI Lesson Builder</h1>
+              <p class="tlive-topbar__meta" data-i18n="tla_subtitle">Generate a classroom-ready HTML teaching page from your topic and source notes</p>
+              <p id="tla-ai-banner" class="tla-status" role="status"></p>
+            </div>
+          </div>
+
+          <div class="tla-layout">
+            <aside class="tla-panel" aria-labelledby="tla-form-heading">
+              <h2 id="tla-form-heading" class="tla-panel__title" data-i18n="tla_form_title">Lesson inputs</h2>
+              <div class="tla-field">
+                <label for="tla-title" data-i18n="tla_title_label">Saved page title</label>
+                <input id="tla-title" type="text" maxlength="200" />
+              </div>
+              <div class="tla-field">
+                <label for="tla-topic" data-i18n="tla_topic_label">Lesson topic</label>
+                <input id="tla-topic" type="text" maxlength="200" required placeholder="e.g. Academic integrity in online learning" />
+              </div>
+              <div class="tla-field">
+                <label for="tla-source" data-i18n="tla_source_label">Source notes (paste text)</label>
+                <textarea id="tla-source" rows="8" placeholder="Optional: paste lecture notes, reading excerpt, or vocabulary list…"></textarea>
+              </div>
+              <div class="tla-field">
+                <label for="tla-instructions" data-i18n="tla_instructions_label">Extra instructions for AI</label>
+                <textarea id="tla-instructions" rows="3" placeholder="Optional: focus on discussion, include a gap-fill activity…"></textarea>
+              </div>
+              <div class="tla-field">
+                <label for="tla-level" data-i18n="tla_level_label">Student level</label>
+                <select id="tla-level">
+                  <option value="beginner" data-i18n="tla_level_beginner">Beginner</option>
+                  <option value="intermediate" selected data-i18n="tla_level_intermediate">Intermediate</option>
+                  <option value="advanced" data-i18n="tla_level_advanced">Advanced</option>
+                </select>
+              </div>
+              <div class="tla-field">
+                <label for="tla-class" data-i18n="tla_class_label">Class (optional)</label>
+                <input id="tla-class" type="text" maxlength="80" placeholder="e.g. EAP047" />
+              </div>
+              <div class="tla-actions">
+                <button type="button" class="btn-primary" id="tla-generate-btn" data-i18n="tla_generate_btn">Generate HTML lesson</button>
+                <button type="button" class="btn-secondary" id="tla-save-btn" data-i18n="tla_save_btn">Save to library</button>
+                <button type="button" class="btn-secondary" id="tla-present-btn" data-i18n="tla_present_btn">Open preview tab</button>
+              </div>
+              <p id="tla-status" class="tla-status hidden" role="status" aria-live="polite"></p>
+            </aside>
+
+            <section class="tla-panel tla-preview-wrap" aria-labelledby="tla-preview-heading">
+              <h2 id="tla-preview-heading" class="tla-panel__title" data-i18n="tla_preview_title">Preview</h2>
+              <p id="tla-preview-empty" class="tla-preview-empty" data-i18n="tla_preview_empty">Generate a lesson to see the HTML preview here.</p>
+              <iframe
+                id="tla-preview-frame"
+                class="tla-preview-frame hidden"
+                title="Lesson preview"
+                sandbox="allow-scripts"
+              ></iframe>
+            </section>
+          </div>
+
+          <section class="tla-panel" style="margin-top: 1.25rem" aria-labelledby="tla-saved-heading">
+            <h2 id="tla-saved-heading" class="tla-panel__title" data-i18n="tla_saved_title">Saved teaching pages</h2>
+            <div id="tla-saved-list"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="js/pilot-wake.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+    <script src="js/teacher-teaching-pages-api.js"></script>
+    <script src="js/teacher-lesson-ai.js"></script>
+  </body>
+</html>

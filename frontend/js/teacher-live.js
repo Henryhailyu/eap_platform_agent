@@ -2463,6 +2463,28 @@
             );
             document.getElementById("tlive-view-poll-responses")?.addEventListener("click", () => openResponsesModal(q, null));
           }
+        } else if (tool === "upload") {
+          const canvas = document.getElementById("tlive-canvas-inner");
+          const lessonAi = window.EAP_TEACHER_LESSON_AI;
+          if (canvas && lessonAi && typeof lessonAi.mountLivePanel === "function") {
+            void (async () => {
+              const api = window.EAP_TEACHER_TEACHING_PAGES;
+              if (api && lessonAi.setAiAvailable) {
+                try {
+                  const st = await api.getAiStatus();
+                  lessonAi.setAiAvailable(!!st.available);
+                } catch (_) {
+                  lessonAi.setAiAvailable(false);
+                }
+              }
+              lessonAi.mountLivePanel(canvas, ctx);
+            })();
+          } else if (canvas) {
+            canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
+            canvas.innerHTML = `<p>${escapeHtml(t("tlive_tool_soon"))}</p>`;
+          }
+        } else if (tool === "ai") {
+          window.location.href = "teacher-lesson-ai.html";
         } else {
           const canvas = document.getElementById("tlive-canvas-inner");
           if (canvas) {
