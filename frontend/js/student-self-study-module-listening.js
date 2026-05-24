@@ -14,6 +14,71 @@
     return MAT ? MAT.renderLearnBlock(skill, levelId) : "";
   }
 
+  function isZh() {
+    return !!(window.EAP_I18N && window.EAP_I18N.getLang() === "zh");
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function aiCoachAvailable() {
+    return !!(window.EAP_SELF_STUDY_AI && typeof window.EAP_SELF_STUDY_AI.coachModule === "function");
+  }
+
+  function renderListeningCoach(explanation) {
+    const zh = isZh();
+    const gist = zh ? explanation.gist_zh || explanation.gist_en : explanation.gist_en;
+    const noteTip = zh
+      ? explanation.note_taking_tip_zh || explanation.note_taking_tip_en
+      : explanation.note_taking_tip_en;
+    const keyPhrases = explanation.key_phrases;
+    return `
+      ${gist ? `<p class="ssc-ai-coach-panel__def">${escapeHtml(gist)}</p>` : ""}
+      ${
+        noteTip
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_listening_ai_note_tip")}:</strong> ${escapeHtml(noteTip)}</p>`
+          : ""
+      }
+      ${
+        keyPhrases
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_listening_ai_key_phrases")}:</strong> ${escapeHtml(keyPhrases)}</p>`
+          : ""
+      }
+    `;
+  }
+
+  function bindListeningAiCoach(root, levelId, scriptText) {
+    const panel = root.querySelector("#ssc-ai-coach-panel");
+    const btn = root.querySelector("#ssc-listening-ai-btn");
+    const AI = window.EAP_SELF_STUDY_AI;
+    if (!panel || !btn || !AI) return;
+
+    btn.addEventListener("click", async () => {
+      const text = scriptText || "";
+      if (!text) return;
+      panel.classList.remove("hidden");
+      panel.innerHTML = `<p class="ssc-ai-coach-panel__loading">${t("self_study_ai_loading")}</p>`;
+      btn.disabled = true;
+      try {
+        const coach = await AI.coachModule("listening", text, levelId, isZh() ? "zh" : "en");
+        panel.innerHTML = `
+          <h3 class="ssc-ai-coach-panel__term">${t("self_study_listening_ai_title")}</h3>
+          ${renderListeningCoach(coach)}
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (_) {
+        panel.innerHTML = `<p class="ssc-ai-coach-panel__error" role="alert">${t("self_study_ai_error")}</p>`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   function refreshStatus(levelId) {
     const p = LISTEN.ensureProgress(levelId);
     const pct = LISTEN.completionPercent(p);
@@ -113,14 +178,32 @@
 
     function renderLearn(root) {
       progress = LISTEN.getProgress() || progress;
+      const scriptText = LISTEN.script(pack);
+      const aiOn = aiCoachAvailable();
       root.innerHTML = `
         ${managerMaterialsBlock("listening", levelId)}
+        ${
+          aiOn
+            ? `<div class="ssc-ai-coach-banner">
+          <p class="ssc-ai-coach-banner__label">${t("self_study_ai_coach_label")}</p>
+          <p class="ssc-ai-coach-banner__hint">${t("self_study_listening_ai_hint")}</p>
+        </div>`
+            : ""
+        }
         <div class="ssc-lesson-card">
           <h2 data-i18n="self_study_listening_learn_title">Listening & note-taking</h2>
           <p>${LISTEN.lesson(pack)}</p>
           <p class="ssc-disclaimer" data-i18n="self_study_listening_no_audio">Text script only — audio (TTS) coming in a later phase.</p>
         </div>
-        <pre class="ssc-script-block">${LISTEN.script(pack)}</pre>
+        <pre class="ssc-script-block">${escapeHtml(scriptText)}</pre>
+        ${
+          aiOn
+            ? `<div class="ssc-placement-actions">
+          <button type="button" class="btn-secondary" id="ssc-listening-ai-btn">${t("self_study_listening_ai_btn")}</button>
+        </div>
+        <section id="ssc-ai-coach-panel" class="ssc-ai-coach-panel hidden" aria-live="polite"></section>`
+            : ""
+        }
         <div class="ssc-placement-actions">
           <button type="button" class="btn-primary" id="ssc-learn-done">${progress.learnDone ? t("self_study_vocab_learn_reviewed") : t("self_study_vocab_mark_learn")}</button>
         </div>
@@ -131,6 +214,9 @@
         progress = refreshStatus(levelId);
         renderLearn(root);
       });
+      if (aiOn) {
+        bindListeningAiCoach(root, levelId, scriptText);
+      }
     }
 
     function renderPractice(root) {

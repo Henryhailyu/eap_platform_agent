@@ -222,6 +222,20 @@ def module_coach_reply(
             f"Sample text:\n{cleaned}"
         )
         meta = {"level": lvl, "module": mod, "sample_preview": cleaned[:160]}
+    elif mod == "listening":
+        user_prompt = (
+            f"Analyse this lecture script for a {lvl}-level EAP student. "
+            f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}.\n\n"
+            f"Script:\n{cleaned}"
+        )
+        meta = {"level": lvl, "module": mod, "script_preview": cleaned[:160]}
+    elif mod == "speaking":
+        user_prompt = (
+            f"Coach this typed speaking response for a {lvl}-level EAP student. "
+            f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}.\n\n"
+            f"Student response:\n{cleaned}"
+        )
+        meta = {"level": lvl, "module": mod, "response_preview": cleaned[:160]}
     else:
         user_prompt = (
             f"Coach this {mod} self-study content for a {lvl}-level EAP student. "

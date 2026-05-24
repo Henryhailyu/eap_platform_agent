@@ -37,9 +37,19 @@
     }).join("");
   }
 
+  function previewTextLabelKey(mod) {
+    const keys = {
+      reading: "admin_ai_preview_passage",
+      writing: "admin_ai_preview_writing",
+      listening: "admin_ai_preview_listening",
+      speaking: "admin_ai_preview_speaking",
+    };
+    return keys[mod] || "admin_ai_preview_passage";
+  }
+
   function syncPreviewFields(mod) {
     const isVocab = mod === "vocabulary";
-    const isTextCoach = mod === "reading" || mod === "writing";
+    const isTextCoach = mod === "reading" || mod === "writing" || mod === "listening" || mod === "speaking";
     document.querySelectorAll(".admin-ai-preview-vocab").forEach((el) => {
       el.classList.toggle("hidden", !isVocab);
     });
@@ -48,8 +58,7 @@
     });
     const passageLabel = document.querySelector('label[for="admin-ai-preview-passage"]');
     if (passageLabel) {
-      passageLabel.textContent =
-        mod === "writing" ? t("admin_ai_preview_writing") : t("admin_ai_preview_passage");
+      passageLabel.textContent = t(previewTextLabelKey(mod));
     }
   }
 
@@ -84,6 +93,44 @@
       ];
       panel.innerHTML = `
         <h4 class="admin-ai-preview__title">${t("self_study_writing_ai_title")}</h4>
+        ${rows
+          .map(([key, label]) => {
+            const val = payload[key];
+            if (!val) return "";
+            return `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(val)}</p>`;
+          })
+          .join("")}
+      `;
+      return;
+    }
+
+    if (mod === "listening") {
+      const rows = [
+        ["gist_en", t("self_study_listening_ai_title")],
+        ["note_taking_tip_en", t("self_study_listening_ai_note_tip")],
+        ["key_phrases", t("self_study_listening_ai_key_phrases")],
+      ];
+      panel.innerHTML = `
+        <h4 class="admin-ai-preview__title">${t("self_study_listening_ai_title")}</h4>
+        ${rows
+          .map(([key, label]) => {
+            const val = payload[key];
+            if (!val) return "";
+            return `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(val)}</p>`;
+          })
+          .join("")}
+      `;
+      return;
+    }
+
+    if (mod === "speaking") {
+      const rows = [
+        ["feedback_en", t("self_study_speaking_ai_title")],
+        ["fluency_tip_en", t("self_study_speaking_ai_fluency_tip")],
+        ["sample_phrase_en", t("self_study_speaking_ai_sample_phrase")],
+      ];
+      panel.innerHTML = `
+        <h4 class="admin-ai-preview__title">${t("self_study_speaking_ai_title")}</h4>
         ${rows
           .map(([key, label]) => {
             const val = payload[key];
@@ -187,7 +234,7 @@
         lang,
         system_prompt: promptEl.value.trim(),
       };
-      if (mod === "reading" || mod === "writing") {
+      if (mod === "reading" || mod === "writing" || mod === "listening" || mod === "speaking") {
         body.text = (document.getElementById("admin-ai-preview-passage")?.value || "").trim();
       } else {
         body.term = (document.getElementById("admin-ai-preview-term")?.value || "analyze").trim();

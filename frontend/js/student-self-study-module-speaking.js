@@ -14,6 +14,75 @@
     return MAT ? MAT.renderLearnBlock(skill, levelId) : "";
   }
 
+  function isZh() {
+    return !!(window.EAP_I18N && window.EAP_I18N.getLang() === "zh");
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function aiCoachAvailable() {
+    return !!(window.EAP_SELF_STUDY_AI && typeof window.EAP_SELF_STUDY_AI.coachModule === "function");
+  }
+
+  function renderSpeakingCoach(explanation) {
+    const zh = isZh();
+    const feedback = zh ? explanation.feedback_zh || explanation.feedback_en : explanation.feedback_en;
+    const fluencyTip = zh ? explanation.fluency_tip_zh || explanation.fluency_tip_en : explanation.fluency_tip_en;
+    const samplePhrase = zh
+      ? explanation.sample_phrase_zh || explanation.sample_phrase_en
+      : explanation.sample_phrase_en;
+    return `
+      ${feedback ? `<p class="ssc-ai-coach-panel__def">${escapeHtml(feedback)}</p>` : ""}
+      ${
+        fluencyTip
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_speaking_ai_fluency_tip")}:</strong> ${escapeHtml(fluencyTip)}</p>`
+          : ""
+      }
+      ${
+        samplePhrase
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_speaking_ai_sample_phrase")}:</strong> ${escapeHtml(samplePhrase)}</p>`
+          : ""
+      }
+    `;
+  }
+
+  function bindSpeakingAiCoach(root, levelId) {
+    const panel = root.querySelector("#ssc-ai-coach-panel");
+    const btn = root.querySelector("#ssc-speaking-ai-btn");
+    const input = root.querySelector("#ssc-speaking-ai-input");
+    const AI = window.EAP_SELF_STUDY_AI;
+    if (!panel || !btn || !input || !AI) return;
+
+    btn.addEventListener("click", async () => {
+      const text = (input.value || "").trim();
+      if (!text) {
+        input.focus();
+        return;
+      }
+      panel.classList.remove("hidden");
+      panel.innerHTML = `<p class="ssc-ai-coach-panel__loading">${t("self_study_ai_loading")}</p>`;
+      btn.disabled = true;
+      try {
+        const coach = await AI.coachModule("speaking", text, levelId, isZh() ? "zh" : "en");
+        panel.innerHTML = `
+          <h3 class="ssc-ai-coach-panel__term">${t("self_study_speaking_ai_title")}</h3>
+          ${renderSpeakingCoach(coach)}
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (_) {
+        panel.innerHTML = `<p class="ssc-ai-coach-panel__error" role="alert">${t("self_study_ai_error")}</p>`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   function refreshStatus(levelId) {
     const p = SPEAK.ensureProgress(levelId);
     const pct = SPEAK.completionPercent(p);
@@ -114,11 +183,20 @@
     function renderLearn(root) {
       progress = SPEAK.getProgress() || progress;
       const promptList = SPEAK.prompts(pack)
-        .map((p) => `<li>${p}</li>`)
+        .map((p) => `<li>${escapeHtml(p)}</li>`)
         .join("");
+      const aiOn = aiCoachAvailable();
 
       root.innerHTML = `
         ${managerMaterialsBlock("speaking", levelId)}
+        ${
+          aiOn
+            ? `<div class="ssc-ai-coach-banner">
+          <p class="ssc-ai-coach-banner__label">${t("self_study_ai_coach_label")}</p>
+          <p class="ssc-ai-coach-banner__hint">${t("self_study_speaking_ai_hint")}</p>
+        </div>`
+            : ""
+        }
         <div class="ssc-lesson-card">
           <h2 data-i18n="self_study_speaking_learn_title">Speaking & discussion</h2>
           <p>${SPEAK.lesson(pack)}</p>
@@ -128,6 +206,16 @@
           <h3 data-i18n="self_study_speaking_prompts">Practice prompts</h3>
           <ul class="ssc-daily-plan__list">${promptList}</ul>
         </div>
+        ${
+          aiOn
+            ? `<label class="ssc-speak-label" for="ssc-speaking-ai-input">${t("self_study_speaking_ai_input_label")}</label>
+        <textarea id="ssc-speaking-ai-input" class="ssc-speak-input" rows="5" placeholder="${escapeHtml(t("self_study_speaking_ai_input_placeholder"))}"></textarea>
+        <div class="ssc-placement-actions">
+          <button type="button" class="btn-secondary" id="ssc-speaking-ai-btn">${t("self_study_speaking_ai_btn")}</button>
+        </div>
+        <section id="ssc-ai-coach-panel" class="ssc-ai-coach-panel hidden" aria-live="polite"></section>`
+            : ""
+        }
         <div class="ssc-placement-actions">
           <button type="button" class="btn-primary" id="ssc-learn-done">${progress.learnDone ? t("self_study_vocab_learn_reviewed") : t("self_study_vocab_mark_learn")}</button>
         </div>
@@ -138,6 +226,9 @@
         progress = refreshStatus(levelId);
         renderLearn(root);
       });
+      if (aiOn) {
+        bindSpeakingAiCoach(root, levelId);
+      }
     }
 
     function renderPractice(root) {

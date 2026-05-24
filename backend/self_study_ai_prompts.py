@@ -102,19 +102,35 @@ DEFAULT_WRITING_SYSTEM_PROMPT = (
     "Use academic register suited to the student's level."
 )
 
+DEFAULT_LISTENING_SYSTEM_PROMPT = (
+    "You are an EAP listening coach for IELTS-aligned university prep. "
+    "Return ONLY valid JSON with exactly these keys: "
+    + ", ".join(LISTENING_JSON_KEYS)
+    + ". "
+    "Field rules: "
+    "gist_en/zh — 2–3 sentence summary of the lecture script; "
+    "note_taking_tip_en/zh — one practical note-taking strategy for this script; "
+    "key_phrases — comma-separated 3–5 signpost or topic phrases from the script. "
+    "Use academic register suited to the student's level."
+)
+
+DEFAULT_SPEAKING_SYSTEM_PROMPT = (
+    "You are an EAP speaking coach for IELTS-aligned university prep. "
+    "Return ONLY valid JSON with exactly these keys: "
+    + ", ".join(SPEAKING_JSON_KEYS)
+    + ". "
+    "Field rules: "
+    "feedback_en/zh — 2–3 sentences on the student's typed response (strengths + one improvement); "
+    "fluency_tip_en/zh — one tip on fluency, organisation, or discussion language; "
+    "sample_phrase_en/zh — one upgraded academic phrase the student could use. "
+    "Be concise and encouraging."
+)
+
 DEFAULT_MODULE_PROMPTS: dict[str, str] = {
     "vocabulary": DEFAULT_VOCABULARY_SYSTEM_PROMPT,
     "reading": DEFAULT_READING_SYSTEM_PROMPT,
-    "listening": (
-        "You are an EAP listening coach. Return ONLY valid JSON with keys: "
-        "gist_en, gist_zh, note_taking_tip_en, note_taking_tip_zh, key_phrases. "
-        "Keep answers concise."
-    ),
-    "speaking": (
-        "You are an EAP speaking coach. Return ONLY valid JSON with keys: "
-        "feedback_en, feedback_zh, fluency_tip_en, fluency_tip_zh, sample_phrase_en, sample_phrase_zh. "
-        "Keep answers concise and encouraging."
-    ),
+    "listening": DEFAULT_LISTENING_SYSTEM_PROMPT,
+    "speaking": DEFAULT_SPEAKING_SYSTEM_PROMPT,
     "writing": DEFAULT_WRITING_SYSTEM_PROMPT,
 }
 
@@ -132,7 +148,7 @@ def normalize_module(module: str | None) -> str:
 
 def coach_modules_with_api() -> frozenset[str]:
     """Modules with a student-facing AI coach route in this release."""
-    return frozenset({"vocabulary", "reading", "writing"})
+    return frozenset({"vocabulary", "reading", "writing", "listening", "speaking"})
 
 
 def json_keys_for_module(module: str) -> tuple[str, ...]:
