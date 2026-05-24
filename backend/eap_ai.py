@@ -215,6 +215,13 @@ def module_coach_reply(
             f"Passage:\n{cleaned}"
         )
         meta = {"level": lvl, "module": mod, "passage_preview": cleaned[:160]}
+    elif mod == "writing":
+        user_prompt = (
+            f"Coach this writing sample for a {lvl}-level EAP student. "
+            f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}.\n\n"
+            f"Sample text:\n{cleaned}"
+        )
+        meta = {"level": lvl, "module": mod, "sample_preview": cleaned[:160]}
     else:
         user_prompt = (
             f"Coach this {mod} self-study content for a {lvl}-level EAP student. "

@@ -38,13 +38,19 @@
   }
 
   function syncPreviewFields(mod) {
-    const isReading = mod === "reading";
+    const isVocab = mod === "vocabulary";
+    const isTextCoach = mod === "reading" || mod === "writing";
     document.querySelectorAll(".admin-ai-preview-vocab").forEach((el) => {
-      el.classList.toggle("hidden", isReading);
+      el.classList.toggle("hidden", !isVocab);
     });
     document.querySelectorAll(".admin-ai-preview-reading").forEach((el) => {
-      el.classList.toggle("hidden", !isReading);
+      el.classList.toggle("hidden", !isTextCoach);
     });
+    const passageLabel = document.querySelector('label[for="admin-ai-preview-passage"]');
+    if (passageLabel) {
+      passageLabel.textContent =
+        mod === "writing" ? t("admin_ai_preview_writing") : t("admin_ai_preview_passage");
+    }
   }
 
   function renderPreview(panel, mod, payload) {
@@ -59,6 +65,25 @@
       ];
       panel.innerHTML = `
         <h4 class="admin-ai-preview__title">${t("self_study_reading_ai_title")}</h4>
+        ${rows
+          .map(([key, label]) => {
+            const val = payload[key];
+            if (!val) return "";
+            return `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(val)}</p>`;
+          })
+          .join("")}
+      `;
+      return;
+    }
+
+    if (mod === "writing") {
+      const rows = [
+        ["feedback_en", t("self_study_writing_ai_title")],
+        ["structure_tip_en", t("self_study_writing_ai_structure_tip")],
+        ["language_tip_en", t("self_study_writing_ai_language_tip")],
+      ];
+      panel.innerHTML = `
+        <h4 class="admin-ai-preview__title">${t("self_study_writing_ai_title")}</h4>
         ${rows
           .map(([key, label]) => {
             const val = payload[key];
@@ -162,7 +187,7 @@
         lang,
         system_prompt: promptEl.value.trim(),
       };
-      if (mod === "reading") {
+      if (mod === "reading" || mod === "writing") {
         body.text = (document.getElementById("admin-ai-preview-passage")?.value || "").trim();
       } else {
         body.term = (document.getElementById("admin-ai-preview-term")?.value || "analyze").trim();

@@ -73,6 +73,55 @@
     });
   }
 
+  function renderWritingCoach(explanation) {
+    const zh = isZh();
+    const feedback = zh ? explanation.feedback_zh || explanation.feedback_en : explanation.feedback_en;
+    const structureTip = zh
+      ? explanation.structure_tip_zh || explanation.structure_tip_en
+      : explanation.structure_tip_en;
+    const languageTip = zh ? explanation.language_tip_zh || explanation.language_tip_en : explanation.language_tip_en;
+    return `
+      ${feedback ? `<p class="ssc-ai-coach-panel__def">${escapeHtml(feedback)}</p>` : ""}
+      ${
+        structureTip
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_writing_ai_structure_tip")}:</strong> ${escapeHtml(structureTip)}</p>`
+          : ""
+      }
+      ${
+        languageTip
+          ? `<p class="ssc-ai-coach-panel__meta"><strong>${t("self_study_writing_ai_language_tip")}:</strong> ${escapeHtml(languageTip)}</p>`
+          : ""
+      }
+    `;
+  }
+
+  function bindWritingAiCoach(root, levelId, sampleText) {
+    const panel = root.querySelector("#ssc-ai-coach-panel");
+    const btn = root.querySelector("#ssc-writing-ai-btn");
+    const AI = window.EAP_SELF_STUDY_AI;
+    if (!panel || !btn || !AI) return;
+
+    btn.addEventListener("click", async () => {
+      const text = sampleText || "";
+      if (!text) return;
+      panel.classList.remove("hidden");
+      panel.innerHTML = `<p class="ssc-ai-coach-panel__loading">${t("self_study_ai_loading")}</p>`;
+      btn.disabled = true;
+      try {
+        const coach = await AI.coachModule("writing", text, levelId, isZh() ? "zh" : "en");
+        panel.innerHTML = `
+          <h3 class="ssc-ai-coach-panel__term">${t("self_study_writing_ai_title")}</h3>
+          ${renderWritingCoach(coach)}
+        `;
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (_) {
+        panel.innerHTML = `<p class="ssc-ai-coach-panel__error" role="alert">${t("self_study_ai_error")}</p>`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   function managerMaterialsBlock(skill, levelId) {
     const MAT = window.EAP_MANAGER_SSC_MATERIALS;
     return MAT ? MAT.renderLearnBlock(skill, levelId) : "";
@@ -352,13 +401,31 @@
 
     function renderLearn(root) {
       progress = WRITE.getProgress() || progress;
+      const sampleText = WRITE.sample(pack);
+      const aiOn = aiCoachAvailable();
       root.innerHTML = `
         ${managerMaterialsBlock("writing", levelId)}
+        ${
+          aiOn
+            ? `<div class="ssc-ai-coach-banner">
+          <p class="ssc-ai-coach-banner__label">${t("self_study_ai_coach_label")}</p>
+          <p class="ssc-ai-coach-banner__hint">${t("self_study_writing_ai_hint")}</p>
+        </div>`
+            : ""
+        }
         <div class="ssc-lesson-card">
           <h2 data-i18n="self_study_writing_learn_title">Writing focus</h2>
           <p>${WRITE.lesson(pack)}</p>
         </div>
-        <div class="ssc-question-card__passage ssc-passage-block">${WRITE.sample(pack)}</div>
+        <div class="ssc-question-card__passage ssc-passage-block">${sampleText}</div>
+        ${
+          aiOn
+            ? `<div class="ssc-placement-actions">
+          <button type="button" class="btn-secondary" id="ssc-writing-ai-btn">${t("self_study_writing_ai_btn")}</button>
+        </div>
+        <section id="ssc-ai-coach-panel" class="ssc-ai-coach-panel hidden" aria-live="polite"></section>`
+            : ""
+        }
         <div class="ssc-placement-actions">
           <button type="button" class="btn-primary" id="ssc-learn-done">${progress.learnDone ? t("self_study_vocab_learn_reviewed") : t("self_study_vocab_mark_learn")}</button>
         </div>
@@ -369,6 +436,9 @@
         progress = refreshStatus(WRITE, levelId, "self_study_writing_complete");
         renderLearn(root);
       });
+      if (aiOn) {
+        bindWritingAiCoach(root, levelId, sampleText);
+      }
     }
 
     function renderPractice(root) {

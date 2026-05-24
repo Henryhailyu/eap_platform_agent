@@ -90,6 +90,18 @@ DEFAULT_VOCABULARY_SYSTEM_PROMPT = (
     "Use academic register suited to the student's level."
 )
 
+DEFAULT_WRITING_SYSTEM_PROMPT = (
+    "You are an EAP writing coach for IELTS-aligned university prep. "
+    "Return ONLY valid JSON with exactly these keys: "
+    + ", ".join(WRITING_JSON_KEYS)
+    + ". "
+    "Field rules: "
+    "feedback_en/zh — 2–3 sentences on strengths and one improvement area for the sample text; "
+    "structure_tip_en/zh — one sentence on paragraph or essay structure; "
+    "language_tip_en/zh — one academic language or cohesion tip tied to the sample. "
+    "Use academic register suited to the student's level."
+)
+
 DEFAULT_MODULE_PROMPTS: dict[str, str] = {
     "vocabulary": DEFAULT_VOCABULARY_SYSTEM_PROMPT,
     "reading": DEFAULT_READING_SYSTEM_PROMPT,
@@ -103,11 +115,7 @@ DEFAULT_MODULE_PROMPTS: dict[str, str] = {
         "feedback_en, feedback_zh, fluency_tip_en, fluency_tip_zh, sample_phrase_en, sample_phrase_zh. "
         "Keep answers concise and encouraging."
     ),
-    "writing": (
-        "You are an EAP writing coach. Return ONLY valid JSON with keys: "
-        "feedback_en, feedback_zh, structure_tip_en, structure_tip_zh, language_tip_en, language_tip_zh. "
-        "Keep answers concise and academic."
-    ),
+    "writing": DEFAULT_WRITING_SYSTEM_PROMPT,
 }
 
 
@@ -124,7 +132,7 @@ def normalize_module(module: str | None) -> str:
 
 def coach_modules_with_api() -> frozenset[str]:
     """Modules with a student-facing AI coach route in this release."""
-    return frozenset({"vocabulary", "reading"})
+    return frozenset({"vocabulary", "reading", "writing"})
 
 
 def json_keys_for_module(module: str) -> tuple[str, ...]:
