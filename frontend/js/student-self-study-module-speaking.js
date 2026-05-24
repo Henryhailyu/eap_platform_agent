@@ -255,5 +255,5 @@
     renderGame(document.getElementById("ssc-panel-game"));
   }
 
-  global.EAP_MODULE_SPEAKING = { initSpeaking };
+  window.EAP_MODULE_SPEAKING = { initSpeaking };
 })();

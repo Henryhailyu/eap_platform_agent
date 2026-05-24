@@ -246,5 +246,5 @@
     renderGame(document.getElementById("ssc-panel-game"));
   }
 
-  global.EAP_MODULE_LISTENING = { initListening };
+  window.EAP_MODULE_LISTENING = { initListening };
 })();

@@ -167,7 +167,7 @@
     renderQ();
   }
 
-  function initReading(levelId, MOCK, renderTabs) {
+  function initReading(levelId, renderTabs) {
     const pack = READ.getPack(levelId);
     let progress = READ.ensureProgress(levelId);
 
@@ -464,7 +464,7 @@
     renderGame(document.getElementById("ssc-panel-game"));
   }
 
-  global.EAP_MODULE_RW = {
+  window.EAP_MODULE_RW = {
     initReading,
     initWriting,
   };
