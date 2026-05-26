@@ -3,8 +3,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# LibreOffice (headless) converts PPT/DOC uploads to PDF for classroom display (K6d).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libreoffice-writer \
+        libreoffice-impress \
+        libreoffice-common \
+        fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-prod.txt /app/
@@ -18,6 +24,7 @@ RUN chmod +x /app/backend/scripts/docker_entrypoint.sh \
     && mkdir -p /data/uploads /data/submissions
 
 ENV PYTHONUNBUFFERED=1 \
+    HOME=/tmp \
     PORT=5051 \
     EAP_ENV=production \
     EAP_PILOT_MODE=1 \

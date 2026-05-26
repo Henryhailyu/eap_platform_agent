@@ -62,6 +62,8 @@ Store copies off Render (iCloud / school drive).
 
 Blueprint syncs from `main` automatically, or **Manual Deploy** on the service.
 
+**Classroom display (PPT/PDF):** The Docker image includes LibreOffice for headless PPT/DOC → PDF conversion. First deploy after this change takes longer (larger image). Re-upload or re-select a PPT in Display library after deploy; first conversion may take 10–30 s.
+
 ---
 
 ## Environment (optional)

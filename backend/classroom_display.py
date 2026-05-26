@@ -121,14 +121,18 @@ def previews_dir(upload_dir: str) -> str:
 
 
 def _find_soffice_binary() -> str | None:
-    """Locate LibreOffice headless binary (PATH or default macOS install)."""
+    """Locate LibreOffice headless binary (PATH, Linux Docker, or default macOS install)."""
     for name in ("soffice", "libreoffice"):
         found = shutil.which(name)
         if found:
             return found
-    mac_default = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
-    if os.path.isfile(mac_default) and os.access(mac_default, os.X_OK):
-        return mac_default
+    for path in (
+        "/usr/bin/soffice",
+        "/usr/bin/libreoffice",
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    ):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
     return None
 
 
