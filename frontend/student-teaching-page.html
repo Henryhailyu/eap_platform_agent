@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Teaching page — EAP Platform" />
+    <title>Teaching page — EAP Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,600;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/student-teaching-pages.css" />
+  </head>
+  <body class="page-app eap-shell-active" data-page="student-teaching-page">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+        <header class="site-header">
+          <div class="site-header__inner">
+            <a class="site-logo" href="student.html"
+              ><span data-i18n="brand">EAP Platform</span
+              ><span class="eap-build-badge" data-i18n="build_badge">Agent build</span></a
+            >
+            <div class="site-header__actions">
+              <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">中文</button>
+              <p class="site-welcome" id="header-welcome" aria-live="polite"><span data-i18n="welcome">Welcome,</span></p>
+              <button type="button" class="btn-logout" id="logout-btn" data-i18n="logout">Logout</button>
+            </div>
+          </div>
+        </header>
+        <main id="main" class="app-main stp-main stp-view">
+          <a class="stp-back" href="student-teaching-pages.html" data-i18n="stp_back_list">← Teaching pages</a>
+          <h1 id="stp-view-title" class="stp-view__title" data-i18n="stp_view_title">Teaching page</h1>
+          <p id="stp-view-error" class="stp-error hidden" role="alert"></p>
+          <iframe
+            id="stp-view-frame"
+            class="stp-view__frame"
+            title="Teaching page"
+            sandbox="allow-scripts"
+          ></iframe>
+        </main>
+      </div>
+    </div>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="js/pilot-wake.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+    <script src="js/teacher-teaching-pages-api.js"></script>
+    <script src="js/student-teaching-pages.js"></script>
+  </body>
+</html>

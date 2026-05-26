@@ -1,13 +1,15 @@
 """
-Live Teaching — teacher sessions and student responses (Phase L27–L29).
+Live Teaching — teacher sessions and student responses (Phase L27–L29, K6 display + activities).
 
-Tables: live_sessions, live_launches, live_responses.
+Tables: live_sessions, live_launches, live_responses, live_page_activity_responses.
 Routes registered via register_live_teaching_routes(app) from app.py.
 
 L28: long-poll wait endpoints (Render-friendly; no WebSocket required).
+K6: classroom display push (slides / HTML / material) + HTML activity responses.
 """
 import json
 import random
+import re
 import string
 import time
 from datetime import datetime, timezone
@@ -15,9 +17,30 @@ from datetime import datetime, timezone
 _WAIT_POLL_SEC = 0.45
 _WAIT_MAX_SEC = 25
 
+_ACTIVITY_ID_RE = re.compile(r'data-eap-id=["\']([^"\']+)["\']', re.IGNORECASE)
+_ACTIVITY_ANSWER_RE = re.compile(
+    r'data-eap-(?:id=["\']([^"\']+)["\'][^>]*answer=["\']([^"\']+)["\']|answer=["\']([^"\']+)["\'][^>]*id=["\']([^"\']+)["\'])',
+    re.IGNORECASE,
+)
+
 
 def utc_now_iso():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def migrate_live_k6(conn):
+    """Add K6 display columns to live_sessions."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(live_sessions)").fetchall()}
+    if "display_mode" not in cols:
+        conn.execute(
+            "ALTER TABLE live_sessions ADD COLUMN display_mode TEXT NOT NULL DEFAULT 'welcome'"
+        )
+    if "display_json" not in cols:
+        conn.execute("ALTER TABLE live_sessions ADD COLUMN display_json TEXT")
+    if "display_version" not in cols:
+        conn.execute(
+            "ALTER TABLE live_sessions ADD COLUMN display_version INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 def init_live_teaching_tables(conn):
@@ -29,7 +52,10 @@ def init_live_teaching_tables(conn):
             teacher_username TEXT,
             session_date TEXT,
             created_at TEXT NOT NULL,
-            active_launch_id INTEGER
+            active_launch_id INTEGER,
+            display_mode TEXT NOT NULL DEFAULT 'welcome',
+            display_json TEXT,
+            display_version INTEGER NOT NULL DEFAULT 0
         )
     """)
     conn.execute("""
@@ -53,6 +79,23 @@ def init_live_teaching_tables(conn):
             UNIQUE(launch_id, student_username)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS live_page_activity_responses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES live_sessions(id),
+            page_id INTEGER NOT NULL,
+            activity_id TEXT NOT NULL,
+            student_username TEXT NOT NULL,
+            team_id TEXT,
+            answer_text TEXT NOT NULL,
+            answer_index INTEGER,
+            is_correct INTEGER NOT NULL DEFAULT 0,
+            duration_ms INTEGER NOT NULL DEFAULT 0,
+            submitted_at TEXT NOT NULL,
+            UNIQUE(session_id, page_id, activity_id, student_username)
+        )
+    """)
+    migrate_live_k6(conn)
 
 
 _CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -74,11 +117,86 @@ def _session_by_code(conn, code):
     return conn.execute(
         """
         SELECT id, session_code, class_name, teacher_username, session_date,
-               created_at, active_launch_id
+               created_at, active_launch_id, display_mode, display_json, display_version
         FROM live_sessions WHERE session_code = ?
         """,
         (code.upper().strip(),),
     ).fetchone()
+
+
+def _display_payload(sess):
+    mode = str(sess["display_mode"] or "welcome").strip().lower()
+    raw = sess["display_json"]
+    meta = {}
+    if raw:
+        try:
+            meta = json.loads(raw)
+            if not isinstance(meta, dict):
+                meta = {}
+        except (TypeError, json.JSONDecodeError):
+            meta = {}
+    return {
+        "mode": mode or "welcome",
+        "version": int(sess["display_version"] or 0),
+        "title": str(meta.get("title") or "").strip(),
+        "page_id": meta.get("page_id"),
+        "upload_label": str(meta.get("upload_label") or "").strip(),
+        "material_label": str(meta.get("material_label") or meta.get("upload_label") or "").strip(),
+        "activity_answers": meta.get("activity_answers") if isinstance(meta.get("activity_answers"), dict) else {},
+        "display_item_id": meta.get("display_item_id"),
+        "file_url": str(meta.get("file_url") or "").strip(),
+        "download_url": str(meta.get("download_url") or meta.get("file_url") or "").strip(),
+        "preview_pdf_url": str(meta.get("preview_pdf_url") or "").strip(),
+        "file_ext": str(meta.get("file_ext") or "").strip(),
+    }
+
+
+def extract_activity_answers(html: str) -> dict[str, str]:
+    answers: dict[str, str] = {}
+    if not html:
+        return answers
+    for match in _ACTIVITY_ANSWER_RE.finditer(html):
+        if match.group(1) and match.group(2):
+            answers[match.group(1)] = match.group(2)
+        elif match.group(4) and match.group(3):
+            answers[match.group(4)] = match.group(3)
+    return answers
+
+
+def inject_live_bridge(html: str, session_code: str, page_id: int, api_base: str = "") -> str:
+    """Append live activity bridge config for student iframe."""
+    text = str(html or "")
+    cfg = json.dumps(
+        {
+            "sessionCode": session_code,
+            "pageId": page_id,
+            "apiBase": api_base.rstrip("/"),
+        },
+        ensure_ascii=False,
+    )
+    snippet = (
+        f'<script>window.EAP_LIVE_CTX={cfg};</script>'
+        '<script src="/ui/js/eap-live-bridge.js"></script>'
+    )
+    lower = text.lower()
+    if "</body>" in lower:
+        idx = lower.rfind("</body>")
+        return text[:idx] + snippet + text[idx:]
+    return text + snippet
+
+
+def _normalize_answer(val: str) -> str:
+    return " ".join(str(val or "").strip().lower().split())
+
+
+def _check_activity_correct(expected_map: dict, activity_id: str, answer_text: str, answer_index) -> bool:
+    expected = expected_map.get(activity_id)
+    if expected is None:
+        return False
+    exp = _normalize_answer(expected)
+    if exp.isdigit() and answer_index is not None:
+        return int(answer_index) == int(exp)
+    return _normalize_answer(answer_text) == exp
 
 
 def _launch_row(conn, launch_id):
@@ -132,6 +250,7 @@ def _student_join_payload(conn, sess, student_username):
         "launch_id": lid,
         "launched_at": launched_at,
         "question": question,
+        "display": _display_payload(sess),
     }
 
 
@@ -180,6 +299,78 @@ def _teacher_responses_payload(conn, sess, launch_id):
         "question": _question_payload(launch),
         "responses": out,
         "count": len(out),
+    }
+
+
+def _teacher_activity_stats_payload(conn, sess, page_id=None):
+    display = _display_payload(sess)
+    pid = page_id or display.get("page_id")
+    if not pid:
+        return {"page_id": None, "activities": [], "summary": {"responses": 0, "correct": 0, "accuracy_pct": 0}}
+
+    pid = int(pid)
+    rows = conn.execute(
+        """
+        SELECT activity_id, student_username, team_id, answer_text, answer_index,
+               is_correct, duration_ms, submitted_at
+        FROM live_page_activity_responses
+        WHERE session_id = ? AND page_id = ?
+        ORDER BY activity_id ASC, submitted_at ASC
+        """,
+        (sess["id"], pid),
+    ).fetchall()
+
+    by_activity: dict[str, dict] = {}
+    for r in rows:
+        aid = r["activity_id"]
+        bucket = by_activity.setdefault(
+            aid,
+            {
+                "activity_id": aid,
+                "responses": [],
+                "count": 0,
+                "correct_count": 0,
+                "total_duration_ms": 0,
+            },
+        )
+        bucket["count"] += 1
+        if r["is_correct"]:
+            bucket["correct_count"] += 1
+        bucket["total_duration_ms"] += int(r["duration_ms"] or 0)
+        bucket["responses"].append(
+            {
+                "student": r["student_username"],
+                "teamId": r["team_id"] or "",
+                "answer": r["answer_text"] or "",
+                "answerIndex": r["answer_index"],
+                "correct": bool(r["is_correct"]),
+                "durationMs": int(r["duration_ms"] or 0),
+                "submittedAt": r["submitted_at"] or "",
+            }
+        )
+
+    activities = []
+    for _aid, bucket in sorted(by_activity.items()):
+        count = bucket["count"]
+        activities.append(
+            {
+                **bucket,
+                "accuracy_pct": round(100 * bucket["correct_count"] / count) if count else 0,
+                "avg_duration_ms": int(bucket["total_duration_ms"] / count) if count else 0,
+            }
+        )
+
+    total = len(rows)
+    correct = sum(1 for r in rows if r["is_correct"])
+    return {
+        "page_id": pid,
+        "display": display,
+        "activities": activities,
+        "summary": {
+            "responses": total,
+            "correct": correct,
+            "accuracy_pct": round(100 * correct / total) if total else 0,
+        },
     }
 
 
@@ -449,12 +640,391 @@ def register_live_teaching_routes(app):
             fresh = conn.execute(
                 """
                 SELECT id, session_code, class_name, teacher_username, session_date,
-                       created_at, active_launch_id
+                       created_at, active_launch_id, display_mode, display_json, display_version
                 FROM live_sessions WHERE id = ?
                 """,
                 (session_id,),
             ).fetchone()
             payload = _student_join_payload(conn, fresh, student_username)
+            payload["waited"] = True
+            return jsonify(payload)
+        finally:
+            conn.close()
+
+    @app.route("/api/student/live/join/<session_code>/wait-display", methods=["GET"])
+    def student_live_wait_display(session_code):
+        from app import get_db_connection, resolve_student_with_optional_enforcement
+
+        since_version = request.args.get("display_version", default=0, type=int)
+        timeout_sec = _clamp_wait_timeout(request.args.get("timeout", type=float))
+
+        conn = get_db_connection()
+        try:
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            student_username, err = resolve_student_with_optional_enforcement(
+                conn, request.args.get("student_username"), sess["class_name"]
+            )
+            if err is not None:
+                return err
+
+            session_id = sess["id"]
+
+            def display_changed():
+                row = conn.execute(
+                    "SELECT display_version FROM live_sessions WHERE id = ?",
+                    (session_id,),
+                ).fetchone()
+                current = int(row["display_version"] if row else 0)
+                return current != since_version
+
+            _wait_until(display_changed, timeout_sec)
+            fresh = conn.execute(
+                """
+                SELECT id, session_code, class_name, teacher_username, session_date,
+                       created_at, active_launch_id, display_mode, display_json, display_version
+                FROM live_sessions WHERE id = ?
+                """,
+                (session_id,),
+            ).fetchone()
+            payload = _student_join_payload(conn, fresh, student_username)
+            payload["waited"] = True
+            return jsonify(payload)
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/live/sessions/<session_code>/display", methods=["POST"])
+    def teacher_live_push_display(session_code):
+        from app import (
+            enforce_teacher_class_access_if_enabled,
+            get_db_connection,
+            get_effective_teacher_username,
+            require_session_role_if_enabled,
+            should_enforce_membership,
+            should_require_session_identity,
+        )
+
+        data = request.get_json(silent=True) or {}
+        mode = str(data.get("mode") or "welcome").strip().lower()
+        if mode not in {"welcome", "slides", "html", "material", "upload", "pdf"}:
+            return jsonify({"error": "Invalid display mode"}), 400
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            teacher_username = get_effective_teacher_username(conn, data.get("teacher_username"))
+            if should_require_session_identity() or should_enforce_membership():
+                if not teacher_username:
+                    return jsonify({"error": "teacher_username is required"}), 400
+                err = enforce_teacher_class_access_if_enabled(
+                    conn, teacher_username, sess["class_name"]
+                )
+                if err is not None:
+                    return err
+
+            title = str(data.get("title") or "").strip()[:200]
+            page_id = data.get("page_id")
+            page_id_val = int(page_id) if page_id is not None and str(page_id).strip().isdigit() else None
+            upload_label = str(data.get("upload_label") or data.get("material_label") or "").strip()[:200]
+
+            activity_answers = {}
+            if mode == "html" and page_id_val:
+                row = conn.execute(
+                    "SELECT html_content FROM teacher_teaching_pages WHERE id = ?",
+                    (page_id_val,),
+                ).fetchone()
+                if row and row["html_content"]:
+                    activity_answers = extract_activity_answers(row["html_content"])
+
+            meta = {
+                "title": title,
+                "page_id": page_id_val,
+                "upload_label": upload_label,
+                "material_label": upload_label,
+                "activity_answers": activity_answers,
+            }
+            item_id_raw = data.get("display_item_id")
+            if item_id_raw is not None and str(item_id_raw).strip().isdigit():
+                meta["display_item_id"] = int(item_id_raw)
+            file_url = str(data.get("file_url") or "").strip()
+            if file_url:
+                meta["file_url"] = file_url[:500]
+            download_url = str(data.get("download_url") or "").strip()
+            if download_url:
+                meta["download_url"] = download_url[:500]
+            preview_pdf_url = str(data.get("preview_pdf_url") or "").strip()
+            if preview_pdf_url:
+                meta["preview_pdf_url"] = preview_pdf_url[:500]
+            file_ext = str(data.get("file_ext") or "").strip().lower()
+            if file_ext:
+                meta["file_ext"] = file_ext
+            if mode in {"welcome", "slides"}:
+                meta = {"title": title or "Classroom display"}
+
+            version = int(sess["display_version"] or 0) + 1
+            now = utc_now_iso()
+            conn.execute(
+                """
+                UPDATE live_sessions
+                SET display_mode = ?, display_json = ?, display_version = ?
+                WHERE id = ?
+                """,
+                (mode if mode != "upload" else "material", json.dumps(meta, ensure_ascii=False), version, sess["id"]),
+            )
+            conn.commit()
+
+            fresh = _session_by_code(conn, session_code)
+            return jsonify(
+                {
+                    "display": _display_payload(fresh),
+                    "session_code": sess["session_code"],
+                    "updated_at": now,
+                }
+            )
+        finally:
+            conn.close()
+
+    @app.route("/api/student/live/join/<session_code>/lesson", methods=["GET"])
+    def student_live_lesson_html(session_code):
+        from app import get_db_connection, resolve_student_with_optional_enforcement
+
+        conn = get_db_connection()
+        try:
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            student_username, err = resolve_student_with_optional_enforcement(
+                conn, request.args.get("student_username"), sess["class_name"]
+            )
+            if err is not None:
+                return err
+
+            display = _display_payload(sess)
+            if display["mode"] != "html" or not display.get("page_id"):
+                return jsonify({"error": "No HTML lesson is live"}), 404
+
+            page_id = int(display["page_id"])
+            row = conn.execute(
+                "SELECT id, title, html_content FROM teacher_teaching_pages WHERE id = ?",
+                (page_id,),
+            ).fetchone()
+            if not row:
+                return jsonify({"error": "Page not found"}), 404
+
+            api_base = request.host_url.rstrip("/")
+            from teacher_teaching_pages import polish_teaching_html
+
+            html = polish_teaching_html(row["html_content"])
+            html = inject_live_bridge(html, sess["session_code"], page_id, api_base)
+            return jsonify(
+                {
+                    "title": row["title"] or display.get("title") or "",
+                    "page_id": page_id,
+                    "html": html,
+                    "display": display,
+                }
+            )
+        finally:
+            conn.close()
+
+    @app.route("/api/student/live/join/<session_code>/activity-respond", methods=["POST"])
+    def student_live_activity_respond(session_code):
+        from app import get_db_connection, resolve_student_with_optional_enforcement
+
+        data = request.get_json(silent=True) or {}
+        activity_id = str(data.get("activity_id") or "").strip()
+        if not activity_id or len(activity_id) > 80:
+            return jsonify({"error": "activity_id is required"}), 400
+
+        try:
+            page_id = int(data.get("page_id"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "page_id is required"}), 400
+
+        answer_text = str(data.get("answer_text") or data.get("answer") or "").strip()[:500]
+        if not answer_text:
+            return jsonify({"error": "answer_text is required"}), 400
+
+        answer_index = data.get("answer_index")
+        answer_index_val = None
+        if answer_index is not None and str(answer_index).strip().isdigit():
+            answer_index_val = int(answer_index)
+
+        try:
+            duration_ms = max(0, int(data.get("duration_ms") or 0))
+        except (TypeError, ValueError):
+            duration_ms = 0
+
+        team_id = str(data.get("team_id") or "").strip().upper()
+        if team_id and team_id not in ("A", "B", "C", "D"):
+            team_id = ""
+
+        conn = get_db_connection()
+        try:
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            student_username, err = resolve_student_with_optional_enforcement(
+                conn, data.get("student_username"), sess["class_name"]
+            )
+            if err is not None:
+                return err
+
+            display = _display_payload(sess)
+            if display["mode"] != "html" or int(display.get("page_id") or 0) != page_id:
+                return jsonify({"error": "This lesson is not currently live"}), 409
+
+            is_correct = _check_activity_correct(
+                display.get("activity_answers") or {},
+                activity_id,
+                answer_text,
+                answer_index_val,
+            )
+            now = utc_now_iso()
+            conn.execute(
+                """
+                INSERT INTO live_page_activity_responses
+                    (session_id, page_id, activity_id, student_username, team_id,
+                     answer_text, answer_index, is_correct, duration_ms, submitted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(session_id, page_id, activity_id, student_username) DO UPDATE SET
+                    team_id = excluded.team_id,
+                    answer_text = excluded.answer_text,
+                    answer_index = excluded.answer_index,
+                    is_correct = excluded.is_correct,
+                    duration_ms = excluded.duration_ms,
+                    submitted_at = excluded.submitted_at
+                """,
+                (
+                    sess["id"],
+                    page_id,
+                    activity_id,
+                    student_username,
+                    team_id or None,
+                    answer_text,
+                    answer_index_val,
+                    1 if is_correct else 0,
+                    duration_ms,
+                    now,
+                ),
+            )
+            conn.commit()
+            return jsonify(
+                {
+                    "ok": True,
+                    "is_correct": bool(is_correct),
+                    "activity_id": activity_id,
+                    "submitted_at": now,
+                }
+            )
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/live/sessions/<session_code>/activity-stats", methods=["GET"])
+    def teacher_live_activity_stats(session_code):
+        from app import (
+            enforce_teacher_class_access_if_enabled,
+            get_db_connection,
+            get_effective_teacher_username,
+            require_session_role_if_enabled,
+            should_enforce_membership,
+            should_require_session_identity,
+        )
+
+        page_id = request.args.get("page_id", type=int)
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            teacher_username = get_effective_teacher_username(conn, request.args.get("teacher_username"))
+            if should_require_session_identity() or should_enforce_membership():
+                if not teacher_username:
+                    return jsonify({"error": "teacher_username is required"}), 400
+                err = enforce_teacher_class_access_if_enabled(
+                    conn, teacher_username, sess["class_name"]
+                )
+                if err is not None:
+                    return err
+
+            display = _display_payload(sess)
+            if not pid:
+                return jsonify({"page_id": None, "activities": [], "summary": {"responses": 0}})
+
+            payload = _teacher_activity_stats_payload(conn, sess, page_id)
+            return jsonify(payload)
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/live/sessions/<session_code>/activity-stats/wait", methods=["GET"])
+    def teacher_live_activity_stats_wait(session_code):
+        from app import (
+            enforce_teacher_class_access_if_enabled,
+            get_db_connection,
+            get_effective_teacher_username,
+            require_session_role_if_enabled,
+            should_enforce_membership,
+            should_require_session_identity,
+        )
+
+        page_id = request.args.get("page_id", type=int)
+        since_count = request.args.get("since_count", default=0, type=int)
+        timeout_sec = _clamp_wait_timeout(request.args.get("timeout", type=float))
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            teacher_username = get_effective_teacher_username(conn, request.args.get("teacher_username"))
+            if should_require_session_identity() or should_enforce_membership():
+                if not teacher_username:
+                    return jsonify({"error": "teacher_username is required"}), 400
+                err = enforce_teacher_class_access_if_enabled(
+                    conn, teacher_username, sess["class_name"]
+                )
+                if err is not None:
+                    return err
+
+            display = _display_payload(sess)
+            pid = page_id or display.get("page_id")
+            session_id = sess["id"]
+
+            def count_changed():
+                if not pid:
+                    return False
+                row = conn.execute(
+                    """
+                    SELECT COUNT(*) AS c FROM live_page_activity_responses
+                    WHERE session_id = ? AND page_id = ?
+                    """,
+                    (session_id, int(pid)),
+                ).fetchone()
+                return int(row["c"] if row else 0) > since_count
+
+            _wait_until(count_changed, timeout_sec)
+            payload = _teacher_activity_stats_payload(conn, sess, page_id)
             payload["waited"] = True
             return jsonify(payload)
         finally:

@@ -330,6 +330,22 @@ def migrate_task_templates_add_i18n_columns(conn):
             conn.execute(f"ALTER TABLE task_templates ADD COLUMN {col} TEXT")
 
 
+def migrate_teacher_teaching_pages_k45(conn):
+    """Phase K4/K5: template_key, published, published_at on teacher_teaching_pages."""
+    rows = conn.execute("PRAGMA table_info(teacher_teaching_pages)").fetchall()
+    column_names = [r[1] for r in rows]
+    if "template_key" not in column_names:
+        conn.execute(
+            "ALTER TABLE teacher_teaching_pages ADD COLUMN template_key TEXT NOT NULL DEFAULT 'standard'"
+        )
+    if "published" not in column_names:
+        conn.execute(
+            "ALTER TABLE teacher_teaching_pages ADD COLUMN published INTEGER NOT NULL DEFAULT 0"
+        )
+    if "published_at" not in column_names:
+        conn.execute("ALTER TABLE teacher_teaching_pages ADD COLUMN published_at TEXT")
+
+
 def backfill_calendar_tasks_title_zh(conn):
     """
     One-time friendly Chinese labels for demo rows missing title_zh.
@@ -580,6 +596,10 @@ def init_database():
 
     init_live_teaching_tables(conn)
 
+    from classroom_display import init_classroom_display_tables
+
+    init_classroom_display_tables(conn)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS classes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -722,12 +742,45 @@ def init_database():
             topic TEXT,
             source_text TEXT,
             html_content TEXT NOT NULL,
+            template_key TEXT NOT NULL DEFAULT 'standard',
+            published INTEGER NOT NULL DEFAULT 0,
+            published_at TEXT,
             teacher_username TEXT NOT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
         """
     )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS teaching_page_templates (
+            template_key TEXT PRIMARY KEY,
+            system_prompt TEXT NOT NULL,
+            is_default INTEGER NOT NULL DEFAULT 1,
+            updated_by TEXT,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS teacher_teaching_source_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            teacher_username TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            stored_name TEXT NOT NULL,
+            extracted_text TEXT NOT NULL,
+            char_count INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'staged',
+            created_at TEXT NOT NULL,
+            confirmed_at TEXT
+        )
+        """
+    )
+
+    migrate_teacher_teaching_pages_k45(conn)
 
     seed_default_users(conn)
     ensure_e1_demo_users(conn)
@@ -738,8 +791,10 @@ def init_database():
     seed_task_templates(conn)
     backfill_calendar_tasks_title_zh(conn)
     from self_study_ai_prompts import seed_default_prompts
+    from teaching_page_templates import seed_default_templates
 
     seed_default_prompts(conn)
+    seed_default_templates(conn)
 
     conn.commit()
     conn.close()
@@ -7304,9 +7359,369 @@ def admin_self_study_ai_prompt_preview(module):
         return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
 
 
-# --- Phase K3: Teacher AI HTML teaching pages ---
+# --- Phase K3–K5: Teacher AI HTML teaching pages ---
 
-from teacher_teaching_pages import MAX_SOURCE_TEXT, MAX_TITLE, row_to_dict as teaching_page_row_to_dict
+from teacher_teaching_pages import (
+    MAX_SOURCE_TEXT,
+    MAX_TITLE,
+    polish_teaching_html,
+    row_to_dict as teaching_page_row_to_dict,
+    row_to_public_dict as teaching_page_public_row,
+)
+from teaching_page_templates import (
+    get_prompt as get_teaching_template_prompt,
+    list_prompts as list_teaching_templates,
+    normalize_template_key,
+    reset_prompt as reset_teaching_template_prompt,
+    save_prompt as save_teaching_template_prompt,
+)
+from teaching_page_source_files import (
+    ALLOWED_SOURCE_EXTENSIONS,
+    MAX_SOURCE_FILE_BYTES,
+    MAX_SOURCE_FILES_PER_TEACHER,
+    allowed_source_extension,
+    delete_stored_file,
+    extract_text_from_bytes,
+    merge_source_text,
+    normalize_extracted_text,
+    row_to_detail as teaching_source_file_detail,
+    row_to_dict as teaching_source_file_row,
+    save_source_file,
+    teaching_source_upload_dir,
+)
+
+_TEACHING_PAGE_SELECT = """
+    SELECT id, title, class_name, task_id, topic, source_text, html_content,
+           template_key, published, published_at, teacher_username, created_at, updated_at
+    FROM teacher_teaching_pages
+"""
+
+_TEACHING_SOURCE_SELECT = """
+    SELECT id, teacher_username, original_name, stored_name, extracted_text, char_count,
+           status, created_at, confirmed_at
+    FROM teacher_teaching_source_files
+"""
+
+
+def _teaching_source_upload_dir():
+    ensure_uploads_directory()
+    return teaching_source_upload_dir(UPLOAD_DIR)
+
+
+def _resolve_teaching_source_text(conn, teacher: str, paste_text: str, file_ids: list | None) -> str:
+    """Merge pasted notes with confirmed uploaded source files."""
+    ids = []
+    if file_ids:
+        for raw in file_ids:
+            if raw is None:
+                continue
+            s = str(raw).strip()
+            if s.isdigit():
+                ids.append(int(s))
+    if not ids:
+        return str(paste_text or "").strip()[:MAX_SOURCE_TEXT]
+
+    placeholders = ",".join("?" for _ in ids)
+    rows = conn.execute(
+        _TEACHING_SOURCE_SELECT
+        + f" WHERE teacher_username = ? AND status = 'confirmed' AND id IN ({placeholders})",
+        (teacher, *ids),
+    ).fetchall()
+    file_texts = [r["extracted_text"] or "" for r in rows]
+    return merge_source_text(paste_text, file_texts, MAX_SOURCE_TEXT)
+
+
+@app.route("/api/teacher/teaching-pages/source-files", methods=["GET", "POST"])
+def teacher_teaching_source_files_collection():
+    """Upload or list staged/confirmed lesson source files (PDF/DOCX/TXT)."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+
+    actor = get_current_authenticated_user(conn)
+    teacher = str(actor["username"] or "").strip() if actor else ""
+
+    if request.method == "GET":
+        rows = conn.execute(
+            _TEACHING_SOURCE_SELECT
+            + " WHERE teacher_username = ? ORDER BY datetime(created_at) DESC, id DESC",
+            (teacher,),
+        ).fetchall()
+        conn.close()
+        return jsonify({"files": [teaching_source_file_row(r) for r in rows]})
+
+    existing = conn.execute(
+        "SELECT COUNT(*) AS n FROM teacher_teaching_source_files WHERE teacher_username = ?",
+        (teacher,),
+    ).fetchone()["n"]
+    uploads = [f for f in request.files.getlist("file") if f and f.filename]
+    if not uploads:
+        single = request.files.get("file")
+        if single and single.filename:
+            uploads = [single]
+    if not uploads:
+        conn.close()
+        return jsonify({"error": "No file provided (field name: file)"}), 400
+    if existing + len(uploads) > MAX_SOURCE_FILES_PER_TEACHER:
+        conn.close()
+        return jsonify({"error": f"Maximum {MAX_SOURCE_FILES_PER_TEACHER} source files per teacher"}), 400
+
+    upload_dir = _teaching_source_upload_dir()
+    created = []
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+    for up in uploads:
+        name = os.path.basename(str(up.filename or "").strip())
+        if not name:
+            continue
+        if not allowed_source_extension(name):
+            conn.close()
+            return jsonify(
+                {"error": "File type not allowed. Allowed: pdf, docx, txt"}
+            ), 400
+        data = up.read()
+        if not data:
+            conn.close()
+            return jsonify({"error": f"Empty file: {name}"}), 400
+        if len(data) > MAX_SOURCE_FILE_BYTES:
+            conn.close()
+            return jsonify({"error": f"File too large (max {MAX_SOURCE_FILE_BYTES // (1024 * 1024)} MB): {name}"}), 400
+        ext = name.rsplit(".", 1)[-1].lower()
+        try:
+            extracted = normalize_extracted_text(extract_text_from_bytes(data, ext))
+        except ValueError as exc:
+            conn.close()
+            return jsonify({"error": str(exc)}), 400
+        except RuntimeError as exc:
+            conn.close()
+            return jsonify({"error": str(exc)}), 503
+        except Exception as exc:  # noqa: BLE001
+            conn.close()
+            return jsonify({"error": f"Could not read file: {name}", "detail": str(exc)[:120]}), 400
+        if not extracted:
+            conn.close()
+            return jsonify({"error": f"No readable text found in: {name}"}), 400
+
+        stored_name, _dest = save_source_file(upload_dir, name, data)
+        cur = conn.execute(
+            """
+            INSERT INTO teacher_teaching_source_files
+                (teacher_username, original_name, stored_name, extracted_text, char_count,
+                 status, created_at, confirmed_at)
+            VALUES (?, ?, ?, ?, ?, 'staged', ?, NULL)
+            """,
+            (teacher, name[:512], stored_name, extracted, len(extracted), now),
+        )
+        row = conn.execute(
+            _TEACHING_SOURCE_SELECT + " WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+        created.append(teaching_source_file_row(row))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"files": created}), 201
+
+
+@app.route("/api/teacher/teaching-pages/source-files/confirm", methods=["POST"])
+def teacher_teaching_source_files_confirm():
+    """Mark staged source files as confirmed for AI generation."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+
+    actor = get_current_authenticated_user(conn)
+    teacher = str(actor["username"] or "").strip() if actor else ""
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get("file_ids") or body.get("ids") or []
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+    if raw_ids:
+        ids = [int(str(x)) for x in raw_ids if str(x).strip().isdigit()]
+        if not ids:
+            conn.close()
+            return jsonify({"error": "file_ids required"}), 400
+        placeholders = ",".join("?" for _ in ids)
+        conn.execute(
+            f"""
+            UPDATE teacher_teaching_source_files
+            SET status = 'confirmed', confirmed_at = ?
+            WHERE teacher_username = ? AND status = 'staged' AND id IN ({placeholders})
+            """,
+            (now, teacher, *ids),
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE teacher_teaching_source_files
+            SET status = 'confirmed', confirmed_at = ?
+            WHERE teacher_username = ? AND status = 'staged'
+            """,
+            (now, teacher),
+        )
+
+    conn.commit()
+    rows = conn.execute(
+        _TEACHING_SOURCE_SELECT
+        + " WHERE teacher_username = ? ORDER BY datetime(created_at) DESC, id DESC",
+        (teacher,),
+    ).fetchall()
+    conn.close()
+    return jsonify({"files": [teaching_source_file_row(r) for r in rows]})
+
+
+@app.route("/api/teacher/teaching-pages/source-files/<int:file_id>", methods=["GET", "DELETE"])
+def teacher_teaching_source_file_detail(file_id):
+    """Preview extracted text or delete one source file."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+
+    actor = get_current_authenticated_user(conn)
+    teacher = str(actor["username"] or "").strip() if actor else ""
+    row = conn.execute(
+        _TEACHING_SOURCE_SELECT + " WHERE id = ? AND teacher_username = ?",
+        (file_id, teacher),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+
+    if request.method == "GET":
+        conn.close()
+        return jsonify({"file": teaching_source_file_detail(row)})
+
+    delete_stored_file(_teaching_source_upload_dir(), row["stored_name"])
+    conn.execute(
+        "DELETE FROM teacher_teaching_source_files WHERE id = ? AND teacher_username = ?",
+        (file_id, teacher),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/api/admin/teaching-page/templates", methods=["GET"])
+def admin_teaching_page_templates_list():
+    """Phase K4: list manager HTML page type templates."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+    templates = list_teaching_templates(conn)
+    conn.close()
+    return jsonify({"templates": templates})
+
+
+@app.route("/api/admin/teaching-page/templates/<template_key>", methods=["GET", "PUT", "DELETE"])
+def admin_teaching_page_template_detail(template_key):
+    """Phase K4: read, save, or reset one teaching page template."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+    try:
+        key = normalize_template_key(template_key)
+    except ValueError:
+        conn.close()
+        return jsonify({"error": "Invalid template"}), 400
+
+    actor = get_current_authenticated_user(conn)
+    updated_by = str(actor["username"] or "").strip() if actor else ""
+
+    if request.method == "GET":
+        payload = get_teaching_template_prompt(conn, key)
+        conn.close()
+        return jsonify({"template": payload, "default_prompt": payload["system_prompt"]})
+
+    if request.method == "DELETE":
+        payload = reset_teaching_template_prompt(conn, key, updated_by)
+        conn.close()
+        return jsonify({"template": payload})
+
+    body = request.get_json(silent=True) or {}
+    text = str(body.get("system_prompt") or "").strip()
+    try:
+        payload = save_teaching_template_prompt(conn, key, text, updated_by)
+    except ValueError as exc:
+        conn.close()
+        return jsonify({"error": str(exc)}), 400
+    conn.close()
+    return jsonify({"template": payload})
+
+
+@app.route("/api/admin/teaching-page/templates/<template_key>/preview", methods=["POST"])
+def admin_teaching_page_template_preview(template_key):
+    """Phase K4: preview HTML output with current or draft template prompt."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+    try:
+        key = normalize_template_key(template_key)
+    except ValueError:
+        conn.close()
+        return jsonify({"error": "Invalid template"}), 400
+
+    if not generate_teaching_page_html or not ai_is_configured or not ai_is_configured():
+        conn.close()
+        return jsonify({"error": "AI not configured"}), 503
+
+    body = request.get_json(silent=True) or {}
+    topic = str(body.get("topic") or "Academic integrity").strip()
+    source_text = str(body.get("source_text") or body.get("text") or "").strip()
+    level = str(body.get("level") or "intermediate").strip().lower()
+    lang = str(body.get("lang") or "en").strip().lower()
+    draft = str(body.get("system_prompt") or "").strip()
+    prompt_row = get_teaching_template_prompt(conn, key)
+    conn.close()
+    system_prompt = draft or prompt_row["system_prompt"]
+
+    try:
+        result = generate_teaching_page_html(
+            topic,
+            source_text=source_text,
+            level=level,
+            lang=lang,
+            system_prompt=system_prompt,
+        )
+        result["template_key"] = key
+        return jsonify({"page": result})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+
+
+@app.route("/api/teacher/teaching-pages/templates", methods=["GET"])
+def teacher_teaching_page_templates_list():
+    """Phase K4: template types available for lesson generation (teacher)."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+    templates = list_teaching_templates(conn)
+    conn.close()
+    public = [
+        {
+            "template_key": t["template_key"],
+            "label_en": t.get("label_en") or t["template_key"],
+            "label_zh": t.get("label_zh") or t["template_key"],
+            "is_default": t.get("is_default", True),
+        }
+        for t in templates
+    ]
+    return jsonify({"templates": public})
 
 
 @app.route("/api/teacher/teaching-pages/ai/status", methods=["GET"])
@@ -7332,26 +7747,41 @@ def teacher_teaching_pages_ai_status():
 
 @app.route("/api/teacher/teaching-pages/generate", methods=["POST"])
 def teacher_teaching_pages_generate():
-    """Phase K3: generate HTML teaching page preview (not saved until POST /teaching-pages)."""
+    """Phase K3/K4: generate HTML teaching page preview using manager template."""
     conn = get_db_connection()
     err = require_session_role_if_enabled(conn, "teacher")
     if err is not None:
         conn.close()
         return err
-    conn.close()
 
     if not generate_teaching_page_html or not ai_is_configured or not ai_is_configured():
+        conn.close()
         return jsonify({"error": "AI lesson generator is not available"}), 503
 
     body = request.get_json(silent=True) or {}
     topic = str(body.get("topic") or body.get("title") or "").strip()
-    source_text = str(body.get("source_text") or body.get("sourceText") or "").strip()
+    paste_source = str(body.get("source_text") or body.get("sourceText") or "").strip()
     level = str(body.get("level") or "intermediate").strip().lower()
     lang = str(body.get("lang") or "en").strip().lower()
     custom_instructions = str(body.get("instructions") or body.get("custom_instructions") or "").strip()
+    source_file_ids = body.get("source_file_ids") or body.get("sourceFileIds") or []
 
     if not topic:
+        conn.close()
         return jsonify({"error": "topic is required"}), 400
+
+    try:
+        tkey = normalize_template_key(body.get("template_key") or "standard")
+    except ValueError:
+        conn.close()
+        return jsonify({"error": "Invalid template"}), 400
+
+    actor = get_current_authenticated_user(conn)
+    teacher = str(actor["username"] or "").strip() if actor else ""
+    source_text = _resolve_teaching_source_text(conn, teacher, paste_source, source_file_ids)
+
+    prompt_row = get_teaching_template_prompt(conn, tkey)
+    conn.close()
 
     try:
         result = generate_teaching_page_html(
@@ -7360,7 +7790,10 @@ def teacher_teaching_pages_generate():
             level=level,
             lang=lang,
             custom_instructions=custom_instructions,
+            system_prompt=prompt_row["system_prompt"],
         )
+        result["template_key"] = tkey
+        result["source_text_used"] = source_text
         return jsonify({"page": result})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
@@ -7382,13 +7815,7 @@ def teacher_teaching_pages_collection():
 
     if request.method == "GET":
         rows = conn.execute(
-            """
-            SELECT id, title, class_name, task_id, topic, source_text, html_content,
-                   teacher_username, created_at, updated_at
-            FROM teacher_teaching_pages
-            WHERE teacher_username = ?
-            ORDER BY datetime(updated_at) DESC, id DESC
-            """,
+            _TEACHING_PAGE_SELECT + " WHERE teacher_username = ? ORDER BY datetime(updated_at) DESC, id DESC",
             (teacher,),
         ).fetchall()
         conn.close()
@@ -7403,6 +7830,13 @@ def teacher_teaching_pages_collection():
     if not html_content:
         conn.close()
         return jsonify({"error": "html_content is required"}), 400
+    html_content = polish_teaching_html(html_content)
+
+    try:
+        tkey = normalize_template_key(body.get("template_key") or "standard")
+    except ValueError:
+        conn.close()
+        return jsonify({"error": "Invalid template"}), 400
 
     class_name = str(body.get("class_name") or body.get("className") or "").strip()[:80]
     topic = str(body.get("topic") or title).strip()[:MAX_TITLE]
@@ -7416,22 +7850,19 @@ def teacher_teaching_pages_collection():
     cur = conn.execute(
         """
         INSERT INTO teacher_teaching_pages
-            (title, class_name, task_id, topic, source_text, html_content, teacher_username, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (title, class_name, task_id, topic, source_text, html_content, template_key,
+             published, published_at, teacher_username, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)
         """,
-        (title, class_name or None, task_id_val, topic, source_text or None, html_content, teacher, now, now),
+        (title, class_name or None, task_id_val, topic, source_text or None, html_content, tkey, teacher, now, now),
     )
     conn.commit()
     row = conn.execute(
-        """
-        SELECT id, title, class_name, task_id, topic, source_text, html_content,
-               teacher_username, created_at, updated_at
-        FROM teacher_teaching_pages WHERE id = ?
-        """,
+        _TEACHING_PAGE_SELECT + " WHERE id = ?",
         (cur.lastrowid,),
     ).fetchone()
     conn.close()
-    return jsonify({"page": teaching_page_row_to_dict(row)}), 201
+    return jsonify({"page": teaching_page_row_to_dict(row, polish=True)}), 201
 
 
 @app.route("/api/teacher/teaching-pages/<int:page_id>", methods=["GET", "DELETE"])
@@ -7447,11 +7878,7 @@ def teacher_teaching_page_detail(page_id):
     teacher = str(actor["username"] or "").strip() if actor else ""
 
     row = conn.execute(
-        """
-        SELECT id, title, class_name, task_id, topic, source_text, html_content,
-               teacher_username, created_at, updated_at
-        FROM teacher_teaching_pages WHERE id = ?
-        """,
+        _TEACHING_PAGE_SELECT + " WHERE id = ?",
         (page_id,),
     ).fetchone()
     if row is None:
@@ -7468,7 +7895,7 @@ def teacher_teaching_page_detail(page_id):
         return jsonify({"ok": True})
 
     conn.close()
-    return jsonify({"page": teaching_page_row_to_dict(row)})
+    return jsonify({"page": teaching_page_row_to_dict(row, polish=True)})
 
 
 @app.route("/api/teacher/teaching-pages/<int:page_id>/view", methods=["GET"])
@@ -7493,7 +7920,145 @@ def teacher_teaching_page_view(page_id):
     if str(row["teacher_username"] or "") != teacher:
         return jsonify({"error": "Forbidden"}), 403
 
-    return Response(row["html_content"], mimetype="text/html; charset=utf-8")
+    return Response(polish_teaching_html(row["html_content"]), mimetype="text/html; charset=utf-8")
+
+
+@app.route("/api/teacher/teaching-pages/<int:page_id>/publish", methods=["PUT"])
+def teacher_teaching_page_publish(page_id):
+    """Phase K5: publish or unpublish a teaching page for students."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+
+    actor = get_current_authenticated_user(conn)
+    teacher = str(actor["username"] or "").strip() if actor else ""
+
+    row = conn.execute(
+        _TEACHING_PAGE_SELECT + " WHERE id = ?",
+        (page_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+    if str(row["teacher_username"] or "") != teacher:
+        conn.close()
+        return jsonify({"error": "Forbidden"}), 403
+
+    body = request.get_json(silent=True) or {}
+    publish = body.get("published")
+    if publish is None:
+        publish = not bool(row["published"])
+    else:
+        publish = bool(publish)
+
+    if publish and not str(row["class_name"] or "").strip():
+        conn.close()
+        return jsonify({"error": "class_name is required to publish for students"}), 400
+
+    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    published_at = now if publish else None
+    conn.execute(
+        """
+        UPDATE teacher_teaching_pages
+        SET published = ?, published_at = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (1 if publish else 0, published_at, now, page_id),
+    )
+    conn.commit()
+    updated = conn.execute(
+        _TEACHING_PAGE_SELECT + " WHERE id = ?",
+        (page_id,),
+    ).fetchone()
+    conn.close()
+    return jsonify({"page": teaching_page_row_to_dict(updated)})
+
+
+@app.route("/api/student/teaching-pages", methods=["GET"])
+def student_teaching_pages_list():
+    """Phase K5: list published teaching pages for student's class."""
+    class_name = normalize_class_name(request.args.get("class_name"))
+    conn = get_db_connection()
+    student_username, err_pair = resolve_student_with_optional_enforcement(
+        conn, request.args.get("student_username"), class_name
+    )
+    if err_pair is not None:
+        conn.close()
+        return err_pair
+    if not class_name:
+        conn.close()
+        return jsonify({"error": "class_name is required"}), 400
+
+    rows = conn.execute(
+        """
+        SELECT id, title, class_name, topic, template_key, teacher_username, published_at, updated_at
+        FROM teacher_teaching_pages
+        WHERE published = 1 AND class_name = ?
+        ORDER BY datetime(published_at) DESC, id DESC
+        """,
+        (class_name,),
+    ).fetchall()
+    conn.close()
+    return jsonify({"pages": [teaching_page_public_row(r) for r in rows]})
+
+
+@app.route("/api/student/teaching-pages/<int:page_id>/view", methods=["GET"])
+def student_teaching_page_view(page_id):
+    """Phase K5: student view of a published teaching page."""
+    class_name = normalize_class_name(request.args.get("class_name"))
+    conn = get_db_connection()
+    student_username, err_pair = resolve_student_with_optional_enforcement(
+        conn, request.args.get("student_username"), class_name
+    )
+    if err_pair is not None:
+        conn.close()
+        return err_pair
+
+    row = conn.execute(
+        """
+        SELECT html_content, class_name, published
+        FROM teacher_teaching_pages WHERE id = ?
+        """,
+        (page_id,),
+    ).fetchone()
+    conn.close()
+    if row is None or not row["published"]:
+        return jsonify({"error": "Not found"}), 404
+    page_class = normalize_class_name(row["class_name"])
+    if class_name and page_class and class_name != page_class:
+        return jsonify({"error": "Forbidden"}), 403
+
+    return Response(polish_teaching_html(row["html_content"]), mimetype="text/html; charset=utf-8")
+
+
+@app.route("/api/student/teaching-pages/<int:page_id>", methods=["GET"])
+def student_teaching_page_meta(page_id):
+    """Phase K5: published page metadata for student viewer shell."""
+    class_name = normalize_class_name(request.args.get("class_name"))
+    conn = get_db_connection()
+    student_username, err_pair = resolve_student_with_optional_enforcement(
+        conn, request.args.get("student_username"), class_name
+    )
+    if err_pair is not None:
+        conn.close()
+        return err_pair
+
+    row = conn.execute(
+        """
+        SELECT id, title, class_name, topic, template_key, teacher_username, published_at, updated_at, published
+        FROM teacher_teaching_pages WHERE id = ?
+        """,
+        (page_id,),
+    ).fetchone()
+    conn.close()
+    if row is None or not row["published"]:
+        return jsonify({"error": "Not found"}), 404
+    page_class = normalize_class_name(row["class_name"])
+    if class_name and page_class and class_name != page_class:
+        return jsonify({"error": "Forbidden"}), 403
+    return jsonify({"page": teaching_page_public_row(row)})
 
 
 # Create database tables when app loads (before first request)
@@ -7502,6 +8067,10 @@ init_database()
 from live_teaching import register_live_teaching_routes
 
 register_live_teaching_routes(app)
+
+from classroom_display import register_classroom_display_routes
+
+register_classroom_display_routes(app)
 
 # Start the Flask server
 if __name__ == "__main__":

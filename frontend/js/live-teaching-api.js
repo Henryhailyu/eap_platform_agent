@@ -144,6 +144,64 @@
     return parseJson(response);
   }
 
+  async function pushDisplay(sessionCode, payload, options) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const opts = options && typeof options === "object" ? options : {};
+    const body = { ...(payload || {}) };
+    if (opts.teacher_username) body.teacher_username = opts.teacher_username;
+    const response = await liveFetch(
+      `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/display`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    return parseJson(response);
+  }
+
+  async function fetchActivityStats(sessionCode, pageId) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const q = pageId != null ? `?page_id=${encodeURIComponent(String(pageId))}` : "";
+    const response = await liveFetch(
+      `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/activity-stats${q}`,
+    );
+    return parseJson(response);
+  }
+
+  async function fetchActivityStatsWait(sessionCode, pageId, sinceCount, signal) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const qs = waitQuery({
+      page_id: pageId,
+      since_count: sinceCount != null ? sinceCount : 0,
+    });
+    const response = await liveFetch(
+      `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/activity-stats/wait?${qs}`,
+      { signal },
+    );
+    return parseJson(response);
+  }
+
+  async function studentFetchLesson(sessionCode) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const response = await liveFetch(
+      `${API_BASE}/api/student/live/join/${encodeURIComponent(code)}/lesson`,
+    );
+    return parseJson(response);
+  }
+
+  async function studentJoinWaitDisplay(sessionCode, displayVersion, signal) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const qs = waitQuery({
+      display_version: displayVersion != null ? displayVersion : 0,
+    });
+    const response = await liveFetch(
+      `${API_BASE}/api/student/live/join/${encodeURIComponent(code)}/wait-display?${qs}`,
+      { signal },
+    );
+    return parseJson(response);
+  }
+
   global.EAP_LIVE_TEACHING_API = {
     API_BASE,
     WAIT_TIMEOUT_SEC,
@@ -152,8 +210,13 @@
     launchQuestion,
     fetchResponses,
     fetchResponsesWait,
+    pushDisplay,
+    fetchActivityStats,
+    fetchActivityStatsWait,
     studentJoin,
     studentJoinWait,
+    studentJoinWaitDisplay,
+    studentFetchLesson,
     studentRespond,
   };
 })(typeof window !== "undefined" ? window : globalThis);

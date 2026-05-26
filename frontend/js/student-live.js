@@ -159,6 +159,8 @@
     code: "",
     teamId: null,
     launchId: null,
+    displayVersion: 0,
+    displayMode: "",
     payloadFingerprint: "",
     pollAbort: null,
     polling: false,
@@ -178,14 +180,153 @@
   function payloadFingerprint(data) {
     if (!data) return "";
     const q = data.question;
-    if (!q) return `wait:${data.session_code || state.code || ""}`;
+    const d = data.display || {};
+    const displayPart = `${d.mode || ""}|${d.version != null ? d.version : ""}|${d.page_id || ""}`;
+    if (!q) return `wait:${data.session_code || state.code || ""}|${displayPart}`;
     const opts = Array.isArray(q.optionsEn) ? q.optionsEn.join("\x1e") : "";
     return [
       data.launch_id != null ? String(data.launch_id) : "",
       normalizeGameType(q.gameType),
       q.textEn || q.textZh || "",
       opts,
+      displayPart,
     ].join("|");
+  }
+
+  function showStudentFileDisplay(display, lesson, lessonFrame, lessonTitle, wait, slides, hintEl) {
+    const fileUrl = display.file_url;
+    const downloadUrl = display.download_url || fileUrl;
+    const previewPdfUrl = display.preview_pdf_url || "";
+    const ext = display.file_ext || "";
+    const title = display.title || display.upload_label || t("slive_material_title");
+    if (wait) wait.classList.add("hidden");
+    if (slides) slides.classList.add("hidden");
+    if (lesson) lesson.classList.remove("hidden");
+    if (lessonTitle) lessonTitle.textContent = title;
+    if (hintEl) hintEl.classList.add("hidden");
+
+    const actions = document.getElementById("slive-lesson-actions");
+    const downloadA = document.getElementById("slive-lesson-download");
+    const dlFn = window.EAP_fileDownloadUrl;
+    const dlUrl = typeof dlFn === "function" ? dlFn(downloadUrl) : downloadUrl;
+    if (actions && downloadA) {
+      downloadA.href = dlUrl;
+      downloadA.textContent = t("slive_download_file");
+      actions.classList.remove("hidden");
+    }
+
+    const mount = window.EAP_mountFileViewer;
+    const mode = window.EAP_fileDisplayMode ? window.EAP_fileDisplayMode(ext) : "download";
+    const wrap = document.getElementById("slive-file-viewer");
+    if (wrap && typeof mount === "function") {
+      wrap.classList.remove("hidden");
+      void mount(wrap, {
+        url: downloadUrl,
+        downloadUrl,
+        previewPdfUrl,
+        ext,
+        title,
+        downloadLabel: t("slive_download_file"),
+        openLabel: t("slive_open_file"),
+        previewHint: t("slive_preview_unavailable_hint"),
+        officeHint: t("slive_office_embed_hint"),
+      });
+      if (lessonFrame) {
+        lessonFrame.classList.add("hidden");
+        lessonFrame.removeAttribute("src");
+        lessonFrame.removeAttribute("srcdoc");
+      }
+      return;
+    }
+
+    if (wrap) wrap.classList.add("hidden");
+    if (lessonFrame) {
+      lessonFrame.classList.remove("hidden");
+      lessonFrame.removeAttribute("srcdoc");
+      if (mode === "pdf" || mode === "text") {
+        lessonFrame.src = fileUrl;
+      } else if ((mode === "presentation" || mode === "office") && window.EAP_officeEmbedUrl) {
+        lessonFrame.src = window.EAP_officeEmbedUrl(fileUrl);
+      } else {
+        lessonFrame.removeAttribute("src");
+      }
+    }
+  }
+
+  async function renderLiveDisplay(data) {
+    const display = (data && data.display) || {};
+    const mode = String(display.mode || "welcome").toLowerCase();
+    const wait = document.getElementById("slive-wait");
+    const lesson = document.getElementById("slive-lesson");
+    const slides = document.getElementById("slive-slides");
+    const lessonTitle = document.getElementById("slive-lesson-title");
+    const lessonFrame = document.getElementById("slive-lesson-frame");
+    const hintEl = document.getElementById("slive-lesson-hint");
+
+    if (mode === "html" && display.page_id) {
+      if (wait) wait.classList.add("hidden");
+      if (slides) slides.classList.add("hidden");
+      if (lesson) lesson.classList.remove("hidden");
+      if (lessonTitle) lessonTitle.textContent = display.title || t("slive_lesson_title");
+      const fileWrap = document.getElementById("slive-file-viewer");
+      if (fileWrap) {
+        fileWrap.classList.add("hidden");
+        fileWrap.innerHTML = "";
+      }
+      const actions = document.getElementById("slive-lesson-actions");
+      if (actions) actions.classList.add("hidden");
+      const api = window.EAP_LIVE_TEACHING_API;
+      if (api && lessonFrame && typeof api.studentFetchLesson === "function") {
+        try {
+          lessonFrame.classList.remove("hidden");
+          lessonFrame.removeAttribute("src");
+          const payload = await api.studentFetchLesson(state.code);
+          if (payload.html) {
+            lessonFrame.srcdoc = payload.html;
+            const count =
+              typeof window.EAP_countLessonActivities === "function"
+                ? window.EAP_countLessonActivities(payload.html)
+                : 0;
+            if (hintEl) {
+              if (count) {
+                hintEl.textContent = t("slive_lesson_interactive_hint");
+                hintEl.classList.remove("hidden");
+              } else {
+                hintEl.textContent = t("slive_lesson_no_interactive");
+                hintEl.classList.remove("hidden");
+              }
+            }
+          }
+        } catch (_) {
+          /* keep previous frame */
+        }
+      }
+      return;
+    }
+
+    const fileModes = ["pdf", "text", "presentation", "office", "material"];
+    if (fileModes.includes(mode) && display.file_url) {
+      showStudentFileDisplay(display, lesson, lessonFrame, lessonTitle, wait, slides, hintEl);
+      return;
+    }
+
+    if (mode === "slides" || mode === "welcome") {
+      if (lesson) lesson.classList.add("hidden");
+      if (lessonFrame) {
+        lessonFrame.removeAttribute("srcdoc");
+        lessonFrame.removeAttribute("src");
+      }
+      if (slides) {
+        slides.classList.remove("hidden");
+        slides.innerHTML = `<p>${escapeHtml(t("slive_slides_wait"))}</p>`;
+      }
+      if (wait && !data.question) wait.classList.add("hidden");
+      return;
+    }
+
+    if (lesson) lesson.classList.add("hidden");
+    if (slides) slides.classList.add("hidden");
+    if (!data.question && wait) wait.classList.remove("hidden");
   }
 
   function updateSyncStatus(data, opts) {
@@ -368,6 +509,11 @@
       const sentEl = document.getElementById("slive-sent");
       if (sentEl) sentEl.classList.add("hidden");
     }
+    if (data.display) {
+      state.displayVersion = data.display.version != null ? data.display.version : state.displayVersion;
+      state.displayMode = data.display.mode || state.displayMode;
+    }
+    void renderLiveDisplay(data);
     renderQuestion(data);
     updateSyncStatus(data);
   }
@@ -407,6 +553,13 @@
         let data;
         if (hidden) {
           data = await api.studentJoin(state.code);
+        } else if (typeof api.studentJoinWaitDisplay === "function") {
+          try {
+            data = await api.studentJoinWaitDisplay(state.code, state.displayVersion, controller.signal);
+          } catch (waitErr) {
+            if (waitErr && waitErr.name === "AbortError") throw waitErr;
+            data = await api.studentJoinWait(state.code, state.launchId, controller.signal);
+          }
         } else if (typeof api.studentJoinWait === "function") {
           data = await api.studentJoinWait(state.code, state.launchId, controller.signal);
         } else {

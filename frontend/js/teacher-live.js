@@ -77,6 +77,7 @@
     const MOCK = getMock();
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas || !MOCK) return;
+    stopActivityStatsPoll();
     canvas.className = "tlive-canvas__inner";
     canvas.innerHTML = `
       <h2 style="color:#0A4D68;margin:0 0 0.5rem">${escapeHtml(t("tlive_welcome_title"))}</h2>
@@ -383,6 +384,373 @@
     el.hidden = false;
     el.classList.toggle("tlive-launch-status--ok", !!isOk);
     el.classList.toggle("tlive-launch-status--err", !isOk);
+  }
+
+  let activityStatsAbort = null;
+  let activityStatsPageId = null;
+
+  function stopActivityStatsPoll() {
+    if (activityStatsAbort) {
+      activityStatsAbort.abort();
+      activityStatsAbort = null;
+    }
+    activityStatsPageId = null;
+  }
+
+  function renderActivityStatsPanel(stats) {
+    const panel = document.getElementById("tlive-activity-stats");
+    if (!panel) return;
+    const summary = (stats && stats.summary) || {};
+    const activities = (stats && stats.activities) || [];
+    if (!activities.length) {
+      panel.innerHTML = `<p class="tlive-activity-stats__empty">${escapeHtml(t("tlive_activity_empty"))}</p>`;
+      return;
+    }
+    panel.innerHTML = `
+      <p class="tlive-activity-stats__summary">${escapeHtml(
+        t("tlive_activity_summary", {
+          count: String(summary.responses || 0),
+          pct: String(summary.accuracy_pct != null ? summary.accuracy_pct : 0),
+        }),
+      )}</p>
+      <ul class="tlive-activity-stats__list">
+        ${activities
+          .map(
+            (a) => `
+          <li>
+            <strong>${escapeHtml(a.activity_id)}</strong>
+            — ${escapeHtml(t("tlive_activity_row", { count: String(a.count || 0), pct: String(a.accuracy_pct || 0), sec: String(Math.round((a.avg_duration_ms || 0) / 1000)) }))}
+          </li>`,
+          )
+          .join("")}
+      </ul>`;
+  }
+
+  async function refreshActivityStats(pageId, sinceCount) {
+    const api = getLiveApi();
+    const sess = window.__tliveLiveSession;
+    if (!api || !sess || !sess.code || !pageId) return null;
+    try {
+      if (typeof api.fetchActivityStatsWait === "function" && sinceCount != null) {
+        const controller = new AbortController();
+        activityStatsAbort = controller;
+        return await api.fetchActivityStatsWait(sess.code, pageId, sinceCount, controller.signal);
+      }
+      return await api.fetchActivityStats(sess.code, pageId);
+    } catch (err) {
+      if (err && err.name === "AbortError") return null;
+      return await api.fetchActivityStats(sess.code, pageId);
+    }
+  }
+
+  async function startActivityStatsPoll(pageId) {
+    stopActivityStatsPoll();
+    if (!pageId) return;
+    activityStatsPageId = pageId;
+    let sinceCount = 0;
+
+    async function loop() {
+      if (activityStatsPageId !== pageId) return;
+      try {
+        const stats = await refreshActivityStats(pageId, sinceCount);
+        if (!stats) return;
+        sinceCount = (stats.summary && stats.summary.responses) || 0;
+        renderActivityStatsPanel(stats);
+      } catch (_) {
+        /* ignore */
+      }
+      if (activityStatsPageId === pageId) {
+        window.setTimeout(loop, getLiveApi()?.FALLBACK_POLL_MS || 4000);
+      }
+    }
+    void loop();
+  }
+
+  async function pushDisplayToClass(payload) {
+    const api = getLiveApi();
+    if (!api || typeof api.pushDisplay !== "function") {
+      updateLaunchStatus(t("tlive_push_fail_no_api"), false);
+      return false;
+    }
+    const teacher = await liveTeacherContext();
+    if (!teacher) {
+      updateLaunchStatus(t("tlive_launch_fail_login"), false);
+      return false;
+    }
+    const ctx = contextFromUrl();
+    if (!(await ensureLiveSession(ctx))) {
+      updateLaunchStatus(t("tlive_launch_fail_no_session"), false);
+      return false;
+    }
+    const sess = window.__tliveLiveSession;
+    try {
+      await api.pushDisplay(sess.code, payload || {}, { teacher_username: teacher.username });
+      updateLaunchStatus(t("tlive_push_ok"), true);
+      return true;
+    } catch (err) {
+      updateLaunchStatus(launchErrorMessage(err), false);
+      return false;
+    }
+  }
+
+  function injectLessonBridge(html, pageId) {
+    let text = html;
+    if (typeof window.EAP_polishLessonHtml === "function") {
+      text = window.EAP_polishLessonHtml(text);
+    }
+    if (typeof window.EAP_injectLiveBridge === "function") {
+      const ctx =
+        pageId && window.__tliveLiveSession?.code
+          ? {
+              sessionCode: window.__tliveLiveSession.code,
+              pageId,
+              apiBase: (getLiveApi() && getLiveApi().API_BASE) || window.location.origin,
+            }
+          : null;
+      return window.EAP_injectLiveBridge(text, ctx);
+    }
+    return text;
+  }
+
+  function renderHtmlLessonOnCanvas(html, title, pageId) {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas || !html) return;
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
+    const activityCount =
+      typeof window.EAP_countLessonActivities === "function" ? window.EAP_countLessonActivities(html) : 0;
+    canvas.innerHTML = `
+      <div class="tla-live-present tla-live-present--with-stats">
+        <div class="tla-live-present__head">
+          <p class="tla-live-present__title">${escapeHtml(title || t("tla_preview_title"))}</p>
+          <button type="button" class="btn-secondary btn-small" id="tlive-push-html-again">${escapeHtml(t("tlive_push_again"))}</button>
+        </div>
+        <div class="tla-live-present__stage">
+          <iframe class="tla-live-present__frame" sandbox="allow-scripts allow-same-origin" title="${escapeHtml(title || "Lesson")}"></iframe>
+          <aside id="tlive-activity-stats" class="tlive-activity-stats" aria-live="polite">${
+            activityCount
+              ? `<p class="tlive-activity-stats__summary">${escapeHtml(t("tlive_activity_live_hint", { count: activityCount }))}</p>`
+              : `<p class="tlive-activity-stats__empty">${escapeHtml(t("tlive_activity_none_hint"))}</p>`
+          }</aside>
+        </div>
+      </div>
+    `;
+    const frame = canvas.querySelector("iframe");
+    if (frame) frame.srcdoc = injectLessonBridge(html, pageId);
+    document.getElementById("tlive-push-html-again")?.addEventListener("click", () => {
+      void pushHtmlLessonToClass({ html, title, pageId });
+    });
+    if (pageId && activityCount) void startActivityStatsPoll(pageId);
+  }
+
+  async function pushHtmlLessonToClass(opts) {
+    const o = opts && typeof opts === "object" ? opts : {};
+    const html = o.html || "";
+    const title = o.title || "";
+    const pageId = o.page_id || o.pageId || null;
+    const className = o.class_name || o.className || contextFromUrl().className;
+    if (!html) return false;
+    let libItem = null;
+    if (pageId) libItem = await addHtmlToDisplayLibrary(className, pageId, title, false);
+    renderHtmlLessonOnCanvas(html, title, pageId);
+    const api = getDisplayApi();
+    if (libItem && api) {
+      try {
+        const res = await api.activateItem(libItem.id);
+        if (res.display) return pushDisplayToClass(res.display);
+      } catch (_) {
+        /* fall through */
+      }
+    }
+    const payload = { mode: "html", title };
+    if (pageId) payload.page_id = pageId;
+    if (libItem) payload.display_item_id = libItem.id;
+    return pushDisplayToClass(payload);
+  }
+
+  async function pushSlidesDisplay() {
+    stopActivityStatsPoll();
+    return pushDisplayToClass({ mode: "slides", title: t("tlive_welcome_title") });
+  }
+
+  const displayLibrary = { items: [], activeId: null, className: "" };
+
+  function getDisplayApi() {
+    return window.EAP_CLASSROOM_DISPLAY || null;
+  }
+
+  function classroomDisplayFileUrl(item, apiBase) {
+    if (item && item.file_url) return item.file_url;
+    const fp = String((item && item.file_path) || "").replace(/\\/g, "/");
+    const base = String(apiBase || window.location.origin).replace(/\/$/, "");
+    const rel = fp.includes("classroom-display/") ? fp : `classroom-display/${fp.split("/").pop() || fp}`;
+    const parts = rel.split("/").map((p) => encodeURIComponent(p));
+    return `${base}/uploads/${parts.join("/")}`;
+  }
+
+  async function loadDisplayLibrary(ctx) {
+    const api = getDisplayApi();
+    if (!api) return;
+    displayLibrary.className = ctx.className || "EAP047";
+    try {
+      const data = await api.listItems(displayLibrary.className);
+      displayLibrary.items = data.items || [];
+      displayLibrary.activeId = data.active_item_id || null;
+      renderDisplayLibraryList();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function renderDisplayLibraryList() {
+    const list = document.getElementById("tlive-display-list");
+    if (!list) return;
+    if (!displayLibrary.items.length) {
+      list.innerHTML = `<li class="tlive-display-list__empty">${escapeHtml(t("tlive_display_empty"))}</li>`;
+      return;
+    }
+    list.innerHTML = displayLibrary.items
+      .map((item) => {
+        const active = item.id === displayLibrary.activeId ? " tlive-display-list__item--active" : "";
+        const badge = item.item_type === "html" ? t("tlive_display_type_html") : t("tlive_display_type_file");
+        return `<li class="tlive-display-list__item${active}">
+          <button type="button" class="tlive-display-list__show" data-show="${item.id}">${escapeHtml(item.title)}</button>
+          <span class="tlive-display-list__badge">${escapeHtml(badge)}</span>
+          <button type="button" class="btn-secondary btn-small" data-del-display="${item.id}">${escapeHtml(t("tla_delete"))}</button>
+        </li>`;
+      })
+      .join("");
+    list.querySelectorAll("[data-show]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const item = displayLibrary.items.find((i) => String(i.id) === btn.getAttribute("data-show"));
+        if (item) void showDisplayLibraryItem(item, true);
+      });
+    });
+    list.querySelectorAll("[data-del-display]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        void deleteDisplayLibraryItem(btn.getAttribute("data-del-display"));
+      });
+    });
+  }
+
+  async function showDisplayLibraryItem(item, pushLive) {
+    const api = getDisplayApi();
+    if (!item) return;
+    displayLibrary.activeId = item.id;
+    renderDisplayLibraryList();
+    if (api && pushLive) {
+      try {
+        const res = await api.activateItem(item.id);
+        if (res.display) await pushDisplayToClass(res.display);
+      } catch (_) {
+        /* still show locally */
+      }
+    }
+    if (item.item_type === "html" && item.page_id) {
+      const tapi = window.EAP_TEACHER_TEACHING_PAGES;
+      if (tapi) {
+        try {
+          const page = await tapi.getPage(item.page_id);
+          renderHtmlLessonOnCanvas(page.html_content, page.title, item.page_id);
+          return;
+        } catch (_) {
+          /* fall through */
+        }
+      }
+    }
+    if (item.item_type === "file") {
+      renderFileOnCanvas(item);
+    }
+  }
+
+  function renderFileOnCanvas(item) {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas) return;
+    stopActivityStatsPoll();
+    const base = (getLiveApi() && getLiveApi().API_BASE) || window.location.origin;
+    const downloadUrl = item.download_url || classroomDisplayFileUrl(item, base);
+    const previewPdfUrl = item.preview_pdf_url || "";
+    const ext = (item.file_ext || "").toLowerCase();
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
+    const mount = window.EAP_mountFileViewer;
+    if (typeof mount === "function") {
+      void mount(canvas, {
+        url: downloadUrl,
+        downloadUrl,
+        previewPdfUrl,
+        ext,
+        title: item.title || item.file_name,
+        downloadLabel: t("tlive_display_download"),
+        openLabel: t("tlive_display_open_file"),
+        previewHint: t("tlive_preview_unavailable_hint"),
+        officeHint: t("tlive_office_embed_hint"),
+        lead: t("tlive_display_file_lead"),
+      });
+      return;
+    }
+    canvas.innerHTML = `
+      <div class="tlive-file-display">
+        <h2>${escapeHtml(item.title || item.file_name)}</h2>
+        <a class="btn-primary" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(t("tlive_display_open_file"))}</a>
+      </div>`;
+  }
+
+  async function deleteDisplayLibraryItem(id) {
+    const api = getDisplayApi();
+    if (!api || !window.confirm(t("tlive_display_delete_confirm"))) return;
+    try {
+      const res = await api.deleteItem(id);
+      displayLibrary.items = displayLibrary.items.filter((i) => String(i.id) !== String(id));
+      if (res.cleared_active || String(displayLibrary.activeId) === String(id)) {
+        displayLibrary.activeId = null;
+        const ctx = contextFromUrl();
+        renderWelcome(ctx);
+      }
+      renderDisplayLibraryList();
+    } catch (err) {
+      updateLaunchStatus((err && err.message) || t("tlive_display_delete_failed"), false);
+    }
+  }
+
+  function bindDisplayLibrary(ctx) {
+    document.getElementById("tlive-display-upload-btn")?.addEventListener("click", () => {
+      document.getElementById("tlive-display-file-input")?.click();
+    });
+    document.getElementById("tlive-display-file-input")?.addEventListener("change", (ev) => {
+      const files = ev.target.files;
+      if (!files || !files.length) return;
+      void (async () => {
+        const api = getDisplayApi();
+        if (!api) return;
+        for (const file of files) {
+          try {
+            const item = await api.uploadFile(displayLibrary.className || ctx.className, file);
+            displayLibrary.items.push(item);
+            await showDisplayLibraryItem(item, true);
+          } catch (err) {
+            updateLaunchStatus((err && err.message) || t("tlive_display_upload_failed"), false);
+          }
+        }
+        renderDisplayLibraryList();
+        ev.target.value = "";
+      })();
+    });
+  }
+
+  async function addHtmlToDisplayLibrary(className, pageId, title, activate) {
+    const api = getDisplayApi();
+    if (!api) return null;
+    try {
+      const item = await api.addHtmlPage(className, pageId, title);
+      if (displayLibrary.className === className) {
+        const exists = displayLibrary.items.some((i) => String(i.id) === String(item.id));
+        if (!exists) displayLibrary.items.push(item);
+        renderDisplayLibraryList();
+      }
+      if (activate) await showDisplayLibraryItem(item, true);
+      return item;
+    } catch (_) {
+      return null;
+    }
   }
 
   async function launchToStudents(question, boardState, launchMeta) {
@@ -2442,7 +2810,10 @@
         setActiveTool(tool);
         if (tool === "games") showGamesTool();
         else if (tool === "wheel") renderNameWheelTool(ctx);
-        else if (tool === "slides") renderWelcome(ctx);
+        else if (tool === "slides") {
+          void pushSlidesDisplay();
+          renderWelcome(ctx);
+        }
         else if (tool === "poll" || tool === "quiz") {
           const q = MOCK.MOCK_QUESTIONS[0];
           const canvas = document.getElementById("tlive-canvas-inner");
@@ -2522,8 +2893,18 @@
 
     bindToolbar(ctx);
     bindModal();
+    bindDisplayLibrary(ctx);
     setActiveTool("slides");
-    renderWelcome(ctx);
+    void (async () => {
+      await loadDisplayLibrary(ctx);
+      if (displayLibrary.activeId) {
+        await ensureLiveSession(ctx);
+        const active = displayLibrary.items.find((i) => i.id === displayLibrary.activeId);
+        if (active) await showDisplayLibraryItem(active, true);
+      } else {
+        renderWelcome(ctx);
+      }
+    })();
   }
 
   function boot() {
@@ -2624,6 +3005,17 @@
       });
     });
   }
+
+  window.EAP_TEACHER_LIVE = {
+    pushHtmlLessonToClass,
+    pushDisplayToClass,
+    pushSlidesDisplay,
+    renderHtmlLessonOnCanvas,
+    stopActivityStatsPoll,
+    addHtmlToDisplayLibrary,
+    loadDisplayLibrary,
+    showDisplayLibraryItem,
+  };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

@@ -60,6 +60,20 @@
             <button type="button" class="btn-secondary" id="slive-refresh" data-i18n="slive_refresh">Refresh</button>
           </section>
 
+          <section id="slive-lesson" class="slive-card slive-lesson hidden">
+            <h2 id="slive-lesson-title" class="slive-lesson__title"></h2>
+            <p id="slive-lesson-hint" class="slive-lesson__hint hidden" role="status"></p>
+            <p id="slive-lesson-actions" class="slive-lesson__actions hidden">
+              <a id="slive-lesson-download" class="btn-secondary btn-small" href="#" target="_blank" rel="noopener"></a>
+            </p>
+            <div id="slive-file-viewer" class="slive-file-viewer hidden"></div>
+            <iframe id="slive-lesson-frame" class="slive-lesson__frame" title="Live lesson" sandbox="allow-scripts allow-same-origin"></iframe>
+          </section>
+
+          <section id="slive-slides" class="slive-card slive-slides hidden">
+            <p data-i18n="slive_slides_wait">Your teacher is showing slides on the classroom display.</p>
+          </section>
+
           <section id="slive-question" class="slive-card hidden">
             <p id="slive-game-badge" class="slive-game-badge hidden" aria-hidden="true"></p>
             <p id="slive-game-context" class="slive-game-context hidden" aria-hidden="true"></p>
@@ -77,6 +91,9 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="app.js"></script>
+    <script src="js/eap-html-bridge.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.9.0/mammoth.browser.min.js"></script>
+    <script src="js/eap-file-viewer.js"></script>
     <script src="js/live-teaching-api.js"></script>
     <script src="js/student-live.js"></script>
   </body>

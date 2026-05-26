@@ -57,9 +57,29 @@
                 <label for="tla-source" data-i18n="tla_source_label">Source notes (paste text)</label>
                 <textarea id="tla-source" rows="8" placeholder="Optional: paste lecture notes, reading excerpt, or vocabulary list…"></textarea>
               </div>
+              <div class="tla-field tla-source-upload">
+                <span class="tla-source-upload__label" data-i18n="tla_source_files_label">Source files (upload)</span>
+                <p class="tla-source-upload__hint" data-i18n="tla_source_files_hint">Upload PDF, Word (.docx), or TXT. Review each file, delete mistakes, then confirm for AI.</p>
+                <input id="tla-source-file-input" type="file" class="hidden" multiple accept=".pdf,.docx,.txt,application/pdf,text/plain" />
+                <button type="button" class="btn-secondary" id="tla-source-upload-btn" data-i18n="tla_source_upload_btn">Upload files</button>
+                <ul id="tla-source-file-list" class="tla-source-file-list" aria-live="polite"></ul>
+                <button type="button" class="btn-secondary hidden" id="tla-source-confirm-btn" data-i18n="tla_source_confirm_btn">Confirm sources for AI</button>
+                <p id="tla-source-files-status" class="tla-status hidden" role="status"></p>
+              </div>
+              <dialog id="tla-source-preview-dialog" class="tla-source-preview-dialog">
+                <div class="tla-source-preview-dialog__inner">
+                  <h3 id="tla-source-preview-title" class="tla-source-preview-dialog__title"></h3>
+                  <pre id="tla-source-preview-body" class="tla-source-preview-dialog__body"></pre>
+                  <button type="button" class="btn-secondary" id="tla-source-preview-close" data-i18n="tla_source_preview_close">Close</button>
+                </div>
+              </dialog>
               <div class="tla-field">
                 <label for="tla-instructions" data-i18n="tla_instructions_label">Extra instructions for AI</label>
                 <textarea id="tla-instructions" rows="3" placeholder="Optional: focus on discussion, include a gap-fill activity…"></textarea>
+              </div>
+              <div class="tla-field">
+                <label for="tla-template" data-i18n="tla_template_label">Lesson template</label>
+                <select id="tla-template"></select>
               </div>
               <div class="tla-field">
                 <label for="tla-level" data-i18n="tla_level_label">Student level</label>
@@ -77,6 +97,7 @@
                 <button type="button" class="btn-primary" id="tla-generate-btn" data-i18n="tla_generate_btn">Generate HTML lesson</button>
                 <button type="button" class="btn-secondary" id="tla-save-btn" data-i18n="tla_save_btn">Save to library</button>
                 <button type="button" class="btn-secondary" id="tla-present-btn" data-i18n="tla_present_btn">Open preview tab</button>
+                <button type="button" class="btn-secondary" id="tla-push-class-btn" data-i18n="tla_push_class">Push to classroom</button>
               </div>
               <p id="tla-status" class="tla-status hidden" role="status" aria-live="polite"></p>
             </aside>
@@ -107,6 +128,10 @@
     <script src="api-config.js"></script>
     <script src="app.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
+    <script src="js/live-teaching-api.js"></script>
+    <script src="js/eap-html-bridge.js"></script>
+    <script src="js/eap-file-viewer.js"></script>
+    <script src="js/classroom-display-api.js"></script>
     <script src="js/teacher-lesson-ai.js"></script>
   </body>
 </html>

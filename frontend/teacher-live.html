@@ -13,6 +13,7 @@
     />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="css/teacher-live.css" />
+    <link rel="stylesheet" href="css/teacher-lesson-ai.css" />
   </head>
   <body class="page-app eap-shell-active" data-page="teacher-live">
     <div id="page-shell" class="page-shell">
@@ -91,6 +92,14 @@
                 <div id="tlive-canvas-inner" class="tlive-canvas__inner"></div>
               </section>
             </div>
+
+            <aside class="tlive-display-library" aria-labelledby="tlive-display-library-heading">
+              <h2 id="tlive-display-library-heading" class="tlive-display-library__title" data-i18n="tlive_display_library">Display library</h2>
+              <p class="tlive-display-library__hint" data-i18n="tlive_display_library_hint">Prepare HTML lessons and files for this class. They stay here until you delete them.</p>
+              <input id="tlive-display-file-input" type="file" class="hidden" multiple accept=".pdf,.ppt,.pptx,.doc,.docx,.txt" />
+              <button type="button" class="btn-secondary btn-small" id="tlive-display-upload-btn" data-i18n="tlive_display_upload">Upload file</button>
+              <ul id="tlive-display-list" class="tlive-display-list" aria-live="polite"></ul>
+            </aside>
           </div>
         </div>
       </div>
@@ -118,6 +127,10 @@
     <script src="js/teacher-name-wheel.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/teacher-lesson-ai.js"></script>
+    <script src="js/eap-html-bridge.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.9.0/mammoth.browser.min.js"></script>
+    <script src="js/eap-file-viewer.js"></script>
+    <script src="js/classroom-display-api.js"></script>
     <script src="js/teacher-live.js"></script>
   </body>
 </html>

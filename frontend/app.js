@@ -325,6 +325,11 @@ function initAppPageHeader() {
   }
 }
 
+function initStudentTeachingPagesNavLink() {
+  const link = document.getElementById("student-teaching-pages-link");
+  if (link) link.classList.remove("hidden");
+}
+
 /** Phase S1 — show AI Self-Study entry when feature flag is on. */
 function initStudentSelfStudyNavLink() {
   if (window.EAP_SELF_STUDY_ENABLED === false) return;
@@ -6388,6 +6393,7 @@ function initStudentPage() {
       saveUserToSession(sessionUser);
       await ensureAcademicCalendarLoaded();
       initAppPageHeader();
+      initStudentTeachingPagesNavLink();
       initStudentSelfStudyNavLink();
     } catch (err) {
       console.error("Student page boot failed:", err);
