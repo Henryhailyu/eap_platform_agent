@@ -604,7 +604,8 @@ window.EAP_STRINGS_ZH = {
   "tla_preview_empty": "生成课时后在此预览 HTML。",
   "tla_saved_title": "已保存的教学页",
   "tla_ai_ready": "AI 课时生成器已就绪。",
-  "tla_ai_unavailable": "AI 未配置。请在 backend/.env 添加 API Key 并重启 Flask。",
+  "tla_ai_unavailable":
+    "本服务器未配置 AI。Render：控制台 → eap-platform-pilot → Environment → 设置 EAP_AI_ENABLED=1 和 EAP_DEEPSEEK_API_KEY（或 EAP_OPENAI_API_KEY），然后重新部署。本地：backend/.env",
   "tla_generating": "正在生成课时… 可能需要约一分钟。",
   "tla_generated_ok": "已生成 — 请预览，满意后再保存。",
   "tla_no_interactive_warn": "此 HTML 没有互动块（data-eap-id）。请重新生成 — 学生只能观看，无法提交答案。",

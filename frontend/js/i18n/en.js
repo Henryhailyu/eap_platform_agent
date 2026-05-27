@@ -604,7 +604,8 @@ window.EAP_STRINGS_EN = {
   "tla_preview_empty": "Generate a lesson to see the HTML preview here.",
   "tla_saved_title": "Saved teaching pages",
   "tla_ai_ready": "AI lesson generator is ready.",
-  "tla_ai_unavailable": "AI is not configured. Add API keys in backend/.env and restart Flask.",
+  "tla_ai_unavailable":
+    "AI is not configured on this server. On Render: Dashboard → eap-platform-pilot → Environment → set EAP_AI_ENABLED=1 and EAP_DEEPSEEK_API_KEY (or EAP_OPENAI_API_KEY), then redeploy. Local: backend/.env",
   "tla_generating": "Generating lesson… this may take up to a minute.",
   "tla_generated_ok": "Lesson generated — review the preview, then save if you are happy.",
   "tla_no_interactive_warn": "This HTML has no interactive blocks (data-eap-id). Regenerate — students can view it but cannot submit answers.",

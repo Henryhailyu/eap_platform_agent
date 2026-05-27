@@ -2888,7 +2888,14 @@
     if (back) {
       const q = new URLSearchParams();
       if (ctx.className) q.set("class", ctx.className);
-      back.href = `teacher.html${q.toString() ? `?${q.toString()}` : ""}`;
+      const backHref = `teacher.html${q.toString() ? `?${q.toString()}` : ""}`;
+      back.href = backHref;
+      back.addEventListener("click", (ev) => {
+        if (typeof window.EAP_warmNavigate === "function" && /onrender\.com$/i.test(location.hostname || "")) {
+          ev.preventDefault();
+          window.EAP_warmNavigate(backHref);
+        }
+      });
     }
 
     bindToolbar(ctx);

@@ -97,4 +97,29 @@
       return attempt(1);
     }
   });
+
+  /** Wake Render before navigation (avoids 502 HTML page when service was sleeping). */
+  function warmNavigate(url) {
+    if (!url) return;
+    if (host.indexOf("onrender.com") === -1) {
+      window.location.href = url;
+      return;
+    }
+    showOverlay();
+    setStatus("Starting server before navigation…");
+    checkHealth().then(function (ok) {
+      if (ok) {
+        hideOverlay();
+        window.location.href = url;
+        return;
+      }
+      return attempt(1).then(function () {
+        window.location.href = url;
+      });
+    });
+  }
+
+  if (typeof window !== "undefined") {
+    window.EAP_warmNavigate = warmNavigate;
+  }
 })();

@@ -37,9 +37,19 @@ services:
         value: /data/submissions
       - key: EAP_SECRET_KEY
         generateValue: true
-      # Optional: set in dashboard to pin a custom domain. If unset, app uses RENDER_EXTERNAL_URL.
       - key: EAP_PUBLIC_URL
+        value: https://eap-platform-pilot.onrender.com
+      # Phase K AI — set EAP_DEEPSEEK_API_KEY (or EAP_OPENAI_API_KEY) in Render Dashboard (Secret).
+      - key: EAP_AI_ENABLED
+        value: "1"
+      - key: EAP_AI_PROVIDER
+        value: deepseek
+      - key: EAP_DEEPSEEK_API_KEY
         sync: false
+      - key: EAP_DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com
+      - key: EAP_DEEPSEEK_MODEL
+        value: deepseek-chat
     disk:
       name: eap-data
       mountPath: /data

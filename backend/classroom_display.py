@@ -172,12 +172,20 @@ def ensure_pdf_preview(upload_dir: str, file_path: str) -> str | None:
     return preview_rel if os.path.isfile(alt) else None
 
 
-def enrich_file_item(item: dict, request_host_url: str = "", upload_dir: str | None = None) -> dict:
+def enrich_file_item(
+    item: dict,
+    request_host_url: str = "",
+    upload_dir: str | None = None,
+    *,
+    build_preview: bool = True,
+) -> dict:
     if str(item.get("item_type") or "").lower() != "file":
         return item
     fp = item.get("file_path") or ""
     item["download_url"] = display_file_public_url(fp, request_host_url)
-    preview_rel = ensure_pdf_preview(upload_dir, fp) if upload_dir and fp else None
+    preview_rel = (
+        ensure_pdf_preview(upload_dir, fp) if upload_dir and fp and build_preview else None
+    )
     item["preview_pdf_url"] = display_file_public_url(preview_rel, request_host_url) if preview_rel else ""
     return item
 
@@ -397,7 +405,9 @@ def register_classroom_display_routes(app):
                 conn.commit()
                 row = conn.execute(_ITEM_SELECT + " WHERE id = ?", (cur.lastrowid,)).fetchone()
                 ud = _upload_dir()
-                item = enrich_file_item(item_row_to_dict(row), request.host_url, ud)
+                item = enrich_file_item(
+                    item_row_to_dict(row), request.host_url, ud, build_preview=False
+                )
                 return jsonify({"item": item}), 201
 
             return jsonify({"error": "Provide page_id or file upload"}), 400

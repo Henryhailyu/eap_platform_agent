@@ -72,6 +72,7 @@ Blueprint syncs from `main` automatically, or **Manual Deploy** on the service.
 |----------|-------------|
 | `EAP_PUBLIC_URL` | `https://eap-platform-pilot.onrender.com` (pin CORS; optional) |
 | `GUNICORN_WORKERS` | `1` (default; required for SQLite) |
+| `EAP_AI_ENABLED` + `EAP_DEEPSEEK_API_KEY` | **Required** for AI lesson generator on Render — see [`RENDER_ENV_SETUP.md`](RENDER_ENV_SETUP.md) |
 
 ---
 

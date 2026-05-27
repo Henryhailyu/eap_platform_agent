@@ -655,7 +655,22 @@
     bindFullPage(ctx);
 
     const back = document.getElementById("tla-back-live");
-    if (back && ctx.className) back.href = `teacher-live.html?class=${encodeURIComponent(ctx.className)}`;
+    if (back && ctx.className) {
+      const backHref = `teacher-live.html?class=${encodeURIComponent(ctx.className)}`;
+      back.href = backHref;
+      back.addEventListener("click", (ev) => {
+        if (typeof global.EAP_warmNavigate === "function" && /onrender\.com$/i.test(location.hostname || "")) {
+          ev.preventDefault();
+          global.EAP_warmNavigate(backHref);
+        }
+      });
+    }
+    document.querySelector(".site-logo[href='teacher.html']")?.addEventListener("click", (ev) => {
+      if (typeof global.EAP_warmNavigate === "function" && /onrender\.com$/i.test(location.hostname || "")) {
+        ev.preventDefault();
+        global.EAP_warmNavigate("teacher.html");
+      }
+    });
 
     if (global.EAP_I18N) global.EAP_I18N.applyStatic();
   }

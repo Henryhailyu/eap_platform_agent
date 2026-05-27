@@ -5,6 +5,9 @@ cd /app/backend
 DATA_DIR="${EAP_DATA_DIR:-/data}"
 SEED_MARKER="${DATA_DIR}/.eap_seeded"
 
+UPLOAD_ROOT="${EAP_UPLOAD_DIR:-/data/uploads}"
+mkdir -p "${UPLOAD_ROOT}/classroom-display/previews" "${EAP_SUBMISSIONS_DIR:-/data/submissions}"
+
 echo "EAP pilot: initializing database at ${EAP_DATABASE_PATH:-/data/eap_platform.db}"
 python -c "from app import init_database; init_database()"
 
@@ -39,4 +42,4 @@ fi
 WORKERS="${GUNICORN_WORKERS:-1}"
 BIND="0.0.0.0:${PORT:-5051}"
 echo "EAP pilot: starting gunicorn on ${BIND} (${WORKERS} workers)"
-exec gunicorn -w "${WORKERS}" -b "${BIND}" --access-logfile - --error-logfile - wsgi:app
+exec gunicorn -w "${WORKERS}" -b "${BIND}" --timeout 120 --access-logfile - --error-logfile - wsgi:app

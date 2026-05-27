@@ -266,6 +266,13 @@ def get_db_connection():
 def ensure_uploads_directory():
     """Create backend/uploads/ if it does not exist (safe to call every startup)."""
     os.makedirs(UPLOAD_DIR, exist_ok=True)
+    try:
+        from classroom_display import classroom_display_upload_dir, previews_dir
+
+        ud = classroom_display_upload_dir(UPLOAD_DIR)
+        previews_dir(ud)
+    except Exception:
+        pass
 
 
 def ensure_submissions_directory():

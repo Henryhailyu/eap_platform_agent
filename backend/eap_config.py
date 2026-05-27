@@ -115,7 +115,7 @@ class EapConfig:
 
     CORS_ORIGINS: list[str] = _parse_cors_origins(
         os.environ.get("EAP_CORS_ORIGINS"),
-        (os.environ.get("EAP_PUBLIC_URL") or "").strip().rstrip("/") or None,
+        PUBLIC_URL,
     )
 
     SESSION_COOKIE_SECURE: bool = _env_bool("EAP_SESSION_COOKIE_SECURE") or IS_PRODUCTION
@@ -182,4 +182,11 @@ def validate_production_config() -> None:
         log.warning(
             "Production without EAP_REQUIRE_SESSION_IDENTITY and EAP_ENFORCE_MEMBERSHIP "
             "is not recommended for a public pilot."
+        )
+    if config.AI_ENABLED and not (
+        config.DEEPSEEK_API_KEY or config.OPENAI_API_KEY
+    ):
+        log.warning(
+            "EAP_AI_ENABLED=1 but no EAP_DEEPSEEK_API_KEY or EAP_OPENAI_API_KEY — "
+            "AI lesson generator and coaches will return 503 until a key is set in the host dashboard."
         )
