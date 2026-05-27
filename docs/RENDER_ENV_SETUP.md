@@ -83,6 +83,14 @@ Render **Starter** sleeps after ~15 minutes without traffic. The first request m
 2. **Live Teaching** → Display library → **Upload file** (PDF small test).
 3. If error: browser **DevTools → Network** → failed request → note status (401 / 413 / 500).
 
+### PPT shows Microsoft “can’t open this” error
+
+**Cause:** Old builds used Office Online embed; Microsoft cannot read login-protected files on Render.
+
+**Fix (after latest deploy):** Click the PPT again — the app converts it to **PDF on the server** (LibreOffice in Docker). Wait up to ~30 s for “Converting to PDF preview…”.
+
+If conversion fails, use **Download** or re-upload a smaller/simpler PPT.
+
 ### Common errors
 
 | Status | Meaning |

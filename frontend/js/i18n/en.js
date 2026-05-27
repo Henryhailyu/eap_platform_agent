@@ -715,6 +715,7 @@ window.EAP_STRINGS_EN = {
   "tlive_display_download": "Download",
   "tlive_office_embed_hint": "PPT/Word preview uses Microsoft Office Online. On localhost (127.0.0.1), use Download or deploy to HTTPS for embedded slides.",
   "tlive_preview_unavailable_hint": "Inline preview needs LibreOffice on the server (soffice) for slides, or use Download. Word (.docx) previews in the browser when possible.",
+  "tlive_preview_converting": "Converting to PDF preview… This may take up to 30 seconds.",
   "slive_preview_unavailable_hint": "Preview is not available for this file. Use Download to open it on your device.",
   "tlive_display_delete_confirm": "Remove this item from the display library?",
   "tlive_display_delete_failed": "Could not delete display item.",

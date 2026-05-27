@@ -4,11 +4,14 @@ K6d — persistent classroom display library per class (HTML + uploaded files).
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
 import uuid
 from datetime import datetime, timezone
+
+log = logging.getLogger("eap.classroom_display")
 
 OFFICE_TO_PDF_EXTS = frozenset({"ppt", "pptx", "doc", "docx"})
 ALLOWED_DISPLAY_FILE_EXTENSIONS = frozenset({"pdf", "ppt", "pptx", "doc", "docx", "txt"})
@@ -156,20 +159,36 @@ def ensure_pdf_preview(upload_dir: str, file_path: str) -> str | None:
         return preview_rel
     soffice = _find_soffice_binary()
     if not soffice:
+        log.warning("LibreOffice (soffice) not found — cannot preview %s", rel)
         return None
+    profile_dir = os.path.join("/tmp", f"lo_profile_{os.getpid()}")
+    os.makedirs(profile_dir, exist_ok=True)
+    cmd = [
+        soffice,
+        "--headless",
+        "--norestore",
+        "--invisible",
+        f"-env:UserInstallation=file://{profile_dir}",
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        out_dir,
+        src,
+    ]
     try:
-        subprocess.run(
-            [soffice, "--headless", "--convert-to", "pdf", "--outdir", out_dir, src],
-            capture_output=True,
-            timeout=120,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
+        proc = subprocess.run(cmd, capture_output=True, timeout=120, check=False)
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or b"").decode("utf-8", errors="replace")[:500]
+            log.warning("soffice convert failed (%s): %s", proc.returncode, err)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        log.warning("soffice convert error: %s", exc)
         return None
     if os.path.isfile(dest):
         return preview_rel
-    alt = os.path.join(out_dir, preview_name)
-    return preview_rel if os.path.isfile(alt) else None
+    for name in os.listdir(out_dir):
+        if name.lower().endswith(".pdf") and name.startswith(os.path.splitext(base_name)[0]):
+            return f"{DISPLAY_FILE_SUBDIR}/previews/{name}"
+    return None
 
 
 def enrich_file_item(
@@ -490,6 +509,65 @@ def register_classroom_display_routes(app):
             item = enrich_file_item(item_row_to_dict(row), request.host_url, ud)
             display = item_display_payload(item, request.host_url, ud)
             return jsonify({"item": item, "display": display, "active_item_id": item_id})
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/classroom-display/<int:item_id>/ensure-preview", methods=["POST"])
+    def teacher_classroom_display_ensure_preview(item_id):
+        """Build PDF preview for PPT/DOC (LibreOffice). Used after upload on Render."""
+        from app import (
+            enforce_teacher_class_access_if_enabled,
+            get_db_connection,
+            get_effective_teacher_username,
+            require_session_role_if_enabled,
+            should_enforce_membership,
+            should_require_session_identity,
+        )
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+
+            row = conn.execute(_ITEM_SELECT + " WHERE id = ?", (item_id,)).fetchone()
+            if not row:
+                return jsonify({"error": "Not found"}), 404
+
+            teacher_username = get_effective_teacher_username(
+                conn, (request.get_json(silent=True) or {}).get("teacher_username")
+            )
+            if should_require_session_identity() or should_enforce_membership():
+                if not teacher_username:
+                    return jsonify({"error": "teacher_username is required"}), 400
+                err = enforce_teacher_class_access_if_enabled(conn, teacher_username, row["class_name"])
+                if err is not None:
+                    return err
+
+            item_raw = item_row_to_dict(row)
+            if str(item_raw.get("item_type") or "").lower() != "file":
+                return jsonify({"error": "Not a file item"}), 400
+
+            ud = _upload_dir()
+            ext = (item_raw.get("file_ext") or "").lower()
+            preview_rel = ensure_pdf_preview(ud, item_raw.get("file_path") or "")
+            item = enrich_file_item(item_raw, request.host_url, ud, build_preview=True)
+            preview_ready = bool(item.get("preview_pdf_url"))
+            soffice_ok = _find_soffice_binary() is not None
+            message = ""
+            if ext in OFFICE_TO_PDF_EXTS and not preview_ready:
+                if not soffice_ok:
+                    message = "LibreOffice is not installed on the server."
+                else:
+                    message = "Could not convert this file to PDF for preview. Try Download or re-upload."
+            return jsonify(
+                {
+                    "item": item,
+                    "display": item_display_payload(item, request.host_url, ud),
+                    "preview_ready": preview_ready,
+                    "message": message,
+                }
+            )
         finally:
             conn.close()
 

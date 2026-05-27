@@ -220,16 +220,21 @@
     const wrap = document.getElementById("slive-file-viewer");
     if (wrap && typeof mount === "function") {
       wrap.classList.remove("hidden");
+      let viewExt = ext;
+      let viewPreview = previewPdfUrl;
+      if (!viewPreview && String(display.mode || "").toLowerCase() === "pdf" && fileUrl) {
+        viewPreview = fileUrl;
+        viewExt = "pdf";
+      }
       void mount(wrap, {
         url: downloadUrl,
         downloadUrl,
-        previewPdfUrl,
-        ext,
+        previewPdfUrl: viewPreview,
+        ext: viewExt,
         title,
         downloadLabel: t("slive_download_file"),
         openLabel: t("slive_open_file"),
         previewHint: t("slive_preview_unavailable_hint"),
-        officeHint: t("slive_office_embed_hint"),
       });
       if (lessonFrame) {
         lessonFrame.classList.add("hidden");
@@ -243,10 +248,9 @@
     if (lessonFrame) {
       lessonFrame.classList.remove("hidden");
       lessonFrame.removeAttribute("srcdoc");
-      if (mode === "pdf" || mode === "text") {
-        lessonFrame.src = fileUrl;
-      } else if ((mode === "presentation" || mode === "office") && window.EAP_officeEmbedUrl) {
-        lessonFrame.src = window.EAP_officeEmbedUrl(fileUrl);
+      const viewSrc = previewPdfUrl || (mode === "pdf" || mode === "text" ? fileUrl : "");
+      if (viewSrc) {
+        lessonFrame.src = viewSrc;
       } else {
         lessonFrame.removeAttribute("src");
       }

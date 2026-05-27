@@ -1,9 +1,8 @@
 /**
  * Classroom display file viewer — inline PDF/TXT, LibreOffice PDF preview, DOCX (mammoth), download.
+ * Does not use Microsoft Office Online (files on Render require login; Office cannot fetch them).
  */
 (function (global) {
-  const OFFICE_EMBED = "https://view.officeapps.live.com/op/embed.aspx?src=";
-
   function fileDisplayMode(ext) {
     const e = String(ext || "").toLowerCase();
     if (e === "pdf") return "pdf";
@@ -11,19 +10,6 @@
     if (e === "ppt" || e === "pptx") return "presentation";
     if (e === "doc" || e === "docx") return "office";
     return "download";
-  }
-
-  function isLocalDevHost(url) {
-    try {
-      const h = new URL(url, global.location.origin).hostname;
-      return h === "127.0.0.1" || h === "localhost";
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function officeEmbedUrl(fileUrl) {
-    return OFFICE_EMBED + encodeURIComponent(fileUrl);
   }
 
   function downloadUrl(fileUrl) {
@@ -74,15 +60,20 @@
     </div>`;
   }
 
-  function loadingMarkup(title, dlHref, dlLabel) {
+  function loadingMarkup(title, dlHref, dlLabel, statusText) {
     return `<div class="eap-file-viewer eap-file-viewer--loading">
       ${headMarkup(title, dlHref, dlLabel)}
-      <p class="eap-file-viewer__hint">Loading preview…</p>
+      <p class="eap-file-viewer__hint">${escapeHtml(statusText || "Loading preview…")}</p>
     </div>`;
   }
 
+  function needsServerPdfPreview(ext) {
+    const e = String(ext || "").toLowerCase();
+    return e === "ppt" || e === "pptx" || e === "doc" || e === "doc";
+  }
+
   /**
-   * @param {{ url?: string, downloadUrl?: string, previewPdfUrl?: string, ext?: string, title?: string, downloadLabel?: string, openLabel?: string, officeHint?: string, previewHint?: string }} opts
+   * @param {{ url?: string, downloadUrl?: string, previewPdfUrl?: string, ext?: string, title?: string, downloadLabel?: string, openLabel?: string, previewHint?: string, loadingHint?: string }} opts
    */
   function buildFileViewerMarkup(opts) {
     const o = opts && typeof opts === "object" ? opts : {};
@@ -99,25 +90,18 @@
     if (previewPdf) {
       return embedMarkup(title, dlHref, dlLabel, previewPdf);
     }
-    if (
-      (fileDisplayMode(ext) === "presentation" || fileDisplayMode(ext) === "office") &&
-      downloadSrc &&
-      !isLocalDevHost(downloadSrc)
-    ) {
-      return embedMarkup(title, dlHref, dlLabel, officeEmbedUrl(downloadSrc));
-    }
     return fallbackMarkup(
       title,
       dlHref,
       dlLabel,
       downloadSrc,
       o.openLabel || "Open file",
-      o.previewHint || o.officeHint || o.lead || ""
+      o.previewHint || o.lead || ""
     );
   }
 
   /**
-   * Mount viewer into a container (async for DOCX mammoth).
+   * Mount viewer into a container (async for DOCX mammoth + optional preview build).
    * @param {HTMLElement} container
    * @param {object} opts
    */
@@ -125,13 +109,12 @@
     if (!container) return;
     const o = opts && typeof opts === "object" ? opts : {};
     const ext = String(o.ext || "").toLowerCase();
-    const downloadSrc = String(o.downloadUrl || o.url || "");
-    const previewPdf = String(o.previewPdfUrl || "");
+    let downloadSrc = String(o.downloadUrl || o.url || "");
+    let previewPdf = String(o.previewPdfUrl || "");
     const title = o.title || "";
     const dlLabel = o.downloadLabel || "Download file";
     const openLabel = o.openLabel || "Open file";
-    const dlHref = downloadUrl(downloadSrc);
-    const mode = fileDisplayMode(ext);
+    let dlHref = downloadUrl(downloadSrc);
 
     if (!downloadSrc && !previewPdf) {
       container.innerHTML = `<p class="eap-file-viewer__hint">${escapeHtml(o.lead || "No file URL.")}</p>`;
@@ -143,13 +126,30 @@
       return;
     }
 
+    if (needsServerPdfPreview(ext) && !previewPdf && typeof o.ensurePreview === "function") {
+      container.innerHTML = loadingMarkup(
+        title,
+        dlHref,
+        dlLabel,
+        o.loadingHint || "Converting to PDF preview…"
+      );
+      try {
+        const built = await o.ensurePreview();
+        if (built && built.previewPdfUrl) previewPdf = built.previewPdfUrl;
+        if (built && built.downloadUrl) downloadSrc = built.downloadUrl;
+        dlHref = downloadUrl(downloadSrc);
+      } catch (_) {
+        /* fall through to fallback */
+      }
+    }
+
     if (previewPdf) {
       container.innerHTML = embedMarkup(title, dlHref, dlLabel, previewPdf);
       return;
     }
 
     if ((ext === "doc" || ext === "docx") && global.mammoth && downloadSrc) {
-      container.innerHTML = loadingMarkup(title, dlHref, dlLabel);
+      container.innerHTML = loadingMarkup(title, dlHref, dlLabel, o.loadingHint || "Loading document…");
       try {
         const resp = await fetch(downloadSrc, { credentials: "same-origin" });
         if (!resp.ok) throw new Error("fetch failed");
@@ -169,26 +169,18 @@
       return;
     }
 
-    if (
-      (mode === "presentation" || mode === "office") &&
-      downloadSrc &&
-      !isLocalDevHost(downloadSrc)
-    ) {
-      container.innerHTML = embedMarkup(title, dlHref, dlLabel, officeEmbedUrl(downloadSrc));
-      return;
-    }
-
-    const hint =
-      o.previewHint ||
-      (mode === "presentation" || mode === "office"
-        ? o.officeHint || ""
-        : o.lead || "");
-    container.innerHTML = fallbackMarkup(title, dlHref, dlLabel, downloadSrc, openLabel, hint);
+    container.innerHTML = fallbackMarkup(
+      title,
+      dlHref,
+      dlLabel,
+      downloadSrc,
+      openLabel,
+      o.previewHint || ""
+    );
   }
 
   global.EAP_fileDisplayMode = fileDisplayMode;
   global.EAP_buildFileViewerMarkup = buildFileViewerMarkup;
   global.EAP_mountFileViewer = mountFileViewer;
-  global.EAP_officeEmbedUrl = officeEmbedUrl;
   global.EAP_fileDownloadUrl = downloadUrl;
 })(typeof window !== "undefined" ? window : globalThis);

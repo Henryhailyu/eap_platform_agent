@@ -85,11 +85,25 @@
     return readJson(response);
   }
 
+  async function ensurePreview(itemId) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/teacher/classroom-display/${encodeURIComponent(itemId)}/ensure-preview`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({}),
+      },
+    );
+    return readJson(response);
+  }
+
   global.EAP_CLASSROOM_DISPLAY = {
     listItems,
     addHtmlPage,
     uploadFile,
     deleteItem,
     activateItem,
+    ensurePreview,
   };
 })(typeof window !== "undefined" ? window : globalThis);

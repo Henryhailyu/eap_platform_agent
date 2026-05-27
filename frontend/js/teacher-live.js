@@ -632,6 +632,13 @@
     });
   }
 
+  function mergeDisplayLibraryItem(updated) {
+    if (!updated || updated.id == null) return;
+    const idx = displayLibrary.items.findIndex((i) => String(i.id) === String(updated.id));
+    if (idx >= 0) displayLibrary.items[idx] = { ...displayLibrary.items[idx], ...updated };
+    else displayLibrary.items.push(updated);
+  }
+
   async function showDisplayLibraryItem(item, pushLive) {
     const api = getDisplayApi();
     if (!item) return;
@@ -640,6 +647,10 @@
     if (api && pushLive) {
       try {
         const res = await api.activateItem(item.id);
+        if (res.item) {
+          mergeDisplayLibraryItem(res.item);
+          item = res.item;
+        }
         if (res.display) await pushDisplayToClass(res.display);
       } catch (_) {
         /* still show locally */
@@ -658,39 +669,55 @@
       }
     }
     if (item.item_type === "file") {
-      renderFileOnCanvas(item);
+      await renderFileOnCanvas(item);
     }
   }
 
-  function renderFileOnCanvas(item) {
+  async function renderFileOnCanvas(item) {
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas) return;
     stopActivityStatsPoll();
     const base = (getLiveApi() && getLiveApi().API_BASE) || window.location.origin;
-    const downloadUrl = item.download_url || classroomDisplayFileUrl(item, base);
-    const previewPdfUrl = item.preview_pdf_url || "";
+    const lib = getDisplayApi();
+    const downloadUrlVal = item.download_url || classroomDisplayFileUrl(item, base);
+    let previewPdfUrl = item.preview_pdf_url || "";
     const ext = (item.file_ext || "").toLowerCase();
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
     const mount = window.EAP_mountFileViewer;
     if (typeof mount === "function") {
-      void mount(canvas, {
-        url: downloadUrl,
-        downloadUrl,
+      const ensurePreviewFn =
+        lib && typeof lib.ensurePreview === "function" && item.id
+          ? async () => {
+              const res = await lib.ensurePreview(item.id);
+              if (res.item) {
+                mergeDisplayLibraryItem(res.item);
+                return {
+                  previewPdfUrl: res.item.preview_pdf_url || "",
+                  downloadUrl: res.item.download_url || downloadUrlVal,
+                };
+              }
+              return { previewPdfUrl: "", downloadUrl: downloadUrlVal };
+            }
+          : null;
+      await mount(canvas, {
+        url: downloadUrlVal,
+        downloadUrl: downloadUrlVal,
         previewPdfUrl,
         ext,
         title: item.title || item.file_name,
         downloadLabel: t("tlive_display_download"),
         openLabel: t("tlive_display_open_file"),
         previewHint: t("tlive_preview_unavailable_hint"),
-        officeHint: t("tlive_office_embed_hint"),
+        loadingHint: t("tlive_preview_converting"),
         lead: t("tlive_display_file_lead"),
+        ensurePreview: ensurePreviewFn,
       });
       return;
     }
     canvas.innerHTML = `
       <div class="tlive-file-display">
         <h2>${escapeHtml(item.title || item.file_name)}</h2>
-        <a class="btn-primary" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(t("tlive_display_open_file"))}</a>
+        <a class="btn-primary" href="${escapeHtml(downloadUrlVal)}" target="_blank" rel="noopener">${escapeHtml(t("tlive_display_open_file"))}</a>
       </div>`;
   }
 

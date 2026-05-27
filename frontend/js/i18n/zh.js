@@ -715,6 +715,7 @@ window.EAP_STRINGS_ZH = {
   "tlive_display_download": "下载",
   "tlive_office_embed_hint": "PPT/Word 预览使用 Microsoft Office Online。在 localhost 上请用「下载」，部署到 HTTPS 后可内嵌演示。",
   "tlive_preview_unavailable_hint": "内嵌预览需要服务器安装 LibreOffice（soffice）以转换幻灯片；也可直接下载。Word（.docx）会尽量在浏览器内预览。",
+  "tlive_preview_converting": "正在转换为 PDF 预览… 最多约 30 秒。",
   "slive_preview_unavailable_hint": "无法内嵌预览此文件，请使用「下载」在本地打开。",
   "tlive_display_delete_confirm": "从展示库中删除此项？",
   "tlive_display_delete_failed": "删除展示项失败。",
