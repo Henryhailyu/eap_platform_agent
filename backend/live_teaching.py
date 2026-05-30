@@ -297,7 +297,7 @@ def _student_join_payload(conn, sess, student_username):
         "launch_id": lid,
         "launched_at": launched_at,
         "question": question,
-        "display": _display_payload(sess, request.host_url),
+        "display": _display_payload(sess),
     }
 
 
