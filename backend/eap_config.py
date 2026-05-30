@@ -118,7 +118,11 @@ class EapConfig:
         PUBLIC_URL,
     )
 
-    SESSION_COOKIE_SECURE: bool = _env_bool("EAP_SESSION_COOKIE_SECURE") or IS_PRODUCTION
+    # Default to Secure in production, but allow explicit EAP_SESSION_COOKIE_SECURE=0
+    # for HTTP-only pilots (e.g. IP:port before a domain + HTTPS is set up).
+    SESSION_COOKIE_SECURE: bool = _env_bool(
+        "EAP_SESSION_COOKIE_SECURE", "1" if IS_PRODUCTION else "0"
+    )
     SESSION_COOKIE_SAMESITE: str = os.environ.get("EAP_SESSION_COOKIE_SAMESITE", "Lax").strip() or "Lax"
     TRUST_PROXY: bool = _env_bool("EAP_TRUST_PROXY")
 
