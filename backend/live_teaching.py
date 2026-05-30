@@ -853,7 +853,6 @@ def register_live_teaching_routes(app):
 
         from app import UPLOAD_DIR, ensure_uploads_directory, get_db_connection, resolve_student_with_optional_enforcement
         from classroom_display import (
-            _ITEM_SELECT,
             classroom_display_upload_dir,
             display_file_basename,
             ensure_pdf_preview,
@@ -883,7 +882,10 @@ def register_live_teaching_routes(app):
             file_ext = str(display.get("file_ext") or "").lower()
 
             if item_id:
-                row = conn.execute(_ITEM_SELECT + " WHERE id = ?", (int(item_id),)).fetchone()
+                row = conn.execute(
+                    "SELECT item_type, file_path, file_ext FROM classroom_display_items WHERE id = ?",
+                    (int(item_id),),
+                ).fetchone()
                 if row and str(row["item_type"] or "").lower() == "file":
                     file_path = row["file_path"] or ""
                     file_ext = (row["file_ext"] or file_ext or "").lower()
