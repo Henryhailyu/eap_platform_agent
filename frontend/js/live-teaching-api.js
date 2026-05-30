@@ -190,6 +190,11 @@
     return parseJson(response);
   }
 
+  function studentDisplayFileUrl(sessionCode) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    return `${API_BASE}/api/student/live/join/${encodeURIComponent(code)}/display-file`;
+  }
+
   async function studentJoinWaitDisplay(sessionCode, displayVersion, signal) {
     const code = String(sessionCode || "").trim().toUpperCase();
     const qs = waitQuery({
@@ -217,6 +222,7 @@
     studentJoinWait,
     studentJoinWaitDisplay,
     studentFetchLesson,
+    studentDisplayFileUrl,
     studentRespond,
   };
 })(typeof window !== "undefined" ? window : globalThis);

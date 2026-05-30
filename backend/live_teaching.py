@@ -8,6 +8,7 @@ L28: long-poll wait endpoints (Render-friendly; no WebSocket required).
 K6: classroom display push (slides / HTML / material) + HTML activity responses.
 """
 import json
+import os
 import random
 import re
 import string
@@ -124,7 +125,30 @@ def _session_by_code(conn, code):
     ).fetchone()
 
 
-def _display_payload(sess):
+def _display_file_path_from_urls(display: dict) -> str:
+    """Resolve stored classroom-display path from public URLs in display payload."""
+    from urllib.parse import unquote, urlparse
+
+    from classroom_display import normalize_display_stored_path
+
+    for key in ("download_url", "file_url"):
+        url = str((display or {}).get(key) or "").strip()
+        if not url or "classroom-display" not in url:
+            continue
+        path = unquote(urlparse(url).path or "")
+        idx = path.find("classroom-display/")
+        if idx < 0:
+            continue
+        rel = path[idx:].lstrip("/")
+        if rel.startswith("classroom-display/previews/"):
+            continue
+        normalized = normalize_display_stored_path(rel)
+        if normalized:
+            return normalized
+    return ""
+
+
+def _display_payload(sess, request_host_url: str = ""):
     mode = str(sess["display_mode"] or "welcome").strip().lower()
     raw = sess["display_json"]
     meta = {}
@@ -135,7 +159,16 @@ def _display_payload(sess):
                 meta = {}
         except (TypeError, json.JSONDecodeError):
             meta = {}
-    return {
+    file_url = str(meta.get("file_url") or "").strip()
+    preview_pdf_url = str(meta.get("preview_pdf_url") or "").strip()
+    download_url = str(meta.get("download_url") or file_url or "").strip()
+    file_ext = str(meta.get("file_ext") or "").strip().lower()
+    if mode in {"presentation", "office", "upload", "material"} and preview_pdf_url:
+        mode = "pdf"
+        file_url = preview_pdf_url or file_url
+    elif mode in {"presentation", "office"} and file_ext == "pdf":
+        mode = "pdf"
+    payload = {
         "mode": mode or "welcome",
         "version": int(sess["display_version"] or 0),
         "title": str(meta.get("title") or "").strip(),
@@ -144,11 +177,25 @@ def _display_payload(sess):
         "material_label": str(meta.get("material_label") or meta.get("upload_label") or "").strip(),
         "activity_answers": meta.get("activity_answers") if isinstance(meta.get("activity_answers"), dict) else {},
         "display_item_id": meta.get("display_item_id"),
-        "file_url": str(meta.get("file_url") or "").strip(),
-        "download_url": str(meta.get("download_url") or meta.get("file_url") or "").strip(),
-        "preview_pdf_url": str(meta.get("preview_pdf_url") or "").strip(),
-        "file_ext": str(meta.get("file_ext") or "").strip(),
+        "file_url": file_url,
+        "download_url": download_url,
+        "preview_pdf_url": preview_pdf_url,
+        "file_ext": file_ext,
     }
+    code = str(sess["session_code"] or "").strip().upper()
+    host = str(request_host_url or "").rstrip("/")
+    if not host:
+        try:
+            from flask import request as flask_request
+
+            host = (flask_request.host_url or "").rstrip("/")
+        except RuntimeError:
+            host = ""
+    if host and code and payload["mode"] in {"pdf", "text", "material"} and (
+        payload["file_url"] or payload.get("display_item_id")
+    ):
+        payload["student_view_url"] = f"{host}/api/student/live/join/{code}/display-file"
+    return payload
 
 
 def extract_activity_answers(html: str) -> dict[str, str]:
@@ -250,7 +297,7 @@ def _student_join_payload(conn, sess, student_username):
         "launch_id": lid,
         "launched_at": launched_at,
         "question": question,
-        "display": _display_payload(sess),
+        "display": _display_payload(sess, request.host_url),
     }
 
 
@@ -708,8 +755,12 @@ def register_live_teaching_routes(app):
 
         data = request.get_json(silent=True) or {}
         mode = str(data.get("mode") or "welcome").strip().lower()
-        if mode not in {"welcome", "slides", "html", "material", "upload", "pdf"}:
+        if mode not in {"welcome", "slides", "html", "material", "upload", "pdf", "text", "presentation", "office"}:
             return jsonify({"error": "Invalid display mode"}), 400
+        if mode in {"presentation", "office", "upload"} and str(data.get("preview_pdf_url") or "").strip():
+            mode = "pdf"
+        elif mode in {"presentation", "office"}:
+            mode = "material"
 
         conn = get_db_connection()
         try:
@@ -790,6 +841,99 @@ def register_live_teaching_routes(app):
                     "updated_at": now,
                 }
             )
+        finally:
+            conn.close()
+
+    @app.route("/api/student/live/join/<session_code>/display-file", methods=["GET"])
+    def student_live_display_file(session_code):
+        """Inline file for current live display (session auth — works for enrolled students)."""
+        from urllib.parse import unquote
+
+        from flask import abort, send_from_directory
+
+        from app import UPLOAD_DIR, ensure_uploads_directory, get_db_connection, resolve_student_with_optional_enforcement
+        from classroom_display import (
+            _ITEM_SELECT,
+            classroom_display_upload_dir,
+            display_file_basename,
+            ensure_pdf_preview,
+            normalize_display_stored_path,
+            previews_dir,
+        )
+
+        conn = get_db_connection()
+        try:
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            student_username, err = resolve_student_with_optional_enforcement(
+                conn, request.args.get("student_username"), sess["class_name"]
+            )
+            if err is not None:
+                return err
+
+            display = _display_payload(sess)
+            mode = str(display.get("mode") or "").lower()
+            if mode == "html":
+                abort(404)
+
+            item_id = display.get("display_item_id")
+            file_path = ""
+            file_ext = str(display.get("file_ext") or "").lower()
+
+            if item_id:
+                row = conn.execute(_ITEM_SELECT + " WHERE id = ?", (int(item_id),)).fetchone()
+                if row and str(row["item_type"] or "").lower() == "file":
+                    file_path = row["file_path"] or ""
+                    file_ext = (row["file_ext"] or file_ext or "").lower()
+
+            if not file_path:
+                file_path = _display_file_path_from_urls(display)
+
+            ensure_uploads_directory()
+            ud = classroom_display_upload_dir(UPLOAD_DIR)
+
+            preview_dir = previews_dir(ud)
+            for preview_url_key in ("preview_pdf_url", "file_url"):
+                preview_url = str(display.get(preview_url_key) or "")
+                if "/classroom-display/previews/" not in preview_url:
+                    continue
+                preview_base = unquote(preview_url.split("/previews/")[-1].split("?")[0])
+                if preview_base and os.path.isfile(os.path.join(preview_dir, preview_base)):
+                    return send_from_directory(
+                        preview_dir,
+                        preview_base,
+                        mimetype="application/pdf",
+                        as_attachment=False,
+                        download_name=preview_base,
+                    )
+
+            if mode == "pdf" or file_ext in {"ppt", "pptx", "doc", "docx"}:
+                preview_rel = ensure_pdf_preview(ud, file_path) if file_path else None
+                if preview_rel:
+                    base = display_file_basename(preview_rel)
+                    if base and os.path.isfile(os.path.join(preview_dir, base)):
+                        return send_from_directory(
+                            preview_dir,
+                            base,
+                            mimetype="application/pdf",
+                            as_attachment=False,
+                            download_name=base,
+                        )
+
+            if file_path:
+                rel = normalize_display_stored_path(file_path)
+                base = display_file_basename(rel)
+                if base and os.path.isfile(os.path.join(ud, base)):
+                    ext = base.rsplit(".", 1)[-1].lower() if "." in base else ""
+                    mime = "application/pdf" if ext == "pdf" else "text/plain; charset=utf-8"
+                    if ext == "txt":
+                        return send_from_directory(ud, base, mimetype=mime, as_attachment=False)
+                    if ext == "pdf":
+                        return send_from_directory(ud, base, mimetype=mime, as_attachment=False)
+
+            abort(404)
         finally:
             conn.close()
 

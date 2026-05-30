@@ -85,6 +85,10 @@
     return readJson(response);
   }
 
+  function viewItemUrl(itemId) {
+    return `${API_BASE}/api/teacher/classroom-display/${encodeURIComponent(itemId)}/view`;
+  }
+
   async function ensurePreview(itemId) {
     const response = await fetchFn()(
       `${API_BASE}/api/teacher/classroom-display/${encodeURIComponent(itemId)}/ensure-preview`,
@@ -105,5 +109,6 @@
     deleteItem,
     activateItem,
     ensurePreview,
+    viewItemUrl,
   };
 })(typeof window !== "undefined" ? window : globalThis);

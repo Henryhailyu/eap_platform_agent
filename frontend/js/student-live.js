@@ -193,45 +193,60 @@
     ].join("|");
   }
 
+  function resolveStudentInlineViewUrl(display) {
+    const fromPayload = String((display && display.student_view_url) || "").trim();
+    if (fromPayload) return fromPayload;
+    const api = window.EAP_LIVE_TEACHING_API;
+    if (api && typeof api.studentDisplayFileUrl === "function" && state.code) {
+      return api.studentDisplayFileUrl(state.code);
+    }
+    return "";
+  }
+
   function showStudentFileDisplay(display, lesson, lessonFrame, lessonTitle, wait, slides, hintEl) {
     const fileUrl = display.file_url;
     const downloadUrl = display.download_url || fileUrl;
     const previewPdfUrl = display.preview_pdf_url || "";
     const ext = display.file_ext || "";
     const title = display.title || display.upload_label || t("slive_material_title");
+    const inlineViewUrl = resolveStudentInlineViewUrl(display);
     if (wait) wait.classList.add("hidden");
     if (slides) slides.classList.add("hidden");
     if (lesson) lesson.classList.remove("hidden");
-    if (lessonTitle) lessonTitle.textContent = title;
     if (hintEl) hintEl.classList.add("hidden");
 
     const actions = document.getElementById("slive-lesson-actions");
     const downloadA = document.getElementById("slive-lesson-download");
     const dlFn = window.EAP_fileDownloadUrl;
     const dlUrl = typeof dlFn === "function" ? dlFn(downloadUrl) : downloadUrl;
-    if (actions && downloadA) {
-      downloadA.href = dlUrl;
-      downloadA.textContent = t("slive_download_file");
-      actions.classList.remove("hidden");
-    }
 
     const mount = window.EAP_mountFileViewer;
     const mode = window.EAP_fileDisplayMode ? window.EAP_fileDisplayMode(ext) : "download";
     const wrap = document.getElementById("slive-file-viewer");
     if (wrap && typeof mount === "function") {
+      if (lessonTitle) {
+        lessonTitle.textContent = title;
+        lessonTitle.classList.remove("hidden");
+      }
+      if (actions && downloadA) {
+        downloadA.href = dlUrl;
+        downloadA.textContent = t("slive_download_file");
+        actions.classList.remove("hidden");
+      }
       wrap.classList.remove("hidden");
       let viewExt = ext;
-      let viewPreview = previewPdfUrl;
-      if (!viewPreview && String(display.mode || "").toLowerCase() === "pdf" && fileUrl) {
-        viewPreview = fileUrl;
+      if (inlineViewUrl && (String(display.mode || "").toLowerCase() === "pdf" || previewPdfUrl)) {
         viewExt = "pdf";
       }
       void mount(wrap, {
         url: downloadUrl,
         downloadUrl,
-        previewPdfUrl: viewPreview,
+        inlineViewUrl,
+        previewPdfUrl: inlineViewUrl || previewPdfUrl,
         ext: viewExt,
         title,
+        hideHead: true,
+        fetchPreviewWithCredentials: true,
         downloadLabel: t("slive_download_file"),
         openLabel: t("slive_open_file"),
         previewHint: t("slive_preview_unavailable_hint"),
@@ -244,11 +259,20 @@
       return;
     }
 
+    if (lessonTitle) {
+      lessonTitle.textContent = title;
+      lessonTitle.classList.remove("hidden");
+    }
+    if (actions && downloadA) {
+      downloadA.href = dlUrl;
+      downloadA.textContent = t("slive_download_file");
+      actions.classList.remove("hidden");
+    }
     if (wrap) wrap.classList.add("hidden");
     if (lessonFrame) {
       lessonFrame.classList.remove("hidden");
       lessonFrame.removeAttribute("srcdoc");
-      const viewSrc = previewPdfUrl || (mode === "pdf" || mode === "text" ? fileUrl : "");
+      const viewSrc = inlineViewUrl || previewPdfUrl || (mode === "pdf" || mode === "text" ? fileUrl : "");
       if (viewSrc) {
         lessonFrame.src = viewSrc;
       } else {
@@ -308,8 +332,8 @@
       return;
     }
 
-    const fileModes = ["pdf", "text", "presentation", "office", "material"];
-    if (fileModes.includes(mode) && display.file_url) {
+    const fileModes = ["pdf", "text", "presentation", "office", "material", "upload"];
+    if (fileModes.includes(mode) && (display.file_url || display.download_url || display.display_item_id)) {
       showStudentFileDisplay(display, lesson, lessonFrame, lessonTitle, wait, slides, hintEl);
       return;
     }

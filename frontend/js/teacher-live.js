@@ -681,6 +681,8 @@
     const lib = getDisplayApi();
     const downloadUrlVal = item.download_url || classroomDisplayFileUrl(item, base);
     let previewPdfUrl = item.preview_pdf_url || "";
+    const inlineViewUrl =
+      item.id && lib && typeof lib.viewItemUrl === "function" ? lib.viewItemUrl(item.id) : "";
     const ext = (item.file_ext || "").toLowerCase();
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
     const mount = window.EAP_mountFileViewer;
@@ -702,9 +704,11 @@
       await mount(canvas, {
         url: downloadUrlVal,
         downloadUrl: downloadUrlVal,
-        previewPdfUrl,
+        inlineViewUrl,
+        previewPdfUrl: inlineViewUrl || previewPdfUrl,
         ext,
         title: item.title || item.file_name,
+        fetchPreviewWithCredentials: true,
         downloadLabel: t("tlive_display_download"),
         openLabel: t("tlive_display_open_file"),
         previewHint: t("tlive_preview_unavailable_hint"),

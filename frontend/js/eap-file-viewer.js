@@ -72,6 +72,31 @@
     return e === "ppt" || e === "pptx" || e === "doc" || e === "doc";
   }
 
+  /** Fetch protected preview with session cookie; iframe src cannot always send cookies on HTTP. */
+  async function resolveAuthedPreviewSrc(url) {
+    const raw = String(url || "").trim();
+    if (!raw || raw.startsWith("blob:")) return raw;
+    try {
+      const resp = await fetch(raw, { credentials: "same-origin" });
+      if (!resp.ok) return "";
+      const ct = (resp.headers.get("content-type") || "").toLowerCase();
+      if (ct.includes("application/json")) return "";
+      return URL.createObjectURL(await resp.blob());
+    } catch (_) {
+      return "";
+    }
+  }
+
+  async function iframeViewSrc(url, o) {
+    const raw = String(url || "").trim();
+    if (!raw) return "";
+    if (o && o.fetchPreviewWithCredentials) {
+      const blob = await resolveAuthedPreviewSrc(raw);
+      if (blob) return blob;
+    }
+    return raw;
+  }
+
   /**
    * @param {{ url?: string, downloadUrl?: string, previewPdfUrl?: string, ext?: string, title?: string, downloadLabel?: string, openLabel?: string, previewHint?: string, loadingHint?: string }} opts
    */
@@ -110,7 +135,8 @@
     const o = opts && typeof opts === "object" ? opts : {};
     const ext = String(o.ext || "").toLowerCase();
     let downloadSrc = String(o.downloadUrl || o.url || "");
-    let previewPdf = String(o.previewPdfUrl || "");
+    let previewPdf = String(o.inlineViewUrl || o.previewPdfUrl || "");
+    const hideHead = !!o.hideHead;
     const title = o.title || "";
     const dlLabel = o.downloadLabel || "Download file";
     const openLabel = o.openLabel || "Open file";
@@ -122,7 +148,21 @@
     }
 
     if (ext === "pdf" || ext === "txt") {
-      container.innerHTML = embedMarkup(title, dlHref, dlLabel, downloadSrc);
+      const viewSrc = await iframeViewSrc(previewPdf || downloadSrc, o);
+      if (!viewSrc) {
+        container.innerHTML = fallbackMarkup(
+          title,
+          dlHref,
+          dlLabel,
+          downloadSrc,
+          openLabel,
+          o.previewHint || o.lead || ""
+        );
+        return;
+      }
+      container.innerHTML = hideHead
+        ? `<div class="eap-file-viewer eap-file-viewer--embed eap-file-viewer--stage-only"><div class="eap-file-viewer__stage"><iframe class="eap-file-viewer__frame" src="${escapeHtml(viewSrc)}" title="${escapeHtml(title)}"></iframe></div></div>`
+        : embedMarkup(title, dlHref, dlLabel, viewSrc);
       return;
     }
 
@@ -144,7 +184,21 @@
     }
 
     if (previewPdf) {
-      container.innerHTML = embedMarkup(title, dlHref, dlLabel, previewPdf);
+      const viewSrc = await iframeViewSrc(previewPdf, o);
+      if (!viewSrc) {
+        container.innerHTML = fallbackMarkup(
+          title,
+          dlHref,
+          dlLabel,
+          downloadSrc,
+          openLabel,
+          o.previewHint || o.lead || ""
+        );
+        return;
+      }
+      container.innerHTML = hideHead
+        ? `<div class="eap-file-viewer eap-file-viewer--embed eap-file-viewer--stage-only"><div class="eap-file-viewer__stage"><iframe class="eap-file-viewer__frame" src="${escapeHtml(viewSrc)}" title="${escapeHtml(title)}"></iframe></div></div>`
+        : embedMarkup(title, dlHref, dlLabel, viewSrc);
       return;
     }
 

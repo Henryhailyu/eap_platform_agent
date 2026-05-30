@@ -512,6 +512,74 @@ def register_classroom_display_routes(app):
         finally:
             conn.close()
 
+    @app.route("/api/teacher/classroom-display/<int:item_id>/view", methods=["GET"])
+    def teacher_classroom_display_view(item_id):
+        """Inline PDF/file for teacher canvas (session auth; iframe-safe via fetch+blob on client)."""
+        from flask import abort, send_from_directory
+
+        from app import (
+            enforce_teacher_class_access_if_enabled,
+            get_db_connection,
+            get_effective_teacher_username,
+            require_session_role_if_enabled,
+            should_enforce_membership,
+            should_require_session_identity,
+        )
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+
+            row = conn.execute(_ITEM_SELECT + " WHERE id = ?", (item_id,)).fetchone()
+            if not row or str(row["item_type"] or "").lower() != "file":
+                return jsonify({"error": "Not found"}), 404
+
+            teacher_username = get_effective_teacher_username(conn, request.args.get("teacher_username"))
+            if should_require_session_identity() or should_enforce_membership():
+                if not teacher_username:
+                    return jsonify({"error": "teacher_username is required"}), 400
+                err = enforce_teacher_class_access_if_enabled(conn, teacher_username, row["class_name"])
+                if err is not None:
+                    return err
+
+            ud = _upload_dir()
+            file_path = row["file_path"] or ""
+            ext = (row["file_ext"] or "").lower()
+            preview_rel = ensure_pdf_preview(ud, file_path) if file_path else None
+            if preview_rel:
+                base = display_file_basename(preview_rel)
+                preview_dir = previews_dir(ud)
+                if base and os.path.isfile(os.path.join(preview_dir, base)):
+                    return send_from_directory(
+                        preview_dir,
+                        base,
+                        mimetype="application/pdf",
+                        as_attachment=False,
+                        download_name=base,
+                    )
+            if file_path:
+                rel = normalize_display_stored_path(file_path)
+                base = display_file_basename(rel)
+                if base and os.path.isfile(os.path.join(ud, base)):
+                    file_ext = base.rsplit(".", 1)[-1].lower() if "." in base else ""
+                    if file_ext == "pdf":
+                        return send_from_directory(
+                            ud, base, mimetype="application/pdf", as_attachment=False, download_name=base
+                        )
+                    if file_ext == "txt":
+                        return send_from_directory(
+                            ud,
+                            base,
+                            mimetype="text/plain; charset=utf-8",
+                            as_attachment=False,
+                            download_name=base,
+                        )
+            abort(404)
+        finally:
+            conn.close()
+
     @app.route("/api/teacher/classroom-display/<int:item_id>/ensure-preview", methods=["POST"])
     def teacher_classroom_display_ensure_preview(item_id):
         """Build PDF preview for PPT/DOC (LibreOffice). Used after upload on Render."""
