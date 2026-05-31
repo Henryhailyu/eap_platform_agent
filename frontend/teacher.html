@@ -391,25 +391,35 @@
                   </fieldset>
                   <div
                     id="teacher-create-recorded-panel"
-                    class="teacher-recorded-create-panel hidden"
+                    class="teacher-recorded-create-panel teacher-task-create-material hidden"
                     aria-hidden="true"
                   >
-                    <p class="teacher-recorded-create-panel__lead" data-i18n="teacher_rec_create_lead">
-                      Step 1: upload audio or video. Step 2: fill in title and instructions, then Save Task.
+                    <p class="teacher-recorded-create-panel__lead field-hint" data-i18n="teacher_rec_create_lead">
+                      Step 1: add audio/video files (like teaching materials). Step 2: upload them, then Save Task.
                     </p>
                     <div id="teacher-create-recorded-file-wrap" class="field">
                       <label for="teacher-create-recorded-video" data-i18n="teacher_rec_media_label"
                         >Class recording (audio or video)</label
                       >
+                      <p class="field-hint" data-i18n="teacher_rec_media_hint">
+                        Add multiple files: pick several at once, or choose files again to add more.
+                      </p>
                       <input
                         id="teacher-create-recorded-video"
                         type="file"
                         multiple
                         accept=".mp4,.webm,.mov,.m4v,.mp3,.m4a,.aac,.wav,.ogg,video/*,audio/*"
                       />
-                      <p class="teacher-recorded-create-panel__hint" data-i18n="trec_file_hint">
-                        Video: MP4, WebM, MOV, M4V (max 500 MB). Audio: MP3, M4A, AAC, WAV, OGG (max 100 MB).
-                      </p>
+                      <p
+                        id="teacher-task-create-recorded-summary"
+                        class="file-selection-summary"
+                        aria-live="polite"
+                      ></p>
+                      <ul
+                        id="teacher-task-create-recorded-list"
+                        class="teacher-create-material-list"
+                        aria-live="polite"
+                      ></ul>
                     </div>
                     <button
                       type="button"
@@ -709,6 +719,6 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="js/recorded-lessons-api.js"></script>
-    <script src="app.js?v=20260531-recorded-media-link"></script>
+    <script src="app.js?v=20260531-recorded-multi-link"></script>
   </body>
 </html>

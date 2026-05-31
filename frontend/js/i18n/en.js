@@ -306,6 +306,14 @@ window.EAP_STRINGS_EN = {
   "teacher_batch_save_ok": "Saved {count} task(s) for this day. You can edit any task below after saving.",
   "teacher_batch_save_working": "Saving…",
   "teacher_batch_save_progress": "Saving… {category}",
+  "teacher_batch_upload_progress": "Uploading files… {category}",
+  "teacher_rec_media_hint":
+    "Add multiple files: pick several at once (Ctrl/Cmd+click), or choose files again to add more.",
+  "teacher_rec_files_ready": "{count} recording(s) ready",
+  "teacher_rec_all_uploaded": "All {count} file(s) uploaded — Save Task to publish.",
+  "teacher_rec_files_pending": "{uploaded}/{total} uploaded — click Upload audio or video for the rest.",
+  "teacher_rec_file_uploaded": "uploaded",
+  "teacher_rec_task_has_multi_published": "{count} recordings published for students",
   "teacher_upload_timeout": "Upload timed out. Try fewer or smaller files, then Save Task again.",
   "teacher_material_file_stale": "Selected files are no longer available. Re-choose the files for this category, then Save Task.",
   "teacher_draft_material_kept": "File ready: {name}",
@@ -709,7 +717,7 @@ window.EAP_STRINGS_EN = {
   "task_recording_label": "Class recording",
   "task_recording_manage": "Manage recording",
   "teacher_rec_create_lead":
-    "Step 1: upload audio or video. Step 2: fill in title and instructions. Switch categories freely — your upload stays here. Save Task publishes to students.",
+    "Step 1: add audio/video files (same as teaching materials). Step 2: upload them, then Save Task.",
   "teacher_rec_upload_media_btn": "Upload audio or video",
   "teacher_rec_upload_video_btn": "Upload audio or video",
   "teacher_rec_upload_first_hint": "Choose a file, then click Upload audio or video.",

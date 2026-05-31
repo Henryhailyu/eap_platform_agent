@@ -154,21 +154,24 @@ def enrich_task_dicts_with_recordings(conn, task_dicts, *, published_only: bool 
         """,
         params,
     ).fetchall()
-    by_task: dict[int, dict] = {}
+    by_task: dict[int, list] = {}
     for r in rows:
         tid = r["calendar_task_id"]
         if tid is None:
             continue
-        by_task[int(tid)] = {
+        entry = {
             "id": r["id"],
             "title": r["title"] or "",
             "visibility": r["visibility"] or VISIBILITY_DRAFT,
             "file_ext": r["file_ext"] or "",
             "file_name": r["file_name"] or "",
         }
+        by_task.setdefault(int(tid), []).append(entry)
     for t in task_dicts:
-        rec = by_task.get(int(t["id"])) if t.get("id") is not None else None
-        t["recorded_lesson"] = rec
+        tid = int(t["id"]) if t.get("id") is not None else None
+        lessons = by_task.get(tid, []) if tid is not None else []
+        t["recorded_lessons"] = lessons
+        t["recorded_lesson"] = lessons[0] if lessons else None
     return task_dicts
 
 
@@ -432,8 +435,6 @@ def register_recorded_lessons_routes(app):
                     now,
                 ),
             )
-            if calendar_task_id is not None:
-                _clear_task_recording_links(conn, calendar_task_id, except_lesson_id=cur.lastrowid)
             conn.commit()
             row = conn.execute(_SELECT + " WHERE id = ?", (cur.lastrowid,)).fetchone()
             lesson = _attach_task_meta_to_lesson(conn, lesson_row_to_dict(row))
@@ -503,7 +504,6 @@ def register_recorded_lessons_routes(app):
                         row["class_name"]
                     ):
                         return jsonify({"error": "Task class does not match recording class"}), 400
-                    _clear_task_recording_links(conn, tid, except_lesson_id=lesson_id)
                     conn.execute(
                         "UPDATE recorded_lessons SET calendar_task_id = ?, updated_at = ? WHERE id = ?",
                         (tid, _now_iso(), lesson_id),

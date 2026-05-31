@@ -45,24 +45,30 @@
       return apiFetch(`/api/teacher/recorded-lessons?class_name=${q}`);
     },
     upload(formData) {
-      const fn = global.eapFetch || global.fetch;
-      return fn(apiUrl("/api/teacher/recorded-lessons"), {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      }).then(async (res) => {
+      const url = apiUrl("/api/teacher/recorded-lessons");
+      const parse = async (res) => {
+        const text = await res.text();
         let data = null;
         try {
-          data = await res.json();
+          data = text ? JSON.parse(text) : null;
         } catch (_) {
-          data = null;
+          data = text ? { error: text.slice(0, 200) } : null;
         }
         if (!res.ok) {
           const msg = (data && data.error) || res.statusText || "Upload failed";
           throw new Error(msg);
         }
         return data;
-      });
+      };
+      if (typeof global.eapPostMultipart === "function") {
+        return global.eapPostMultipart(url, formData).then(parse);
+      }
+      const fn = global.eapFetch || global.fetch;
+      return fn(url, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      }).then(parse);
     },
     update(lessonId, patch) {
       return apiFetch(`/api/teacher/recorded-lessons/${lessonId}`, {
