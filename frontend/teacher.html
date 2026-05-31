@@ -395,9 +395,9 @@
                     aria-hidden="true"
                   >
                     <p class="teacher-recorded-create-panel__lead" data-i18n="teacher_rec_create_lead">
-                      Upload the class recording and add instructions students should follow before watching.
+                      Step 1: upload the video. Step 2: fill in title and instructions, then Save Task.
                     </p>
-                    <div class="field">
+                    <div id="teacher-create-recorded-file-wrap" class="field">
                       <label for="teacher-create-recorded-video" data-i18n="teacher_rec_video_label"
                         >Class recording video</label
                       >
@@ -410,10 +410,20 @@
                         MP4, WebM, MOV, or M4V — max 500 MB
                       </p>
                     </div>
-                    <label class="teacher-recorded-create-panel__check">
-                      <input id="teacher-create-recorded-publish" type="checkbox" value="1" />
-                      <span data-i18n="trec_publish_on_create">Publish to students when saved</span>
-                    </label>
+                    <button
+                      type="button"
+                      class="btn-secondary"
+                      id="teacher-create-recorded-upload-btn"
+                      data-i18n="teacher_rec_upload_video_btn"
+                    >
+                      Upload video
+                    </button>
+                    <p
+                      id="teacher-create-recorded-upload-status"
+                      class="teacher-recorded-upload-status"
+                      role="status"
+                      aria-live="polite"
+                    ></p>
                   </div>
                   <div class="field">
                     <label for="task-title" id="task-title-label" data-i18n="task_title_en">Task title</label>
@@ -490,6 +500,13 @@
                       aria-live="polite"
                     ></p>
                   </div>
+                  <label
+                    id="teacher-create-recorded-publish-wrap"
+                    class="teacher-recorded-create-panel__check hidden"
+                  >
+                    <input id="teacher-create-recorded-publish" type="checkbox" value="1" />
+                    <span data-i18n="trec_publish_on_create">Publish to students when saved</span>
+                  </label>
                   <button type="submit" class="btn-primary" data-i18n="save_task">Save Task</button>
                   <p id="teacher-form-message" class="form-message" role="status" aria-live="polite"></p>
                 </form>

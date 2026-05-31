@@ -479,8 +479,116 @@ const TASK_CATEGORIES = [
 
 const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 
+/** Draft recording uploaded before Save Task (calendar create form). */
+let teacherPendingRecordedLessonId = null;
+let teacherPendingRecordedLessonName = "";
+
 function isRecordedLessonCategory(category) {
   return String(category || "").trim() === RECORDED_LESSON_CATEGORY;
+}
+
+function resetTeacherPendingRecordedLesson(options) {
+  const { deleteRemote = false } = options || {};
+  const id = teacherPendingRecordedLessonId;
+  teacherPendingRecordedLessonId = null;
+  teacherPendingRecordedLessonName = "";
+  if (deleteRemote && id != null && window.EAP_RECORDED_LESSONS) {
+    void window.EAP_RECORDED_LESSONS.remove(id).catch(() => {});
+  }
+  syncTeacherCreateRecordedUploadUI();
+}
+
+function syncTeacherCreateRecordedUploadUI() {
+  const statusEl = document.getElementById("teacher-create-recorded-upload-status");
+  const uploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
+  const fileWrap = document.getElementById("teacher-create-recorded-file-wrap");
+  const fileInput = document.getElementById("teacher-create-recorded-video");
+  const uploaded = teacherPendingRecordedLessonId != null;
+
+  if (fileWrap) fileWrap.classList.toggle("hidden", uploaded);
+  if (uploadBtn) {
+    uploadBtn.disabled = uploaded;
+    uploadBtn.classList.toggle("hidden", uploaded);
+  }
+  if (statusEl) {
+    statusEl.classList.remove(
+      "teacher-recorded-upload-status--ok",
+      "teacher-recorded-upload-status--error",
+      "teacher-recorded-upload-status--pending",
+    );
+    if (uploaded) {
+      statusEl.textContent = t("teacher_rec_upload_done", {
+        name: teacherPendingRecordedLessonName || "",
+      });
+      statusEl.classList.add("teacher-recorded-upload-status--ok");
+    } else {
+      statusEl.textContent = t("teacher_rec_upload_first_hint");
+      statusEl.classList.add("teacher-recorded-upload-status--pending");
+    }
+  }
+  if (fileInput && uploaded) fileInput.value = "";
+}
+
+async function uploadTeacherPendingRecordedVideo(className) {
+  const api = window.EAP_RECORDED_LESSONS;
+  const fileInput = document.getElementById("teacher-create-recorded-video");
+  const statusEl = document.getElementById("teacher-create-recorded-upload-status");
+  const uploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
+  if (!api || !fileInput || !fileInput.files || !fileInput.files[0]) {
+    if (statusEl) {
+      statusEl.textContent = t("teacher_rec_video_required");
+      statusEl.classList.add("teacher-recorded-upload-status--error");
+    }
+    return null;
+  }
+  const file = fileInput.files[0];
+  const titleEl = document.getElementById("task-title");
+  const descEl = document.getElementById("task-description");
+  const title = (titleEl && String(titleEl.value || "").trim()) || file.name;
+  const description = descEl ? String(descEl.value || "").trim() : "";
+
+  if (uploadBtn) uploadBtn.disabled = true;
+  if (statusEl) {
+    statusEl.textContent = t("trec_uploading");
+    statusEl.classList.remove("teacher-recorded-upload-status--ok", "teacher-recorded-upload-status--error");
+    statusEl.classList.add("teacher-recorded-upload-status--pending");
+  }
+
+  const fd = new FormData();
+  fd.append("class_name", className || teacherDefaultClassFallback());
+  fd.append("title", title);
+  fd.append("description", description);
+  fd.append("file", file);
+
+  const res = await api.upload(fd);
+  const lesson = res && res.lesson ? res.lesson : res;
+  if (!lesson || lesson.id == null) {
+    throw new Error(t("trec_error_generic"));
+  }
+  teacherPendingRecordedLessonId = lesson.id;
+  teacherPendingRecordedLessonName = lesson.file_name || file.name;
+  syncTeacherCreateRecordedUploadUI();
+  return lesson;
+}
+
+async function finalizePendingRecordedLessonForTask({
+  taskId,
+  title,
+  description,
+  publish,
+}) {
+  const api = window.EAP_RECORDED_LESSONS;
+  const lessonId = teacherPendingRecordedLessonId;
+  if (!api || lessonId == null) {
+    throw new Error(t("teacher_rec_video_required"));
+  }
+  await api.update(lessonId, {
+    calendar_task_id: taskId,
+    title: title || undefined,
+    description: description || undefined,
+    visibility: publish ? "published" : "draft",
+  });
+  resetTeacherPendingRecordedLesson({ deleteRemote: false });
 }
 
 async function uploadRecordedLessonForTask({
@@ -1100,9 +1208,10 @@ function populateTeacherCategoryChips(chipsEl, selectEl, onCategoryChange) {
     btn.setAttribute("data-category", label);
     btn.setAttribute("aria-pressed", "false");
     btn.addEventListener("click", () => {
+      const prev = selectEl.value;
       selectEl.value = label;
       syncTeacherCategoryChipHighlight(chipsEl, selectEl);
-      if (typeof onCategoryChange === "function") onCategoryChange(label);
+      if (typeof onCategoryChange === "function") onCategoryChange(label, prev);
     });
     chipsEl.appendChild(btn);
   });
@@ -1112,9 +1221,14 @@ function populateTeacherCategoryChips(chipsEl, selectEl, onCategoryChange) {
 /**
  * Phase N6 — calendar create form: show video upload + instructions when category is Recorded lesson.
  */
-function syncTeacherCreateTaskFormMode(category) {
+function syncTeacherCreateTaskFormMode(category, previousCategory) {
   const isRec = isRecordedLessonCategory(category);
+  const wasRec = isRecordedLessonCategory(previousCategory);
+  if (wasRec && !isRec && teacherPendingRecordedLessonId != null) {
+    resetTeacherPendingRecordedLesson({ deleteRemote: true });
+  }
   const recordedPanel = document.getElementById("teacher-create-recorded-panel");
+  const publishWrap = document.getElementById("teacher-create-recorded-publish-wrap");
   const materialField = document.getElementById("teacher-task-create-material-field");
   const periodField = document.getElementById("task-period")?.closest(".field");
   const titleLabel = document.getElementById("task-title-label");
@@ -1126,6 +1240,8 @@ function syncTeacherCreateTaskFormMode(category) {
     recordedPanel.classList.toggle("hidden", !isRec);
     recordedPanel.setAttribute("aria-hidden", isRec ? "false" : "true");
   }
+  if (publishWrap) publishWrap.classList.toggle("hidden", !isRec);
+  if (isRec) syncTeacherCreateRecordedUploadUI();
   if (materialField) materialField.classList.toggle("hidden", isRec);
   if (periodField) periodField.classList.toggle("hidden", isRec);
 
@@ -1147,30 +1263,19 @@ function syncTeacherCreateTaskFormMode(category) {
   }
 }
 
-function buildTeacherRecordedLessonManagePanel(task) {
+/** Read-only recording status on task detail (upload only in Create New Task). */
+function buildTeacherRecordedLessonStatusPanel(task) {
   const section = document.createElement("section");
-  section.className = "task-card__recorded-manage";
-  section.setAttribute("data-task-id", String(task.id));
-
-  const heading = document.createElement("h4");
-  heading.textContent = t("teacher_rec_manage_heading");
-
-  const meta = document.createElement("p");
-  meta.className = "task-card__recorded-manage__meta";
-  meta.textContent = t("teacher_rec_manage_lead");
-
-  section.appendChild(heading);
-  section.appendChild(meta);
-
+  section.className = "task-card__recorded-status-readonly";
   const rec = task.recorded_lesson;
+
   if (rec && rec.id != null) {
-    const status = document.createElement("p");
-    status.className = "task-card__recorded-manage__meta";
     const published = rec.visibility === "published";
-    status.textContent = published
-      ? t("trec_status_published") + (rec.title ? ` · ${rec.title}` : "")
-      : t("trec_status_draft") + (rec.title ? ` · ${rec.title}` : "");
-    section.appendChild(status);
+    const line = document.createElement("p");
+    line.textContent = published
+      ? t("teacher_rec_task_has_video_published", { name: rec.title || rec.file_name || "" })
+      : t("teacher_rec_task_has_video_draft", { name: rec.title || rec.file_name || "" });
+    section.appendChild(line);
 
     const actions = document.createElement("div");
     actions.className = "task-card__recorded-manage__actions";
@@ -1193,49 +1298,11 @@ function buildTeacherRecordedLessonManagePanel(task) {
     actions.appendChild(previewBtn);
     actions.appendChild(pubBtn);
     section.appendChild(actions);
+  } else {
+    const hint = document.createElement("p");
+    hint.textContent = t("teacher_rec_task_no_video_hint");
+    section.appendChild(hint);
   }
-
-  const uploadWrap = document.createElement("div");
-  uploadWrap.className = "task-card__recorded-upload";
-
-  const fileLab = document.createElement("label");
-  fileLab.className = "task-upload-choose";
-  const chooseSpan = document.createElement("span");
-  chooseSpan.className = "task-upload-choose-text";
-  chooseSpan.textContent = rec && rec.id != null ? t("teacher_rec_replace_video") : t("teacher_rec_video_label");
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.className = "task-recorded-file-input";
-  fileInput.accept = ".mp4,.webm,.mov,.m4v,video/*";
-  fileLab.appendChild(chooseSpan);
-  fileLab.appendChild(fileInput);
-
-  const pubOnUpload = document.createElement("label");
-  pubOnUpload.className = "teacher-recorded-create-panel__check";
-  const pubCb = document.createElement("input");
-  pubCb.type = "checkbox";
-  pubCb.className = "task-recorded-publish-cb";
-  pubCb.checked = !!(rec && rec.visibility === "published");
-  const pubSpan = document.createElement("span");
-  pubSpan.textContent = t("trec_publish_on_create");
-  pubOnUpload.appendChild(pubCb);
-  pubOnUpload.appendChild(pubSpan);
-
-  const uploadBtn = document.createElement("button");
-  uploadBtn.type = "button";
-  uploadBtn.className = "btn-primary task-recorded-upload-btn";
-  uploadBtn.setAttribute("data-task-id", String(task.id));
-  uploadBtn.textContent = rec && rec.id != null ? t("teacher_rec_replace_btn") : t("teacher_rec_upload_btn");
-
-  const statusEl = document.createElement("p");
-  statusEl.className = "task-card__recorded-status";
-  statusEl.setAttribute("aria-live", "polite");
-
-  uploadWrap.appendChild(fileLab);
-  uploadWrap.appendChild(pubOnUpload);
-  uploadWrap.appendChild(uploadBtn);
-  uploadWrap.appendChild(statusEl);
-  section.appendChild(uploadWrap);
 
   return section;
 }
@@ -3390,7 +3457,7 @@ function buildTeacherTaskCardElement(task, copyContext) {
   li.appendChild(copyWrap);
   li.appendChild(templateSaveWrap);
   if (isRecordedTask) {
-    li.appendChild(buildTeacherRecordedLessonManagePanel(task));
+    li.appendChild(buildTeacherRecordedLessonStatusPanel(task));
   } else {
     li.appendChild(attach);
     li.appendChild(submissionsWrap);
@@ -3975,10 +4042,28 @@ function initTeacherPage() {
   const createMaterialInput = document.getElementById("teacher-task-create-material");
   const createMaterialSummary = document.getElementById("teacher-task-create-material-summary");
 
-  populateTeacherCategoryChips(categoryChipsEl, typeSelect, (cat) => {
-    syncTeacherCreateTaskFormMode(cat);
+  populateTeacherCategoryChips(categoryChipsEl, typeSelect, (cat, prev) => {
+    syncTeacherCreateTaskFormMode(cat, prev);
   });
   syncTeacherCreateTaskFormMode(typeSelect.value);
+
+  const recordedUploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
+  if (recordedUploadBtn && recordedUploadBtn.dataset.eapBound !== "1") {
+    recordedUploadBtn.dataset.eapBound = "1";
+    recordedUploadBtn.addEventListener("click", async () => {
+      setTeacherPageError(pageErrorEl, "");
+      try {
+        await uploadTeacherPendingRecordedVideo(getFilterClass());
+      } catch (err) {
+        const statusEl = document.getElementById("teacher-create-recorded-upload-status");
+        if (statusEl) {
+          statusEl.textContent = (err && err.message) || t("trec_error_generic");
+          statusEl.classList.add("teacher-recorded-upload-status--error");
+        }
+      }
+    });
+  }
+  syncTeacherCreateRecordedUploadUI();
 
   function syncTeacherCreateTaskContext() {
     if (!createContextEl) return;
@@ -4017,6 +4102,7 @@ function initTeacherPage() {
       syncTeacherCategoryChipHighlight(categoryChipsEl, typeSelect);
     }
     syncTeacherCreateTaskFormMode(typeSelect.value);
+    if (isRecordedLessonCategory(typeSelect.value)) syncTeacherCreateRecordedUploadUI();
     if (scroll && createTaskDetailsEl) {
       createTaskDetailsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
@@ -5578,57 +5664,6 @@ function initTeacherPage() {
       return;
     }
 
-    const recUploadBtn = ev.target.closest(".task-recorded-upload-btn");
-    if (recUploadBtn) {
-      const taskId = Number(recUploadBtn.getAttribute("data-task-id"), 10);
-      const card = recUploadBtn.closest("li.task-card");
-      if (!Number.isFinite(taskId) || !card) return;
-      const task = lastTeacherDailyTasks.find((t) => Number(t.id) === taskId);
-      const fileInput = card.querySelector(".task-recorded-file-input");
-      const statusEl = card.querySelector(".task-card__recorded-status");
-      const pubCb = card.querySelector(".task-recorded-publish-cb");
-      if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-        if (statusEl) {
-          statusEl.textContent = t("teacher_rec_video_required");
-          statusEl.classList.add("task-card__recorded-status--error");
-        }
-        return;
-      }
-      recUploadBtn.disabled = true;
-      if (statusEl) {
-        statusEl.textContent = t("trec_uploading");
-        statusEl.classList.remove("task-card__recorded-status--error", "task-card__recorded-status--ok");
-      }
-      try {
-        await uploadRecordedLessonForTask({
-          className: (task && task.class_name) || getFilterClass(),
-          taskId,
-          title: (task && taskDisplayTitle(task)) || t("trec_title"),
-          description: (task && task.description) || "",
-          file: fileInput.files[0],
-          publish: !!(pubCb && pubCb.checked),
-        });
-        fileInput.value = "";
-        if (statusEl) {
-          statusEl.textContent = t("trec_upload_ok");
-          statusEl.classList.add("task-card__recorded-status--ok");
-        }
-        await refreshTaskList();
-        await reloadPlannerTasksFromApi();
-        if (selectedTeacherTaskId === taskId) {
-          selectTeacherTaskById(taskId);
-        }
-      } catch (err) {
-        if (statusEl) {
-          statusEl.textContent = err.message;
-          statusEl.classList.add("task-card__recorded-status--error");
-        }
-      } finally {
-        recUploadBtn.disabled = false;
-      }
-      return;
-    }
-
     const btn = ev.target.closest(".task-upload-submit");
     if (!btn) return;
 
@@ -5703,14 +5738,11 @@ function initTeacherPage() {
     }
 
     const isRecCreate = isRecordedLessonCategory(category);
-    const recordedVideoInput = document.getElementById("teacher-create-recorded-video");
     const recordedPublishCb = document.getElementById("teacher-create-recorded-publish");
-    if (isRecCreate) {
-      if (!recordedVideoInput || !recordedVideoInput.files || !recordedVideoInput.files[0]) {
-        messageEl.textContent = t("teacher_rec_video_required");
-        messageEl.classList.add("form-message--error");
-        return;
-      }
+    if (isRecCreate && teacherPendingRecordedLessonId == null) {
+      messageEl.textContent = t("teacher_rec_upload_first_required");
+      messageEl.classList.add("form-message--error");
+      return;
     }
 
     const submitBtn = form.querySelector('button[type="submit"]');
@@ -5731,17 +5763,14 @@ function initTeacherPage() {
       let savedMsg = t("task_saved");
       let uploadFailed = false;
 
-      if (isRecCreate && created && created.id != null && recordedVideoInput.files[0]) {
+      if (isRecCreate && created && created.id != null) {
         try {
-          await uploadRecordedLessonForTask({
-            className: class_name || teacherDefaultClassFallback(),
+          await finalizePendingRecordedLessonForTask({
             taskId: created.id,
             title,
             description,
-            file: recordedVideoInput.files[0],
             publish: !!(recordedPublishCb && recordedPublishCb.checked),
           });
-          recordedVideoInput.value = "";
           savedMsg = t("teacher_rec_task_saved");
         } catch (uploadErr) {
           uploadFailed = true;
@@ -5780,8 +5809,8 @@ function initTeacherPage() {
       form.querySelector("#task-description").value = "";
       const descZhEl = form.querySelector("#task-description-zh");
       if (descZhEl) descZhEl.value = "";
-      if (recordedVideoInput) recordedVideoInput.value = "";
       if (recordedPublishCb) recordedPublishCb.checked = false;
+      resetTeacherPendingRecordedLesson({ deleteRemote: false });
       syncTeacherCreateTaskFormMode(typeSelect.value);
 
       await refreshTaskList();
@@ -5881,8 +5910,8 @@ function initTeacherPage() {
 
   window.__eapTeacherLangRefresh = () => {
     populateCategorySelect(typeSelect, false);
-    populateTeacherCategoryChips(categoryChipsEl, typeSelect, (cat) => {
-      syncTeacherCreateTaskFormMode(cat);
+    populateTeacherCategoryChips(categoryChipsEl, typeSelect, (cat, prev) => {
+      syncTeacherCreateTaskFormMode(cat, prev);
     });
     syncTeacherCreateTaskFormMode(typeSelect.value);
     populateTeacherTemplateCategoryFilterSelect(templateCategoryFilterEl);

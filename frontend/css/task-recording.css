@@ -53,9 +53,45 @@
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  margin-top: 0.75rem;
+  margin: 0.75rem 0 1rem;
   font-size: 0.95rem;
   cursor: pointer;
+}
+
+.teacher-recorded-create-panel__check.hidden {
+  display: none;
+}
+
+#teacher-create-recorded-upload-btn {
+  margin-bottom: 0.5rem;
+}
+
+.teacher-recorded-upload-status {
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.9rem;
+  min-height: 1.25rem;
+}
+
+.teacher-recorded-upload-status--ok {
+  color: #1b5e20;
+  font-weight: 600;
+}
+
+.teacher-recorded-upload-status--error {
+  color: #b42318;
+}
+
+.teacher-recorded-upload-status--pending {
+  color: var(--color-text-muted, #5c6470);
+}
+
+.task-card__recorded-status-readonly {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: rgba(10, 126, 164, 0.06);
+  border: 1px solid rgba(10, 126, 164, 0.18);
+  font-size: 0.9rem;
 }
 
 .task-card__recorded-manage {
