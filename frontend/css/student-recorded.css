@@ -1,0 +1,89 @@
+.srec-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 2.5rem;
+}
+
+.srec-back {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: var(--color-text-muted, #5c6470);
+  text-decoration: none;
+}
+
+.srec-back:hover {
+  text-decoration: underline;
+}
+
+.srec-hero h1 {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-serif, "Source Serif 4", serif);
+}
+
+.srec-hero__lead {
+  margin: 0 0 1.25rem;
+  color: var(--color-text-muted, #5c6470);
+}
+
+.srec-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.srec-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border, #e2e6eb);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.srec-card__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.srec-card__meta {
+  margin: 0 0 0.75rem;
+  color: var(--color-text-muted, #5c6470);
+  font-size: 0.95rem;
+}
+
+.srec-empty,
+.srec-error {
+  color: var(--color-text-muted, #5c6470);
+}
+
+.srec-error {
+  color: #b42318;
+}
+
+.srec-player-section {
+  margin-top: 1.5rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--color-border, #e2e6eb);
+}
+
+.srec-player__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.srec-player {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.srec-player video {
+  width: 100%;
+  max-height: min(70vh, 480px);
+  display: block;
+}
+
+.srec-player__hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #5c6470);
+}

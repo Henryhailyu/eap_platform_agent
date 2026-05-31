@@ -330,6 +330,12 @@ function initStudentTeachingPagesNavLink() {
   if (link) link.classList.remove("hidden");
 }
 
+/** Phase N4 — student recorded lesson viewer. */
+function initStudentRecordedNavLink() {
+  const link = document.getElementById("student-recorded-link");
+  if (link) link.classList.remove("hidden");
+}
+
 /** Phase S1 — show AI Self-Study entry when feature flag is on. */
 function initStudentSelfStudyNavLink() {
   if (window.EAP_SELF_STUDY_ENABLED === false) return;
@@ -391,6 +397,11 @@ function bindStudentLiveNavLink() {
     document.getElementById("student-live-link"),
     "student",
     "student-live.html",
+  );
+  bindRoleGuardedNavLink(
+    document.getElementById("student-recorded-link"),
+    "student",
+    "student-recorded.html",
   );
 }
 
@@ -6396,6 +6407,7 @@ function initStudentPage() {
       await ensureAcademicCalendarLoaded();
       initAppPageHeader();
       initStudentTeachingPagesNavLink();
+      initStudentRecordedNavLink();
       initStudentSelfStudyNavLink();
     } catch (err) {
       console.error("Student page boot failed:", err);
