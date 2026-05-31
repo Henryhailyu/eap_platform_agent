@@ -544,7 +544,7 @@ const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 const teacherCategoryDrafts = {};
 let teacherCreateContextKey = "";
 /** Bump when create-form draft logic changes (cache-bust + deploy verification). */
-const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-recorded-link-on-create";
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-fix-audio-set";
 
 const RECORDED_AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
 
@@ -562,7 +562,10 @@ function recordedLessonIsAudio(rec) {
   const ext = String(rec.file_ext || "").toLowerCase();
   if (ext && RECORDED_AUDIO_EXTENSIONS.has(ext)) return true;
   const name = String(rec.file_name || rec.title || "").toLowerCase();
-  return RECORDED_AUDIO_EXTENSIONS.some((e) => name.endsWith(`.${e}`));
+  for (const e of RECORDED_AUDIO_EXTENSIONS) {
+    if (name.endsWith(`.${e}`)) return true;
+  }
+  return false;
 }
 
 function isRecordedLessonCategory(category) {
