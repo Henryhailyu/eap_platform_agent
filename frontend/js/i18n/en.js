@@ -300,6 +300,11 @@ window.EAP_STRINGS_EN = {
   "save_task": "Save Task",
   "teacher_new_task_btn": "New task for this day",
   "teacher_create_context_hint": "Task will be created for this class and date from your calendar.",
+  "teacher_create_context_hint_batch":
+    "Each category keeps its own draft (blue dot = ready). One Save Task publishes every prepared category for this class and date.",
+  "teacher_batch_save_empty": "Prepare at least one category (title or uploaded video) before saving.",
+  "teacher_batch_save_ok": "Saved {count} task(s) for this day. You can edit any task below after saving.",
+  "teacher_draft_material_kept": "File ready: {name}",
   "teacher_create_material_label": "Teaching material (optional)",
   "teacher_create_validation": "Please choose a category and enter a title.",
   "teacher_task_saved_with_material": "Task saved and material uploaded.",
@@ -687,7 +692,8 @@ window.EAP_STRINGS_EN = {
   "trec_linked_task": "Calendar {date}",
   "task_recording_label": "Class recording",
   "task_recording_manage": "Manage recording",
-  "teacher_rec_create_lead": "Step 1: upload the video. Step 2: fill in title and instructions, then Save Task.",
+  "teacher_rec_create_lead":
+    "Step 1: upload the video. Step 2: fill in title and instructions. Switch categories freely — your upload stays here. Save Task publishes to students.",
   "teacher_rec_upload_video_btn": "Upload video",
   "teacher_rec_upload_first_hint": "Choose a file, then click Upload video.",
   "teacher_rec_upload_done": "Video uploaded — {name}. Now complete the fields below and Save Task.",

@@ -479,31 +479,136 @@ const TASK_CATEGORIES = [
 
 const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 
-/** Draft recording uploaded before Save Task (calendar create form). */
-let teacherPendingRecordedLessonId = null;
-let teacherPendingRecordedLessonName = "";
+/** Per-category drafts for Create New Task (same class + date). */
+const teacherCategoryDrafts = {};
+let teacherCreateContextKey = "";
+/** Bump when create-form draft logic changes (cache-bust + deploy verification). */
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-category-drafts";
 
 function isRecordedLessonCategory(category) {
   return String(category || "").trim() === RECORDED_LESSON_CATEGORY;
 }
 
-function resetTeacherPendingRecordedLesson(options) {
-  const { deleteRemote = false } = options || {};
-  const id = teacherPendingRecordedLessonId;
-  teacherPendingRecordedLessonId = null;
-  teacherPendingRecordedLessonName = "";
-  if (deleteRemote && id != null && window.EAP_RECORDED_LESSONS) {
-    void window.EAP_RECORDED_LESSONS.remove(id).catch(() => {});
-  }
-  syncTeacherCreateRecordedUploadUI();
+function createEmptyTeacherCategoryDraft() {
+  return {
+    title: "",
+    title_zh: "",
+    description: "",
+    description_zh: "",
+    period: "",
+    recordedLessonId: null,
+    recordedLessonFileName: "",
+    materialFile: null,
+    materialFileName: "",
+  };
 }
 
-function syncTeacherCreateRecordedUploadUI() {
+function getTeacherCategoryDraft(category) {
+  const key = String(category || "").trim();
+  if (!key) return createEmptyTeacherCategoryDraft();
+  if (!teacherCategoryDrafts[key]) {
+    teacherCategoryDrafts[key] = createEmptyTeacherCategoryDraft();
+  }
+  return teacherCategoryDrafts[key];
+}
+
+function categoryDraftHasWork(draft, category) {
+  if (!draft) return false;
+  if (isRecordedLessonCategory(category)) {
+    return draft.recordedLessonId != null;
+  }
+  return !!(
+    String(draft.title || "").trim() ||
+    String(draft.description || "").trim() ||
+    String(draft.title_zh || "").trim() ||
+    String(draft.description_zh || "").trim() ||
+    String(draft.period || "").trim() ||
+    draft.materialFile
+  );
+}
+
+function saveFormToCategoryDraft(category) {
+  const d = getTeacherCategoryDraft(category);
+  const titleEl = document.getElementById("task-title");
+  const titleZhEl = document.getElementById("task-title-zh");
+  const descEl = document.getElementById("task-description");
+  const descZhEl = document.getElementById("task-description-zh");
+  const periodEl = document.getElementById("task-period");
+  d.title = titleEl ? String(titleEl.value || "") : "";
+  d.title_zh = titleZhEl ? String(titleZhEl.value || "") : "";
+  d.description = descEl ? String(descEl.value || "") : "";
+  d.description_zh = descZhEl ? String(descZhEl.value || "") : "";
+  d.period = periodEl ? String(periodEl.value || "") : "";
+  if (!isRecordedLessonCategory(category)) {
+    const matInput = document.getElementById("teacher-task-create-material");
+    if (matInput && matInput.files && matInput.files[0]) {
+      d.materialFile = matInput.files[0];
+      d.materialFileName = matInput.files[0].name;
+    }
+  }
+}
+
+function loadCategoryDraftToForm(category) {
+  const d = getTeacherCategoryDraft(category);
+  const titleEl = document.getElementById("task-title");
+  const titleZhEl = document.getElementById("task-title-zh");
+  const descEl = document.getElementById("task-description");
+  const descZhEl = document.getElementById("task-description-zh");
+  const periodEl = document.getElementById("task-period");
+  const matInput = document.getElementById("teacher-task-create-material");
+  const matSummary = document.getElementById("teacher-task-create-material-summary");
+  if (titleEl) titleEl.value = d.title || "";
+  if (titleZhEl) titleZhEl.value = d.title_zh || "";
+  if (descEl) descEl.value = d.description || "";
+  if (descZhEl) descZhEl.value = d.description_zh || "";
+  if (periodEl) periodEl.value = d.period || "";
+  if (matInput) matInput.value = "";
+  if (matSummary) {
+    matSummary.textContent = d.materialFileName
+      ? t("teacher_draft_material_kept", { name: d.materialFileName })
+      : t("no_file_selected");
+  }
+  if (isRecordedLessonCategory(category)) {
+    syncTeacherCreateRecordedUploadUI(category);
+  }
+}
+
+function syncTeacherCategoryChipDraftIndicators(chipsEl) {
+  if (!chipsEl) return;
+  chipsEl.querySelectorAll(".teacher-category-chip").forEach((btn) => {
+    const cat = btn.getAttribute("data-category");
+    const has = categoryDraftHasWork(getTeacherCategoryDraft(cat), cat);
+    btn.classList.toggle("teacher-category-chip--has-draft", has);
+  });
+}
+
+async function clearTeacherCategoryDrafts(options) {
+  const { deleteRemote = false } = options || {};
+  if (deleteRemote && window.EAP_RECORDED_LESSONS) {
+    const api = window.EAP_RECORDED_LESSONS;
+    for (const cat of Object.keys(teacherCategoryDrafts)) {
+      const d = teacherCategoryDrafts[cat];
+      if (d && d.recordedLessonId != null) {
+        try {
+          await api.remove(d.recordedLessonId);
+        } catch (_) {
+          /* orphan cleanup best-effort */
+        }
+      }
+    }
+  }
+  Object.keys(teacherCategoryDrafts).forEach((k) => delete teacherCategoryDrafts[k]);
+  syncTeacherCategoryChipDraftIndicators(document.getElementById("teacher-task-category-chips"));
+}
+
+function syncTeacherCreateRecordedUploadUI(category) {
+  const cat = category || RECORDED_LESSON_CATEGORY;
+  const draft = getTeacherCategoryDraft(cat);
   const statusEl = document.getElementById("teacher-create-recorded-upload-status");
   const uploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
   const fileWrap = document.getElementById("teacher-create-recorded-file-wrap");
   const fileInput = document.getElementById("teacher-create-recorded-video");
-  const uploaded = teacherPendingRecordedLessonId != null;
+  const uploaded = draft.recordedLessonId != null;
 
   if (fileWrap) fileWrap.classList.toggle("hidden", uploaded);
   if (uploadBtn) {
@@ -518,7 +623,7 @@ function syncTeacherCreateRecordedUploadUI() {
     );
     if (uploaded) {
       statusEl.textContent = t("teacher_rec_upload_done", {
-        name: teacherPendingRecordedLessonName || "",
+        name: draft.recordedLessonFileName || "",
       });
       statusEl.classList.add("teacher-recorded-upload-status--ok");
     } else {
@@ -529,11 +634,14 @@ function syncTeacherCreateRecordedUploadUI() {
   if (fileInput && uploaded) fileInput.value = "";
 }
 
-async function uploadTeacherPendingRecordedVideo(className) {
+async function uploadTeacherPendingRecordedVideo(className, category) {
+  const cat = category || RECORDED_LESSON_CATEGORY;
+  const draft = getTeacherCategoryDraft(cat);
   const api = window.EAP_RECORDED_LESSONS;
   const fileInput = document.getElementById("teacher-create-recorded-video");
   const statusEl = document.getElementById("teacher-create-recorded-upload-status");
   const uploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
+  saveFormToCategoryDraft(cat);
   if (!api || !fileInput || !fileInput.files || !fileInput.files[0]) {
     if (statusEl) {
       statusEl.textContent = t("teacher_rec_video_required");
@@ -542,10 +650,12 @@ async function uploadTeacherPendingRecordedVideo(className) {
     return null;
   }
   const file = fileInput.files[0];
-  const titleEl = document.getElementById("task-title");
-  const descEl = document.getElementById("task-description");
-  const title = (titleEl && String(titleEl.value || "").trim()) || file.name;
-  const description = descEl ? String(descEl.value || "").trim() : "";
+  const title =
+    String(draft.title || "").trim() ||
+    (document.getElementById("task-title") &&
+      String(document.getElementById("task-title").value || "").trim()) ||
+    file.name;
+  const description = String(draft.description || "").trim();
 
   if (uploadBtn) uploadBtn.disabled = true;
   if (statusEl) {
@@ -565,20 +675,23 @@ async function uploadTeacherPendingRecordedVideo(className) {
   if (!lesson || lesson.id == null) {
     throw new Error(t("trec_error_generic"));
   }
-  teacherPendingRecordedLessonId = lesson.id;
-  teacherPendingRecordedLessonName = lesson.file_name || file.name;
-  syncTeacherCreateRecordedUploadUI();
+  draft.recordedLessonId = lesson.id;
+  draft.recordedLessonFileName = lesson.file_name || file.name;
+  if (!String(draft.title || "").trim()) draft.title = title;
+  const titleEl = document.getElementById("task-title");
+  if (titleEl && !String(titleEl.value || "").trim()) titleEl.value = title;
+  syncTeacherCreateRecordedUploadUI(cat);
+  syncTeacherCategoryChipDraftIndicators(document.getElementById("teacher-task-category-chips"));
   return lesson;
 }
 
-async function finalizePendingRecordedLessonForTask({
+async function finalizeRecordedLessonForTask({
+  lessonId,
   taskId,
   title,
   description,
-  publish,
 }) {
   const api = window.EAP_RECORDED_LESSONS;
-  const lessonId = teacherPendingRecordedLessonId;
   if (!api || lessonId == null) {
     throw new Error(t("teacher_rec_video_required"));
   }
@@ -586,9 +699,84 @@ async function finalizePendingRecordedLessonForTask({
     calendar_task_id: taskId,
     title: title || undefined,
     description: description || undefined,
-    visibility: publish ? "published" : "draft",
+    visibility: "published",
   });
-  resetTeacherPendingRecordedLesson({ deleteRemote: false });
+}
+
+async function saveAllTeacherCategoryDrafts({ class_name, date }) {
+  const currentCat = document.getElementById("task-type")?.value;
+  if (currentCat) saveFormToCategoryDraft(currentCat);
+
+  const categories = TASK_CATEGORIES.filter((cat) =>
+    categoryDraftHasWork(getTeacherCategoryDraft(cat), cat),
+  );
+  if (!categories.length) {
+    throw new Error(t("teacher_batch_save_empty"));
+  }
+
+  let createdCount = 0;
+  const errors = [];
+
+  for (const cat of categories) {
+    const draft = getTeacherCategoryDraft(cat);
+    try {
+      if (isRecordedLessonCategory(cat)) {
+        if (!draft.recordedLessonId) {
+          errors.push(`${translateCategory(cat)}: ${t("teacher_rec_video_required")}`);
+          continue;
+        }
+        const title =
+          String(draft.title || "").trim() ||
+          draft.recordedLessonFileName ||
+          t("trec_title");
+        const created = await apiPost("/api/tasks", {
+          date,
+          title,
+          title_zh: draft.title_zh.trim() || null,
+          category: cat,
+          period: "",
+          description: draft.description.trim() || null,
+          description_zh: draft.description_zh.trim() || null,
+          class_name: class_name || teacherDefaultClassFallback(),
+        });
+        await finalizeRecordedLessonForTask({
+          lessonId: draft.recordedLessonId,
+          taskId: created.id,
+          title,
+          description: draft.description.trim(),
+        });
+        draft.recordedLessonId = null;
+        createdCount += 1;
+        continue;
+      }
+
+      const title = String(draft.title || "").trim();
+      if (!title) {
+        errors.push(`${translateCategory(cat)}: ${t("teacher_create_validation")}`);
+        continue;
+      }
+      const created = await apiPost("/api/tasks", {
+        date,
+        title,
+        title_zh: draft.title_zh.trim() || null,
+        category: cat,
+        period: draft.period.trim() || "",
+        description: draft.description.trim() || null,
+        description_zh: draft.description_zh.trim() || null,
+        class_name: class_name || teacherDefaultClassFallback(),
+      });
+      if (draft.materialFile && created && created.id != null) {
+        await apiUploadTaskFile(Number(created.id, 10), draft.materialFile);
+      }
+      draft.materialFile = null;
+      draft.materialFileName = "";
+      createdCount += 1;
+    } catch (err) {
+      errors.push(`${translateCategory(cat)}: ${(err && err.message) || t("trec_error_generic")}`);
+    }
+  }
+
+  return { createdCount, errors };
 }
 
 async function uploadRecordedLessonForTask({
@@ -1208,10 +1396,13 @@ function populateTeacherCategoryChips(chipsEl, selectEl, onCategoryChange) {
     btn.setAttribute("data-category", label);
     btn.setAttribute("aria-pressed", "false");
     btn.addEventListener("click", () => {
-      const prev = selectEl.value;
-      selectEl.value = label;
+      const prev = String(selectEl.value || "").trim();
+      const next = String(label || "").trim();
+      if (prev === next) return;
+      selectEl.value = next;
+      selectEl.dataset.eapPrevCategory = next;
       syncTeacherCategoryChipHighlight(chipsEl, selectEl);
-      if (typeof onCategoryChange === "function") onCategoryChange(label, prev);
+      if (typeof onCategoryChange === "function") onCategoryChange(next, prev);
     });
     chipsEl.appendChild(btn);
   });
@@ -1221,14 +1412,47 @@ function populateTeacherCategoryChips(chipsEl, selectEl, onCategoryChange) {
 /**
  * Phase N6 — calendar create form: show video upload + instructions when category is Recorded lesson.
  */
-function syncTeacherCreateTaskFormMode(category, previousCategory) {
+function switchTeacherCreateCategory(newCategory, previousCategory) {
+  const next = String(newCategory || "").trim();
+  const prev = String(previousCategory || "").trim();
+  if (prev && prev !== next) saveFormToCategoryDraft(prev);
+  loadCategoryDraftToForm(next);
+}
+
+/** Keep the active category draft in sync while the teacher types (not only on chip click). */
+function bindTeacherCreateTaskDraftAutosave(form, typeSelect, categoryChipsEl) {
+  if (!form || !typeSelect || form.dataset.eapDraftAutosave === "1") return;
+  form.dataset.eapDraftAutosave = "1";
+
+  const persistNow = () => {
+    const cat = String(typeSelect.value || "").trim();
+    if (!cat) return;
+    saveFormToCategoryDraft(cat);
+    syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+  };
+
+  ["task-title", "task-title-zh", "task-description", "task-description-zh", "task-period"].forEach(
+    (id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("input", persistNow);
+      el.addEventListener("change", persistNow);
+    },
+  );
+
+  typeSelect.addEventListener("change", () => {
+    const next = String(typeSelect.value || "").trim();
+    const prev = typeSelect.dataset.eapPrevCategory || "";
+    switchTeacherCreateCategory(next, prev);
+    typeSelect.dataset.eapPrevCategory = next;
+    syncTeacherCreateTaskFormMode(next);
+    syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+  });
+}
+
+function syncTeacherCreateTaskFormMode(category) {
   const isRec = isRecordedLessonCategory(category);
-  const wasRec = isRecordedLessonCategory(previousCategory);
-  if (wasRec && !isRec && teacherPendingRecordedLessonId != null) {
-    resetTeacherPendingRecordedLesson({ deleteRemote: true });
-  }
   const recordedPanel = document.getElementById("teacher-create-recorded-panel");
-  const publishWrap = document.getElementById("teacher-create-recorded-publish-wrap");
   const materialField = document.getElementById("teacher-task-create-material-field");
   const periodField = document.getElementById("task-period")?.closest(".field");
   const titleLabel = document.getElementById("task-title-label");
@@ -1240,8 +1464,7 @@ function syncTeacherCreateTaskFormMode(category, previousCategory) {
     recordedPanel.classList.toggle("hidden", !isRec);
     recordedPanel.setAttribute("aria-hidden", isRec ? "false" : "true");
   }
-  if (publishWrap) publishWrap.classList.toggle("hidden", !isRec);
-  if (isRec) syncTeacherCreateRecordedUploadUI();
+  if (isRec) syncTeacherCreateRecordedUploadUI(category);
   if (materialField) materialField.classList.toggle("hidden", isRec);
   if (periodField) periodField.classList.toggle("hidden", isRec);
 
@@ -4043,9 +4266,19 @@ function initTeacherPage() {
   const createMaterialSummary = document.getElementById("teacher-task-create-material-summary");
 
   populateTeacherCategoryChips(categoryChipsEl, typeSelect, (cat, prev) => {
-    syncTeacherCreateTaskFormMode(cat, prev);
+    switchTeacherCreateCategory(cat, prev);
+    syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+    syncTeacherCreateTaskFormMode(cat);
   });
+  if (!String(typeSelect.value || "").trim() && TASK_CATEGORIES.length) {
+    typeSelect.value = TASK_CATEGORIES.includes("Homework") ? "Homework" : TASK_CATEGORIES[0];
+    syncTeacherCategoryChipHighlight(categoryChipsEl, typeSelect);
+  }
+  typeSelect.dataset.eapPrevCategory = String(typeSelect.value || "").trim();
+  loadCategoryDraftToForm(typeSelect.value);
+  bindTeacherCreateTaskDraftAutosave(form, typeSelect, categoryChipsEl);
   syncTeacherCreateTaskFormMode(typeSelect.value);
+  syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
 
   const recordedUploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
   if (recordedUploadBtn && recordedUploadBtn.dataset.eapBound !== "1") {
@@ -4053,7 +4286,7 @@ function initTeacherPage() {
     recordedUploadBtn.addEventListener("click", async () => {
       setTeacherPageError(pageErrorEl, "");
       try {
-        await uploadTeacherPendingRecordedVideo(getFilterClass());
+        await uploadTeacherPendingRecordedVideo(getFilterClass(), typeSelect.value);
       } catch (err) {
         const statusEl = document.getElementById("teacher-create-recorded-upload-status");
         if (statusEl) {
@@ -4063,12 +4296,21 @@ function initTeacherPage() {
       }
     });
   }
-  syncTeacherCreateRecordedUploadUI();
+  syncTeacherCreateRecordedUploadUI(typeSelect.value);
 
   function syncTeacherCreateTaskContext() {
     if (!createContextEl) return;
     const cls = getFilterClass();
     const iso = getTaskListDate().trim().slice(0, 10);
+    const contextKey = `${cls}|${iso}`;
+    if (teacherCreateContextKey && teacherCreateContextKey !== contextKey) {
+      void clearTeacherCategoryDrafts({ deleteRemote: true }).then(() => {
+        loadCategoryDraftToForm(typeSelect.value);
+        syncTeacherCreateTaskFormMode(typeSelect.value);
+        syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+      });
+    }
+    teacherCreateContextKey = contextKey;
     createContextEl.innerHTML = "";
     const line = document.createElement("p");
     line.className = "teacher-task-create-context__line";
@@ -4087,8 +4329,13 @@ function initTeacherPage() {
     createContextEl.appendChild(line);
     const hint = document.createElement("p");
     hint.className = "teacher-task-create-context__hint";
-    hint.textContent = t("teacher_create_context_hint");
+    hint.textContent = t("teacher_create_context_hint_batch");
     createContextEl.appendChild(hint);
+    const buildNote = document.createElement("p");
+    buildNote.className = "teacher-task-create-context__build visually-hidden";
+    buildNote.setAttribute("data-eap-create-build", EAP_TEACHER_CREATE_DRAFT_BUILD);
+    buildNote.textContent = EAP_TEACHER_CREATE_DRAFT_BUILD;
+    createContextEl.appendChild(buildNote);
     taskClassSelect.value = cls;
     if (iso.length >= 10) dateInput.value = iso;
   }
@@ -4101,8 +4348,9 @@ function initTeacherPage() {
       typeSelect.value = TASK_CATEGORIES.includes("Homework") ? "Homework" : TASK_CATEGORIES[0];
       syncTeacherCategoryChipHighlight(categoryChipsEl, typeSelect);
     }
+    loadCategoryDraftToForm(typeSelect.value);
     syncTeacherCreateTaskFormMode(typeSelect.value);
-    if (isRecordedLessonCategory(typeSelect.value)) syncTeacherCreateRecordedUploadUI();
+    syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
     if (scroll && createTaskDetailsEl) {
       createTaskDetailsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
@@ -4118,6 +4366,13 @@ function initTeacherPage() {
 
   if (createMaterialInput && createMaterialSummary) {
     const refreshMaterialSummary = () => {
+      const cat = typeSelect.value;
+      if (!isRecordedLessonCategory(cat) && createMaterialInput.files && createMaterialInput.files[0]) {
+        const d = getTeacherCategoryDraft(cat);
+        d.materialFile = createMaterialInput.files[0];
+        d.materialFileName = createMaterialInput.files[0].name;
+        syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+      }
       updateSelectedFileSummary(createMaterialInput, createMaterialSummary);
     };
     createMaterialInput.addEventListener("change", refreshMaterialSummary);
@@ -5724,23 +5979,9 @@ function initTeacherPage() {
     const formData = new FormData(form);
     const class_name = String(formData.get("class_name") || "").trim();
     const date = String(formData.get("date") || "").trim();
-    const title = String(formData.get("title") || "").trim();
-    const title_zh = String(formData.get("title_zh") || "").trim();
-    const category = String(formData.get("type") || "").trim();
-    const period = String(formData.get("period") || "").trim();
-    const description = String(formData.get("description") || "").trim();
-    const description_zh = String(formData.get("description_zh") || "").trim();
 
-    if (!date || !title || !category) {
+    if (!date) {
       messageEl.textContent = t("teacher_create_validation");
-      messageEl.classList.add("form-message--error");
-      return;
-    }
-
-    const isRecCreate = isRecordedLessonCategory(category);
-    const recordedPublishCb = document.getElementById("teacher-create-recorded-publish");
-    if (isRecCreate && teacherPendingRecordedLessonId == null) {
-      messageEl.textContent = t("teacher_rec_upload_first_required");
       messageEl.classList.add("form-message--error");
       return;
     }
@@ -5749,57 +5990,22 @@ function initTeacherPage() {
     if (submitBtn) submitBtn.disabled = true;
 
     try {
-      const created = await apiPost("/api/tasks", {
-        date,
-        title,
-        title_zh: title_zh || null,
-        category,
-        period: isRecCreate ? "" : period,
-        description,
-        description_zh: description_zh || null,
+      const { createdCount, errors } = await saveAllTeacherCategoryDrafts({
         class_name: class_name || teacherDefaultClassFallback(),
+        date,
       });
 
-      let savedMsg = t("task_saved");
-      let uploadFailed = false;
-
-      if (isRecCreate && created && created.id != null) {
-        try {
-          await finalizePendingRecordedLessonForTask({
-            taskId: created.id,
-            title,
-            description,
-            publish: !!(recordedPublishCb && recordedPublishCb.checked),
-          });
-          savedMsg = t("teacher_rec_task_saved");
-        } catch (uploadErr) {
-          uploadFailed = true;
-          savedMsg = `${t("task_saved")} ${uploadErr.message}`;
-        }
-      } else if (
-        createMaterialInput &&
-        createMaterialInput.files &&
-        createMaterialInput.files.length > 0 &&
-        created &&
-        created.id != null
-      ) {
-        try {
-          await apiUploadTaskFile(Number(created.id, 10), createMaterialInput.files[0]);
-          createMaterialInput.value = "";
-          if (createMaterialSummary) {
-            updateSelectedFileSummary(createMaterialInput, createMaterialSummary);
-          }
-          savedMsg = t("teacher_task_saved_with_material");
-        } catch (uploadErr) {
-          uploadFailed = true;
-          savedMsg = `${t("task_saved")} ${uploadErr.message}`;
-        }
+      let savedMsg = t("teacher_batch_save_ok", { count: createdCount });
+      const uploadFailed = errors.length > 0;
+      if (uploadFailed) {
+        savedMsg = `${savedMsg} ${errors.join(" · ")}`;
       }
 
       messageEl.textContent = savedMsg;
-      messageEl.classList.toggle("form-message--success", !uploadFailed);
-      messageEl.classList.toggle("form-message--error", uploadFailed);
+      messageEl.classList.toggle("form-message--success", createdCount > 0 && !uploadFailed);
+      messageEl.classList.toggle("form-message--error", uploadFailed || createdCount === 0);
 
+      await clearTeacherCategoryDrafts({ deleteRemote: true });
       form.querySelector("#task-title").value = "";
       const titleZhEl = form.querySelector("#task-title-zh");
       if (titleZhEl) titleZhEl.value = "";
@@ -5809,9 +6015,11 @@ function initTeacherPage() {
       form.querySelector("#task-description").value = "";
       const descZhEl = form.querySelector("#task-description-zh");
       if (descZhEl) descZhEl.value = "";
-      if (recordedPublishCb) recordedPublishCb.checked = false;
-      resetTeacherPendingRecordedLesson({ deleteRemote: false });
+      if (createMaterialInput) createMaterialInput.value = "";
+      if (createMaterialSummary) createMaterialSummary.textContent = t("no_file_selected");
+      loadCategoryDraftToForm(typeSelect.value);
       syncTeacherCreateTaskFormMode(typeSelect.value);
+      syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
 
       await refreshTaskList();
       await refreshDashboard();
@@ -5909,11 +6117,21 @@ function initTeacherPage() {
   }
 
   window.__eapTeacherLangRefresh = () => {
+    const langPrevCat = String(typeSelect.value || "").trim();
+    if (langPrevCat) saveFormToCategoryDraft(langPrevCat);
     populateCategorySelect(typeSelect, false);
+    if (langPrevCat && TASK_CATEGORIES.includes(langPrevCat)) {
+      typeSelect.value = langPrevCat;
+    }
     populateTeacherCategoryChips(categoryChipsEl, typeSelect, (cat, prev) => {
-      syncTeacherCreateTaskFormMode(cat, prev);
+      switchTeacherCreateCategory(cat, prev);
+      syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+      syncTeacherCreateTaskFormMode(cat);
     });
+    typeSelect.dataset.eapPrevCategory = String(typeSelect.value || "").trim();
+    loadCategoryDraftToForm(typeSelect.value);
     syncTeacherCreateTaskFormMode(typeSelect.value);
+    syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
     populateTeacherTemplateCategoryFilterSelect(templateCategoryFilterEl);
     populateTeacherTemplateCategoryChips(templateCategoryChipsEl, templateCategoryFilterEl);
     syncTeacherCreateTaskContext();

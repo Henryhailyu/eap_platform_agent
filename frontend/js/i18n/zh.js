@@ -300,6 +300,11 @@ window.EAP_STRINGS_ZH = {
   "save_task": "保存任务",
   "teacher_new_task_btn": "为本日新建任务",
   "teacher_create_context_hint": "任务将创建在当前日历所选班级与日期下。",
+  "teacher_create_context_hint_batch":
+    "各类别草稿相互独立（蓝点表示已填写）。点一次「保存任务」会为本日已配置的所有类别一起创建并推送。",
+  "teacher_batch_save_empty": "请至少为一个类别填写标题或上传录课视频后再保存。",
+  "teacher_batch_save_ok": "已为本日保存 {count} 个任务。保存后可在下方任务卡片中继续修改。",
+  "teacher_draft_material_kept": "已选文件：{name}",
   "teacher_create_material_label": "教学资料（可选）",
   "teacher_create_validation": "请选择类别并填写标题。",
   "teacher_task_saved_with_material": "任务已保存，资料已上传。",
@@ -687,7 +692,8 @@ window.EAP_STRINGS_ZH = {
   "trec_linked_task": "日历 {date}",
   "task_recording_label": "课堂录像",
   "task_recording_manage": "管理录像",
-  "teacher_rec_create_lead": "第一步：上传视频。第二步：填写标题与说明，再点保存任务。",
+  "teacher_rec_create_lead":
+    "第一步：上传视频。第二步：填写标题与说明。可切换其他类别继续设置，录课视频会保留。保存任务后直接推送给学生。",
   "teacher_rec_upload_video_btn": "上传视频",
   "teacher_rec_upload_first_hint": "请选择文件，再点击「上传视频」。",
   "teacher_rec_upload_done": "视频已上传 — {name}。请填写下方内容后点击「保存任务」。",
