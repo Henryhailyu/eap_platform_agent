@@ -5881,7 +5881,10 @@ function initTeacherPage() {
 
   window.__eapTeacherLangRefresh = () => {
     populateCategorySelect(typeSelect, false);
-    populateTeacherCategoryChips(categoryChipsEl, typeSelect);
+    populateTeacherCategoryChips(categoryChipsEl, typeSelect, (cat) => {
+      syncTeacherCreateTaskFormMode(cat);
+    });
+    syncTeacherCreateTaskFormMode(typeSelect.value);
     populateTeacherTemplateCategoryFilterSelect(templateCategoryFilterEl);
     populateTeacherTemplateCategoryChips(templateCategoryChipsEl, templateCategoryFilterEl);
     syncTeacherCreateTaskContext();
