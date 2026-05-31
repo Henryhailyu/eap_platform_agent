@@ -79,7 +79,7 @@ def _save_one_material_upload(conn, task_id: int, row, upload) -> dict:
         raise ValueError("No file selected")
     if not allowed_file_extension(upload.filename):
         raise ValueError(
-            "File type not allowed. Allowed: pdf, doc, docx, ppt, pptx, mp3, mp4, txt, jpg, png"
+            "File type not allowed. Allowed: pdf, doc, docx, ppt, pptx, xls, xlsx, mp3, mp4, txt, jpg, jpeg, png"
         )
     ext = upload.filename.rsplit(".", 1)[-1].lower()
     stored_name = f"{uuid.uuid4().hex}.{ext}"

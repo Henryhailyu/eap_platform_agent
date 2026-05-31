@@ -544,7 +544,7 @@ const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 const teacherCategoryDrafts = {};
 let teacherCreateContextKey = "";
 /** Bump when create-form draft logic changes (cache-bust + deploy verification). */
-const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-fix-audio-set";
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-material-xhr-excel";
 
 const RECORDED_AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
 
@@ -1654,60 +1654,45 @@ async function apiPutFeedbackFormData(submissionId, formData) {
  * Important: pass a FormData instance (or build one here). Do NOT set the Content-Type header —
  * the browser will set multipart boundaries automatically; a manual JSON header would break uploads.
  */
-async function apiUploadTaskFile(taskId, file) {
-  const formData = new FormData();
-  formData.append("file", file);
-  const response = await eapPostMultipart(apiPathForUpload(`/api/tasks/${taskId}/upload`), formData);
-  const data = await readJsonOrError(response);
-  if (!response.ok) {
-    const msg =
-      (data && (data.error || data.message)) || `Upload failed (${response.status})`;
-    throw new Error(msg);
-  }
-  return data;
-}
-
-/** POST an additional teaching material (keeps existing files). */
-async function apiUploadTaskMaterial(taskId, file) {
-  const formData = new FormData();
-  formData.append("file", file);
-  const response = await eapPostMultipart(apiPathForUpload(`/api/tasks/${taskId}/materials`), formData);
-  const data = await readJsonOrError(response);
-  if (!response.ok) {
-    const msg =
-      (data && (data.error || data.message)) || `Upload failed (${response.status})`;
-    throw new Error(msg);
-  }
-  return data;
-}
-
-/** Upload all teaching materials for a task in one request. */
-function apiPathForUpload(path) {
-  const p = path.startsWith("/") ? path : `/${path}`;
-  if (typeof window !== "undefined" && window.location.origin) {
+/**
+ * Upload a single teaching material file via XHR using full absolute URL.
+ * XHR is more reliable than fetch for multipart in same-origin production setups.
+ */
+function eapXhrUploadFile(taskId, file) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
     const base = String(API_BASE || "").replace(/\/$/, "");
-    if (base === window.location.origin) return p;
-  }
-  return `${String(API_BASE || "").replace(/\/$/, "")}${p}`;
+    const url = `${base}/api/tasks/${taskId}/upload`;
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.withCredentials = true;
+    const token = getAccessToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.timeout = 120000;
+    xhr.onload = () => {
+      let data;
+      try {
+        data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+      } catch (_) {
+        data = { error: (xhr.responseText || "").slice(0, 200) };
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const msg = (data && (data.error || data.message)) || `Upload failed (${xhr.status})`;
+        reject(new Error(msg));
+      }
+    };
+    xhr.onerror = () => reject(new Error(apiUnreachableMessage()));
+    xhr.ontimeout = () => reject(new Error(t("teacher_upload_timeout")));
+    xhr.send(formData);
+  });
 }
 
-async function apiUploadTaskMaterialsBatch(taskId, files) {
-  const formData = new FormData();
-  const list = Array.isArray(files) ? files.filter(Boolean) : [];
-  list.forEach((f) => formData.append("files", f));
-  const response = await eapPostMultipart(
-    apiPathForUpload(`/api/tasks/${taskId}/materials/batch`),
-    formData,
-  );
-  const data = await readJsonOrError(response);
-  if (!response.ok) {
-    const msg =
-      (data && (data.error || data.message)) ||
-      (data && data.errors && data.errors[0]) ||
-      `Upload failed (${response.status})`;
-    throw new Error(msg);
-  }
-  return data;
+/** Legacy fetch-based task file upload (kept for task-detail repair button). */
+async function apiUploadTaskFile(taskId, file) {
+  return eapXhrUploadFile(taskId, file);
 }
 
 function eapSleep(ms) {
@@ -1716,13 +1701,11 @@ function eapSleep(ms) {
 
 function normalizeDraftMaterialFiles(files) {
   const raw = Array.isArray(files) ? files : [];
-  const valid = raw.filter(
-    (f) => f && (f instanceof File || f instanceof Blob) && Number(f.size) > 0,
-  );
+  const valid = raw.filter((f) => f && f.name && Number(f.size) >= 0);
   return { valid, stale: raw.length > 0 && valid.length === 0 };
 }
 
-/** Upload teaching materials after Save Task (batch first, then per-file fallback). */
+/** Upload teaching materials after Save Task — one file at a time via XHR. */
 async function apiUploadTaskMaterialsReliable(taskId, files) {
   const { valid: list, stale } = normalizeDraftMaterialFiles(files);
   if (!list.length) {
@@ -1730,54 +1713,30 @@ async function apiUploadTaskMaterialsReliable(taskId, files) {
     return { uploaded: 0, materials: [] };
   }
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      await apiUploadTaskMaterialsBatch(taskId, list);
-      return { uploaded: list.length, materials: list.map((f) => ({ file_name: f.name })) };
-    } catch (batchErr) {
-      if (attempt === 0) await eapSleep(500);
-      else {
-        /* fall through to per-file */
-      }
-    }
-  }
-
   const errors = [];
   let uploaded = 0;
 
-  async function uploadOne(file, useLegacyUpload) {
+  for (let i = 0; i < list.length; i += 1) {
+    const file = list[i];
     let ok = false;
     for (let attempt = 0; attempt < 3 && !ok; attempt += 1) {
       try {
-        if (useLegacyUpload) {
-          await apiUploadTaskFile(taskId, file);
-        } else {
-          await apiUploadTaskMaterial(taskId, file);
-        }
+        await eapXhrUploadFile(taskId, file);
         uploaded += 1;
         ok = true;
       } catch (err) {
         if (attempt === 2) {
           errors.push(`${file.name}: ${(err && err.message) || t("trec_error_generic")}`);
         } else {
-          await eapSleep(500 * (attempt + 1));
+          await eapSleep(800 * (attempt + 1));
         }
       }
     }
+    if (i < list.length - 1) await eapSleep(300);
   }
 
-  await uploadOne(list[0], true);
-  for (let i = 1; i < list.length; i += 1) {
-    await eapSleep(150);
-    await uploadOne(list[i], false);
-  }
-
-  if (!uploaded && errors.length) {
-    throw new Error(errors.join(" · "));
-  }
-  if (errors.length) {
-    throw new Error(errors.join(" · "));
-  }
+  if (!uploaded && errors.length) throw new Error(errors.join(" · "));
+  if (errors.length) throw new Error(errors.join(" · "));
   return { uploaded, materials: list.map((f) => ({ file_name: f.name })) };
 }
 
@@ -4319,7 +4278,7 @@ function buildTeacherTaskCardElement(task, copyContext) {
   fileInput.type = "file";
   fileInput.className = "task-upload-input";
   fileInput.accept =
-    ".pdf,.doc,.docx,.ppt,.pptx,.mp3,.mp4,.txt,.jpg,.jpeg,.png";
+    ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp3,.mp4,.txt,.jpg,.jpeg,.png";
 
   fileLabel.appendChild(chooseSpan);
   fileLabel.appendChild(fileInput);

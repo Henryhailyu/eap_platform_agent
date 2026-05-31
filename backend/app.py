@@ -243,7 +243,7 @@ SUBMISSIONS_DIR = config.SUBMISSIONS_DIR
 
 # Lowercase extensions (no dot) — keep in sync with what teachers may upload.
 ALLOWED_UPLOAD_EXTENSIONS = frozenset(
-    {"pdf", "doc", "docx", "ppt", "pptx", "mp3", "mp4", "txt", "jpg", "png"}
+    {"pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "mp3", "mp4", "txt", "jpg", "jpeg", "png"}
 )
 
 # Homework uploads: smaller allowlist than teaching materials (no ppt/mp3/mp4 here).
