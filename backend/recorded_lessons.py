@@ -249,7 +249,7 @@ def register_recorded_lessons_routes(app):
                     (class_name, teacher_username, title, description,
                      file_path, file_name, file_ext, file_size_bytes, visibility,
                      calendar_task_id, vod_file_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
                 """,
                 (
                     class_name,
