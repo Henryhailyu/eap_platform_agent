@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Recorded lessons — EAP Platform" />
+    <title>Recorded lessons — EAP Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,600;1,8..60,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/teacher-live.css" />
+    <link rel="stylesheet" href="css/teacher-recorded.css" />
+  </head>
+  <body class="page-app eap-shell-active" data-page="teacher-recorded">
+    <div id="page-shell" class="page-shell">
+      <div class="page-overlay">
+        <header class="site-header">
+          <div class="site-header__inner">
+            <a class="site-logo" href="teacher.html"
+              ><span data-i18n="brand">EAP Platform</span
+              ><span class="eap-build-badge" data-i18n="build_badge">Agent build</span></a
+            >
+            <div class="site-header__actions">
+              <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">中文</button>
+              <p class="site-welcome" id="header-welcome" aria-live="polite"><span data-i18n="welcome">Welcome,</span></p>
+              <button type="button" class="btn-logout" id="logout-btn" data-i18n="logout">Logout</button>
+            </div>
+          </div>
+        </header>
+
+        <main class="trec-page" id="trec-main">
+          <div class="tlive-topbar">
+            <div>
+              <a class="tlive-back" href="teacher.html" data-i18n="trec_back_calendar">← Teaching calendar</a>
+              <h1 data-i18n="trec_title">Recorded lessons</h1>
+              <p class="tlive-topbar__meta" data-i18n="trec_subtitle">
+                Upload class recordings for your students. Videos are stored on the server until Tencent VOD is connected.
+              </p>
+            </div>
+          </div>
+
+          <section class="trec-panel" aria-labelledby="trec-upload-heading">
+            <h2 id="trec-upload-heading" class="tla-panel__title" data-i18n="trec_upload_heading">Upload recording</h2>
+            <form id="trec-upload-form">
+              <div class="trec-field">
+                <label for="trec-class" data-i18n="trec_class_label">Class</label>
+                <select id="trec-class" name="class_name" required></select>
+              </div>
+              <div class="trec-field">
+                <label for="trec-title" data-i18n="trec_title_label">Title</label>
+                <input id="trec-title" name="title" type="text" maxlength="200" required />
+              </div>
+              <div class="trec-field">
+                <label for="trec-file" data-i18n="trec_file_label">Video file</label>
+                <input id="trec-file" name="file" type="file" accept=".mp4,.webm,.mov,.m4v,video/*" required />
+                <p class="trec-hint" data-i18n="trec_file_hint">MP4, WebM, MOV, or M4V — max 500 MB</p>
+              </div>
+              <button type="submit" class="btn-primary" id="trec-upload-btn" data-i18n="trec_upload_btn">Upload</button>
+              <p id="trec-upload-status" class="trec-status" role="status" aria-live="polite"></p>
+            </form>
+          </section>
+
+          <section class="trec-panel" aria-labelledby="trec-list-heading">
+            <h2 id="trec-list-heading" class="tla-panel__title" data-i18n="trec_list_heading">Your recordings</h2>
+            <ul id="trec-list" class="trec-list" role="list"></ul>
+            <p id="trec-list-empty" class="trec-empty hidden" data-i18n="trec_list_empty">No recordings yet for this class.</p>
+          </section>
+
+          <section id="trec-preview-section" class="trec-panel hidden" aria-labelledby="trec-preview-heading">
+            <h2 id="trec-preview-heading" class="tla-panel__title" data-i18n="trec_preview_heading">Preview</h2>
+            <div class="trec-preview">
+              <video id="trec-preview-video" controls controlsList="nodownload" playsinline></video>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="js/pilot-wake.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+    <script src="js/recorded-lessons-api.js"></script>
+    <script src="js/teacher-recorded.js"></script>
+  </body>
+</html>

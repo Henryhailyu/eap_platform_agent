@@ -607,6 +607,10 @@ def init_database():
 
     init_classroom_display_tables(conn)
 
+    from recorded_lessons import init_recorded_lessons_tables
+
+    init_recorded_lessons_tables(conn)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS classes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8078,6 +8082,10 @@ register_live_teaching_routes(app)
 from classroom_display import register_classroom_display_routes
 
 register_classroom_display_routes(app)
+
+from recorded_lessons import register_recorded_lessons_routes
+
+register_recorded_lessons_routes(app)
 
 # Start the Flask server
 if __name__ == "__main__":

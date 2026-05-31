@@ -1,0 +1,122 @@
+/* Phase N — teacher recorded lessons */
+.trec-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+.trec-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.trec-field {
+  margin-bottom: 1rem;
+}
+
+.trec-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: #1d1d1f;
+}
+
+.trec-field input[type="text"],
+.trec-field input[type="file"],
+.trec-field select {
+  width: 100%;
+  max-width: 28rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #c8c8cc;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.trec-hint {
+  font-size: 0.875rem;
+  color: #6e6e73;
+  margin-top: 0.25rem;
+}
+
+.trec-status {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
+.trec-status--error {
+  color: #b42318;
+}
+
+.trec-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.trec-item {
+  border: 1px solid #e5e5ea;
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.75rem;
+  background: #fff;
+}
+
+.trec-item__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.trec-item__title {
+  font-weight: 600;
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.trec-badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #e8f4f8;
+  color: #0a7ea4;
+}
+
+.trec-badge--published {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.trec-item__meta {
+  font-size: 0.85rem;
+  color: #6e6e73;
+  margin: 0 0 0.75rem;
+}
+
+.trec-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.trec-preview {
+  margin-top: 1rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.trec-preview video {
+  width: 100%;
+  max-height: 360px;
+  display: block;
+}
+
+.trec-empty {
+  color: #6e6e73;
+  font-style: italic;
+}

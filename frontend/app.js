@@ -395,7 +395,7 @@ function bindStudentLiveNavLink() {
 }
 
 function bindTeacherLiveNavLink() {
-  document.querySelectorAll("#teacher-live-link, #teacher-lesson-ai-link, #tgb-open-live, a.tlive-back").forEach((link) => {
+  document.querySelectorAll("#teacher-live-link, #teacher-lesson-ai-link, #teacher-recorded-link, #tgb-open-live, a.tlive-back").forEach((link) => {
     bindRoleGuardedNavLink(link, "teacher", link.getAttribute("href") || "teacher-live.html");
   });
 }
@@ -423,6 +423,8 @@ function initTeacherLiveNavLink() {
   }
   const lessonLink = document.getElementById("teacher-lesson-ai-link");
   if (lessonLink) lessonLink.classList.remove("hidden");
+  const recordedLink = document.getElementById("teacher-recorded-link");
+  if (recordedLink) recordedLink.classList.remove("hidden");
   bindTeacherLiveNavLink();
 }
 
