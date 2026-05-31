@@ -6,7 +6,7 @@ DATA_DIR="${EAP_DATA_DIR:-/data}"
 SEED_MARKER="${DATA_DIR}/.eap_seeded"
 
 UPLOAD_ROOT="${EAP_UPLOAD_DIR:-/data/uploads}"
-mkdir -p "${UPLOAD_ROOT}/classroom-display/previews" "${EAP_SUBMISSIONS_DIR:-/data/submissions}"
+mkdir -p "${UPLOAD_ROOT}/classroom-display/previews" "${UPLOAD_ROOT}/recorded-lessons" "${EAP_SUBMISSIONS_DIR:-/data/submissions}"
 
 echo "EAP pilot: initializing database at ${EAP_DATABASE_PATH:-/data/eap_platform.db}"
 python -c "from app import init_database; init_database()"
