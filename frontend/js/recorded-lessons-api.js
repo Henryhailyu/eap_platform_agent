@@ -71,6 +71,13 @@
         body: JSON.stringify(patch || {}),
       });
     },
+    linkTask(lessonId, calendarTaskId) {
+      return apiFetch(`/api/teacher/recorded-lessons/${lessonId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ calendar_task_id: calendarTaskId }),
+      });
+    },
     remove(lessonId) {
       return apiFetch(`/api/teacher/recorded-lessons/${lessonId}`, {
         method: "DELETE",

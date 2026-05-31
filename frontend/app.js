@@ -74,6 +74,7 @@ const TASK_CATEGORY_I18N = {
   Speaking: "cat_speaking",
   Writing: "cat_writing",
   Homework: "cat_homework",
+  "Recorded lesson": "cat_recorded",
 };
 
 function translateCategory(label) {
@@ -473,6 +474,7 @@ const TASK_CATEGORIES = [
   "Speaking",
   "Writing",
   "Homework",
+  "Recorded lesson",
 ];
 
 /** When enrolment API has no class and login has no class_name, student UI uses this (Phase C3). */
@@ -1302,8 +1304,44 @@ function calendarCategoryClass(category) {
   if (raw.includes("speak")) return "cal-pill--speaking";
   if (raw.includes("writ")) return "cal-pill--writing";
   if (raw.includes("self") && raw.includes("stud")) return "cal-pill--selfstudy";
+  if (raw.includes("record")) return "cal-pill--listening";
 
   return "cal-pill--other";
+}
+
+/** Phase N6 — linked published recording on a calendar task. */
+function appendTaskRecordedLessonBlock(parent, task, role) {
+  const rec = task && task.recorded_lesson;
+  if (!rec || rec.id == null) return;
+  if (role === "student" && rec.visibility && rec.visibility !== "published") return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "task-card__recording";
+
+  const label = document.createElement("span");
+  label.className = "task-card__recording-label";
+  label.textContent = t("task_recording_label");
+
+  const link = document.createElement("a");
+  link.className = "btn-secondary task-card__recording-link";
+  if (role === "teacher") {
+    const cls = task.class_name ? `?class_name=${encodeURIComponent(task.class_name)}` : "";
+    link.href = `teacher-recorded.html${cls}`;
+    link.textContent = t("task_recording_manage");
+  } else {
+    link.href = `student-recorded.html?id=${encodeURIComponent(String(rec.id))}`;
+    link.textContent = t("srec_watch_btn");
+  }
+
+  wrap.appendChild(label);
+  if (rec.title) {
+    const meta = document.createElement("span");
+    meta.className = "task-card__recording-meta";
+    meta.textContent = rec.title;
+    wrap.appendChild(meta);
+  }
+  wrap.appendChild(link);
+  parent.appendChild(wrap);
 }
 
 /**
@@ -2898,6 +2936,8 @@ function buildTeacherTaskCardElement(task, copyContext) {
   desc.className = "task-card__description";
   const descShown = taskDisplayDescription(task);
   if (descShown) desc.textContent = descShown;
+
+  appendTaskRecordedLessonBlock(li, task, "teacher");
 
   const copyWrap = document.createElement("div");
   copyWrap.className = "task-card__copy-wrap";
@@ -5840,6 +5880,8 @@ function buildStudentTaskCardElement(task, mySub) {
     material.classList.add("task-card__material--empty");
     material.textContent = t("no_material");
   }
+
+  appendTaskRecordedLessonBlock(li, task, "student");
 
   const homework = document.createElement("div");
   homework.className = "task-card__homework";

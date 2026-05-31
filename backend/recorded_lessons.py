@@ -17,6 +17,7 @@ MAX_RECORDED_VIDEO_BYTES = 500 * 1024 * 1024  # 500 MB pilot cap
 
 VISIBILITY_DRAFT = "draft"
 VISIBILITY_PUBLISHED = "published"
+RECORDED_LESSON_CATEGORY = "Recorded lesson"
 
 
 def _now_iso() -> str:
@@ -98,6 +99,100 @@ def lesson_row_to_dict(row) -> dict:
         "created_at": row["created_at"] or "",
         "updated_at": row["updated_at"] or "",
     }
+
+
+def enrich_task_dicts_with_recordings(conn, task_dicts, *, published_only: bool = False) -> list:
+    """Attach recorded_lesson {id, title, visibility} to each task dict when linked."""
+    if not task_dicts:
+        return task_dicts
+    task_ids = [int(t["id"]) for t in task_dicts if t.get("id") is not None]
+    if not task_ids:
+        return task_dicts
+    placeholders = ",".join("?" * len(task_ids))
+    params: list = list(task_ids)
+    vis_sql = ""
+    if published_only:
+        vis_sql = " AND visibility = ?"
+        params.append(VISIBILITY_PUBLISHED)
+    rows = conn.execute(
+        f"""
+        SELECT id, calendar_task_id, title, visibility
+        FROM recorded_lessons
+        WHERE calendar_task_id IN ({placeholders}){vis_sql}
+        """,
+        params,
+    ).fetchall()
+    by_task: dict[int, dict] = {}
+    for r in rows:
+        tid = r["calendar_task_id"]
+        if tid is None:
+            continue
+        by_task[int(tid)] = {
+            "id": r["id"],
+            "title": r["title"] or "",
+            "visibility": r["visibility"] or VISIBILITY_DRAFT,
+        }
+    for t in task_dicts:
+        rec = by_task.get(int(t["id"])) if t.get("id") is not None else None
+        t["recorded_lesson"] = rec
+    return task_dicts
+
+
+def _clear_task_recording_links(conn, calendar_task_id: int, except_lesson_id: int | None = None) -> None:
+    if except_lesson_id is not None:
+        conn.execute(
+            """
+            UPDATE recorded_lessons
+            SET calendar_task_id = NULL, updated_at = ?
+            WHERE calendar_task_id = ? AND id != ?
+            """,
+            (_now_iso(), calendar_task_id, except_lesson_id),
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE recorded_lessons
+            SET calendar_task_id = NULL, updated_at = ?
+            WHERE calendar_task_id = ?
+            """,
+            (_now_iso(), calendar_task_id),
+        )
+
+
+def _attach_task_meta_to_lesson(conn, lesson: dict) -> dict:
+    tid = lesson.get("calendar_task_id")
+    if not tid:
+        lesson["calendar_task_date"] = ""
+        lesson["calendar_task_title"] = ""
+        return lesson
+    row = conn.execute(
+        "SELECT date, title FROM calendar_tasks WHERE id = ?",
+        (int(tid),),
+    ).fetchone()
+    if row:
+        lesson["calendar_task_date"] = row["date"] or ""
+        lesson["calendar_task_title"] = row["title"] or ""
+    else:
+        lesson["calendar_task_date"] = ""
+        lesson["calendar_task_title"] = ""
+    return lesson
+
+
+def _create_calendar_task_for_recording(
+    conn, class_name: str, task_date: str, title: str
+) -> int:
+    from app import normalize_class_name
+
+    class_norm = normalize_class_name(class_name)
+    cur = conn.execute(
+        """
+        INSERT INTO calendar_tasks
+            (date, title, category, period, description, status, class_name)
+        VALUES (?, ?, ?, '', '', 'Pending', ?)
+        """,
+        (task_date, title[:200], RECORDED_LESSON_CATEGORY, class_norm),
+    )
+    return int(cur.lastrowid)
 
 
 def init_recorded_lessons_tables(conn):
@@ -192,12 +287,10 @@ def register_recorded_lessons_routes(app):
                     _SELECT + " WHERE class_name = ? ORDER BY created_at DESC",
                     (class_name,),
                 ).fetchall()
-                return jsonify(
-                    {
-                        "lessons": [lesson_row_to_dict(r) for r in rows],
-                        "class_name": class_name,
-                    }
-                )
+                lessons = [
+                    _attach_task_meta_to_lesson(conn, lesson_row_to_dict(r)) for r in rows
+                ]
+                return jsonify({"lessons": lessons, "class_name": class_name})
 
             teacher_username = get_effective_teacher_username(
                 conn, request.form.get("teacher_username")
@@ -209,6 +302,12 @@ def register_recorded_lessons_routes(app):
             calendar_task_id = None
             if task_raw and str(task_raw).strip().isdigit():
                 calendar_task_id = int(task_raw)
+            create_task_flag = str(request.form.get("create_calendar_task") or "").lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            task_date = str(request.form.get("task_date") or "").strip()[:10]
 
             if not class_name:
                 return jsonify({"error": "class_name is required"}), 400
@@ -222,6 +321,25 @@ def register_recorded_lessons_routes(app):
                 )
                 if err is not None:
                     return err
+
+            from app import normalize_class_name
+
+            class_norm = normalize_class_name(class_name)
+            if create_task_flag:
+                if not task_date:
+                    return jsonify({"error": "task_date is required to create a calendar task"}), 400
+                calendar_task_id = _create_calendar_task_for_recording(
+                    conn, class_norm, task_date, title
+                )
+            elif calendar_task_id is not None:
+                task_row = conn.execute(
+                    "SELECT id, class_name FROM calendar_tasks WHERE id = ?",
+                    (calendar_task_id,),
+                ).fetchone()
+                if not task_row:
+                    return jsonify({"error": "Calendar task not found"}), 404
+                if normalize_class_name(task_row["class_name"]) != class_norm:
+                    return jsonify({"error": "Task class does not match recording class"}), 400
 
             upload = request.files.get("file")
             if not upload or not upload.filename:
@@ -266,9 +384,12 @@ def register_recorded_lessons_routes(app):
                     now,
                 ),
             )
+            if calendar_task_id is not None:
+                _clear_task_recording_links(conn, calendar_task_id, except_lesson_id=cur.lastrowid)
             conn.commit()
             row = conn.execute(_SELECT + " WHERE id = ?", (cur.lastrowid,)).fetchone()
-            return jsonify({"lesson": lesson_row_to_dict(row)}), 201
+            lesson = _attach_task_meta_to_lesson(conn, lesson_row_to_dict(row))
+            return jsonify({"lesson": lesson, "calendar_task_id": calendar_task_id}), 201
         finally:
             conn.close()
 
@@ -311,6 +432,43 @@ def register_recorded_lessons_routes(app):
             title = body.get("title")
             description = body.get("description")
             visibility = body.get("visibility")
+            if "calendar_task_id" in body:
+                from app import normalize_class_name
+
+                raw_tid = body.get("calendar_task_id")
+                if raw_tid is None or raw_tid == "":
+                    updates_tid = "calendar_task_id = NULL"
+                    conn.execute(
+                        f"UPDATE recorded_lessons SET {updates_tid}, updated_at = ? WHERE id = ?",
+                        (_now_iso(), lesson_id),
+                    )
+                    conn.commit()
+                    row = conn.execute(_SELECT + " WHERE id = ?", (lesson_id,)).fetchone()
+                    lesson = _attach_task_meta_to_lesson(conn, lesson_row_to_dict(row))
+                    return jsonify({"lesson": lesson})
+                if not str(raw_tid).strip().isdigit():
+                    return jsonify({"error": "calendar_task_id must be an integer"}), 400
+                tid = int(raw_tid)
+                task_row = conn.execute(
+                    "SELECT id, class_name FROM calendar_tasks WHERE id = ?",
+                    (tid,),
+                ).fetchone()
+                if not task_row:
+                    return jsonify({"error": "Calendar task not found"}), 404
+                if normalize_class_name(task_row["class_name"]) != normalize_class_name(
+                    row["class_name"]
+                ):
+                    return jsonify({"error": "Task class does not match recording class"}), 400
+                _clear_task_recording_links(conn, tid, except_lesson_id=lesson_id)
+                conn.execute(
+                    "UPDATE recorded_lessons SET calendar_task_id = ?, updated_at = ? WHERE id = ?",
+                    (tid, _now_iso(), lesson_id),
+                )
+                conn.commit()
+                row = conn.execute(_SELECT + " WHERE id = ?", (lesson_id,)).fetchone()
+                lesson = _attach_task_meta_to_lesson(conn, lesson_row_to_dict(row))
+                return jsonify({"lesson": lesson})
+
             updates = []
             params = []
             if title is not None:
@@ -336,7 +494,8 @@ def register_recorded_lessons_routes(app):
             )
             conn.commit()
             row = conn.execute(_SELECT + " WHERE id = ?", (lesson_id,)).fetchone()
-            return jsonify({"lesson": lesson_row_to_dict(row)})
+            lesson = _attach_task_meta_to_lesson(conn, lesson_row_to_dict(row))
+            return jsonify({"lesson": lesson})
         finally:
             conn.close()
 

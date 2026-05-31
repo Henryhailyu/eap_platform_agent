@@ -55,6 +55,23 @@
                 <input id="trec-title" name="title" type="text" maxlength="200" required />
               </div>
               <div class="trec-field">
+                <label for="trec-task-date" data-i18n="trec_task_date_label">Calendar date</label>
+                <input id="trec-task-date" name="task_date" type="date" />
+                <p class="trec-hint" data-i18n="trec_task_date_hint">Used when linking to or creating a calendar task.</p>
+              </div>
+              <div class="trec-field">
+                <label for="trec-task-select" data-i18n="trec_task_link_label">Link to calendar task</label>
+                <select id="trec-task-select" name="calendar_task_id">
+                  <option value="" data-i18n="trec_task_link_none">— No link —</option>
+                </select>
+              </div>
+              <div class="trec-field">
+                <label class="trec-check">
+                  <input id="trec-create-task" name="create_calendar_task" type="checkbox" value="1" />
+                  <span data-i18n="trec_create_task">Create a new calendar task on this date</span>
+                </label>
+              </div>
+              <div class="trec-field">
                 <label for="trec-file" data-i18n="trec_file_label">Video file</label>
                 <input id="trec-file" name="file" type="file" accept=".mp4,.webm,.mov,.m4v,video/*" required />
                 <p class="trec-hint" data-i18n="trec_file_hint">MP4, WebM, MOV, or M4V — max 500 MB</p>

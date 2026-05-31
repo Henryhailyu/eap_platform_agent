@@ -2996,8 +2996,15 @@ def get_tasks():
             f"SELECT * FROM calendar_tasks WHERE {where_clause} ORDER BY id DESC",
             params,
         ).fetchall()
+        role = str(actor["role"] or "").strip()
+        from recorded_lessons import enrich_task_dicts_with_recordings
+
+        out = [task_to_dict(task) for task in tasks]
+        enrich_task_dicts_with_recordings(
+            conn, out, published_only=(role == "student")
+        )
         conn.close()
-        return jsonify([task_to_dict(task) for task in tasks])
+        return jsonify(out)
 
     conditions = []
     params = []
@@ -3023,9 +3030,18 @@ def get_tasks():
             "SELECT * FROM calendar_tasks ORDER BY id DESC",
         ).fetchall()
 
+    from recorded_lessons import enrich_task_dicts_with_recordings
+
+    out = [task_to_dict(task) for task in tasks]
+    actor = get_current_authenticated_user(conn)
+    if actor is not None:
+        role = str(actor["role"] or "").strip()
+        enrich_task_dicts_with_recordings(
+            conn, out, published_only=(role == "student")
+        )
     conn.close()
 
-    return jsonify([task_to_dict(task) for task in tasks])
+    return jsonify(out)
 
 
 @app.route("/api/tasks/my-completions", methods=["GET"])

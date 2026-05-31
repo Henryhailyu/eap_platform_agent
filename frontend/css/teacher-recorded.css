@@ -41,6 +41,18 @@
   margin-top: 0.25rem;
 }
 
+.trec-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.trec-check input {
+  margin-top: 0.2rem;
+}
+
 .trec-status {
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
