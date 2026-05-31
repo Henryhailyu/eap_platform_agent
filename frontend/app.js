@@ -477,6 +477,38 @@ const TASK_CATEGORIES = [
   "Recorded lesson",
 ];
 
+const RECORDED_LESSON_CATEGORY = "Recorded lesson";
+
+function isRecordedLessonCategory(category) {
+  return String(category || "").trim() === RECORDED_LESSON_CATEGORY;
+}
+
+async function uploadRecordedLessonForTask({
+  className,
+  taskId,
+  title,
+  description,
+  file,
+  publish,
+}) {
+  const api = window.EAP_RECORDED_LESSONS;
+  if (!api || typeof api.upload !== "function") {
+    throw new Error("Recorded lessons API not loaded");
+  }
+  const fd = new FormData();
+  fd.append("class_name", className);
+  fd.append("title", title);
+  fd.append("description", description || "");
+  fd.append("calendar_task_id", String(taskId));
+  fd.append("file", file);
+  const res = await api.upload(fd);
+  const lesson = res && res.lesson ? res.lesson : res;
+  if (publish && lesson && lesson.id != null && typeof api.update === "function") {
+    await api.update(lesson.id, { visibility: "published" });
+  }
+  return lesson;
+}
+
 /** When enrolment API has no class and login has no class_name, student UI uses this (Phase C3). */
 const STUDENT_CLASS_FALLBACK = "EAP047";
 
@@ -1057,7 +1089,7 @@ function syncTeacherCategoryChipHighlight(chipsEl, selectEl) {
   });
 }
 
-function populateTeacherCategoryChips(chipsEl, selectEl) {
+function populateTeacherCategoryChips(chipsEl, selectEl, onCategoryChange) {
   if (!chipsEl || !selectEl) return;
   chipsEl.innerHTML = "";
   TASK_CATEGORIES.forEach((label) => {
@@ -1070,10 +1102,142 @@ function populateTeacherCategoryChips(chipsEl, selectEl) {
     btn.addEventListener("click", () => {
       selectEl.value = label;
       syncTeacherCategoryChipHighlight(chipsEl, selectEl);
+      if (typeof onCategoryChange === "function") onCategoryChange(label);
     });
     chipsEl.appendChild(btn);
   });
   syncTeacherCategoryChipHighlight(chipsEl, selectEl);
+}
+
+/**
+ * Phase N6 — calendar create form: show video upload + instructions when category is Recorded lesson.
+ */
+function syncTeacherCreateTaskFormMode(category) {
+  const isRec = isRecordedLessonCategory(category);
+  const recordedPanel = document.getElementById("teacher-create-recorded-panel");
+  const materialField = document.getElementById("teacher-task-create-material-field");
+  const periodField = document.getElementById("task-period")?.closest(".field");
+  const titleLabel = document.getElementById("task-title-label");
+  const descLabel = document.getElementById("task-description-label");
+  const descArea = document.getElementById("task-description");
+  const titleInput = document.getElementById("task-title");
+
+  if (recordedPanel) {
+    recordedPanel.classList.toggle("hidden", !isRec);
+    recordedPanel.setAttribute("aria-hidden", isRec ? "false" : "true");
+  }
+  if (materialField) materialField.classList.toggle("hidden", isRec);
+  if (periodField) periodField.classList.toggle("hidden", isRec);
+
+  if (titleLabel) {
+    titleLabel.textContent = isRec ? t("teacher_rec_title_label") : t("task_title_en");
+  }
+  if (descLabel) {
+    descLabel.textContent = isRec ? t("teacher_rec_instructions_label") : t("task_description_en");
+  }
+  if (descArea) {
+    descArea.placeholder = isRec
+      ? t("teacher_rec_instructions_placeholder")
+      : t("task_description_en_placeholder");
+  }
+  if (titleInput && isRec && !String(titleInput.value || "").trim()) {
+    titleInput.placeholder = t("teacher_rec_title_placeholder");
+  } else if (titleInput) {
+    titleInput.placeholder = t("task_title_en_placeholder");
+  }
+}
+
+function buildTeacherRecordedLessonManagePanel(task) {
+  const section = document.createElement("section");
+  section.className = "task-card__recorded-manage";
+  section.setAttribute("data-task-id", String(task.id));
+
+  const heading = document.createElement("h4");
+  heading.textContent = t("teacher_rec_manage_heading");
+
+  const meta = document.createElement("p");
+  meta.className = "task-card__recorded-manage__meta";
+  meta.textContent = t("teacher_rec_manage_lead");
+
+  section.appendChild(heading);
+  section.appendChild(meta);
+
+  const rec = task.recorded_lesson;
+  if (rec && rec.id != null) {
+    const status = document.createElement("p");
+    status.className = "task-card__recorded-manage__meta";
+    const published = rec.visibility === "published";
+    status.textContent = published
+      ? t("trec_status_published") + (rec.title ? ` · ${rec.title}` : "")
+      : t("trec_status_draft") + (rec.title ? ` · ${rec.title}` : "");
+    section.appendChild(status);
+
+    const actions = document.createElement("div");
+    actions.className = "task-card__recorded-manage__actions";
+
+    const previewBtn = document.createElement("button");
+    previewBtn.type = "button";
+    previewBtn.className = "btn-secondary";
+    previewBtn.setAttribute("data-recorded-action", "preview");
+    previewBtn.setAttribute("data-lesson-id", String(rec.id));
+    previewBtn.textContent = t("trec_preview_btn");
+
+    const pubBtn = document.createElement("button");
+    pubBtn.type = "button";
+    pubBtn.className = "btn-secondary";
+    pubBtn.setAttribute("data-recorded-action", "toggle-publish");
+    pubBtn.setAttribute("data-lesson-id", String(rec.id));
+    pubBtn.setAttribute("data-published", published ? "1" : "0");
+    pubBtn.textContent = published ? t("trec_unpublish_btn") : t("trec_publish_btn");
+
+    actions.appendChild(previewBtn);
+    actions.appendChild(pubBtn);
+    section.appendChild(actions);
+  }
+
+  const uploadWrap = document.createElement("div");
+  uploadWrap.className = "task-card__recorded-upload";
+
+  const fileLab = document.createElement("label");
+  fileLab.className = "task-upload-choose";
+  const chooseSpan = document.createElement("span");
+  chooseSpan.className = "task-upload-choose-text";
+  chooseSpan.textContent = rec && rec.id != null ? t("teacher_rec_replace_video") : t("teacher_rec_video_label");
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.className = "task-recorded-file-input";
+  fileInput.accept = ".mp4,.webm,.mov,.m4v,video/*";
+  fileLab.appendChild(chooseSpan);
+  fileLab.appendChild(fileInput);
+
+  const pubOnUpload = document.createElement("label");
+  pubOnUpload.className = "teacher-recorded-create-panel__check";
+  const pubCb = document.createElement("input");
+  pubCb.type = "checkbox";
+  pubCb.className = "task-recorded-publish-cb";
+  pubCb.checked = !!(rec && rec.visibility === "published");
+  const pubSpan = document.createElement("span");
+  pubSpan.textContent = t("trec_publish_on_create");
+  pubOnUpload.appendChild(pubCb);
+  pubOnUpload.appendChild(pubSpan);
+
+  const uploadBtn = document.createElement("button");
+  uploadBtn.type = "button";
+  uploadBtn.className = "btn-primary task-recorded-upload-btn";
+  uploadBtn.setAttribute("data-task-id", String(task.id));
+  uploadBtn.textContent = rec && rec.id != null ? t("teacher_rec_replace_btn") : t("teacher_rec_upload_btn");
+
+  const statusEl = document.createElement("p");
+  statusEl.className = "task-card__recorded-status";
+  statusEl.setAttribute("aria-live", "polite");
+
+  uploadWrap.appendChild(fileLab);
+  uploadWrap.appendChild(pubOnUpload);
+  uploadWrap.appendChild(uploadBtn);
+  uploadWrap.appendChild(statusEl);
+  section.appendChild(uploadWrap);
+
+  return section;
 }
 
 /**
@@ -2937,7 +3101,10 @@ function buildTeacherTaskCardElement(task, copyContext) {
   const descShown = taskDisplayDescription(task);
   if (descShown) desc.textContent = descShown;
 
-  appendTaskRecordedLessonBlock(li, task, "teacher");
+  const isRecordedTask = isRecordedLessonCategory(task.category || task.type);
+  if (!isRecordedTask) {
+    appendTaskRecordedLessonBlock(li, task, "teacher");
+  }
 
   const copyWrap = document.createElement("div");
   copyWrap.className = "task-card__copy-wrap";
@@ -3222,8 +3389,12 @@ function buildTeacherTaskCardElement(task, copyContext) {
   li.appendChild(desc);
   li.appendChild(copyWrap);
   li.appendChild(templateSaveWrap);
-  li.appendChild(attach);
-  li.appendChild(submissionsWrap);
+  if (isRecordedTask) {
+    li.appendChild(buildTeacherRecordedLessonManagePanel(task));
+  } else {
+    li.appendChild(attach);
+    li.appendChild(submissionsWrap);
+  }
 
   return li;
 }
@@ -3804,7 +3975,10 @@ function initTeacherPage() {
   const createMaterialInput = document.getElementById("teacher-task-create-material");
   const createMaterialSummary = document.getElementById("teacher-task-create-material-summary");
 
-  populateTeacherCategoryChips(categoryChipsEl, typeSelect);
+  populateTeacherCategoryChips(categoryChipsEl, typeSelect, (cat) => {
+    syncTeacherCreateTaskFormMode(cat);
+  });
+  syncTeacherCreateTaskFormMode(typeSelect.value);
 
   function syncTeacherCreateTaskContext() {
     if (!createContextEl) return;
@@ -3842,6 +4016,7 @@ function initTeacherPage() {
       typeSelect.value = TASK_CATEGORIES.includes("Homework") ? "Homework" : TASK_CATEGORIES[0];
       syncTeacherCategoryChipHighlight(categoryChipsEl, typeSelect);
     }
+    syncTeacherCreateTaskFormMode(typeSelect.value);
     if (scroll && createTaskDetailsEl) {
       createTaskDetailsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
@@ -5380,6 +5555,80 @@ function initTeacherPage() {
       return;
     }
 
+    const recActionBtn = ev.target.closest("[data-recorded-action]");
+    if (recActionBtn) {
+      const lessonId = Number(recActionBtn.getAttribute("data-lesson-id"), 10);
+      const api = window.EAP_RECORDED_LESSONS;
+      if (!Number.isFinite(lessonId) || !api) return;
+      const action = recActionBtn.getAttribute("data-recorded-action");
+      recActionBtn.disabled = true;
+      try {
+        if (action === "preview") {
+          window.open(api.teacherStreamUrl(lessonId), "_blank", "noopener,noreferrer");
+        } else if (action === "toggle-publish") {
+          const published = recActionBtn.getAttribute("data-published") === "1";
+          await api.update(lessonId, { visibility: published ? "draft" : "published" });
+          await refreshTaskList();
+        }
+      } catch (err) {
+        setTeacherPageError(pageErrorEl, err.message);
+      } finally {
+        recActionBtn.disabled = false;
+      }
+      return;
+    }
+
+    const recUploadBtn = ev.target.closest(".task-recorded-upload-btn");
+    if (recUploadBtn) {
+      const taskId = Number(recUploadBtn.getAttribute("data-task-id"), 10);
+      const card = recUploadBtn.closest("li.task-card");
+      if (!Number.isFinite(taskId) || !card) return;
+      const task = lastTeacherDailyTasks.find((t) => Number(t.id) === taskId);
+      const fileInput = card.querySelector(".task-recorded-file-input");
+      const statusEl = card.querySelector(".task-card__recorded-status");
+      const pubCb = card.querySelector(".task-recorded-publish-cb");
+      if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+        if (statusEl) {
+          statusEl.textContent = t("teacher_rec_video_required");
+          statusEl.classList.add("task-card__recorded-status--error");
+        }
+        return;
+      }
+      recUploadBtn.disabled = true;
+      if (statusEl) {
+        statusEl.textContent = t("trec_uploading");
+        statusEl.classList.remove("task-card__recorded-status--error", "task-card__recorded-status--ok");
+      }
+      try {
+        await uploadRecordedLessonForTask({
+          className: (task && task.class_name) || getFilterClass(),
+          taskId,
+          title: (task && taskDisplayTitle(task)) || t("trec_title"),
+          description: (task && task.description) || "",
+          file: fileInput.files[0],
+          publish: !!(pubCb && pubCb.checked),
+        });
+        fileInput.value = "";
+        if (statusEl) {
+          statusEl.textContent = t("trec_upload_ok");
+          statusEl.classList.add("task-card__recorded-status--ok");
+        }
+        await refreshTaskList();
+        await reloadPlannerTasksFromApi();
+        if (selectedTeacherTaskId === taskId) {
+          selectTeacherTaskById(taskId);
+        }
+      } catch (err) {
+        if (statusEl) {
+          statusEl.textContent = err.message;
+          statusEl.classList.add("task-card__recorded-status--error");
+        }
+      } finally {
+        recUploadBtn.disabled = false;
+      }
+      return;
+    }
+
     const btn = ev.target.closest(".task-upload-submit");
     if (!btn) return;
 
@@ -5453,6 +5702,17 @@ function initTeacherPage() {
       return;
     }
 
+    const isRecCreate = isRecordedLessonCategory(category);
+    const recordedVideoInput = document.getElementById("teacher-create-recorded-video");
+    const recordedPublishCb = document.getElementById("teacher-create-recorded-publish");
+    if (isRecCreate) {
+      if (!recordedVideoInput || !recordedVideoInput.files || !recordedVideoInput.files[0]) {
+        messageEl.textContent = t("teacher_rec_video_required");
+        messageEl.classList.add("form-message--error");
+        return;
+      }
+    }
+
     const submitBtn = form.querySelector('button[type="submit"]');
     if (submitBtn) submitBtn.disabled = true;
 
@@ -5462,7 +5722,7 @@ function initTeacherPage() {
         title,
         title_zh: title_zh || null,
         category,
-        period,
+        period: isRecCreate ? "" : period,
         description,
         description_zh: description_zh || null,
         class_name: class_name || teacherDefaultClassFallback(),
@@ -5470,7 +5730,24 @@ function initTeacherPage() {
 
       let savedMsg = t("task_saved");
       let uploadFailed = false;
-      if (
+
+      if (isRecCreate && created && created.id != null && recordedVideoInput.files[0]) {
+        try {
+          await uploadRecordedLessonForTask({
+            className: class_name || teacherDefaultClassFallback(),
+            taskId: created.id,
+            title,
+            description,
+            file: recordedVideoInput.files[0],
+            publish: !!(recordedPublishCb && recordedPublishCb.checked),
+          });
+          recordedVideoInput.value = "";
+          savedMsg = t("teacher_rec_task_saved");
+        } catch (uploadErr) {
+          uploadFailed = true;
+          savedMsg = `${t("task_saved")} ${uploadErr.message}`;
+        }
+      } else if (
         createMaterialInput &&
         createMaterialInput.files &&
         createMaterialInput.files.length > 0 &&
@@ -5503,6 +5780,9 @@ function initTeacherPage() {
       form.querySelector("#task-description").value = "";
       const descZhEl = form.querySelector("#task-description-zh");
       if (descZhEl) descZhEl.value = "";
+      if (recordedVideoInput) recordedVideoInput.value = "";
+      if (recordedPublishCb) recordedPublishCb.checked = false;
+      syncTeacherCreateTaskFormMode(typeSelect.value);
 
       await refreshTaskList();
       await refreshDashboard();
@@ -5876,12 +6156,24 @@ function buildStudentTaskCardElement(task, mySub) {
       : "View or download attachment";
     material.appendChild(materialLabel);
     material.appendChild(link);
-  } else {
+  } else if (!isRecordedLessonCategory(task.category || task.type)) {
     material.classList.add("task-card__material--empty");
     material.textContent = t("no_material");
+  } else {
+    material.classList.add("hidden");
+    material.setAttribute("aria-hidden", "true");
   }
 
   appendTaskRecordedLessonBlock(li, task, "student");
+  if (
+    isRecordedLessonCategory(task.category || task.type) &&
+    (!task.recorded_lesson || task.recorded_lesson.id == null)
+  ) {
+    const pending = document.createElement("p");
+    pending.className = "task-card__recording-pending";
+    pending.textContent = t("student_rec_not_published");
+    li.appendChild(pending);
+  }
 
   const homework = document.createElement("div");
   homework.className = "task-card__homework";
@@ -6242,7 +6534,14 @@ function buildStudentTaskCardElement(task, mySub) {
   }
 
   let homeworkNode = homework;
-  if (hasSubmissionRow) {
+  if (isRecordedLessonCategory(task.category || task.type)) {
+    homeworkNode = document.createElement("div");
+    homeworkNode.className = "task-card__recording-study";
+    const note = document.createElement("p");
+    note.className = "task-card__recording-study-note";
+    note.textContent = t("student_rec_study_note");
+    homeworkNode.appendChild(note);
+  } else if (hasSubmissionRow) {
     const hwDetails = document.createElement("details");
     hwDetails.className = "student-homework-resubmit-details";
     const hwSummary = document.createElement("summary");

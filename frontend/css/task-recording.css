@@ -24,3 +24,86 @@
 .task-card__recording-link {
   margin-left: auto;
 }
+
+.teacher-recorded-create-panel {
+  margin: 0 0 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  background: rgba(10, 126, 164, 0.06);
+  border: 1px solid rgba(10, 126, 164, 0.22);
+}
+
+.teacher-recorded-create-panel.hidden {
+  display: none;
+}
+
+.teacher-recorded-create-panel__lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  color: var(--color-text-muted, #5c6470);
+}
+
+.teacher-recorded-create-panel__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #5c6470);
+}
+
+.teacher-recorded-create-panel__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.task-card__recorded-manage {
+  margin: 0.75rem 0 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  background: rgba(10, 126, 164, 0.06);
+  border: 1px solid rgba(10, 126, 164, 0.22);
+}
+
+.task-card__recorded-manage h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.task-card__recorded-manage__meta {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #5c6470);
+}
+
+.task-card__recorded-manage__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.task-card__recorded-upload {
+  margin-top: 0.75rem;
+}
+
+.task-card__recorded-status {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.task-card__recorded-status--error {
+  color: #b42318;
+}
+
+.task-card__recorded-status--ok {
+  color: #1b5e20;
+}
+
+.task-card__recording-pending,
+.task-card__recording-study-note {
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #5c6470);
+}

@@ -389,8 +389,34 @@
                     ></div>
                     <select id="task-type" name="type" class="visually-hidden" required aria-hidden="true" tabindex="-1"></select>
                   </fieldset>
+                  <div
+                    id="teacher-create-recorded-panel"
+                    class="teacher-recorded-create-panel hidden"
+                    aria-hidden="true"
+                  >
+                    <p class="teacher-recorded-create-panel__lead" data-i18n="teacher_rec_create_lead">
+                      Upload the class recording and add instructions students should follow before watching.
+                    </p>
+                    <div class="field">
+                      <label for="teacher-create-recorded-video" data-i18n="teacher_rec_video_label"
+                        >Class recording video</label
+                      >
+                      <input
+                        id="teacher-create-recorded-video"
+                        type="file"
+                        accept=".mp4,.webm,.mov,.m4v,video/*"
+                      />
+                      <p class="teacher-recorded-create-panel__hint" data-i18n="trec_file_hint">
+                        MP4, WebM, MOV, or M4V — max 500 MB
+                      </p>
+                    </div>
+                    <label class="teacher-recorded-create-panel__check">
+                      <input id="teacher-create-recorded-publish" type="checkbox" value="1" />
+                      <span data-i18n="trec_publish_on_create">Publish to students when saved</span>
+                    </label>
+                  </div>
                   <div class="field">
-                    <label for="task-title" data-i18n="task_title_en">Task title</label>
+                    <label for="task-title" id="task-title-label" data-i18n="task_title_en">Task title</label>
                     <input
                       id="task-title"
                       name="title"
@@ -437,8 +463,10 @@
                       autocomplete="off"
                     />
                   </div>
-                  <div class="field">
-                    <label for="task-description" data-i18n="task_description_en">Description</label>
+                  <div class="field" id="teacher-task-description-field">
+                    <label for="task-description" id="task-description-label" data-i18n="task_description_en"
+                      >Description</label
+                    >
                     <textarea
                       id="task-description"
                       name="description"
@@ -447,7 +475,7 @@
                       placeholder="Instructions, links, or notes for students…"
                     ></textarea>
                   </div>
-                  <div class="field teacher-task-create-material">
+                  <div class="field teacher-task-create-material" id="teacher-task-create-material-field">
                     <label for="teacher-task-create-material" data-i18n="teacher_create_material_label"
                       >Teaching material (optional)</label
                     >
@@ -660,6 +688,7 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
+    <script src="js/recorded-lessons-api.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
