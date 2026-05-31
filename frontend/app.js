@@ -544,7 +544,7 @@ const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 const teacherCategoryDrafts = {};
 let teacherCreateContextKey = "";
 /** Bump when create-form draft logic changes (cache-bust + deploy verification). */
-const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-material-xhr-excel";
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-upload-xhr-abs";
 
 const RECORDED_AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
 

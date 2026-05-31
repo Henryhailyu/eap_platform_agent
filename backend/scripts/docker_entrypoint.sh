@@ -38,8 +38,9 @@ else
   echo "EAP pilot: skipping seeds (already seeded; set EAP_FORCE_SEED=1 to re-run)"
 fi
 
-# SQLite on /data: use one worker (multi-worker causes lock/crash on Render).
-WORKERS="${GUNICORN_WORKERS:-1}"
+# SQLite WAL mode allows 2 workers safely: reads and writes don't block each other.
+# worker 1 handles uploads while worker 2 serves dashboard/task-list requests.
+WORKERS="${GUNICORN_WORKERS:-2}"
 BIND="0.0.0.0:${PORT:-5051}"
 echo "EAP pilot: starting gunicorn on ${BIND} (${WORKERS} workers)"
-exec gunicorn -w "${WORKERS}" -b "${BIND}" --timeout 300 --access-logfile - --error-logfile - wsgi:app
+exec gunicorn -w "${WORKERS}" -b "${BIND}" --timeout 300 --worker-connections 50 --access-logfile - --error-logfile - wsgi:app

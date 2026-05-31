@@ -2,12 +2,19 @@
  * Phase N — recorded lessons API (local storage; Tencent VOD later).
  */
 (function (global) {
-  const API_BASE = () =>
-    (typeof global.API_BASE !== "undefined" ? global.API_BASE : "") || "";
+  /** Resolve the absolute API base URL (never a relative path). */
+  function resolveBase() {
+    const custom =
+      (typeof global.EAP_API_BASE !== "undefined" && global.EAP_API_BASE) || "";
+    if (custom && String(custom).trim()) return String(custom).trim().replace(/\/$/, "");
+    if (typeof window !== "undefined" && window.location && window.location.origin) {
+      return window.location.origin.replace(/\/$/, "");
+    }
+    return "";
+  }
 
   function apiUrl(path) {
-    const base = API_BASE().replace(/\/$/, "");
-    return `${base}${path}`;
+    return `${resolveBase()}${path}`;
   }
 
   async function apiFetch(path, options) {
@@ -31,6 +38,43 @@
     return data;
   }
 
+  /**
+   * Upload via XHR with an absolute URL so it works reliably in same-origin
+   * production (avoids fetch/AbortController issues with large multipart bodies).
+   */
+  function uploadXhr(url, formData) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      xhr.withCredentials = true;
+      if (typeof global.EAP_getAuthHeaders === "function") {
+        const hdrs = global.EAP_getAuthHeaders({});
+        Object.keys(hdrs).forEach((k) => xhr.setRequestHeader(k, hdrs[k]));
+      }
+      xhr.timeout = 300000;
+      xhr.onload = () => {
+        let data = null;
+        try {
+          data = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+        } catch (_) {
+          data = xhr.responseText ? { error: xhr.responseText.slice(0, 300) } : null;
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data);
+        } else {
+          const msg =
+            (data && (data.error || data.message)) ||
+            xhr.statusText ||
+            `Upload failed (${xhr.status})`;
+          reject(new Error(msg));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error — check server and retry."));
+      xhr.ontimeout = () => reject(new Error("Upload timed out. Try a smaller file or retry."));
+      xhr.send(formData);
+    });
+  }
+
   function streamUrl(lessonId, role) {
     const prefix =
       role === "student"
@@ -45,30 +89,7 @@
       return apiFetch(`/api/teacher/recorded-lessons?class_name=${q}`);
     },
     upload(formData) {
-      const url = apiUrl("/api/teacher/recorded-lessons");
-      const parse = async (res) => {
-        const text = await res.text();
-        let data = null;
-        try {
-          data = text ? JSON.parse(text) : null;
-        } catch (_) {
-          data = text ? { error: text.slice(0, 200) } : null;
-        }
-        if (!res.ok) {
-          const msg = (data && data.error) || res.statusText || "Upload failed";
-          throw new Error(msg);
-        }
-        return data;
-      };
-      if (typeof global.eapPostMultipart === "function") {
-        return global.eapPostMultipart(url, formData).then(parse);
-      }
-      const fn = global.eapFetch || global.fetch;
-      return fn(url, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      }).then(parse);
+      return uploadXhr(apiUrl("/api/teacher/recorded-lessons"), formData);
     },
     update(lessonId, patch) {
       return apiFetch(`/api/teacher/recorded-lessons/${lessonId}`, {
