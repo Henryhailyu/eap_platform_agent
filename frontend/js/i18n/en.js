@@ -309,6 +309,9 @@ window.EAP_STRINGS_EN = {
   "teacher_rec_videos_ready": "{count} videos ready for Save Task",
   "teacher_rec_repair_upload_btn": "Upload & link video",
   "teacher_rec_repair_ok": "Video linked and published.",
+  "eap_inline_recording_heading": "Class recording (watch online)",
+  "eap_inline_recording_hint": "Playback stays in EAP. Use the player controls — do not download.",
+  "eap_inline_play_btn": "Play video",
   "teacher_create_material_label": "Teaching material (optional)",
   "teacher_create_material_hint":
     "Add multiple files: select several at once (Ctrl/Cmd+click), or click Choose files again to add more.",

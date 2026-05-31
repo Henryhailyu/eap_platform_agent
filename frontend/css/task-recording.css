@@ -196,6 +196,39 @@
   color: #b42318;
 }
 
+.eap-inline-recording {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(22, 45, 61, 0.1);
+}
+
+.eap-inline-recording__label {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.eap-inline-recording__video {
+  width: 100%;
+  max-height: min(52vh, 420px);
+  border-radius: 8px;
+  background: #111;
+}
+
+.eap-inline-recording__hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #5c6470);
+}
+
+.task-card__recording-manage-link {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+}
+
 .teacher-category-chip--has-draft:not(.teacher-category-chip--active)::after {
   content: "";
   display: inline-block;

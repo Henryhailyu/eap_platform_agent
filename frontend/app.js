@@ -898,7 +898,9 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
   let createdCount = 0;
   const errors = [];
 
-  for (const cat of categories) {
+  for (let ci = 0; ci < categories.length; ci += 1) {
+    const cat = categories[ci];
+    if (ci > 0) await eapSleep(200);
     const draft = getTeacherCategoryDraft(cat);
     try {
       if (isRecordedLessonCategory(cat)) {
@@ -969,7 +971,7 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
       createdCount += 1;
       if (created && created.id != null && mats.length) {
         try {
-          await apiUploadTaskMaterialsBatch(Number(created.id, 10), mats);
+          await apiUploadTaskMaterialsReliable(Number(created.id, 10), mats);
         } catch (matErr) {
           errors.push(
             `${translateCategory(cat)} (${t("teacher_material_upload_label")}): ${(matErr && matErr.message) || t("trec_error_generic")}`,
@@ -1427,35 +1429,41 @@ async function apiUploadTaskMaterial(taskId, file) {
   return data;
 }
 
-/** Upload all teaching materials for a task in one request (fewer connection errors). */
-async function apiUploadTaskMaterialsBatch(taskId, files) {
+function eapSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Upload each teaching material with retries (reliable after batch Save Task). */
+async function apiUploadTaskMaterialsReliable(taskId, files) {
   const list = Array.isArray(files) ? files.filter(Boolean) : [];
-  if (!list.length) return { materials: [] };
-  const formData = new FormData();
-  list.forEach((f) => formData.append("files", f));
-  let response;
-  try {
-    response = await eapFetch(`${API_BASE}/api/tasks/${taskId}/materials/batch`, {
-      method: "POST",
-      body: formData,
-      credentials: EAP_FETCH_CREDENTIALS,
-    });
-  } catch (err) {
-    throw new Error(apiUnreachableMessage());
-  }
-  const data = await readJsonOrError(response);
-  if (response.status === 404) {
-    for (const f of list) {
-      await apiUploadTaskMaterial(taskId, f);
+  if (!list.length) return { uploaded: 0, materials: [] };
+  const errors = [];
+  let uploaded = 0;
+  for (let i = 0; i < list.length; i += 1) {
+    const file = list[i];
+    let ok = false;
+    for (let attempt = 0; attempt < 3 && !ok; attempt += 1) {
+      try {
+        await apiUploadTaskMaterial(taskId, file);
+        uploaded += 1;
+        ok = true;
+      } catch (err) {
+        if (attempt === 2) {
+          errors.push(`${file.name}: ${(err && err.message) || t("trec_error_generic")}`);
+        } else {
+          await eapSleep(350 * (attempt + 1));
+        }
+      }
     }
-    return { materials: list.map((f) => ({ file_name: f.name })) };
+    if (i < list.length - 1) await eapSleep(120);
   }
-  if (!response.ok) {
-    const msg =
-      (data && (data.error || data.message)) || `Upload failed (${response.status})`;
-    throw new Error(msg);
+  if (!uploaded && errors.length) {
+    throw new Error(errors.join(" · "));
   }
-  return data;
+  if (errors.length) {
+    throw new Error(errors.join(" · "));
+  }
+  return { uploaded, materials: list.map((f) => ({ file_name: f.name })) };
 }
 
 /**
@@ -1784,6 +1792,9 @@ function buildTeacherRecordedLessonStatusPanel(task) {
       : t("teacher_rec_task_has_video_draft", { name: rec.title || rec.file_name || "" });
     section.appendChild(line);
 
+    const player = buildInlineRecordedVideoBlock(rec, "teacher");
+    if (player) section.appendChild(player);
+
     const actions = document.createElement("div");
     actions.className = "task-card__recorded-manage__actions";
 
@@ -1792,7 +1803,7 @@ function buildTeacherRecordedLessonStatusPanel(task) {
     previewBtn.className = "btn-secondary";
     previewBtn.setAttribute("data-recorded-action", "preview");
     previewBtn.setAttribute("data-lesson-id", String(rec.id));
-    previewBtn.textContent = t("trec_preview_btn");
+    previewBtn.textContent = t("eap_inline_play_btn");
 
     const pubBtn = document.createElement("button");
     pubBtn.type = "button";
@@ -2066,39 +2077,59 @@ function calendarCategoryClass(category) {
   return "cal-pill--other";
 }
 
+/** Inline HTML5 player — same experience for teacher review and student viewing. */
+function buildInlineRecordedVideoBlock(rec, role) {
+  const api = window.EAP_RECORDED_LESSONS;
+  if (!api || !rec || rec.id == null) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "eap-inline-recording";
+  wrap.id = `eap-recording-player-${rec.id}`;
+  const label = document.createElement("p");
+  label.className = "eap-inline-recording__label";
+  label.textContent = t("eap_inline_recording_heading");
+  const video = document.createElement("video");
+  video.className = "eap-inline-recording__video";
+  video.controls = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+  video.setAttribute("controlsList", "nodownload");
+  video.src = role === "teacher" ? api.teacherStreamUrl(rec.id) : api.studentStreamUrl(rec.id);
+  video.addEventListener("contextmenu", (ev) => ev.preventDefault());
+  const hint = document.createElement("p");
+  hint.className = "eap-inline-recording__hint";
+  hint.textContent = t("eap_inline_recording_hint");
+  wrap.appendChild(label);
+  wrap.appendChild(video);
+  wrap.appendChild(hint);
+  return wrap;
+}
+
+function focusInlineRecordedPlayer(lessonId) {
+  const wrap = document.getElementById(`eap-recording-player-${lessonId}`);
+  if (!wrap) return;
+  wrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  const video = wrap.querySelector("video");
+  if (video) void video.play().catch(() => {});
+}
+
 /** Phase N6 — linked published recording on a calendar task. */
 function appendTaskRecordedLessonBlock(parent, task, role) {
   const rec = task && task.recorded_lesson;
   if (!rec || rec.id == null) return;
   if (role === "student" && rec.visibility && rec.visibility !== "published") return;
 
-  const wrap = document.createElement("div");
-  wrap.className = "task-card__recording";
+  const player = buildInlineRecordedVideoBlock(rec, role);
+  if (player) parent.appendChild(player);
 
-  const label = document.createElement("span");
-  label.className = "task-card__recording-label";
-  label.textContent = t("task_recording_label");
-
-  const link = document.createElement("a");
-  link.className = "btn-secondary task-card__recording-link";
   if (role === "teacher") {
-    const cls = task.class_name ? `?class_name=${encodeURIComponent(task.class_name)}` : "";
-    link.href = `teacher-recorded.html${cls}`;
-    link.textContent = t("task_recording_manage");
-  } else {
-    link.href = `student-recorded.html?id=${encodeURIComponent(String(rec.id))}`;
-    link.textContent = t("srec_watch_btn");
+    const manage = document.createElement("a");
+    manage.className = "task-card__recording-manage-link";
+    manage.href = task.class_name
+      ? `teacher-recorded.html?class_name=${encodeURIComponent(task.class_name)}`
+      : "teacher-recorded.html";
+    manage.textContent = t("task_recording_manage");
+    parent.appendChild(manage);
   }
-
-  wrap.appendChild(label);
-  if (rec.title) {
-    const meta = document.createElement("span");
-    meta.className = "task-card__recording-meta";
-    meta.textContent = rec.title;
-    wrap.appendChild(meta);
-  }
-  wrap.appendChild(link);
-  parent.appendChild(wrap);
 }
 
 /**
@@ -6269,7 +6300,7 @@ function initTeacherPage() {
       recActionBtn.disabled = true;
       try {
         if (action === "preview") {
-          window.open(api.teacherStreamUrl(lessonId), "_blank", "noopener,noreferrer");
+          focusInlineRecordedPlayer(lessonId);
         } else if (action === "toggle-publish") {
           const published = recActionBtn.getAttribute("data-published") === "1";
           await api.update(lessonId, { visibility: published ? "draft" : "published" });

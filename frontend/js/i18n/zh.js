@@ -309,6 +309,9 @@ window.EAP_STRINGS_ZH = {
   "teacher_rec_videos_ready": "已选 {count} 个视频，保存任务时将一并上传",
   "teacher_rec_repair_upload_btn": "上传并关联视频",
   "teacher_rec_repair_ok": "视频已关联并发布给学生。",
+  "eap_inline_recording_heading": "课堂录像（在线观看）",
+  "eap_inline_recording_hint": "请在平台内播放，勿下载。",
+  "eap_inline_play_btn": "播放视频",
   "teacher_create_material_label": "教学资料（可选）",
   "teacher_create_material_hint":
     "可上传多个文件：一次多选（按住 Ctrl/Cmd 点选），或多次点击「选择文件」逐个添加。",

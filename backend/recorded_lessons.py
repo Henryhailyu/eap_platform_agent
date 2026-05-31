@@ -245,13 +245,16 @@ def register_recorded_lessons_routes(app):
         if not resolved_dir:
             return jsonify({"error": "File not found"}), 404
         full = os.path.join(resolved_dir, safe_base)
-        return send_file(
+        resp = send_file(
             full,
             mimetype=video_mimetype(ext),
             as_attachment=False,
             conditional=True,
             download_name=None,
         )
+        resp.headers["Content-Disposition"] = "inline"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        return resp
 
     @app.route("/api/teacher/recorded-lessons", methods=["GET", "POST"])
     def teacher_recorded_lessons_collection():
