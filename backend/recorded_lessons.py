@@ -13,7 +13,10 @@ log = logging.getLogger("eap.recorded_lessons")
 
 RECORDED_LESSON_SUBDIR = "recorded-lessons"
 ALLOWED_VIDEO_EXTENSIONS = frozenset({"mp4", "webm", "mov", "m4v"})
+ALLOWED_AUDIO_EXTENSIONS = frozenset({"mp3", "m4a", "aac", "wav", "ogg"})
+ALLOWED_RECORDED_MEDIA_EXTENSIONS = ALLOWED_VIDEO_EXTENSIONS | ALLOWED_AUDIO_EXTENSIONS
 MAX_RECORDED_VIDEO_BYTES = 500 * 1024 * 1024  # 500 MB pilot cap
+MAX_RECORDED_AUDIO_BYTES = 100 * 1024 * 1024  # 100 MB pilot cap
 
 VISIBILITY_DRAFT = "draft"
 VISIBILITY_PUBLISHED = "published"
@@ -28,6 +31,26 @@ def allowed_video_extension(filename: str) -> bool:
     if not filename or "." not in filename:
         return False
     return filename.rsplit(".", 1)[-1].lower() in ALLOWED_VIDEO_EXTENSIONS
+
+
+def allowed_audio_extension(filename: str) -> bool:
+    if not filename or "." not in filename:
+        return False
+    return filename.rsplit(".", 1)[-1].lower() in ALLOWED_AUDIO_EXTENSIONS
+
+
+def allowed_recorded_media_extension(filename: str) -> bool:
+    if not filename or "." not in filename:
+        return False
+    return filename.rsplit(".", 1)[-1].lower() in ALLOWED_RECORDED_MEDIA_EXTENSIONS
+
+
+def is_audio_extension(ext: str) -> bool:
+    return (ext or "").lower() in ALLOWED_AUDIO_EXTENSIONS
+
+
+def max_bytes_for_recorded_ext(ext: str) -> int:
+    return MAX_RECORDED_AUDIO_BYTES if is_audio_extension(ext) else MAX_RECORDED_VIDEO_BYTES
 
 
 def recorded_lessons_upload_dir(upload_dir: str) -> str:
@@ -71,7 +94,16 @@ def delete_recorded_video_file(upload_dir: str, file_path: str | None) -> None:
 
 
 def video_mimetype(ext: str) -> str:
+    """MIME for streaming a recorded lesson (video or audio)."""
     e = (ext or "").lower()
+    if e == "mp3":
+        return "audio/mpeg"
+    if e == "m4a" or e == "aac":
+        return "audio/mp4"
+    if e == "wav":
+        return "audio/wav"
+    if e == "ogg":
+        return "audio/ogg"
     if e == "mp4" or e == "m4v":
         return "video/mp4"
     if e == "webm":
@@ -116,7 +148,7 @@ def enrich_task_dicts_with_recordings(conn, task_dicts, *, published_only: bool 
         params.append(VISIBILITY_PUBLISHED)
     rows = conn.execute(
         f"""
-        SELECT id, calendar_task_id, title, visibility
+        SELECT id, calendar_task_id, title, visibility, file_ext, file_name
         FROM recorded_lessons
         WHERE calendar_task_id IN ({placeholders}){vis_sql}
         """,
@@ -131,6 +163,8 @@ def enrich_task_dicts_with_recordings(conn, task_dicts, *, published_only: bool 
             "id": r["id"],
             "title": r["title"] or "",
             "visibility": r["visibility"] or VISIBILITY_DRAFT,
+            "file_ext": r["file_ext"] or "",
+            "file_name": r["file_name"] or "",
         }
     for t in task_dicts:
         rec = by_task.get(int(t["id"])) if t.get("id") is not None else None
@@ -354,19 +388,24 @@ def register_recorded_lessons_routes(app):
             if not upload or not upload.filename:
                 return jsonify({"error": "file is required"}), 400
             name = os.path.basename(upload.filename.strip())
-            if not allowed_video_extension(name):
+            if not allowed_recorded_media_extension(name):
                 return jsonify(
                     {
-                        "error": "File type not allowed. Allowed: mp4, webm, mov, m4v"
+                        "error": (
+                            "File type not allowed. Allowed video: mp4, webm, mov, m4v; "
+                            "audio: mp3, m4a, aac, wav, ogg"
+                        )
                     }
                 ), 400
+            ext = name.rsplit(".", 1)[-1].lower()
             data = upload.read()
-            if len(data) > MAX_RECORDED_VIDEO_BYTES:
-                return jsonify({"error": "File too large (max 500 MB)"}), 400
+            cap = max_bytes_for_recorded_ext(ext)
+            if len(data) > cap:
+                cap_mb = cap // (1024 * 1024)
+                return jsonify({"error": f"File too large (max {cap_mb} MB)"}), 400
             if len(data) == 0:
                 return jsonify({"error": "Empty file"}), 400
 
-            ext = name.rsplit(".", 1)[-1].lower()
             upload_dir = _upload_root()
             stored, _dest = save_recorded_video(upload_dir, name, data)
             now = _now_iso()
@@ -379,7 +418,7 @@ def register_recorded_lessons_routes(app):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
                 """,
                 (
-                    class_name,
+                    class_norm,
                     teacher_username or "",
                     title,
                     description or None,

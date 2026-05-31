@@ -210,7 +210,8 @@
   font-size: 0.95rem;
 }
 
-.eap-inline-recording__video {
+.eap-inline-recording__video,
+.eap-inline-recording audio.eap-inline-recording__video {
   width: 100%;
   max-height: min(52vh, 420px);
   border-radius: 8px;

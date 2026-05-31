@@ -395,29 +395,29 @@
                     aria-hidden="true"
                   >
                     <p class="teacher-recorded-create-panel__lead" data-i18n="teacher_rec_create_lead">
-                      Step 1: upload the video. Step 2: fill in title and instructions, then Save Task.
+                      Step 1: upload audio or video. Step 2: fill in title and instructions, then Save Task.
                     </p>
                     <div id="teacher-create-recorded-file-wrap" class="field">
-                      <label for="teacher-create-recorded-video" data-i18n="teacher_rec_video_label"
-                        >Class recording video</label
+                      <label for="teacher-create-recorded-video" data-i18n="teacher_rec_media_label"
+                        >Class recording (audio or video)</label
                       >
                       <input
                         id="teacher-create-recorded-video"
                         type="file"
                         multiple
-                        accept=".mp4,.webm,.mov,.m4v,video/*"
+                        accept=".mp4,.webm,.mov,.m4v,.mp3,.m4a,.aac,.wav,.ogg,video/*,audio/*"
                       />
                       <p class="teacher-recorded-create-panel__hint" data-i18n="trec_file_hint">
-                        MP4, WebM, MOV, or M4V — max 500 MB
+                        Video: MP4, WebM, MOV, M4V (max 500 MB). Audio: MP3, M4A, AAC, WAV, OGG (max 100 MB).
                       </p>
                     </div>
                     <button
                       type="button"
                       class="btn-secondary"
                       id="teacher-create-recorded-upload-btn"
-                      data-i18n="teacher_rec_upload_video_btn"
+                      data-i18n="teacher_rec_upload_media_btn"
                     >
-                      Upload video
+                      Upload audio or video
                     </button>
                     <p
                       id="teacher-create-recorded-upload-status"
@@ -709,6 +709,6 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="js/recorded-lessons-api.js"></script>
-    <script src="app.js?v=20260531-materials-batch"></script>
+    <script src="app.js?v=20260531-recorded-media-link"></script>
   </body>
 </html>
