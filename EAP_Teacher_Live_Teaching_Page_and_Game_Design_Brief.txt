@@ -1,0 +1,906 @@
+EAP PLATFORM DEVELOPMENT BRIEF
+Teacher Live Teaching Page and AI Game-Based Teaching Design
+Prepared for Cursor / Codex
+
+============================================================
+1. Purpose of this document
+============================================================
+
+This document describes the future design direction for the EAP Platform's Teacher Live Teaching Page and its AI-assisted game-based teaching features.
+
+The platform currently has a stable web-based EAP teaching and learning workflow. The next design direction is to create a richer classroom teaching page for teachers. This page should be based on the previous prototype file named preview-teaching.html, but it should be treated as a reference design, not as a file to directly replace the current stable teacher calendar or task management pages.
+
+The new Teacher Live Teaching Page should support:
+
+- AI-generated HTML teaching pages from uploaded teaching materials.
+- Direct presentation of uploaded PDF, PPT/PPTX, Word, and TXT teaching files.
+- A large central teaching display area.
+- A left vertical icon-based classroom tool menu.
+- Floating windows for supporting tools.
+- Pre-class AI game generation.
+- In-class use of saved games.
+- Teacher-student live classroom interaction.
+- Student responses, scores, rankings, and progress shown on the teacher side.
+
+This is a planning and design brief. Do not implement all features at once. Development should be staged safely.
+
+============================================================
+2. Reference design: preview-teaching.html
+============================================================
+
+The uploaded preview-teaching.html file should be used as the main visual and structural reference for the future Teacher Live Teaching Page.
+
+The prototype already includes the following design ideas:
+
+- A top teaching title bar.
+- A left vertical toolbar.
+- A central slide or teaching content display area.
+- A right quick tools panel.
+- Floating tool windows.
+- Material Icons.
+- A deep blue-green theme color (#0A4D68).
+- White cards, rounded corners, and a clean classroom dashboard style.
+
+The left toolbar in the prototype includes tools such as:
+
+- Slides
+- Upload
+- Draw
+- Poll
+- Cloud
+- Board
+- Share
+- Timer
+- Groups
+- Track
+- Voice
+- Quiz
+- Stats
+- AI
+- Files
+- Help
+
+The future page should keep this general architecture but redesign the layout so that the central teaching display area becomes much larger and more suitable for real classroom teaching.
+
+============================================================
+3. Overall page identity
+============================================================
+
+The new page should be understood as:
+
+- Teacher Live Teaching Page
+- Teacher Live Teaching Dashboard
+- AI-generated HTML Teaching Page Viewer
+- Teaching File Presentation Viewer
+- Classroom Interaction Control Centre
+- AI-assisted Game-Based Teaching Centre
+- Teacher-Student Live Interaction Hub
+
+This page is not a normal homework management page. It is the page that teachers use during class.
+
+Its main purpose is to help teachers:
+
+- Display teaching materials.
+- Use AI to generate classroom-ready HTML teaching pages.
+- Present uploaded files directly.
+- Launch classroom activities.
+- Use classroom games.
+- Manage student participation.
+- View student responses and group results.
+- Show rankings, scores, and selected student work to the class.
+- Save classroom interaction data as learning evidence.
+
+============================================================
+4. Main page layout
+============================================================
+
+The page should keep the basic structure of preview-teaching.html, but the proportions should be redesigned.
+
+4.1 Top bar
+
+The top bar should display contextual information such as:
+
+- Course title.
+- Class name.
+- Teaching date.
+- Teaching task title.
+- Current activity or file name.
+- Present / Edit / Save / Share status.
+
+4.2 Left vertical toolbar
+
+The left vertical toolbar should remain the main tool entry point. It should be icon-based and compact.
+
+Suggested categories:
+
+Present:
+- Slides
+- Upload
+- Draw
+
+Interact:
+- Poll
+- Cloud
+- Board
+- Games
+- Share
+
+Manage:
+- Timer
+- Groups
+- Track
+- Voice
+
+Assess:
+- Quiz
+- Stats
+- AI
+
+Resource:
+- Files
+- Help
+
+The new important tool is Games.
+
+4.3 Central teaching display area
+
+The central display area should be the main focus of the whole page. It should take around 85% of the available page space.
+
+The old prototype shows a smaller central slide with the text:
+
+"Goals of this course - reflection session"
+"In this session, we will reflect on the goals of this course and what you need to do in order to reach them. Please join by scanning the QR code"
+
+In the future, this central area should become a large teaching display canvas.
+
+It should be able to display:
+
+- AI-generated HTML teaching pages.
+- Uploaded PDF files.
+- Uploaded PPT/PPTX files.
+- Uploaded Word files.
+- Uploaded TXT files.
+- Classroom games.
+- Student response results.
+- Group scores.
+- Rankings.
+- Advancement results.
+- AI summaries.
+- Selected student work.
+
+4.4 Supporting tools
+
+Supporting tools should not permanently occupy too much screen space.
+
+Recommended behaviour:
+
+- The right quick tools panel can be hidden, collapsed, or made optional.
+- Tools such as Timer, Poll, Groups, AI, Files, Games, and Stats should open as floating windows when clicked.
+- Floating windows should be draggable, closable, and ideally minimisable in later phases.
+- The central teaching area should remain the main classroom display.
+
+============================================================
+5. Teaching content modes in the central area
+============================================================
+
+The central teaching display area should support two main content modes.
+
+------------------------------------------------------------
+Mode 1: AI-generated HTML teaching page
+------------------------------------------------------------
+
+Teachers should be able to upload teaching materials and ask AI to generate an HTML teaching page.
+
+Basic workflow:
+
+1. The teacher enters the Teacher Live Teaching Page.
+2. The teacher clicks Upload in the left toolbar.
+3. The teacher uploads a teaching file.
+4. The system reads the file content.
+5. AI generates an HTML teaching page based on the material.
+6. The generated HTML page appears in the central teaching display area.
+7. The teacher previews and checks the result.
+8. If satisfied, the teacher saves and uses it in class.
+9. If not satisfied, the teacher enters additional requirements and regenerates it.
+
+Supported source materials may include:
+
+- PDF
+- Word
+- PPT/PPTX
+- TXT
+- Reading materials
+- Listening transcripts
+- Vocabulary materials
+- Worksheets
+- Review materials
+- Exam practice materials
+
+Later exploration:
+
+- EPUB
+- MOBI
+- Other e-book formats
+
+EPUB/MOBI conversion is not required in the first stage.
+
+------------------------------------------------------------
+Mode 2: Direct file presentation
+------------------------------------------------------------
+
+Teachers should also be able to directly display uploaded files without AI conversion.
+
+The system should support direct display of:
+
+- PDF
+- PPT/PPTX
+- Word
+- TXT
+
+Suggested default behaviour:
+
+PDF:
+- Default to direct preview.
+- Also provide a "Generate HTML with AI" option.
+
+PPT/PPTX:
+- Default to presentation/playback mode after upload.
+- Show slide navigation controls such as previous, next, play, and fullscreen.
+
+Word:
+- Default to document preview if possible.
+- Also provide a "Generate HTML with AI" option.
+
+TXT:
+- Can be displayed directly.
+- Also suitable for quick AI conversion into an HTML teaching page.
+
+============================================================
+6. AI-generated HTML teaching page rules
+============================================================
+
+AI generation should use three inputs:
+
+1. Uploaded teaching file.
+2. Manager default prompt.
+3. Teacher custom prompt.
+
+If the teacher does not enter extra requirements:
+
+AI = uploaded file + manager default prompt
+
+If the teacher enters custom requirements:
+
+AI = uploaded file + manager default prompt + teacher custom prompt
+
+The teacher custom prompt should not completely override the manager default prompt. It should adjust the output within the manager-defined standard.
+
+This ensures:
+
+- Consistent teaching page style across teachers.
+- More stable EAP teaching quality.
+- Teacher flexibility.
+- Manager control over the overall structure and style.
+
+The manager default prompt may define a common HTML teaching page structure such as:
+
+1. Lesson title.
+2. Learning outcomes.
+3. Warm-up question.
+4. Key vocabulary.
+5. Main input material.
+6. Guided practice.
+7. Pair or group activity.
+8. Quick poll or check.
+9. Reflection or exit ticket.
+10. Homework or follow-up task.
+
+EAP-specific sections may include:
+
+- Academic vocabulary focus.
+- Reading strategy.
+- Listening strategy.
+- Note-taking task.
+- Summary writing task.
+- Speaking discussion prompt.
+- Writing sentence frames.
+- Formative assessment.
+
+============================================================
+7. Regeneration and teacher review
+============================================================
+
+AI-generated content should not be automatically published to students without teacher review.
+
+The teacher should be able to:
+
+- Preview generated HTML.
+- Save the teaching page.
+- Regenerate the page.
+- Enter additional requirements.
+- Use the page in class.
+- Restore a previous version in later phases.
+
+Example teacher custom requirements:
+
+- Design this as a 20-minute classroom activity.
+- Add a vocabulary prediction activity.
+- Add pair discussion.
+- Add reading comprehension questions.
+- Reduce text and increase interaction.
+- Make it suitable for lower-level students.
+- Add an exit ticket.
+- Focus on root-prefix-suffix vocabulary learning.
+- Add classroom poll questions.
+
+============================================================
+8. Teacher-student live classroom interaction
+============================================================
+
+The Teacher Live Teaching Page must not be only a one-way presentation page.
+
+It should connect to a Student Interaction View.
+
+The teacher side and student side should interact during class.
+
+Future view separation:
+
+Teacher Teaching View:
+- Displays teaching content.
+- Controls activities.
+- Launches questions or games.
+- Views student responses.
+- Views group scores.
+- Shows selected results to the class.
+- Saves classroom data.
+
+Student Interaction View:
+- Shows the student version of the activity.
+- Lets students answer questions.
+- Lets students participate in games.
+- Lets students submit text, files, images, or answers.
+- Shows personal or group feedback.
+- Shows scores or progress when appropriate.
+
+AI-generated HTML teaching pages can include interactive elements such as:
+
+- Multiple-choice questions.
+- Fill-in-the-blank questions.
+- Short-answer questions.
+- Polls.
+- Vocabulary matching.
+- Ordering tasks.
+- Reflection boxes.
+- Group discussion submission boxes.
+- Exit tickets.
+
+When students complete these elements, the data should return to the teacher side.
+
+The teacher side should be able to show:
+
+- Number of submitted responses.
+- Number of missing responses.
+- Correct rate.
+- Student answer list.
+- Group performance.
+- Excellent responses.
+- Common errors.
+- AI summary.
+
+The teacher should control what is shown to the class.
+
+Recommended display controls:
+
+- Show to class.
+- Hide from class.
+- Show anonymous results.
+- Show group names only.
+- Show individual names.
+- Export results.
+- Save to learning record.
+
+============================================================
+9. Games feature overview
+============================================================
+
+Games should be added as a new icon in the left vertical toolbar.
+
+The Games feature should be an AI-assisted game-based EAP teaching tool.
+
+It is not a separate entertainment feature. It is designed to help teachers transform EAP learning content into classroom games.
+
+Games can be used for:
+
+- Vocabulary review.
+- Reading comprehension.
+- Listening comprehension.
+- Grammar review.
+- Summary writing preparation.
+- Academic speaking.
+- Critical thinking.
+- Presentation skills.
+- Group competition.
+- Warm-up activities.
+- Exit-ticket review.
+
+============================================================
+10. Important Games logic: two stages
+============================================================
+
+The Games feature must be divided into two stages.
+
+------------------------------------------------------------
+Stage 1: Pre-class game design / Game Builder
+------------------------------------------------------------
+
+Teachers design games before class.
+
+In this stage, teachers can choose from the 15 game templates.
+
+Workflow:
+
+1. The teacher enters lesson preparation or Game Builder.
+2. The teacher chooses teaching content.
+3. The teacher chooses one of the 15 game types.
+4. The teacher enters optional custom requirements.
+5. AI generates the game.
+6. The teacher previews and reviews the game.
+7. The teacher edits, regenerates, or saves the game.
+8. The game is saved to the lesson, task, or teaching page.
+
+------------------------------------------------------------
+Stage 2: In-class saved game use
+------------------------------------------------------------
+
+During class, when the teacher clicks the Games icon, the system should NOT show all 15 templates.
+
+Instead, it should only show games that have already been prepared, reviewed, and saved by the teacher.
+
+Workflow:
+
+1. The teacher clicks Games in the left toolbar.
+2. A Saved Games window opens.
+3. The teacher selects a saved game.
+4. The teacher clicks Use in Class.
+5. The game is displayed in the central teaching display area.
+6. Students join through the mini-program or web student view.
+7. Student answers, scores, rankings, and progress return to the teacher side.
+8. The teacher can display selected results to the class.
+
+This is important for classroom stability. Teachers should not need to generate and check games during live teaching unless they deliberately choose to.
+
+============================================================
+11. Game Builder input sources
+============================================================
+
+AI game generation can use different content sources:
+
+- Newly uploaded teaching files.
+- Existing teaching materials from the current task.
+- The current PDF/PPT/Word/TXT shown in the central display area.
+- An AI-generated HTML teaching page.
+- Manually entered vocabulary or questions.
+- Manager-defined course objectives or unit themes.
+
+Example:
+
+A teacher uploads vocabulary content from Merriam-Webster's Vocabulary Builder, chooses Vocabulary Bingo, and asks AI to generate a vocabulary bingo game. The teacher reviews it, saves it, and later opens it in class from the Games icon.
+
+============================================================
+12. Teacher review and saving of games
+============================================================
+
+AI-generated games must enter Preview / Review Mode before use.
+
+Teachers should check:
+
+- Whether questions are accurate.
+- Whether answers are correct.
+- Whether difficulty is suitable.
+- Whether timing is suitable.
+- Whether instructions are clear.
+- Whether the game matches the lesson objective.
+- Whether the game fits the students' English level.
+- Whether it supports EAP learning.
+
+Teacher options:
+
+- Save Game.
+- Use in Class.
+- Share with Students.
+- Regenerate.
+- Edit requirements.
+- Modify manually.
+- Discard.
+
+Later, version history may be useful so that teachers can restore previous game versions.
+
+============================================================
+13. The 15 game templates
+============================================================
+
+The Game Builder should include the following 15 game templates for pre-class design.
+
+1. Board Race Game / Flying Chess Style Game
+
+Students or groups answer questions. If they answer correctly, they roll a dice and move forward on the board. The first group to reach the finish line, or the group with the highest score when time ends, wins.
+
+Suitable for:
+- Vocabulary review.
+- Reading comprehension.
+- Listening details.
+- Grammar correction.
+- Summary writing concepts.
+- Presentation skills review.
+
+Possible board squares:
+- Bonus.
+- Challenge.
+- Penalty.
+- Swap.
+- Team Help.
+- Vocabulary Boost.
+
+2. Vocabulary Bingo
+
+AI generates bingo cards from vocabulary. The teacher gives definitions, example sentences, or synonyms. Students mark the correct words. The first student or group to complete a row, column, or diagonal wins.
+
+Suitable for:
+- Academic vocabulary.
+- AWL vocabulary.
+- Merriam-Webster Vocabulary Builder.
+- Roots and affixes.
+- Collocations.
+
+3. Matching Race
+
+Students match two sets of cards as quickly and accurately as possible.
+
+Possible matching pairs:
+- Word - definition.
+- Word - example sentence.
+- Root - meaning.
+- Prefix - meaning.
+- Paragraph - main idea.
+- Claim - evidence.
+- Problem - solution.
+
+4. Treasure Hunt
+
+Students answer questions to unlock clues. Each correct answer reveals the next clue. The final goal is to find the treasure or complete the final task.
+
+Suitable for:
+- Reading detail search.
+- Scanning practice.
+- Listening for key information.
+- Finding textual evidence.
+- Argument structure recognition.
+
+5. Escape Room
+
+Students complete a sequence of language tasks. Each completed task gives a password, clue, or key. Students escape after completing the final task.
+
+Suitable for:
+- Academic reading.
+- Listening comprehension.
+- Vocabulary review.
+- Summary writing.
+- Citation and paraphrasing.
+
+6. Quiz Battle
+
+AI generates questions from teaching material. Students or groups compete to answer. Correct answers earn points. Wrong answers may lose points or allow another team to answer.
+
+Question types may include:
+- Normal question.
+- Challenge question.
+- Timed question.
+- Double-point question.
+- Group cooperation question.
+- Individual quick-answer question.
+
+7. Word Ladder
+
+Students move through a vocabulary ladder by identifying word families, roots, affixes, derivations, synonyms, or collocations.
+
+Examples:
+- act -> action -> active -> activity -> activate -> activation
+- predict -> prediction -> predictable -> unpredictable
+
+Suitable for:
+- Word family learning.
+- Roots and affixes.
+- Academic vocabulary expansion.
+
+8. Sentence Builder
+
+AI breaks academic sentences into chunks or phrases. Students reorder them to form correct, natural, academic sentences.
+
+Suitable for:
+- Topic sentences.
+- Thesis statements.
+- Summary sentences.
+- Cause-effect sentences.
+- Compare-contrast structures.
+- Academic writing structures.
+
+9. Argument Sorting
+
+AI extracts claim, reason, evidence, example, and counterargument from a text. Students drag or place them into the correct structure.
+
+Suitable for:
+- Argumentative writing.
+- Critical reading.
+- Research article structure.
+- Problem-solution essay.
+- Academic paragraph structure.
+
+10. Summary Mission
+
+Students complete a sequence of summary tasks. Each task earns points. The final goal is to produce a complete summary.
+
+Mission steps may include:
+- Identify the main idea.
+- Select key points.
+- Remove minor details.
+- Paraphrase key information.
+- Organise summary structure.
+- Write final summary.
+
+This game is especially important for EAP reading, listening, and summary writing assessment.
+
+11. Memory Card Game
+
+Cards are shown face down. Students flip two cards. If the pair matches, they score points. If not, the cards turn back.
+
+Possible pairs:
+- Word - definition.
+- Word - synonym.
+- Word - collocation.
+- Root - meaning.
+- Phrase - function.
+
+12. Hot Seat
+
+One student or group cannot see the target word on the screen. Other students explain the word in English. The target student or group guesses the word.
+
+AI may generate:
+- Target words.
+- Clue sentences.
+- Forbidden words.
+- Difficulty level.
+- Timing rules.
+
+Suitable for vocabulary and speaking practice.
+
+13. Debate Cards
+
+AI generates claim cards, evidence cards, counterargument cards, example cards, and question cards. Students draw cards and use them for mini-debate or group discussion.
+
+Suitable for:
+- Academic speaking.
+- Seminar discussion.
+- Critical thinking.
+- Argument development.
+- Presentation preparation.
+
+14. Ranking Challenge
+
+Students place items in the correct order or rank them by importance.
+
+Possible ranking tasks:
+- Paragraph order.
+- Process steps.
+- Lecture structure.
+- Importance ranking.
+- Cause-effect chain.
+- Summary points.
+- Presentation order.
+
+15. Spin Wheel
+
+The teacher spins a wheel. The system randomly selects a question, student, group, task, or challenge.
+
+Suitable for:
+- Warm-up.
+- Review.
+- Speaking prompts.
+- Vocabulary challenges.
+- Bonus points.
+- Team selection.
+
+============================================================
+14. Padlet-style interaction ideas integrated into games
+============================================================
+
+The goal is not to rebuild Padlet inside the platform.
+
+Instead, the platform should borrow some interaction ideas from Padlet and integrate them into games and classroom activities.
+
+Useful interaction ideas include:
+
+- Students post content.
+- Students upload group work.
+- Students see peer responses.
+- Students like or respond to peer contributions.
+- Teachers select excellent answers.
+- Teachers hide or filter responses.
+- AI summarises class contributions.
+- AI generates follow-up questions based on student responses.
+
+Examples of integration:
+
+Board Race Game:
+- Students submit answers, evidence, or short explanations.
+- Correct answers allow groups to move forward.
+
+Vocabulary Bingo:
+- Students may submit original example sentences for marked words.
+
+Summary Mission:
+- Students submit summaries.
+- Teachers show strong examples.
+- AI summarises common issues.
+
+Debate Cards:
+- Students upload evidence or speaking notes.
+
+Treasure Hunt:
+- Students upload textual evidence or screenshots.
+
+Quiz Battle:
+- Students answer through the student view.
+- The teacher side shows rankings and scores.
+
+This makes games more than simple quizzes. They become collaborative, evidence-based EAP learning activities.
+
+============================================================
+15. Games results shown on the teacher side
+============================================================
+
+Student game actions must return to the teacher side.
+
+The teacher side should be able to show:
+
+- Individual scores.
+- Group scores.
+- Current ranking.
+- Advancing students.
+- Advancing groups.
+- Correct rate.
+- Round results.
+- Board positions.
+- Number of completed tasks.
+- Timer status.
+- Final winners.
+
+Examples:
+
+Board Race Game:
+1. Students or groups answer a question.
+2. If correct, they roll a dice.
+3. Their token moves forward.
+4. The teacher side shows the updated board.
+5. The class sees which group is leading.
+6. Some groups may advance to the next round.
+7. The teacher side shows the final winner.
+
+Quiz Battle:
+1. Students submit answers.
+2. The teacher side shows fastest groups or students.
+3. Correct answers earn points.
+4. The teacher side shows a live leaderboard.
+
+Summary Mission:
+1. Students complete main idea, key point, paraphrasing, and summary tasks.
+2. The teacher side shows progress for each student or group.
+3. AI summarises excellent responses and common problems.
+4. The teacher can display selected summaries to the class.
+
+============================================================
+16. General teacher-student data flow
+============================================================
+
+The general classroom interaction flow should be:
+
+Teacher launches activity.
+↓
+Student receives activity on mini-program or web student view.
+↓
+Student answers, submits, uploads, or plays.
+↓
+System records response.
+↓
+Teacher dashboard updates.
+↓
+Teacher chooses what to show to class.
+↓
+Results are saved to class record or learning record.
+
+This flow applies to:
+
+- AI HTML page questions.
+- Polls.
+- Quizzes.
+- Games.
+- Board activities.
+- Exit tickets.
+- Group tasks.
+- Vocabulary activities.
+- Summary tasks.
+
+============================================================
+17. First development priority
+============================================================
+
+Although 15 templates should be kept in the design, they should not all be implemented at once.
+
+Recommended first real game:
+
+Board Race Game / Flying Chess Style Game
+
+Reasons:
+
+- Strong visual classroom effect.
+- Easy for students to understand.
+- Good for group competition.
+- Clearly shows teacher-student interaction.
+- Suitable for AI-generated questions.
+- Good as a platform demo highlight.
+
+Recommended next games:
+
+2. Vocabulary Bingo
+3. Summary Mission
+
+Reasons:
+
+Vocabulary Bingo fits EAP vocabulary learning and Merriam-Webster Vocabulary Builder.
+Summary Mission is highly aligned with EAP reading, listening, and summary writing assessment.
+
+============================================================
+18. Safe staged development recommendation
+============================================================
+
+Do not implement all features immediately.
+
+Suggested staged plan:
+
+T1 - Save preview-teaching.html as a reference design.
+T2 - Design the new Teacher Live Teaching Page layout.
+T3 - Expand the central teaching display area to around 85%.
+T4 - Keep the left toolbar icon-based and compact.
+T5 - Add a Games icon to the toolbar.
+T6 - Make Games icon open a Saved Games mock window only.
+T7 - Create a static/mock central display for game results.
+T8 - Design the Student Interaction View structure.
+T9 - Implement a minimum interaction flow: teacher launches a question, student submits, teacher sees results.
+T10 - Add a mock Game Builder planning page.
+T11 - Add the 15 game template selection UI in Game Builder.
+T12 - Add AI game generation mock mode.
+T13 - Add preview, regenerate, and save game flow.
+T14 - Implement the first real game: Board Race Game.
+T15 - Add group scoring and advancement display.
+T16 - Later expand to Vocabulary Bingo, Matching Race, Summary Mission, and other games.
+
+============================================================
+19. Important implementation cautions for Cursor / Codex
+============================================================
+
+- Do not replace the existing teacher calendar page immediately.
+- Do not break the current stable MVP.
+- Do not change unrelated authentication, task, upload, or student submission logic without a plan.
+- Treat preview-teaching.html as a reference design, not a direct replacement.
+- First produce a safe pre-edit plan.
+- Prefer additive development: create new pages or routes rather than overwriting stable pages.
+- Do not implement real AI calls until the UI flow, data flow, and safety plan are approved.
+- Use mock AI generation first.
+- Use mock saved games first.
+- Use mock student responses first if necessary.
+- Keep web teacher UI and future WeChat student mini-program integration clearly separated.
+
+============================================================
+20. One-sentence summary
+============================================================
+
+Build a new Teacher Live Teaching Page based on preview-teaching.html, with a large central teaching display area, direct file presentation, AI-generated HTML teaching pages, a Games tool for pre-prepared AI-generated classroom games, and live teacher-student interaction where student answers, scores, rankings, and advancement results return to the teacher side and can be displayed during class.

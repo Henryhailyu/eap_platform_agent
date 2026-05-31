@@ -308,6 +308,12 @@ def register_recorded_lessons_routes(app):
                 "yes",
             )
             task_date = str(request.form.get("task_date") or "").strip()[:10]
+            vis_raw = str(request.form.get("visibility") or "").strip().lower()
+            initial_visibility = (
+                VISIBILITY_PUBLISHED
+                if vis_raw == VISIBILITY_PUBLISHED
+                else VISIBILITY_DRAFT
+            )
 
             if not class_name:
                 return jsonify({"error": "class_name is required"}), 400
@@ -378,7 +384,7 @@ def register_recorded_lessons_routes(app):
                     name[:512],
                     ext,
                     len(data),
-                    VISIBILITY_DRAFT,
+                    initial_visibility,
                     calendar_task_id,
                     now,
                     now,

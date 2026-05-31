@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EAP Language Hub - Teaching Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            background: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .presentation-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #0A4D68;
+        }
+
+        .top-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 64px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .side-toolbar {
+            width: 80px;
+            background: white;
+            padding: 1rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            max-height: calc(100vh - 64px);
+            z-index: 1;
+            position: relative;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(10, 77, 104, 0.2) transparent;
+        }
+
+        .tool-button {
+            width: 60px;
+            height: auto;
+            min-height: 65px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #666;
+            position: relative;
+            margin: 0.5rem 0;
+            background: transparent;
+            border: 2px solid transparent;
+            flex-shrink: 0;
+            padding: 8px 4px;
+            gap: 4px;
+        }
+
+        .tool-button .label {
+            font-size: 10px;
+            text-align: center;
+            line-height: 1.2;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+
+        .tool-button:hover .label {
+            color: #0A4D68;
+        }
+
+        .tool-button.active .label {
+            color: white;
+        }
+
+        .content-area {
+            flex-grow: 1;
+            display: flex;
+            margin-left: 20px;
+            z-index: 0;
+            position: relative;
+        }
+
+        .slide-area {
+            flex-grow: 1;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f8f8f8;
+        }
+
+        .slide-container {
+            width: 100%;
+            max-width: 900px;
+            aspect-ratio: 16/9;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 2rem;
+            position: relative;
+        }
+
+        .slide-content {
+            text-align: center;
+        }
+
+        .slide-title {
+            font-size: 2.5rem;
+            color: #0A4D68;
+            margin-bottom: 1rem;
+        }
+
+        .slide-subtitle {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 2rem;
+        }
+
+        .qr-code {
+            width: 200px;
+            height: 200px;
+            background: #f0f0f0;
+            margin: 0 auto;
+            border-radius: 8px;
+        }
+
+        .tools-panel {
+            width: 300px;
+            background: white;
+            padding: 1.5rem;
+            border-left: 1px solid #eee;
+            overflow-y: auto;
+            z-index: 90;
+        }
+
+        .tool-section {
+            margin-bottom: 2rem;
+        }
+
+        .tool-section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #0A4D68;
+            margin-bottom: 1rem;
+        }
+
+        .quick-tools {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .quick-tool {
+            padding: 1rem;
+            background: #f8f8f8;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .quick-tool .quick-tool-icon {
+            font-size: 24px;
+            transition: all 0.3s ease;
+            margin-bottom: 0;
+        }
+
+        .quick-tool .label {
+            font-size: 10px;
+            text-align: center;
+            line-height: 1.2;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+
+        .quick-tool:hover {
+            background: rgba(10, 77, 104, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .quick-tool:hover .quick-tool-icon {
+            transform: scale(1.1);
+            color: #0A4D68;
+        }
+
+        .quick-tool:hover .label {
+            color: #0A4D68;
+        }
+
+        .button {
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+        }
+
+        .button-primary {
+            background: #0A4D68;
+            color: white;
+        }
+
+        .button-secondary {
+            background: #f0f0f0;
+            color: #0A4D68;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .slide-controls {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 1rem;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .slide-control-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: transparent;
+            border: none;
+            color: #666;
+        }
+
+        .slide-control-button:hover {
+            background: #f0f0f0;
+            color: #0A4D68;
+        }
+
+        .timer-display {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #0A4D68;
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+
+        /* Tooltip styles */
+        .tool-button {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .tool-button::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: calc(100% + 10px);  /* Position to the right with some spacing */
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #0A4D68;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 9999;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .tool-button::after {
+            content: '';
+            position: absolute;
+            left: calc(100% + 4px);  /* Position arrow to the right */
+            top: 50%;
+            transform: translateY(-50%);
+            border: 6px solid transparent;
+            border-right-color: #0A4D68;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 9999;
+        }
+
+        .tool-button:hover::before,
+        .tool-button:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Floating window styles */
+        .floating-window {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: none;
+            min-width: 400px;
+            min-height: 300px;
+        }
+
+        .window-header {
+            padding: 12px 20px;
+            background: #0A4D68;
+            color: white;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .window-content {
+            padding: 20px;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        /* Presentation Viewer Styles */
+        .presentation-viewer {
+            width: 800px;
+            height: 600px;
+        }
+
+        .presentation-controls {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        /* Upload Area Styles */
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area.drag-over {
+            border-color: #0A4D68;
+            background: rgba(10, 77, 104, 0.1);
+        }
+
+        .upload-area p {
+            margin-top: 10px;
+            color: #666;
+        }
+
+        /* Drawing Area Styles */
+        .draw-window {
+            width: 640px;
+            height: 480px;
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .draw-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        /* Poll Styles */
+        .poll-window {
+            width: 500px;
+        }
+
+        .qr-code-container {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f8f8;
+            border-radius: 8px;
+        }
+
+        .poll-url {
+            margin-top: 10px;
+            color: #666;
+            word-break: break-all;
+        }
+
+        .poll-results {
+            margin-top: 20px;
+        }
+
+        .result-bar {
+            height: 24px;
+            background: #0A4D68;
+            border-radius: 12px;
+            margin: 8px 0;
+            transition: width 0.3s ease;
+        }
+
+        /* Annotation Tools */
+        .annotation-tools {
+            position: fixed;
+            left: 100px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .annotation-tool {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .annotation-tool:hover {
+            background: rgba(10, 77, 104, 0.1);
+        }
+
+        .annotation-tool.active {
+            background: #0A4D68;
+            color: white;
+        }
+
+        /* Control panels */
+        .control-panel {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        /* Result bars styling */
+        .result-item {
+            margin: 12px 0;
+        }
+
+        /* Button enhancements */
+        .button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #f0f0f0;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .button:hover {
+            background: #e0e0e0;
+        }
+
+        .button .material-icons {
+            font-size: 20px;
+        }
+
+        /* Select styling */
+        select.button {
+            padding-right: 24px;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 16px;
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize all tool windows and their functionality
+        const toolWindows = {};
+        
+        // Map of tool labels to their functions
+        const toolFunctions = {
+            'slides': showPresentationWindow,
+            'upload': showUploadWindow,
+            'draw': showDrawingWindow,
+            'poll': showPollWindow,
+            'cloud': showWordCloud,
+            'board': showInteractiveBoard,
+            'share': showScreenSharing,
+            'timer': showTimer,
+            'groups': showGroupManagement,
+            'track': showAttendanceTracker,
+            'voice': showVoiceControls,
+            'quiz': showQuickAssessment,
+            'stats': showAnalytics,
+            'ai': showAIFeedback,
+            'files': showResourceManager,
+            'help': showHelpCenter
+        };
+
+        // Initialize all tool buttons
+        document.querySelectorAll('.tool-button').forEach(button => {
+            const label = button.querySelector('.label')?.textContent.toLowerCase();
+            if (label && toolFunctions[label]) {
+                button.onclick = () => {
+                    // Remove active class from all buttons
+                    document.querySelectorAll('.tool-button').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    
+                    // Add active class to clicked button
+                    button.classList.add('active');
+                    
+                    // Call the corresponding function
+                    toolFunctions[label]();
+                };
+            }
+        });
+
+        // Initialize quick tools in the right panel
+        document.querySelectorAll('.quick-tool').forEach(tool => {
+            tool.onclick = () => {
+                const label = tool.querySelector('.label')?.textContent.toLowerCase();
+                switch(label) {
+                    case 'timer':
+                        showTimer();
+                        break;
+                    case 'pick':
+                        showRandomPicker();
+                        break;
+                    case 'team':
+                        showGroupManagement();
+                        break;
+                    case 'check':
+                        showAttendanceTracker();
+                        break;
+                }
+            };
+        });
+
+        // Base class for floating windows
+        class FloatingWindow {
+            constructor(title) {
+                this.window = document.createElement('div');
+                this.window.className = 'floating-window';
+                
+                this.header = document.createElement('div');
+                this.header.className = 'window-header';
+                this.header.innerHTML = `
+                    <span>${title}</span>
+                    <button class="close-button material-icons">close</button>
+                `;
+                
+                this.content = document.createElement('div');
+                this.content.className = 'window-content';
+                
+                this.window.appendChild(this.header);
+                this.window.appendChild(this.content);
+                document.body.appendChild(this.window);
+                
+                this.setupDragging();
+                this.setupClosing();
+            }
+            
+            setupDragging() {
+                let isDragging = false;
+                let currentX;
+                let currentY;
+                let initialX;
+                let initialY;
+                
+                this.header.onmousedown = (e) => {
+                    if (e.target.classList.contains('close-button')) return;
+                    isDragging = true;
+                    initialX = e.clientX - this.window.offsetLeft;
+                    initialY = e.clientY - this.window.offsetTop;
+                };
+                
+                document.onmousemove = (e) => {
+                    if (isDragging) {
+                        e.preventDefault();
+                        currentX = e.clientX - initialX;
+                        currentY = e.clientY - initialY;
+                        this.window.style.left = currentX + 'px';
+                        this.window.style.top = currentY + 'px';
+                    }
+                };
+                
+                document.onmouseup = () => {
+                    isDragging = false;
+                };
+            }
+            
+            setupClosing() {
+                const closeBtn = this.window.querySelector('.close-button');
+                closeBtn.onclick = () => this.hide();
+            }
+            
+            show() {
+                // Center the window
+                const rect = this.window.getBoundingClientRect();
+                const centerX = (window.innerWidth - rect.width) / 2;
+                const centerY = (window.innerHeight - rect.height) / 2;
+                this.window.style.left = centerX + 'px';
+                this.window.style.top = centerY + 'px';
+                
+                this.window.style.display = 'block';
+            }
+            
+            hide() {
+                this.window.style.display = 'none';
+            }
+            
+            setContent(content) {
+                this.content.innerHTML = content;
+            }
+        }
+
+        // Function to show presentation window
+        function showPresentationWindow() {
+            const win = new FloatingWindow('Presentation');
+            win.window.style.width = '800px';
+            win.window.style.height = '600px';
+            win.setContent(`
+                <div class="control-panel">
+                    <button class="button"><span class="material-icons">skip_previous</span></button>
+                    <button class="button button-primary"><span class="material-icons">play_arrow</span></button>
+                    <button class="button"><span class="material-icons">skip_next</span></button>
+                    <button class="button"><span class="material-icons">fullscreen</span></button>
+                </div>
+                <div style="height: 500px; background: white; margin-top: 20px; display: flex; justify-content: center; align-items: center;">
+                    <div class="slide-content">
+                        <h1>Presentation Title</h1>
+                        <p>Slide content goes here</p>
+                    </div>
+                </div>
+            `);
+            win.show();
+        }
+
+        // Function to show upload window
+        function showUploadWindow() {
+            const win = new FloatingWindow('Upload Files');
+            win.window.style.width = '600px';
+            win.setContent(`
+                <div class="upload-area" style="border: 2px dashed #ccc; padding: 40px; text-align: center; margin: 20px;">
+                    <span class="material-icons" style="font-size: 48px; color: #666;">cloud_upload</span>
+                    <p>Drag and drop files here or click to browse</p>
+                    <input type="file" style="display: none;">
+                </div>
+                <div class="uploaded-files" style="margin-top: 20px;">
+                    <h3>Uploaded Files</h3>
+                    <div class="file-list"></div>
+                </div>
+            `);
+            win.show();
+
+            // Setup upload functionality
+            const uploadArea = win.content.querySelector('.upload-area');
+            const input = win.content.querySelector('input');
+            
+            uploadArea.onclick = () => input.click();
+            
+            uploadArea.ondragover = (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#0A4D68';
+                uploadArea.style.backgroundColor = 'rgba(10, 77, 104, 0.1)';
+            };
+            
+            uploadArea.ondragleave = () => {
+                uploadArea.style.borderColor = '#ccc';
+                uploadArea.style.backgroundColor = 'transparent';
+            };
+            
+            uploadArea.ondrop = (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#ccc';
+                uploadArea.style.backgroundColor = 'transparent';
+                handleFiles(e.dataTransfer.files);
+            };
+            
+            input.onchange = (e) => {
+                handleFiles(e.target.files);
+            };
+            
+            function handleFiles(files) {
+                const fileList = win.content.querySelector('.file-list');
+                Array.from(files).forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.style.padding = '10px';
+                    fileItem.style.borderBottom = '1px solid #eee';
+                    fileItem.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>${file.name}</span>
+                            <button class="button">Remove</button>
+                        </div>
+                    `;
+                    fileList.appendChild(fileItem);
+                });
+            }
+        }
+
+        // Function to show drawing window
+        function showDrawingWindow() {
+            const win = new FloatingWindow('Drawing Board');
+            win.window.style.width = '800px';
+            win.window.style.height = '600px';
+            win.setContent(`
+                <div class="control-panel">
+                    <button class="button"><span class="material-icons">brush</span></button>
+                    <button class="button"><span class="material-icons">gesture</span></button>
+                    <button class="button"><span class="material-icons">format_shapes</span></button>
+                    <button class="button"><span class="material-icons">delete</span></button>
+                </div>
+                <canvas id="drawingCanvas" style="width: 100%; height: 500px; margin-top: 20px; border: 1px solid #eee;"></canvas>
+            `);
+            win.show();
+
+            // Setup canvas
+            const canvas = win.content.querySelector('#drawingCanvas');
+            const ctx = canvas.getContext('2d');
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+
+            function startDrawing(e) {
+                isDrawing = true;
+                [lastX, lastY] = [e.offsetX, e.offsetY];
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(e.offsetX, e.offsetY);
+                ctx.stroke();
+                [lastX, lastY] = [e.offsetX, e.offsetY];
+            }
+
+            function stopDrawing() {
+                isDrawing = false;
+            }
+        }
+
+        // Function to show poll window
+        function showPollWindow() {
+            const win = new FloatingWindow('Quick Poll');
+            win.window.style.width = '500px';
+            win.setContent(`
+                <div class="control-panel">
+                    <button class="button button-primary">Create New Poll</button>
+                    <button class="button">Export Results</button>
+                </div>
+                <div class="qr-code-container" style="text-align: center; margin: 20px 0;">
+                    <h3>Scan to Participate</h3>
+                    <div style="width: 200px; height: 200px; background: #f5f5f5; margin: 10px auto;"></div>
+                    <p>https://example.com/poll/123</p>
+                </div>
+                <div class="poll-results">
+                    <h3>Live Results</h3>
+                    <div class="result-bars"></div>
+                </div>
+            `);
+            win.show();
+        }
+
+        // Add other window functions here...
+        function showWordCloud() {
+            const win = new FloatingWindow('Word Cloud');
+            win.window.style.width = '600px';
+            win.setContent(`
+                <div class="control-panel">
+                    <input type="text" class="input-field" placeholder="Enter topic or paste responses" style="width: 70%; padding: 8px;">
+                    <button class="button button-primary">Generate Cloud</button>
+                </div>
+                <div style="height: 300px; background: #f5f5f5; margin-top: 20px; display: flex; justify-content: center; align-items: center;">
+                    Word Cloud Visualization Area
+                </div>
+            `);
+            win.show();
+        }
+
+        function showInteractiveBoard() {
+            const win = new FloatingWindow('Interactive Board');
+            win.window.style.width = '800px';
+            win.window.style.height = '600px';
+            win.setContent(`
+                <div class="control-panel">
+                    <button class="button"><span class="material-icons">brush</span></button>
+                    <button class="button"><span class="material-icons">gesture</span></button>
+                    <button class="button"><span class="material-icons">format_shapes</span></button>
+                    <button class="button"><span class="material-icons">delete</span></button>
+                </div>
+                <div style="height: 500px; background: white; margin-top: 20px; border: 1px solid #eee;">
+                    Interactive Board Area
+                </div>
+            `);
+            win.show();
+        }
+
+        function showScreenSharing() {
+            const win = new FloatingWindow('Screen Sharing');
+            win.window.style.width = '600px';
+            win.setContent(`
+                <div class="control-panel">
+                    <select class="button" style="margin-right: 10px;">
+                        <option>Entire Screen</option>
+                        <option>Application Window</option>
+                        <option>Browser Tab</option>
+                    </select>
+                    <button class="button button-primary">Start Sharing</button>
+                </div>
+                <div style="margin-top: 20px; padding: 20px; background: #f5f5f5; border-radius: 8px;">
+                    <h3>Connected Students</h3>
+                    <div style="margin-top: 10px;">No students connected</div>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showTimer() {
+            const win = new FloatingWindow('Timer');
+            win.window.style.width = '300px';
+            win.setContent(`
+                <div style="text-align: center;">
+                    <div style="font-size: 48px; margin: 20px 0;" id="timer-display">05:00</div>
+                    <div class="control-panel">
+                        <button class="button">-1m</button>
+                        <button class="button button-primary">Start</button>
+                        <button class="button">+1m</button>
+                    </div>
+                </div>
+            `);
+            win.show();
+
+            // Add timer functionality
+            let time = 300; // 5 minutes in seconds
+            let timerInterval;
+            const display = win.content.querySelector('#timer-display');
+            const buttons = win.content.querySelectorAll('.button');
+            
+            buttons[0].onclick = () => updateTime(-60);
+            buttons[1].onclick = toggleTimer;
+            buttons[2].onclick = () => updateTime(60);
+
+            function updateTime(change) {
+                time = Math.max(0, time + change);
+                updateDisplay();
+            }
+
+            function toggleTimer() {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    buttons[1].textContent = 'Start';
+                } else {
+                    timerInterval = setInterval(() => {
+                        if (time > 0) {
+                            time--;
+                            updateDisplay();
+                        } else {
+                            clearInterval(timerInterval);
+                            timerInterval = null;
+                            buttons[1].textContent = 'Start';
+                            alert('Time is up!');
+                        }
+                    }, 1000);
+                    buttons[1].textContent = 'Pause';
+                }
+            }
+
+            function updateDisplay() {
+                const minutes = Math.floor(time / 60);
+                const seconds = time % 60;
+                display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        function showGroupManagement() {
+            const win = new FloatingWindow('Group Management');
+            win.window.style.width = '500px';
+            win.setContent(`
+                <div class="control-panel">
+                    <input type="number" class="input-field" placeholder="Number of groups" style="width: 150px; padding: 8px;">
+                    <button class="button button-primary">Create Groups</button>
+                </div>
+                <div style="margin-top: 20px;">
+                    <h3>Current Groups</h3>
+                    <div style="margin-top: 10px; color: #666;">No groups created yet</div>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showAttendanceTracker() {
+            const win = new FloatingWindow('Attendance Tracker');
+            win.window.style.width = '400px';
+            win.setContent(`
+                <div style="margin-bottom: 20px;">
+                    <h3>Today's Attendance</h3>
+                    <div style="color: #666;">Class: EAP Language Hub</div>
+                    <div style="color: #666;">Date: ${new Date().toLocaleDateString()}</div>
+                </div>
+                <div class="control-panel">
+                    <button class="button button-primary">Start Check-in</button>
+                    <button class="button">Export Report</button>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showVoiceControls() {
+            const win = new FloatingWindow('Voice Controls');
+            win.window.style.width = '400px';
+            win.setContent(`
+                <div class="control-panel">
+                    <button class="button"><span class="material-icons">mic</span> Mute All</button>
+                    <button class="button"><span class="material-icons">record_voice_over</span> Allow Speaking</button>
+                </div>
+                <div style="margin-top: 20px;">
+                    <h3>Raised Hands</h3>
+                    <div style="color: #666;">No hands raised</div>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showQuickAssessment() {
+            const win = new FloatingWindow('Quick Assessment');
+            win.window.style.width = '600px';
+            win.setContent(`
+                <div class="control-panel">
+                    <select class="button" style="margin-right: 10px;">
+                        <option>Multiple Choice</option>
+                        <option>True/False</option>
+                        <option>Short Answer</option>
+                    </select>
+                    <button class="button button-primary">Create New</button>
+                </div>
+                <div style="margin-top: 20px; padding: 20px; background: #f5f5f5; border-radius: 8px;">
+                    <h3>Recent Assessments</h3>
+                    <div style="margin-top: 10px; color: #666;">No recent assessments</div>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showAnalytics() {
+            const win = new FloatingWindow('Analytics');
+            win.window.style.width = '800px';
+            win.window.style.height = '600px';
+            win.setContent(`
+                <div class="control-panel">
+                    <select class="button">
+                        <option>This Week</option>
+                        <option>This Month</option>
+                        <option>This Term</option>
+                    </select>
+                    <button class="button">Export Data</button>
+                </div>
+                <div style="height: 500px; margin-top: 20px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                    <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
+                        <h3>Participation Rate</h3>
+                        <div style="height: 200px; display: flex; justify-content: center; align-items: center;">
+                            Chart Area
+                        </div>
+                    </div>
+                    <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
+                        <h3>Assessment Results</h3>
+                        <div style="height: 200px; display: flex; justify-content: center; align-items: center;">
+                            Chart Area
+                        </div>
+                    </div>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showAIFeedback() {
+            const win = new FloatingWindow('AI Assistant');
+            win.window.style.width = '500px';
+            win.setContent(`
+                <div style="margin-bottom: 20px;">
+                    <textarea placeholder="Enter your teaching scenario or question..." 
+                              style="width: 100%; height: 100px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                </div>
+                <div class="control-panel">
+                    <button class="button button-primary">Get AI Suggestions</button>
+                </div>
+                <div style="margin-top: 20px; padding: 20px; background: #f5f5f5; border-radius: 8px;">
+                    <h3>AI Suggestions</h3>
+                    <div style="margin-top: 10px; color: #666;">Ask a question to get started</div>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showResourceManager() {
+            const win = new FloatingWindow('Resource Manager');
+            win.window.style.width = '700px';
+            win.window.style.height = '500px';
+            win.setContent(`
+                <div class="control-panel">
+                    <button class="button"><span class="material-icons">create_new_folder</span> New Folder</button>
+                    <button class="button"><span class="material-icons">upload_file</span> Upload Files</button>
+                    <button class="button"><span class="material-icons">share</span> Share</button>
+                </div>
+                <div style="margin-top: 20px; height: 400px; background: white; border: 1px solid #eee; border-radius: 8px; padding: 20px;">
+                    <div style="color: #666; text-align: center; margin-top: 150px;">
+                        <span class="material-icons" style="font-size: 48px;">folder_open</span>
+                        <p>No files uploaded yet</p>
+                    </div>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showHelpCenter() {
+            const win = new FloatingWindow('Help Center');
+            win.window.style.width = '600px';
+            win.setContent(`
+                <div style="padding: 20px;">
+                    <h3>Quick Start Guide</h3>
+                    <div style="margin: 20px 0;">
+                        <h4>Common Tasks</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin: 10px 0;"><span class="material-icons">slideshow</span> Present: Start a presentation</li>
+                            <li style="margin: 10px 0;"><span class="material-icons">poll</span> Poll: Create instant polls</li>
+                            <li style="margin: 10px 0;"><span class="material-icons">groups</span> Groups: Manage student groups</li>
+                        </ul>
+                    </div>
+                    <button class="button button-primary">View Full Documentation</button>
+                </div>
+            `);
+            win.show();
+        }
+
+        function showRandomPicker() {
+            const win = new FloatingWindow('Random Picker');
+            win.window.style.width = '400px';
+            win.setContent(`
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 24px; margin: 20px 0;" id="picked-name">Click to pick a student</div>
+                    <button class="button button-primary">Pick Random Student</button>
+                </div>
+            `);
+            win.show();
+        }
+    });
+    </script>
+</head>
+<body>
+    <div class="top-bar">
+        <div class="presentation-title">
+            Goals of this course - reflection session
+        </div>
+        <div class="top-controls">
+            <button class="button button-secondary" data-tooltip="Edit presentation content and settings">
+                <span class="material-icons">edit</span>
+                Edit
+            </button>
+            <button class="button button-primary" data-tooltip="Start presentation mode">
+                <span class="material-icons">play_arrow</span>
+                Present
+            </button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="side-toolbar">
+            <!-- Presentation Tools -->
+            <div class="tool-category">Present</div>
+            <div class="tool-button active" data-tooltip="Manage and navigate through slides">
+                <span class="material-icons">slideshow</span>
+                <span class="label">Slides</span>
+            </div>
+            <div class="tool-button" data-tooltip="Upload and manage presentation files">
+                <span class="material-icons">upload_file</span>
+                <span class="label">Upload</span>
+            </div>
+            <div class="tool-button" data-tooltip="Draw and annotate on slides">
+                <span class="material-icons">draw</span>
+                <span class="label">Draw</span>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Interactive Tools -->
+            <div class="tool-category">Interact</div>
+            <div class="tool-button" data-tooltip="Create quick polls and quizzes">
+                <span class="material-icons">poll</span>
+                <span class="label">Poll</span>
+            </div>
+            <div class="tool-button" data-tooltip="Generate word clouds from responses">
+                <span class="material-icons">cloud</span>
+                <span class="label">Cloud</span>
+            </div>
+            <div class="tool-button" data-tooltip="Launch interactive whiteboard">
+                <span class="material-icons">edit_note</span>
+                <span class="label">Board</span>
+            </div>
+            <div class="tool-button" data-tooltip="Screen sharing and student displays">
+                <span class="material-icons">screen_share</span>
+                <span class="label">Share</span>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Class Management -->
+            <div class="tool-category">Manage</div>
+            <div class="tool-button" data-tooltip="Timer and activity countdown">
+                <span class="material-icons">timer</span>
+                <span class="label">Timer</span>
+            </div>
+            <div class="tool-button" data-tooltip="Student groups and breakout rooms">
+                <span class="material-icons">groups</span>
+                <span class="label">Groups</span>
+            </div>
+            <div class="tool-button" data-tooltip="Take attendance and track participation">
+                <span class="material-icons">how_to_reg</span>
+                <span class="label">Track</span>
+            </div>
+            <div class="tool-button" data-tooltip="Manage student permissions and hands raised">
+                <span class="material-icons">record_voice_over</span>
+                <span class="label">Voice</span>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Assessment Tools -->
+            <div class="tool-category">Assess</div>
+            <div class="tool-button" data-tooltip="Quick assessments and exit tickets">
+                <span class="material-icons">assignment</span>
+                <span class="label">Quiz</span>
+            </div>
+            <div class="tool-button" data-tooltip="Progress tracking and analytics">
+                <span class="material-icons">insights</span>
+                <span class="label">Stats</span>
+            </div>
+            <div class="tool-button" data-tooltip="Generate AI-powered feedback">
+                <span class="material-icons">psychology</span>
+                <span class="label">AI</span>
+            </div>
+            
+            <div class="tool-separator"></div>
+            
+            <!-- Resources -->
+            <div class="tool-category">Resource</div>
+            <div class="tool-button" data-tooltip="Access teaching materials and resources">
+                <span class="material-icons">folder</span>
+                <span class="label">Files</span>
+            </div>
+            <div class="tool-button" data-tooltip="Share files with students">
+                <span class="material-icons">share</span>
+                <span class="label">Share</span>
+            </div>
+            <div class="tool-button" data-tooltip="Access help and tutorials">
+                <span class="material-icons">help</span>
+                <span class="label">Help</span>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <div class="slide-area">
+                <div class="slide-container">
+                    <div class="slide-content">
+                        <h1 class="slide-title">Goals of this course - reflection session</h1>
+                        <p class="slide-subtitle">In this session, we will reflect on the goals of this course and what you need to do in order to reach them. Please join by scanning the QR code</p>
+                        <div class="qr-code"></div>
+                    </div>
+                    <div class="slide-controls">
+                        <button class="slide-control-button" data-tooltip="Previous Slide">
+                            <span class="material-icons">skip_previous</span>
+                        </button>
+                        <button class="slide-control-button" data-tooltip="Play/Pause Presentation">
+                            <span class="material-icons">play_arrow</span>
+                        </button>
+                        <button class="slide-control-button" data-tooltip="Next Slide">
+                            <span class="material-icons">skip_next</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tools-panel">
+                <div class="tool-section">
+                    <h3 class="tool-section-title">Quick Tools</h3>
+                    <div class="quick-tools">
+                        <div class="quick-tool" data-tooltip="Set countdown timer for activities">
+                            <span class="material-icons quick-tool-icon">timer</span>
+                            <span class="label">Timer</span>
+                        </div>
+                        <div class="quick-tool" data-tooltip="Randomly select student names">
+                            <span class="material-icons quick-tool-icon">casino</span>
+                            <span class="label">Pick</span>
+                        </div>
+                        <div class="quick-tool" data-tooltip="Create random student groups">
+                            <span class="material-icons quick-tool-icon">groups</span>
+                            <span class="label">Team</span>
+                        </div>
+                        <div class="quick-tool" data-tooltip="Track student attendance">
+                            <span class="material-icons quick-tool-icon">how_to_reg</span>
+                            <span class="label">Check</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <h3 class="tool-section-title">Timer</h3>
+                    <div class="timer-display">05:00</div>
+                    <div class="timer-controls">
+                        <button class="button button-secondary" data-tooltip="Reset timer to default">Reset</button>
+                        <button class="button button-primary" data-tooltip="Start/Stop timer">Start</button>
+                    </div>
+                </div>
+
+                <div class="tool-section">
+                    <h3 class="tool-section-title">AI Assistant</h3>
+                    <button class="button button-secondary" style="width: 100%" data-tooltip="Get AI-powered teaching suggestions">
+                        <span class="material-icons">psychology</span>
+                        Get Teaching Suggestions
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

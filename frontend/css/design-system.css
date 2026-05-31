@@ -7,15 +7,16 @@
   --eap-teal-soft: rgba(10, 126, 164, 0.12);
   --eap-text: #1d1d1f;
   --eap-text-secondary: #86868b;
-  --eap-surface: rgba(255, 255, 255, 0.78);
-  --eap-surface-strong: rgba(255, 255, 255, 0.92);
+  --eap-surface: rgba(255, 255, 255, 0.7);
+  --eap-surface-strong: rgba(255, 255, 255, 0.7);
   --eap-border: rgba(0, 0, 0, 0.08);
   --eap-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
   --eap-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.1);
   --eap-radius: 12px;
   --eap-radius-pill: 980px;
   --eap-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-  --eap-overlay: rgba(250, 250, 252, 0.82);
+  --eap-overlay: rgba(255, 255, 255, 0.3);
+  --eap-backdrop-blur: 3px;
   --eap-bg-image: none;
 }
 
@@ -48,8 +49,8 @@ body.eap-shell-active {
 .page-overlay {
   min-height: 100vh;
   background: var(--eap-overlay);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(var(--eap-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--eap-backdrop-blur));
 }
 
 /* Language toggle */
@@ -100,14 +101,14 @@ body.eap-shell-active .teacher-progress-card,
 body.eap-shell-active .task-card,
 body.eap-shell-active .planner-day-detail,
 body.eap-shell-active .page-hero {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--eap-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--eap-backdrop-blur));
 }
 
 body.eap-shell-active .site-header {
   background: var(--eap-surface-strong);
   border-bottom: 1px solid var(--eap-border);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(var(--eap-backdrop-blur));
 }
 
 body.eap-shell-active .site-logo {

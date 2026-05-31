@@ -9,12 +9,13 @@
   --wix-teal: #0a7ea4;
   --wix-text: #162d3d;
   --wix-muted: #5e6b78;
-  --wix-card: rgba(255, 255, 255, 0.92);
+  --wix-card: rgba(255, 255, 255, 0.7);
   --wix-card-border: rgba(22, 45, 61, 0.08);
   --wix-shadow: 0 8px 40px rgba(17, 109, 255, 0.08);
   --wix-radius: 16px;
   --wix-pill: 999px;
-  --eap-overlay: rgba(255, 255, 255, 0.78);
+  --eap-overlay: rgba(255, 255, 255, 0.3);
+  --eap-backdrop-blur: 3px;
 }
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
@@ -39,8 +40,8 @@ body.eap-wix #page-shell {
 body.eap-wix #page-shell > .page-overlay {
   min-height: 100vh;
   background: var(--eap-overlay) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--eap-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--eap-backdrop-blur));
 }
 
 /* Kill old landing layers */
@@ -62,8 +63,8 @@ body.eap-wix .eap-lang-bar {
   align-items: center;
   justify-content: space-between;
   padding: 14px 28px;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(var(--eap-backdrop-blur));
   border-bottom: 1px solid var(--wix-card-border);
 }
 
@@ -190,6 +191,11 @@ body.eap-wix .eap-login-session-banner__actions .btn-primary,
 body.eap-wix .eap-login-session-banner__actions .btn-secondary {
   width: auto;
   min-width: 10rem;
+}
+
+body.eap-wix .login-card,
+body.eap-wix .wix-feature-card {
+  color: var(--wix-text);
 }
 
 body.eap-wix .login-card {

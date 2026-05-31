@@ -498,8 +498,12 @@ function createEmptyTeacherCategoryDraft() {
     period: "",
     recordedLessonId: null,
     recordedLessonFileName: "",
+    recordedVideoFile: null,
+    recordedVideoFiles: [],
     materialFile: null,
     materialFileName: "",
+    materialFiles: [],
+    materialFileNames: [],
   };
 }
 
@@ -515,15 +519,21 @@ function getTeacherCategoryDraft(category) {
 function categoryDraftHasWork(draft, category) {
   if (!draft) return false;
   if (isRecordedLessonCategory(category)) {
-    return draft.recordedLessonId != null;
+    return !!(
+      draft.recordedLessonId != null ||
+      draft.recordedVideoFile ||
+      (draft.recordedVideoFiles && draft.recordedVideoFiles.length > 0)
+    );
   }
+  const mats = draft.materialFiles && draft.materialFiles.length ? draft.materialFiles : [];
   return !!(
     String(draft.title || "").trim() ||
     String(draft.description || "").trim() ||
     String(draft.title_zh || "").trim() ||
     String(draft.description_zh || "").trim() ||
     String(draft.period || "").trim() ||
-    draft.materialFile
+    draft.materialFile ||
+    mats.length > 0
   );
 }
 
@@ -541,11 +551,34 @@ function saveFormToCategoryDraft(category) {
   d.period = periodEl ? String(periodEl.value || "") : "";
   if (!isRecordedLessonCategory(category)) {
     const matInput = document.getElementById("teacher-task-create-material");
-    if (matInput && matInput.files && matInput.files[0]) {
-      d.materialFile = matInput.files[0];
-      d.materialFileName = matInput.files[0].name;
+    if (matInput && matInput.files && matInput.files.length > 0) {
+      d.materialFiles = Array.from(matInput.files);
+      d.materialFileNames = d.materialFiles.map((f) => f.name);
+      d.materialFile = d.materialFiles[0];
+      d.materialFileName = d.materialFileNames[0] || "";
     }
   }
+}
+
+function getRecordedDraftVideoFiles(draft) {
+  if (!draft) return [];
+  if (draft.recordedVideoFiles && draft.recordedVideoFiles.length) {
+    return draft.recordedVideoFiles;
+  }
+  if (draft.recordedVideoFile) return [draft.recordedVideoFile];
+  return [];
+}
+
+function formatMaterialDraftSummary(draft) {
+  const names =
+    draft.materialFileNames && draft.materialFileNames.length
+      ? draft.materialFileNames
+      : draft.materialFileName
+        ? [draft.materialFileName]
+        : [];
+  if (!names.length) return t("no_file_selected");
+  if (names.length === 1) return t("teacher_draft_material_kept", { name: names[0] });
+  return t("teacher_draft_materials_kept", { count: names.length, names: names.join(", ") });
 }
 
 function loadCategoryDraftToForm(category) {
@@ -564,9 +597,7 @@ function loadCategoryDraftToForm(category) {
   if (periodEl) periodEl.value = d.period || "";
   if (matInput) matInput.value = "";
   if (matSummary) {
-    matSummary.textContent = d.materialFileName
-      ? t("teacher_draft_material_kept", { name: d.materialFileName })
-      : t("no_file_selected");
+    matSummary.textContent = formatMaterialDraftSummary(d);
   }
   if (isRecordedLessonCategory(category)) {
     syncTeacherCreateRecordedUploadUI(category);
@@ -608,7 +639,10 @@ function syncTeacherCreateRecordedUploadUI(category) {
   const uploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
   const fileWrap = document.getElementById("teacher-create-recorded-file-wrap");
   const fileInput = document.getElementById("teacher-create-recorded-video");
-  const uploaded = draft.recordedLessonId != null;
+  const uploaded =
+    draft.recordedLessonId != null ||
+    (draft.recordedVideoFiles && draft.recordedVideoFiles.length > 0) ||
+    !!draft.recordedVideoFile;
 
   if (fileWrap) fileWrap.classList.toggle("hidden", uploaded);
   if (uploadBtn) {
@@ -654,7 +688,12 @@ async function uploadTeacherPendingRecordedVideo(className, category) {
     }
     return null;
   }
-  const file = fileInput.files[0];
+  const files = Array.from(fileInput.files);
+  const file = files[0];
+  draft.recordedVideoFiles = files;
+  draft.recordedVideoFile = file;
+  draft.recordedLessonFileName =
+    files.length > 1 ? t("teacher_rec_videos_ready", { count: files.length }) : file.name;
   const title =
     String(draft.title || "").trim() ||
     (document.getElementById("task-title") &&
@@ -688,6 +727,56 @@ async function uploadTeacherPendingRecordedVideo(className, category) {
   syncTeacherCreateRecordedUploadUI(cat);
   syncTeacherCategoryChipDraftIndicators(document.getElementById("teacher-task-category-chips"));
   return lesson;
+}
+
+async function removeOrphanRecordedLesson(lessonId) {
+  if (lessonId == null || !window.EAP_RECORDED_LESSONS) return;
+  try {
+    await window.EAP_RECORDED_LESSONS.remove(lessonId);
+  } catch (_) {
+    /* best-effort */
+  }
+}
+
+async function attachRecordedVideosToTask({
+  class_name,
+  taskId,
+  title,
+  description,
+  videoFiles,
+  orphanLessonId,
+}) {
+  const cls = class_name || teacherDefaultClassFallback();
+  const files = Array.isArray(videoFiles) ? videoFiles.filter(Boolean) : [];
+  if (!files.length) {
+    if (orphanLessonId != null) {
+      await finalizeRecordedLessonForTask({
+        lessonId: orphanLessonId,
+        taskId,
+        title,
+        description,
+      });
+    }
+    return;
+  }
+  for (let i = 0; i < files.length; i += 1) {
+    const file = files[i];
+    const vidTitle =
+      files.length > 1 && i > 0
+        ? `${title || file.name} (${i + 1})`
+        : title || file.name;
+    await uploadRecordedLessonForTask({
+      className: cls,
+      taskId,
+      title: vidTitle,
+      description: i === 0 ? description : "",
+      file,
+      publish: true,
+    });
+  }
+  if (orphanLessonId != null) {
+    await removeOrphanRecordedLesson(orphanLessonId);
+  }
 }
 
 async function finalizeRecordedLessonForTask({
@@ -735,13 +824,15 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
     const draft = getTeacherCategoryDraft(cat);
     try {
       if (isRecordedLessonCategory(cat)) {
-        if (!draft.recordedLessonId) {
+        const videoFiles = getRecordedDraftVideoFiles(draft);
+        if (!videoFiles.length && !draft.recordedLessonId) {
           errors.push(`${translateCategory(cat)}: ${t("teacher_rec_video_required")}`);
           continue;
         }
         const title =
           String(draft.title || "").trim() ||
           draft.recordedLessonFileName ||
+          (videoFiles[0] && videoFiles[0].name) ||
           t("trec_title");
         const created = await apiPost("/api/tasks", {
           date,
@@ -753,15 +844,19 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
           description_zh: draft.description_zh.trim() || null,
           class_name: class_name || teacherDefaultClassFallback(),
         });
-        await finalizeRecordedLessonForTask({
-          lessonId: draft.recordedLessonId,
-          taskId: created.id,
+        const tid = Number(created.id, 10);
+        await attachRecordedVideosToTask({
+          class_name: class_name || teacherDefaultClassFallback(),
+          taskId: tid,
           title,
           description: draft.description.trim(),
-          class_name: class_name || teacherDefaultClassFallback(),
+          videoFiles,
+          orphanLessonId: draft.recordedLessonId,
         });
         draft.recordedLessonId = null;
         draft.recordedLessonFileName = "";
+        draft.recordedVideoFile = null;
+        draft.recordedVideoFiles = [];
         createdCount += 1;
         continue;
       }
@@ -781,11 +876,21 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
         description_zh: draft.description_zh.trim() || null,
         class_name: class_name || teacherDefaultClassFallback(),
       });
-      if (draft.materialFile && created && created.id != null) {
-        await apiUploadTaskFile(Number(created.id, 10), draft.materialFile);
+      const mats =
+        draft.materialFiles && draft.materialFiles.length
+          ? draft.materialFiles
+          : draft.materialFile
+            ? [draft.materialFile]
+            : [];
+      for (const mat of mats) {
+        if (created && created.id != null && mat) {
+          await apiUploadTaskMaterial(Number(created.id, 10), mat);
+        }
       }
       draft.materialFile = null;
       draft.materialFileName = "";
+      draft.materialFiles = [];
+      draft.materialFileNames = [];
       createdCount += 1;
     } catch (err) {
       errors.push(`${translateCategory(cat)}: ${(err && err.message) || t("trec_error_generic")}`);
@@ -812,10 +917,11 @@ async function uploadRecordedLessonForTask({
   fd.append("title", title);
   fd.append("description", description || "");
   fd.append("calendar_task_id", String(taskId));
+  if (publish) fd.append("visibility", "published");
   fd.append("file", file);
   const res = await api.upload(fd);
   const lesson = res && res.lesson ? res.lesson : res;
-  if (publish && lesson && lesson.id != null && typeof api.update === "function") {
+  if (publish && lesson && lesson.id != null && lesson.visibility !== "published") {
     await api.update(lesson.id, { visibility: "published" });
   }
   return lesson;
@@ -1210,6 +1316,29 @@ async function apiUploadTaskFile(taskId, file) {
   return data;
 }
 
+/** POST an additional teaching material (keeps existing files). */
+async function apiUploadTaskMaterial(taskId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  let response;
+  try {
+    response = await eapFetch(`${API_BASE}/api/tasks/${taskId}/materials`, {
+      method: "POST",
+      body: formData,
+      credentials: EAP_FETCH_CREDENTIALS,
+    });
+  } catch (err) {
+    throw new Error(apiUnreachableMessage());
+  }
+  const data = await readJsonOrError(response);
+  if (!response.ok) {
+    const msg =
+      (data && (data.error || data.message)) || `Upload failed (${response.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
 /**
  * POST student homework: multipart FormData to Flask `POST /api/tasks/<id>/submit`.
  *
@@ -1282,7 +1411,27 @@ function normalizeTask(t) {
     class_name: t.class_name != null && t.class_name !== "" ? t.class_name : "EAP047",
     file_path: t.file_path != null && String(t.file_path).trim() !== "" ? String(t.file_path).trim() : null,
     file_name: t.file_name != null && String(t.file_name).trim() !== "" ? String(t.file_name).trim() : null,
+    materials: Array.isArray(t.materials) ? t.materials : [],
+    recorded_lesson: t.recorded_lesson && typeof t.recorded_lesson === "object" ? t.recorded_lesson : null,
   };
+}
+
+function taskMaterialEntries(task) {
+  const out = [];
+  const seen = new Set();
+  const push = (fp, fn) => {
+    const path = fp != null ? String(fp).trim() : "";
+    if (!path || seen.has(path)) return;
+    seen.add(path);
+    out.push({ file_path: path, file_name: fn != null ? String(fn).trim() : path });
+  };
+  if (task && Array.isArray(task.materials)) {
+    task.materials.forEach((m) => {
+      if (m && m.file_path) push(m.file_path, m.file_name);
+    });
+  }
+  if (task && task.file_path) push(task.file_path, task.file_name);
+  return out;
 }
 
 function isCompleted(task) {
@@ -1541,6 +1690,25 @@ function buildTeacherRecordedLessonStatusPanel(task) {
     const hint = document.createElement("p");
     hint.textContent = t("teacher_rec_task_no_video_hint");
     section.appendChild(hint);
+
+    const repair = document.createElement("div");
+    repair.className = "task-card__recorded-repair";
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".mp4,.webm,.mov,.m4v,video/*";
+    fileInput.className = "task-card__recorded-repair-input";
+    const uploadBtn = document.createElement("button");
+    uploadBtn.type = "button";
+    uploadBtn.className = "btn-secondary task-card__recorded-repair-btn";
+    uploadBtn.setAttribute("data-task-id", String(task.id));
+    uploadBtn.textContent = t("teacher_rec_repair_upload_btn");
+    const statusEl = document.createElement("p");
+    statusEl.className = "task-card__recorded-repair-status";
+    statusEl.setAttribute("aria-live", "polite");
+    repair.appendChild(fileInput);
+    repair.appendChild(uploadBtn);
+    repair.appendChild(statusEl);
+    section.appendChild(repair);
   }
 
   return section;
@@ -3595,24 +3763,28 @@ function buildTeacherTaskCardElement(task, copyContext) {
   const attach = document.createElement("div");
   attach.className = "task-card__attachment";
 
-  const attachedP = document.createElement("p");
+  const matEntries = taskMaterialEntries(task);
+  const attachedP = document.createElement("div");
   attachedP.className = "task-card__attached-info";
-  if (hasFile) {
-    const displayName =
-      task.file_name && String(task.file_name).trim()
-        ? task.file_name
-        : task.file_path;
+  if (matEntries.length) {
     const label = document.createElement("span");
     label.className = "task-card__attached-label";
-    label.textContent = "Teaching material: ";
-    const link = document.createElement("a");
-    link.className = "task-card__material-link";
-    link.href = `${API_BASE}/uploads/${encodeURIComponent(String(task.file_path).trim())}`;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = displayName;
+    label.textContent = t("teacher_create_material_label") + " ";
     attachedP.appendChild(label);
-    attachedP.appendChild(link);
+    const list = document.createElement("ul");
+    list.className = "task-card__material-list";
+    matEntries.forEach((m) => {
+      const li = document.createElement("li");
+      const link = document.createElement("a");
+      link.className = "task-card__material-link";
+      link.href = `${API_BASE}/uploads/${encodeURIComponent(m.file_path)}`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = m.file_name || m.file_path;
+      li.appendChild(link);
+      list.appendChild(li);
+    });
+    attachedP.appendChild(list);
   } else {
     attachedP.classList.add("task-card__attached-info--empty");
     attachedP.textContent = t("no_material");
@@ -4383,16 +4555,37 @@ function initTeacherPage() {
   if (createMaterialInput && createMaterialSummary) {
     const refreshMaterialSummary = () => {
       const cat = typeSelect.value;
-      if (!isRecordedLessonCategory(cat) && createMaterialInput.files && createMaterialInput.files[0]) {
+      if (!isRecordedLessonCategory(cat) && createMaterialInput.files && createMaterialInput.files.length) {
         const d = getTeacherCategoryDraft(cat);
-        d.materialFile = createMaterialInput.files[0];
-        d.materialFileName = createMaterialInput.files[0].name;
+        d.materialFiles = Array.from(createMaterialInput.files);
+        d.materialFileNames = d.materialFiles.map((f) => f.name);
+        d.materialFile = d.materialFiles[0];
+        d.materialFileName = d.materialFileNames[0] || "";
+        if (createMaterialSummary) createMaterialSummary.textContent = formatMaterialDraftSummary(d);
         syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
       }
-      updateSelectedFileSummary(createMaterialInput, createMaterialSummary);
     };
     createMaterialInput.addEventListener("change", refreshMaterialSummary);
     refreshMaterialSummary();
+  }
+
+  const recordedVideoInput = document.getElementById("teacher-create-recorded-video");
+  if (recordedVideoInput && recordedVideoInput.dataset.eapBound !== "1") {
+    recordedVideoInput.dataset.eapBound = "1";
+    recordedVideoInput.addEventListener("change", () => {
+      const cat = typeSelect.value;
+      if (!isRecordedLessonCategory(cat) || !recordedVideoInput.files || !recordedVideoInput.files.length) {
+        return;
+      }
+      const d = getTeacherCategoryDraft(cat);
+      d.recordedVideoFiles = Array.from(recordedVideoInput.files);
+      d.recordedVideoFile = d.recordedVideoFiles[0];
+      d.recordedLessonFileName =
+        d.recordedVideoFiles.length > 1
+          ? t("teacher_rec_videos_ready", { count: d.recordedVideoFiles.length })
+          : d.recordedVideoFile.name;
+      syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+    });
   }
 
   function syncTeacherTemplateFormDefaults() {
@@ -5912,6 +6105,47 @@ function initTeacherPage() {
       return;
     }
 
+    const repairRecBtn = ev.target.closest(".task-card__recorded-repair-btn");
+    if (repairRecBtn) {
+      const taskId = Number(repairRecBtn.getAttribute("data-task-id"), 10);
+      const card = repairRecBtn.closest("li.task-card");
+      const fileInput = card && card.querySelector(".task-card__recorded-repair-input");
+      const statusEl = card && card.querySelector(".task-card__recorded-repair-status");
+      if (!Number.isFinite(taskId) || !fileInput || !fileInput.files || !fileInput.files[0]) {
+        if (statusEl) {
+          statusEl.textContent = t("teacher_rec_video_required");
+          statusEl.classList.add("task-card__recorded-repair-status--error");
+        }
+        return;
+      }
+      const taskRow = (lastTeacherDailyTasks || []).find((row) => Number(row.id, 10) === taskId);
+      repairRecBtn.disabled = true;
+      if (statusEl) statusEl.textContent = t("trec_uploading");
+      try {
+        await uploadRecordedLessonForTask({
+          className: (taskRow && taskRow.class_name) || teacherDefaultClassFallback(),
+          taskId,
+          title: (taskRow && taskRow.title) || fileInput.files[0].name,
+          description: (taskRow && taskRow.description) || "",
+          file: fileInput.files[0],
+          publish: true,
+        });
+        if (statusEl) {
+          statusEl.textContent = t("teacher_rec_repair_ok");
+          statusEl.classList.remove("task-card__recorded-repair-status--error");
+        }
+        await refreshTaskList();
+      } catch (err) {
+        if (statusEl) {
+          statusEl.textContent = err.message;
+          statusEl.classList.add("task-card__recorded-repair-status--error");
+        }
+      } finally {
+        repairRecBtn.disabled = false;
+      }
+      return;
+    }
+
     const recActionBtn = ev.target.closest("[data-recorded-action]");
     if (recActionBtn) {
       const lessonId = Number(recActionBtn.getAttribute("data-lesson-id"), 10);
@@ -6320,7 +6554,7 @@ function renderStudentTaskMasterList(masterEl, tasksForDay, subMap) {
     const mySub = m.get(task.id);
     const wfState = getStudentTaskWorkflowState(task, mySub);
     const needsAction = studentTaskNeedsAction(task, mySub);
-    const hasMaterial = !!(task.file_path && String(task.file_path).trim());
+    const hasMaterial = taskMaterialEntries(task).length > 0;
     const hasSubmission = !!(mySub && mySub.id != null);
     const hasFb = studentSubmissionHasFeedback(mySub);
     const hasRev = studentSubmissionHasRevisionRow(mySub);
@@ -6408,20 +6642,26 @@ function buildStudentTaskCardElement(task, mySub) {
 
   const material = document.createElement("div");
   material.className = "task-card__material";
-  if (task.file_path) {
+  const matEntries = taskMaterialEntries(task);
+  if (matEntries.length) {
     const materialLabel = document.createElement("span");
     materialLabel.className = "task-card__material-label";
     materialLabel.textContent = t("teaching_material_label");
-    const link = document.createElement("a");
-    link.className = "task-card__material-link";
-    link.href = `${API_BASE}/uploads/${encodeURIComponent(task.file_path)}`;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = task.file_name
-      ? `View or download: ${task.file_name}`
-      : "View or download attachment";
     material.appendChild(materialLabel);
-    material.appendChild(link);
+    const list = document.createElement("ul");
+    list.className = "task-card__material-list";
+    matEntries.forEach((m) => {
+      const li = document.createElement("li");
+      const link = document.createElement("a");
+      link.className = "task-card__material-link";
+      link.href = `${API_BASE}/uploads/${encodeURIComponent(m.file_path)}`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = m.file_name || m.file_path;
+      li.appendChild(link);
+      list.appendChild(li);
+    });
+    material.appendChild(list);
   } else if (!isRecordedLessonCategory(task.category || task.type)) {
     material.classList.add("task-card__material--empty");
     material.textContent = t("no_material");

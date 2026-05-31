@@ -1,0 +1,628 @@
+EAP Platform Design Brief
+Student AI Self-Study Centre
+Version: Planning Brief for Cursor / Codex
+Purpose: This document describes the future design direction for the student-side AI self-study system in the EAP Platform. It should be treated as a planning and reference document only. Do not implement directly without a separate approved implementation plan.
+
+============================================================
+1. Overall Positioning
+============================================================
+
+The EAP Platform should have two major future highlights:
+
+1. Teacher-side highlight:
+   AI-assisted Teacher Live Teaching Page with AI-generated HTML teaching pages, direct file presentation, game-based classroom interaction, and teacher-student live interaction.
+
+2. Student-side highlight:
+   AI-supported Self-Study Centre for vocabulary, reading, listening, speaking, and writing.
+
+The Student AI Self-Study Centre is different from the current calendar task system.
+
+Current calendar system:
+- Teacher creates tasks.
+- Student views tasks on the calendar.
+- Student submits homework or completes learning activities.
+- Teacher reviews and gives feedback.
+
+Future AI Self-Study Centre:
+- Student takes a placement test.
+- AI diagnoses the student's level.
+- AI assigns a personalised learning path.
+- Student studies independently in vocabulary, reading, listening, speaking, and writing.
+- AI generates materials, practice tasks, feedback, review plans, and suitable learning games.
+- The system records progress and recommends next steps.
+
+Suggested English names:
+- AI Self-Study Centre
+- Student AI Learning Centre
+- Personalised EAP Study Centre
+- EAP AI Learning Path
+
+============================================================
+2. Relationship with Existing Platform Features
+============================================================
+
+The self-study system should not replace the current teacher-student calendar workflow.
+
+It should work alongside the existing system:
+
+1. Teacher-led learning:
+   - Calendar tasks
+   - Homework submissions
+   - Teacher feedback
+   - Classroom interaction
+   - Teacher Live Teaching Page
+
+2. Student-led learning:
+   - Placement test
+   - Personalised AI study path
+   - Individual skill modules
+   - AI-generated practice
+   - Game-based self-study
+   - Progress tracking
+
+The two systems can share student accounts, class information, learning records, uploaded materials, AI-generated activities, game templates, and progress data.
+
+Example: A teacher uses a vocabulary game in class. After class, the student self-study system recommends a related Memory Card Game or Matching Race activity for individual review.
+
+============================================================
+3. Entry Flow: AI Placement Test
+============================================================
+
+Before students enter the AI Self-Study Centre, they should complete an AI placement test.
+
+Recommended duration: around 20 minutes.
+
+Purpose:
+- Diagnose the student's current EAP / IELTS-aligned English level.
+- Place the student into a suitable learning path.
+- Provide a skill profile across vocabulary, reading, listening, speaking, and writing.
+- Recommend suitable self-study modules and daily tasks.
+
+The system should classify students into three main levels:
+
+1. Beginner
+   - IELTS-aligned range: 5.0-6.0
+   - Focus: foundation building, core academic vocabulary, basic academic reading, basic listening, sentence-level writing, short speaking responses.
+
+2. Intermediate
+   - IELTS-aligned range: 6.0-7.0
+   - Focus: academic performance improvement, longer reading/listening tasks, paragraph writing, summary writing, discussion skills, collocation and academic word use.
+
+3. Advanced
+   - IELTS-aligned range: 7.0+
+   - Focus: advanced academic language, critical reading, academic synthesis, seminar discussion, presentation skills, advanced writing, IELTS 7.5+ readiness.
+
+Important note: The system should be described as "IELTS-aligned EAP self-study," not only an IELTS training system. The platform's main identity is still EAP learning in a university context.
+
+Advanced level should support students who need IELTS 7.5+ or equivalent academic English performance for competitive postgraduate applications.
+
+============================================================
+4. Suggested Placement Test Structure
+============================================================
+
+A 20-minute test cannot fully assess all language skills, so it should be a mini diagnostic test.
+
+Recommended first-stage structure:
+
+Part 1: Vocabulary and Academic Word Knowledge
+- Duration: around 5 minutes
+- Question types: word meaning, collocation, word family, academic phrase use, synonym/paraphrase recognition.
+
+Part 2: Reading
+- Duration: around 6 minutes
+- Question types: main idea, supporting details, inference, vocabulary in context, paragraph function, argument structure.
+
+Part 3: Listening
+- Duration: around 5 minutes
+- Question types: main idea, key details, lecture structure, note-taking completion, speaker purpose.
+
+Part 4: Writing / Sentence Awareness
+- Duration: around 4 minutes
+- Question types: sentence correction, sentence ordering, short academic sentence production, summary sentence selection, paragraph organisation.
+
+Optional later stage: Speaking Sample
+- Duration: around 2-3 minutes.
+- Students record a short answer.
+- AI gives feedback on content, fluency, coherence, vocabulary, grammar, and pronunciation if suitable speech APIs are available.
+
+First MVP recommendation: Start with vocabulary, reading, listening, and writing/sentence awareness. Add speaking after the basic system is stable because speaking requires recording, speech-to-text, possible pronunciation analysis, storage, and API cost management.
+
+============================================================
+5. AI Placement Report
+============================================================
+
+After the placement test, students should receive a simple AI-generated learning profile.
+
+Example report structure:
+
+Overall Level: Intermediate
+Estimated IELTS-Aligned Range: 6.0-7.0
+
+Skill Profile:
+- Vocabulary: Intermediate
+- Reading: Intermediate
+- Listening: Beginner / Intermediate
+- Speaking: Not assessed yet
+- Writing: Intermediate
+
+Strengths:
+- Good understanding of general academic vocabulary.
+- Can identify main ideas in short academic texts.
+- Can understand basic lecture structure.
+
+Areas for Improvement:
+- Needs stronger collocation awareness.
+- Needs more accurate summary writing.
+- Needs better listening note-taking.
+- Needs more advanced academic sentence patterns.
+
+Recommended Learning Path:
+- Vocabulary: Intermediate academic vocabulary and collocations.
+- Reading: inference and argument structure.
+- Listening: lecture note-taking practice.
+- Writing: summary writing and paragraph development.
+- Speaking: academic discussion and explanation practice.
+
+============================================================
+6. Five Main Self-Study Modules
+============================================================
+
+The Student AI Self-Study Centre should contain five main modules:
+
+1. Vocabulary
+2. Reading
+3. Listening
+4. Speaking
+5. Writing
+
+Each module should support three levels: Beginner, Intermediate, and Advanced.
+
+Each module should include:
+- AI-generated learning materials
+- Manager-uploaded learning materials
+- AI-organised practice tasks
+- AI-generated questions
+- Game-based learning activities
+- Review tasks
+- Feedback and recommendations
+- Progress tracking
+
+============================================================
+7. Vocabulary Module
+============================================================
+
+Purpose: Help students build academic and IELTS-aligned vocabulary knowledge through structured, level-based learning.
+
+Possible learning content:
+- Academic vocabulary
+- IELTS vocabulary
+- Merriam-Webster Vocabulary Builder style vocabulary
+- Academic Word List vocabulary
+- Roots and affixes
+- Word families
+- Collocations
+- Synonyms and antonyms
+- Example sentences
+- Paraphrasing use
+
+AI functions:
+- Generate daily vocabulary plans.
+- Explain meaning, word family, root, prefix, suffix, and usage.
+- Generate example sentences.
+- Generate collocation practice.
+- Generate memory strategies.
+- Arrange spaced repetition.
+- Generate quizzes and review tasks.
+- Recommend suitable games.
+
+Level design:
+- Beginner: high-frequency academic words, simple definitions, basic example sentences, bilingual support if needed, matching and memory practice.
+- Intermediate: collocations, word families, academic phrase use, paraphrase recognition, sentence-level use.
+- Advanced: nuanced meaning, register, synonyms for academic writing, paraphrasing in context, topic-specific academic vocabulary, 7.5+ lexical resource development.
+
+Suitable games:
+- Vocabulary Bingo
+- Matching Race
+- Memory Card Game
+- Word Ladder
+- Board Race Game
+- Spin Wheel
+- Hot Seat
+
+============================================================
+8. Reading Module
+============================================================
+
+Purpose: Help students improve academic reading, IELTS-aligned reading strategies, and EAP critical reading skills.
+
+Skills:
+- Main idea
+- Supporting details
+- Inference
+- Scanning
+- Skimming
+- Vocabulary in context
+- Argument structure
+- Author stance
+- Reference words
+- Academic text organisation
+
+AI functions:
+- Generate graded reading passages.
+- Generate IELTS-style reading questions.
+- Generate summary tasks.
+- Generate vocabulary-in-context questions.
+- Generate paragraph matching tasks.
+- Generate true / false / not given tasks.
+- Generate short-answer questions.
+- Generate argument sorting tasks.
+
+Level design:
+- Beginner: short academic texts, main idea, basic detail questions, vocabulary in context.
+- Intermediate: longer academic texts, inference, paragraph function, IELTS-style question types, summary completion.
+- Advanced: research-style texts, critical reading, argument evaluation, author stance, synthesis, 7.5+ level academic reading practice.
+
+Suitable games:
+- Treasure Hunt
+- Escape Room
+- Argument Sorting
+- Ranking Challenge
+- Summary Mission
+- Board Race Game
+
+============================================================
+9. Listening Module
+============================================================
+
+Purpose: Help students improve lecture listening, note-taking, and academic listening comprehension.
+
+Skills:
+- Listening for main ideas
+- Listening for details
+- Recognising lecture structure
+- Note-taking
+- Identifying examples and evidence
+- Recognising speaker attitude and emphasis
+- Listening-to-summary practice
+
+AI functions:
+- Generate graded listening scripts.
+- Generate listening questions.
+- Generate pre-listening prediction tasks.
+- Generate note-taking tasks.
+- Generate post-listening comprehension tasks.
+- Generate summary writing tasks.
+- Provide feedback on listening performance.
+
+Possible API requirements:
+The listening module may require external AI or model APIs depending on the final implementation.
+
+Potential technical needs:
+- Text-to-Speech API to convert AI-generated lecture scripts into audio.
+- Speech-to-Text API if students respond orally or summarise by voice.
+- Audio file storage for generated audio and student recordings.
+- Playback controls for pause, replay, speed control, and listening attempt limits.
+
+First-stage recommendation: Start with AI-generated listening scripts and text-based listening tasks. Add generated audio through a TTS API in a later phase. Add student audio response and speech-to-text feedback after the platform is stable.
+
+Level design:
+- Beginner: short talks, clear structure, slower speed, basic detail questions.
+- Intermediate: academic mini-lectures, note-taking tasks, main ideas and supporting points, summary practice.
+- Advanced: longer lectures, natural speed, inference, speaker attitude, integrated listening-reading-writing summary tasks, 7.5+ readiness.
+
+Suitable games:
+- Summary Mission
+- Treasure Hunt
+- Ranking Challenge
+- Quiz Battle
+- Board Race Game
+
+============================================================
+10. Speaking Module
+============================================================
+
+Purpose: Help students practise IELTS-aligned and EAP speaking, including academic discussion, presentation, explanation, and seminar participation.
+
+Skills:
+- Short responses
+- Extended speaking
+- Academic discussion
+- Seminar participation
+- Presentation practice
+- Explaining vocabulary
+- Summarising reading/listening orally
+- Responding to follow-up questions
+
+AI functions:
+- Generate speaking prompts.
+- Simulate IELTS examiner questions.
+- Generate academic discussion prompts.
+- Provide follow-up questions.
+- Analyse response structure.
+- Give feedback on fluency, coherence, vocabulary, grammar, and pronunciation where possible.
+
+Possible API requirements:
+- Speech-to-Text for transcribing student recordings.
+- Pronunciation or speech evaluation if detailed pronunciation feedback is required.
+- Text feedback model for content, organisation, vocabulary, and grammar.
+
+First-stage recommendation: Start with student recorded or typed responses. The system stores the response, and AI gives feedback based on transcript or text. Detailed pronunciation scoring can be added later.
+
+Level design:
+- Beginner: short answers, familiar topics, basic fluency, simple explanation.
+- Intermediate: IELTS Part 2 style long turn, academic opinions, examples and explanations, discussion practice.
+- Advanced: seminar discussion, critical response, presentation Q&A, 7.5+ extended speaking, academic argumentation.
+
+Suitable games:
+- Hot Seat
+- Debate Cards
+- Spin Wheel
+- Quiz Battle
+- Board Race Game
+
+============================================================
+11. Writing Module
+============================================================
+
+Purpose: Help students improve academic writing, summary writing, paragraph writing, and IELTS-aligned writing skills.
+
+Skills:
+- Sentence accuracy
+- Academic sentence patterns
+- Topic sentences
+- Paragraph development
+- Summary writing
+- Paraphrasing
+- Cohesion and coherence
+- Argument development
+- Grammar accuracy
+- Lexical range
+- Revision
+
+AI functions:
+- Generate writing prompts.
+- Generate paragraph writing practice.
+- Generate summary writing tasks.
+- Generate IELTS Task 1 / Task 2 style practice if needed.
+- Give feedback on structure, content, vocabulary, grammar, and coherence.
+- Suggest revisions.
+- Generate model answers or annotated examples.
+- Track improvement over time.
+
+Level design:
+- Beginner: sentence accuracy, topic sentences, short paragraphs, basic summary sentences.
+- Intermediate: paragraph development, summary writing, IELTS Task 2 structure, cohesion and coherence, academic vocabulary use.
+- Advanced: argument quality, synthesis, source use, paraphrasing, advanced lexical and grammatical range, 7.5+ writing improvement.
+
+Suitable games:
+- Sentence Builder
+- Argument Sorting
+- Summary Mission
+- Ranking Challenge
+- Matching Race
+
+============================================================
+12. Manager-Uploaded Self-Study Materials
+============================================================
+
+The manager side should allow authorised managers to upload self-study materials.
+
+Possible material types:
+- PDF
+- Word
+- PPT
+- TXT
+- Vocabulary books
+- Reading passages
+- Listening scripts
+- Writing samples
+- IELTS practice materials
+- EAP course materials
+
+AI should organise these materials for student self-study.
+
+"Organise" may include:
+- Extracting key learning points.
+- Classifying materials by skill module.
+- Classifying materials by difficulty level.
+- Splitting long materials into daily learning tasks.
+- Generating practice questions.
+- Generating quizzes.
+- Generating games.
+- Generating review plans.
+- Generating student-facing HTML learning pages.
+- Generating learning advice.
+- Linking materials to the student's level and progress.
+
+Manager control is important because the system should not rely only on random AI-generated content. Manager-uploaded resources help maintain course quality and consistency.
+
+============================================================
+13. AI Game Selection in Self-Study
+============================================================
+
+The self-study system should reuse the 15 game templates from the Teacher Live Teaching Page, but adapt them for self-study.
+
+The 15 game templates are:
+1. Board Race Game
+2. Vocabulary Bingo
+3. Matching Race
+4. Treasure Hunt
+5. Escape Room
+6. Quiz Battle
+7. Word Ladder
+8. Sentence Builder
+9. Argument Sorting
+10. Summary Mission
+11. Memory Card Game
+12. Hot Seat
+13. Debate Cards
+14. Ranking Challenge
+15. Spin Wheel
+
+In the teacher classroom system:
+- Games are often group-based and live.
+- Teacher controls the activity.
+- Results are shown on the teacher dashboard.
+
+In the student self-study system:
+- Games are mainly individual practice.
+- AI recommends games based on the student's skill, level, and learning goals.
+- The student completes games independently.
+- Progress is saved to the personal learning record.
+
+AI should choose suitable games based on skill module, student level, learning content type, learning objective, task duration, individual/group mode, and classroom/self-study mode.
+
+Example mapping:
+- Vocabulary + Beginner: Matching Race / Memory Card Game
+- Vocabulary + Intermediate: Vocabulary Bingo / Word Ladder
+- Vocabulary + Advanced: Hot Seat / Debate Cards / Board Race Game
+- Reading + Intermediate: Treasure Hunt / Argument Sorting
+- Writing + Advanced: Summary Mission / Argument Sorting / Sentence Builder
+- Speaking + Advanced: Debate Cards / Spin Wheel / Hot Seat
+- Listening + Intermediate: Summary Mission / Ranking Challenge / Quiz Battle
+
+============================================================
+14. Daily AI Study Plan
+============================================================
+
+The AI Self-Study Centre should not only show modules. It should also provide a daily recommended plan.
+
+Possible daily plan:
+
+Today’s AI Study Plan:
+1. Vocabulary: 10 academic words, 1 collocation task, 1 review game.
+2. Reading: 1 short academic passage, 5 questions, 1 summary task.
+3. Listening: 1 mini lecture, note-taking task, 3 comprehension questions.
+4. Speaking: 1 speaking prompt, record or type answer, AI feedback.
+5. Writing: 1 paragraph or summary writing task, AI feedback and revision suggestions.
+6. Review: spaced repetition vocabulary review and recommended game.
+
+The daily plan should adapt to placement level, student progress, weak skills, completed tasks, teacher/manager priorities, and upcoming class tasks.
+
+============================================================
+15. Progress Tracking
+============================================================
+
+The self-study system should track learning progress.
+
+Possible metrics:
+- Placement level
+- Current skill level per module
+- Completed tasks
+- Accuracy rate
+- Vocabulary mastered
+- Reading comprehension progress
+- Listening task completion
+- Speaking practice count
+- Writing feedback history
+- Game scores
+- Review streak
+- AI recommendations
+- Progress over time
+
+Student dashboard could show:
+- Today’s plan
+- Weekly progress
+- Skill radar chart
+- Strengths and weaknesses
+- Recommended next task
+- Recent AI feedback
+
+Teacher/manager dashboard could later show:
+- Aggregated class self-study participation
+- Common weak areas
+- Most completed modules
+- Student progress summaries
+- Materials that need improvement
+
+Privacy note: Detailed individual self-study data should be controlled carefully. The system should decide what teachers/managers can view and what remains private to the student.
+
+============================================================
+16. Suggested Development Phases
+============================================================
+
+This is a large feature and should not be implemented all at once.
+
+Phase S0: Planning only
+- Read this brief.
+- Inspect current project.
+- Do not modify files.
+- Identify safe integration points.
+- Produce a pre-edit plan only.
+
+Phase S1: Student Self-Study Centre skeleton
+- Add a student-side entry point.
+- Add static module cards: Vocabulary, Reading, Listening, Speaking, Writing.
+- Add placeholder level display.
+- No AI yet.
+
+Phase S2: Placement Test mock
+- Create a 20-minute placement test prototype with mock questions.
+- On completion, assign Beginner / Intermediate / Advanced.
+- Show a mock AI learning profile.
+- Store result only if safe.
+
+Phase S3: Vocabulary MVP
+- Start with Vocabulary because it is easiest to implement.
+- Display level-based vocabulary tasks.
+- Add AI mock output or static generated content.
+- Add one simple game, such as Matching Race or Memory Card Game.
+- Track completion.
+
+Phase S4: Reading and Writing MVP
+- Add reading materials.
+- Add AI-generated or mock reading questions.
+- Add Summary Mission / Argument Sorting for reading and writing.
+- Add basic AI writing feedback later.
+
+Phase S5: Listening MVP
+- Start with listening scripts and text-based tasks.
+- Later add Text-to-Speech audio generation.
+- Later add student audio responses.
+
+Phase S6: Speaking MVP
+- Start with speaking prompts and typed/recorded responses.
+- Later add Speech-to-Text and pronunciation feedback.
+
+Phase S7: Manager material upload and AI organisation
+- Allow manager to upload self-study materials.
+- AI organises them by module and level.
+- AI generates student-facing tasks and games.
+
+Phase S8: Personalised daily study plan
+- AI recommends daily tasks based on level and progress.
+
+============================================================
+17. Important Safety and Implementation Notes for Cursor / Codex
+============================================================
+
+This document is a planning brief. It should not trigger immediate implementation.
+
+When using this file with Cursor or Codex:
+- Do not modify the current stable MVP unless explicitly approved.
+- Do not replace current student calendar features.
+- Do not change teacher-side classroom features.
+- Do not add external APIs yet.
+- Do not add TTS, STT, or audio generation yet.
+- Do not add paid API keys into code.
+- Do not store secrets in source files.
+- Do not reset the database.
+- Do not run destructive SQL.
+- Do not implement all modules at once.
+- Start with planning and safe phased design.
+
+Recommended first action: Ask Cursor or Codex to inspect the current project and produce a pre-edit plan only.
+
+============================================================
+18. Final Summary
+============================================================
+
+The Student AI Self-Study Centre is a major future feature of the EAP Platform.
+
+It should provide personalised, IELTS-aligned EAP self-study for university students from Year 1 to Year 4. Before entering the self-study system, students complete an approximately 20-minute placement test. AI analyses the results and places students into Beginner, Intermediate, or Advanced levels, corresponding roughly to IELTS 5.0-6.0, 6.0-7.0, and 7.0+ respectively. Advanced learning should also support students aiming for 7.5+ for competitive postgraduate applications.
+
+The self-study system includes five modules: Vocabulary, Reading, Listening, Speaking, and Writing. Each module is level-based and can include AI-generated learning materials, manager-uploaded resources, practice tasks, games, feedback, and progress tracking. Manager-uploaded materials can be organised by AI into student-facing learning pages, daily tasks, quizzes, and suitable game-based activities.
+
+The 15 game templates from the Teacher Live Teaching Page can also be reused in the self-study system, but adapted for individual learning rather than live classroom competition. AI can recommend suitable games based on the student's level, skill module, learning content, and learning objective.
+
+The system should eventually provide a daily AI study plan, adaptive recommendations, progress tracking, and feedback. However, development should be phased carefully. The first safe MVP should focus on a self-study skeleton, placement test mock, and vocabulary module MVP before adding listening, speaking, advanced AI feedback, or external APIs.

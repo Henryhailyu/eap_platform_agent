@@ -608,8 +608,10 @@ def init_database():
     init_classroom_display_tables(conn)
 
     from recorded_lessons import init_recorded_lessons_tables
+    from task_materials import init_task_materials_tables
 
     init_recorded_lessons_tables(conn)
+    init_task_materials_tables(conn)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS classes (
@@ -3003,6 +3005,9 @@ def get_tasks():
         enrich_task_dicts_with_recordings(
             conn, out, published_only=(role == "student")
         )
+        from task_materials import enrich_task_dicts_with_materials
+
+        enrich_task_dicts_with_materials(conn, out)
         conn.close()
         return jsonify(out)
 
@@ -3039,6 +3044,9 @@ def get_tasks():
         enrich_task_dicts_with_recordings(
             conn, out, published_only=(role == "student")
         )
+        from task_materials import enrich_task_dicts_with_materials
+
+        enrich_task_dicts_with_materials(conn, out)
     conn.close()
 
     return jsonify(out)
@@ -8100,8 +8108,10 @@ from classroom_display import register_classroom_display_routes
 register_classroom_display_routes(app)
 
 from recorded_lessons import register_recorded_lessons_routes
+from task_materials import register_task_materials_routes
 
 register_recorded_lessons_routes(app)
+register_task_materials_routes(app)
 
 # Start the Flask server
 if __name__ == "__main__":
