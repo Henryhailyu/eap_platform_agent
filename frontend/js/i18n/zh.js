@@ -310,6 +310,10 @@ window.EAP_STRINGS_ZH = {
   "teacher_rec_repair_upload_btn": "上传并关联视频",
   "teacher_rec_repair_ok": "视频已关联并发布给学生。",
   "teacher_create_material_label": "教学资料（可选）",
+  "teacher_create_material_hint":
+    "可上传多个文件：一次多选（按住 Ctrl/Cmd 点选），或多次点击「选择文件」逐个添加。",
+  "teacher_material_upload_label": "资料",
+  "remove_file_btn": "移除",
   "teacher_create_validation": "请选择类别并填写标题。",
   "teacher_task_saved_with_material": "任务已保存，资料已上传。",
   "create_from_template": "从模板创建",

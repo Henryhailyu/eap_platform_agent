@@ -72,7 +72,104 @@ def enrich_task_dicts_with_materials(conn, task_dicts: list) -> list:
     return task_dicts
 
 
+def _save_one_material_upload(conn, task_id: int, row, upload) -> dict:
+    from app import UPLOAD_DIR, allowed_file_extension
+
+    if upload is None or upload.filename is None or not str(upload.filename).strip():
+        raise ValueError("No file selected")
+    if not allowed_file_extension(upload.filename):
+        raise ValueError(
+            "File type not allowed. Allowed: pdf, doc, docx, ppt, pptx, mp3, mp4, txt, jpg, png"
+        )
+    ext = upload.filename.rsplit(".", 1)[-1].lower()
+    stored_name = f"{uuid.uuid4().hex}.{ext}"
+    dest_abs = os.path.join(UPLOAD_DIR, stored_name)
+    display_name = os.path.basename(upload.filename.strip())[:512]
+    upload.save(dest_abs)
+    count_row = conn.execute(
+        "SELECT COUNT(*) AS c FROM task_materials WHERE task_id = ?",
+        (task_id,),
+    ).fetchone()
+    sort_order = int(count_row["c"] if count_row else 0)
+    now = _now_iso()
+    cur = conn.execute(
+        """
+        INSERT INTO task_materials (task_id, file_path, file_name, sort_order, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (task_id, stored_name, display_name, sort_order, now),
+    )
+    if not (row["file_path"] and str(row["file_path"]).strip()):
+        conn.execute(
+            "UPDATE calendar_tasks SET file_path = ?, file_name = ? WHERE id = ?",
+            (stored_name, display_name, task_id),
+        )
+    return {
+        "id": cur.lastrowid,
+        "task_id": task_id,
+        "file_path": stored_name,
+        "file_name": display_name,
+    }
+
+
 def register_task_materials_routes(app) -> None:
+    @app.route("/api/tasks/<int:task_id>/materials/batch", methods=["POST"])
+    def add_task_materials_batch(task_id: int):
+        from app import (
+            ensure_uploads_directory,
+            get_db_connection,
+            require_session_role_if_enabled,
+            resolve_teacher_with_optional_enforcement,
+            task_to_dict,
+        )
+
+        ensure_uploads_directory()
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+            row = conn.execute(
+                "SELECT id, class_name, file_path, file_name FROM calendar_tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+            if row is None:
+                return jsonify({"error": "Task not found"}), 404
+            err = resolve_teacher_with_optional_enforcement(conn, None, row["class_name"])
+            if err is not None:
+                return err
+
+            uploads = request.files.getlist("files")
+            if not uploads:
+                single = request.files.get("file")
+                uploads = [single] if single and single.filename else []
+            if not uploads:
+                return jsonify({"error": 'Missing form parts named "files" or "file"'}), 400
+
+            saved = []
+            errors = []
+            for upload in uploads:
+                try:
+                    saved.append(_save_one_material_upload(conn, task_id, row, upload))
+                except ValueError as exc:
+                    errors.append(str(exc))
+            if not saved:
+                return jsonify({"error": errors[0] if errors else "No valid files"}), 400
+            conn.commit()
+            task_row = conn.execute("SELECT * FROM calendar_tasks WHERE id = ?", (task_id,)).fetchone()
+            return (
+                jsonify(
+                    {
+                        "materials": saved,
+                        "errors": errors,
+                        "task": task_to_dict(task_row),
+                    }
+                ),
+                201,
+            )
+        finally:
+            conn.close()
+
     @app.route("/api/tasks/<int:task_id>/materials", methods=["POST"])
     def add_task_material(task_id: int):
         from app import (
@@ -118,48 +215,11 @@ def register_task_materials_routes(app) -> None:
                     }
                 ), 400
 
-            ext = upload.filename.rsplit(".", 1)[-1].lower()
-            stored_name = f"{uuid.uuid4().hex}.{ext}"
-            dest_abs = os.path.join(UPLOAD_DIR, stored_name)
-            display_name = os.path.basename(upload.filename.strip())[:512]
-            upload.save(dest_abs)
-
-            count_row = conn.execute(
-                "SELECT COUNT(*) AS c FROM task_materials WHERE task_id = ?",
-                (task_id,),
-            ).fetchone()
-            sort_order = int(count_row["c"] if count_row else 0)
-            now = _now_iso()
-            cur = conn.execute(
-                """
-                INSERT INTO task_materials (task_id, file_path, file_name, sort_order, created_at)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (task_id, stored_name, display_name, sort_order, now),
-            )
-            if not (row["file_path"] and str(row["file_path"]).strip()):
-                conn.execute(
-                    "UPDATE calendar_tasks SET file_path = ?, file_name = ? WHERE id = ?",
-                    (stored_name, display_name, task_id),
-                )
+            mat = _save_one_material_upload(conn, task_id, row, upload)
             conn.commit()
-            mat_row = conn.execute(
-                "SELECT id, task_id, file_path, file_name FROM task_materials WHERE id = ?",
-                (cur.lastrowid,),
-            ).fetchone()
             task_row = conn.execute("SELECT * FROM calendar_tasks WHERE id = ?", (task_id,)).fetchone()
             return (
-                jsonify(
-                    {
-                        "material": {
-                            "id": mat_row["id"],
-                            "task_id": mat_row["task_id"],
-                            "file_path": mat_row["file_path"],
-                            "file_name": mat_row["file_name"],
-                        },
-                        "task": task_to_dict(task_row),
-                    }
-                ),
+                jsonify({"material": mat, "task": task_to_dict(task_row)}),
                 201,
             )
         finally:

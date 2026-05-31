@@ -310,6 +310,10 @@ window.EAP_STRINGS_EN = {
   "teacher_rec_repair_upload_btn": "Upload & link video",
   "teacher_rec_repair_ok": "Video linked and published.",
   "teacher_create_material_label": "Teaching material (optional)",
+  "teacher_create_material_hint":
+    "Add multiple files: select several at once (Ctrl/Cmd+click), or click Choose files again to add more.",
+  "teacher_material_upload_label": "materials",
+  "remove_file_btn": "Remove",
   "teacher_create_validation": "Please choose a category and enter a title.",
   "teacher_task_saved_with_material": "Task saved and material uploaded.",
   "create_from_template": "Create from Template",

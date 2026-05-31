@@ -490,6 +490,9 @@
                     <label for="teacher-task-create-material" data-i18n="teacher_create_material_label"
                       >Teaching material (optional)</label
                     >
+                    <p class="field-hint" data-i18n="teacher_create_material_hint">
+                      Add multiple files: pick several at once (Ctrl/Cmd+click), or use Add files repeatedly.
+                    </p>
                     <input
                       id="teacher-task-create-material"
                       type="file"
@@ -501,6 +504,11 @@
                       class="file-selection-summary"
                       aria-live="polite"
                     ></p>
+                    <ul
+                      id="teacher-task-create-material-list"
+                      class="teacher-create-material-list"
+                      aria-live="polite"
+                    ></ul>
                   </div>
                   <button type="submit" class="btn-primary" data-i18n="save_task">Save Task</button>
                   <p id="teacher-form-message" class="form-message" role="status" aria-live="polite"></p>
@@ -701,6 +709,6 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="js/recorded-lessons-api.js"></script>
-    <script src="app.js?v=20260531-recording-save-v2"></script>
+    <script src="app.js?v=20260531-multi-materials"></script>
   </body>
 </html>

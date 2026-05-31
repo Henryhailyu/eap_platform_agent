@@ -552,10 +552,7 @@ function saveFormToCategoryDraft(category) {
   if (!isRecordedLessonCategory(category)) {
     const matInput = document.getElementById("teacher-task-create-material");
     if (matInput && matInput.files && matInput.files.length > 0) {
-      d.materialFiles = Array.from(matInput.files);
-      d.materialFileNames = d.materialFiles.map((f) => f.name);
-      d.materialFile = d.materialFiles[0];
-      d.materialFileName = d.materialFileNames[0] || "";
+      mergeMaterialFilesIntoDraft(d, matInput.files);
     }
   }
 }
@@ -581,6 +578,85 @@ function formatMaterialDraftSummary(draft) {
   return t("teacher_draft_materials_kept", { count: names.length, names: names.join(", ") });
 }
 
+function fileIdentityKey(file) {
+  if (!file) return "";
+  return `${file.name}|${file.size}|${file.lastModified}`;
+}
+
+function mergeMaterialFilesIntoDraft(draft, newFiles) {
+  if (!draft) return;
+  const existing = Array.isArray(draft.materialFiles) ? [...draft.materialFiles] : [];
+  const keys = new Set(existing.map(fileIdentityKey));
+  Array.from(newFiles || []).forEach((f) => {
+    const k = fileIdentityKey(f);
+    if (!k || keys.has(k)) return;
+    keys.add(k);
+    existing.push(f);
+  });
+  draft.materialFiles = existing;
+  draft.materialFileNames = existing.map((f) => f.name);
+  draft.materialFile = existing[0] || null;
+  draft.materialFileName = draft.materialFileNames[0] || "";
+}
+
+function mergeRecordedVideosIntoDraft(draft, newFiles) {
+  if (!draft) return;
+  const existing = Array.isArray(draft.recordedVideoFiles) ? [...draft.recordedVideoFiles] : [];
+  const keys = new Set(existing.map(fileIdentityKey));
+  Array.from(newFiles || []).forEach((f) => {
+    const k = fileIdentityKey(f);
+    if (!k || keys.has(k)) return;
+    keys.add(k);
+    existing.push(f);
+  });
+  draft.recordedVideoFiles = existing;
+  draft.recordedVideoFile = existing[0] || null;
+  draft.recordedLessonFileName =
+    existing.length > 1
+      ? t("teacher_rec_videos_ready", { count: existing.length })
+      : existing[0]
+        ? existing[0].name
+        : "";
+}
+
+function renderTeacherMaterialDraftList(category) {
+  const listEl = document.getElementById("teacher-task-create-material-list");
+  const summaryEl = document.getElementById("teacher-task-create-material-summary");
+  if (!listEl) return;
+  const d = getTeacherCategoryDraft(category);
+  listEl.innerHTML = "";
+  const files = d.materialFiles && d.materialFiles.length ? d.materialFiles : [];
+  if (!files.length) {
+    if (summaryEl) summaryEl.textContent = t("no_file_selected");
+    return;
+  }
+  if (summaryEl) summaryEl.textContent = formatMaterialDraftSummary(d);
+  files.forEach((file, index) => {
+    const li = document.createElement("li");
+    li.className = "teacher-create-material-list__item";
+    const name = document.createElement("span");
+    name.className = "teacher-create-material-list__name";
+    name.textContent = file.name;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn-secondary teacher-create-material-list__remove";
+    removeBtn.textContent = t("remove_file_btn");
+    removeBtn.addEventListener("click", () => {
+      d.materialFiles.splice(index, 1);
+      d.materialFileNames = d.materialFiles.map((f) => f.name);
+      d.materialFile = d.materialFiles[0] || null;
+      d.materialFileName = d.materialFileNames[0] || "";
+      renderTeacherMaterialDraftList(category);
+      syncTeacherCategoryChipDraftIndicators(
+        document.getElementById("teacher-task-category-chips"),
+      );
+    });
+    li.appendChild(name);
+    li.appendChild(removeBtn);
+    listEl.appendChild(li);
+  });
+}
+
 function loadCategoryDraftToForm(category) {
   const d = getTeacherCategoryDraft(category);
   const titleEl = document.getElementById("task-title");
@@ -596,9 +672,7 @@ function loadCategoryDraftToForm(category) {
   if (descZhEl) descZhEl.value = d.description_zh || "";
   if (periodEl) periodEl.value = d.period || "";
   if (matInput) matInput.value = "";
-  if (matSummary) {
-    matSummary.textContent = formatMaterialDraftSummary(d);
-  }
+  renderTeacherMaterialDraftList(category);
   if (isRecordedLessonCategory(category)) {
     syncTeacherCreateRecordedUploadUI(category);
   }
@@ -689,11 +763,15 @@ async function uploadTeacherPendingRecordedVideo(className, category) {
     return null;
   }
   const files = Array.from(fileInput.files);
-  const file = files[0];
-  draft.recordedVideoFiles = files;
-  draft.recordedVideoFile = file;
-  draft.recordedLessonFileName =
-    files.length > 1 ? t("teacher_rec_videos_ready", { count: files.length }) : file.name;
+  mergeRecordedVideosIntoDraft(draft, files);
+  const file = draft.recordedVideoFiles[0];
+  if (!file) {
+    if (statusEl) {
+      statusEl.textContent = t("teacher_rec_video_required");
+      statusEl.classList.add("teacher-recorded-upload-status--error");
+    }
+    return null;
+  }
   const title =
     String(draft.title || "").trim() ||
     (document.getElementById("task-title") &&
@@ -845,19 +923,25 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
           class_name: class_name || teacherDefaultClassFallback(),
         });
         const tid = Number(created.id, 10);
-        await attachRecordedVideosToTask({
-          class_name: class_name || teacherDefaultClassFallback(),
-          taskId: tid,
-          title,
-          description: draft.description.trim(),
-          videoFiles,
-          orphanLessonId: draft.recordedLessonId,
-        });
+        createdCount += 1;
+        try {
+          await attachRecordedVideosToTask({
+            class_name: class_name || teacherDefaultClassFallback(),
+            taskId: tid,
+            title,
+            description: draft.description.trim(),
+            videoFiles,
+            orphanLessonId: draft.recordedLessonId,
+          });
+        } catch (vidErr) {
+          errors.push(
+            `${translateCategory(cat)} (${t("cat_recorded")}): ${(vidErr && vidErr.message) || t("trec_error_generic")}`,
+          );
+        }
         draft.recordedLessonId = null;
         draft.recordedLessonFileName = "";
         draft.recordedVideoFile = null;
         draft.recordedVideoFiles = [];
-        createdCount += 1;
         continue;
       }
 
@@ -882,16 +966,20 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
           : draft.materialFile
             ? [draft.materialFile]
             : [];
-      for (const mat of mats) {
-        if (created && created.id != null && mat) {
-          await apiUploadTaskMaterial(Number(created.id, 10), mat);
+      createdCount += 1;
+      if (created && created.id != null && mats.length) {
+        try {
+          await apiUploadTaskMaterialsBatch(Number(created.id, 10), mats);
+        } catch (matErr) {
+          errors.push(
+            `${translateCategory(cat)} (${t("teacher_material_upload_label")}): ${(matErr && matErr.message) || t("trec_error_generic")}`,
+          );
         }
       }
       draft.materialFile = null;
       draft.materialFileName = "";
       draft.materialFiles = [];
       draft.materialFileNames = [];
-      createdCount += 1;
     } catch (err) {
       errors.push(`${translateCategory(cat)}: ${(err && err.message) || t("trec_error_generic")}`);
     }
@@ -1331,6 +1419,37 @@ async function apiUploadTaskMaterial(taskId, file) {
     throw new Error(apiUnreachableMessage());
   }
   const data = await readJsonOrError(response);
+  if (!response.ok) {
+    const msg =
+      (data && (data.error || data.message)) || `Upload failed (${response.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+/** Upload all teaching materials for a task in one request (fewer connection errors). */
+async function apiUploadTaskMaterialsBatch(taskId, files) {
+  const list = Array.isArray(files) ? files.filter(Boolean) : [];
+  if (!list.length) return { materials: [] };
+  const formData = new FormData();
+  list.forEach((f) => formData.append("files", f));
+  let response;
+  try {
+    response = await eapFetch(`${API_BASE}/api/tasks/${taskId}/materials/batch`, {
+      method: "POST",
+      body: formData,
+      credentials: EAP_FETCH_CREDENTIALS,
+    });
+  } catch (err) {
+    throw new Error(apiUnreachableMessage());
+  }
+  const data = await readJsonOrError(response);
+  if (response.status === 404) {
+    for (const f of list) {
+      await apiUploadTaskMaterial(taskId, f);
+    }
+    return { materials: list.map((f) => ({ file_name: f.name })) };
+  }
   if (!response.ok) {
     const msg =
       (data && (data.error || data.message)) || `Upload failed (${response.status})`;
@@ -4557,11 +4676,9 @@ function initTeacherPage() {
       const cat = typeSelect.value;
       if (!isRecordedLessonCategory(cat) && createMaterialInput.files && createMaterialInput.files.length) {
         const d = getTeacherCategoryDraft(cat);
-        d.materialFiles = Array.from(createMaterialInput.files);
-        d.materialFileNames = d.materialFiles.map((f) => f.name);
-        d.materialFile = d.materialFiles[0];
-        d.materialFileName = d.materialFileNames[0] || "";
-        if (createMaterialSummary) createMaterialSummary.textContent = formatMaterialDraftSummary(d);
+        mergeMaterialFilesIntoDraft(d, createMaterialInput.files);
+        renderTeacherMaterialDraftList(cat);
+        createMaterialInput.value = "";
         syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
       }
     };
@@ -4578,13 +4695,10 @@ function initTeacherPage() {
         return;
       }
       const d = getTeacherCategoryDraft(cat);
-      d.recordedVideoFiles = Array.from(recordedVideoInput.files);
-      d.recordedVideoFile = d.recordedVideoFiles[0];
-      d.recordedLessonFileName =
-        d.recordedVideoFiles.length > 1
-          ? t("teacher_rec_videos_ready", { count: d.recordedVideoFiles.length })
-          : d.recordedVideoFile.name;
+      mergeRecordedVideosIntoDraft(d, recordedVideoInput.files);
+      recordedVideoInput.value = "";
       syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+      syncTeacherCreateRecordedUploadUI(cat);
     });
   }
 
