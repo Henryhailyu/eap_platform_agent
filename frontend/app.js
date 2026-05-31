@@ -641,7 +641,12 @@ async function uploadTeacherPendingRecordedVideo(className, category) {
   const fileInput = document.getElementById("teacher-create-recorded-video");
   const statusEl = document.getElementById("teacher-create-recorded-upload-status");
   const uploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
+  const taskClassEl = document.getElementById("teacher-task-class");
   saveFormToCategoryDraft(cat);
+  const uploadClass =
+    (className && String(className).trim()) ||
+    (taskClassEl && String(taskClassEl.value || "").trim()) ||
+    teacherDefaultClassFallback();
   if (!api || !fileInput || !fileInput.files || !fileInput.files[0]) {
     if (statusEl) {
       statusEl.textContent = t("teacher_rec_video_required");
@@ -665,7 +670,7 @@ async function uploadTeacherPendingRecordedVideo(className, category) {
   }
 
   const fd = new FormData();
-  fd.append("class_name", className || teacherDefaultClassFallback());
+  fd.append("class_name", uploadClass);
   fd.append("title", title);
   fd.append("description", description);
   fd.append("file", file);
@@ -690,13 +695,22 @@ async function finalizeRecordedLessonForTask({
   taskId,
   title,
   description,
+  class_name,
 }) {
   const api = window.EAP_RECORDED_LESSONS;
   if (!api || lessonId == null) {
     throw new Error(t("teacher_rec_video_required"));
   }
+  const tid = Number(taskId, 10);
+  if (!Number.isFinite(tid)) {
+    throw new Error(t("trec_error_generic"));
+  }
+  if (typeof api.linkTask === "function") {
+    await api.linkTask(lessonId, tid);
+  } else {
+    await api.update(lessonId, { calendar_task_id: tid });
+  }
   await api.update(lessonId, {
-    calendar_task_id: taskId,
     title: title || undefined,
     description: description || undefined,
     visibility: "published",
@@ -744,8 +758,10 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
           taskId: created.id,
           title,
           description: draft.description.trim(),
+          class_name: class_name || teacherDefaultClassFallback(),
         });
         draft.recordedLessonId = null;
+        draft.recordedLessonFileName = "";
         createdCount += 1;
         continue;
       }
@@ -6005,7 +6021,7 @@ function initTeacherPage() {
       messageEl.classList.toggle("form-message--success", createdCount > 0 && !uploadFailed);
       messageEl.classList.toggle("form-message--error", uploadFailed || createdCount === 0);
 
-      await clearTeacherCategoryDrafts({ deleteRemote: true });
+      await clearTeacherCategoryDrafts({ deleteRemote: false });
       form.querySelector("#task-title").value = "";
       const titleZhEl = form.querySelector("#task-title-zh");
       if (titleZhEl) titleZhEl.value = "";
@@ -6415,14 +6431,19 @@ function buildStudentTaskCardElement(task, mySub) {
   }
 
   appendTaskRecordedLessonBlock(li, task, "student");
-  if (
-    isRecordedLessonCategory(task.category || task.type) &&
-    (!task.recorded_lesson || task.recorded_lesson.id == null)
-  ) {
-    const pending = document.createElement("p");
-    pending.className = "task-card__recording-pending";
-    pending.textContent = t("student_rec_not_published");
-    li.appendChild(pending);
+  if (isRecordedLessonCategory(task.category || task.type)) {
+    const rec = task.recorded_lesson;
+    if (!rec || rec.id == null) {
+      const pending = document.createElement("p");
+      pending.className = "task-card__recording-pending";
+      pending.textContent = t("student_rec_not_linked");
+      li.appendChild(pending);
+    } else if (rec.visibility && rec.visibility !== "published") {
+      const pending = document.createElement("p");
+      pending.className = "task-card__recording-pending";
+      pending.textContent = t("student_rec_not_published");
+      li.appendChild(pending);
+    }
   }
 
   const homework = document.createElement("div");

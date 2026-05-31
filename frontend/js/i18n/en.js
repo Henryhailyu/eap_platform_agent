@@ -715,6 +715,7 @@ window.EAP_STRINGS_EN = {
   "teacher_rec_replace_btn": "Replace video",
   "teacher_rec_replace_video": "Replace video file",
   "student_rec_not_published": "Your teacher has not published the recording for this task yet.",
+  "student_rec_not_linked": "No class recording is linked to this task yet. Ask your teacher to re-save the recorded lesson.",
   "student_rec_study_note": "Watch the class recording above. No homework file upload is required for this task.",
   "srec_nav": "Recorded lessons",
   "srec_list_title": "Recorded lessons",

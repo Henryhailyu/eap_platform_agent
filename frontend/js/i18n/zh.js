@@ -715,6 +715,7 @@ window.EAP_STRINGS_ZH = {
   "teacher_rec_replace_btn": "更换视频",
   "teacher_rec_replace_video": "更换视频文件",
   "student_rec_not_published": "老师尚未发布此任务的录像。",
+  "student_rec_not_linked": "本任务尚未关联课堂录像，请联系老师重新保存录课任务。",
   "student_rec_study_note": "请先观看上方课堂录像。本任务无需提交作业文件。",
   "srec_nav": "录课",
   "srec_list_title": "录课回放",
