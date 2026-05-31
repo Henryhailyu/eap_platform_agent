@@ -42,4 +42,4 @@ fi
 WORKERS="${GUNICORN_WORKERS:-1}"
 BIND="0.0.0.0:${PORT:-5051}"
 echo "EAP pilot: starting gunicorn on ${BIND} (${WORKERS} workers)"
-exec gunicorn -w "${WORKERS}" -b "${BIND}" --timeout 120 --access-logfile - --error-logfile - wsgi:app
+exec gunicorn -w "${WORKERS}" -b "${BIND}" --timeout 300 --access-logfile - --error-logfile - wsgi:app

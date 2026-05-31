@@ -123,8 +123,15 @@ sudo docker compose up -d
 在 Mac 打包最新前端/后端后 `scp` 上传，或 `git pull` 后：
 
 ```bash
+cd ~/eap_platform_agent
+git pull
+set -a && source .env && set +a
 sudo docker compose up -d --build
 ```
+
+**不要用** `cd /path/to/eap_platform_agent`（那是文档占位符）。`ubuntu` 用户若报 `permission denied` on docker.sock，必须加 **`sudo`**（或 `sudo usermod -aG docker ubuntu` 后重新 SSH 登录）。
+
+部署后确认：`curl -s http://127.0.0.1:5051/ui/teacher.html | grep app.js` 应看到较新的 `?v=20260531-materials-batch`（或更新版本号）。
 
 ---
 

@@ -185,6 +185,66 @@ function apiUnreachableMessage() {
   );
 }
 
+/** Longer timeout for teaching-material / video uploads (single gunicorn worker). */
+const EAP_UPLOAD_TIMEOUT_MS = 300000;
+
+function eapFormatFetchNetworkError(err) {
+  const hint = apiUnreachableMessage();
+  if (!err) return hint;
+  const msg = String(err.message || err).trim();
+  if (!msg || msg === "Failed to fetch") return hint;
+  return `${msg} — ${hint}`;
+}
+
+function eapPostMultipartXHR(url, formData, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.withCredentials = true;
+    const token = getAccessToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.timeout = timeoutMs;
+    xhr.onload = () => {
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        text: () => Promise.resolve(xhr.responseText || ""),
+      });
+    };
+    xhr.onerror = () => reject(new Error("Failed to fetch"));
+    xhr.ontimeout = () => reject(new Error(t("teacher_upload_timeout")));
+    xhr.send(formData);
+  });
+}
+
+/** POST multipart with fetch; falls back to XHR if fetch fails (some networks / large bodies). */
+async function eapPostMultipart(url, formData, timeoutMs) {
+  const ms = timeoutMs != null ? timeoutMs : EAP_UPLOAD_TIMEOUT_MS;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    try {
+      return await eapFetch(url, {
+        method: "POST",
+        body: formData,
+        credentials: EAP_FETCH_CREDENTIALS,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (fetchErr) {
+    if (fetchErr && fetchErr.name === "AbortError") {
+      throw new Error(t("teacher_upload_timeout"));
+    }
+    try {
+      return await eapPostMultipartXHR(url, formData, ms);
+    } catch (xhrErr) {
+      throw new Error(eapFormatFetchNetworkError(xhrErr || fetchErr));
+    }
+  }
+}
+
 /**
  * After a successful login we store the user object here until the tab is closed.
  * Other pages can read it with getLoggedInUser().
@@ -483,7 +543,7 @@ const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 const teacherCategoryDrafts = {};
 let teacherCreateContextKey = "";
 /** Bump when create-form draft logic changes (cache-bust + deploy verification). */
-const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-category-drafts";
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-materials-batch";
 
 function isRecordedLessonCategory(category) {
   return String(category || "").trim() === RECORDED_LESSON_CATEGORY;
@@ -497,6 +557,7 @@ function createEmptyTeacherCategoryDraft() {
     description_zh: "",
     period: "",
     recordedLessonId: null,
+    recordedLessonIds: [],
     recordedLessonFileName: "",
     recordedVideoFile: null,
     recordedVideoFiles: [],
@@ -521,6 +582,7 @@ function categoryDraftHasWork(draft, category) {
   if (isRecordedLessonCategory(category)) {
     return !!(
       draft.recordedLessonId != null ||
+      (draft.recordedLessonIds && draft.recordedLessonIds.length > 0) ||
       draft.recordedVideoFile ||
       (draft.recordedVideoFiles && draft.recordedVideoFiles.length > 0)
     );
@@ -693,9 +755,16 @@ async function clearTeacherCategoryDrafts(options) {
     const api = window.EAP_RECORDED_LESSONS;
     for (const cat of Object.keys(teacherCategoryDrafts)) {
       const d = teacherCategoryDrafts[cat];
-      if (d && d.recordedLessonId != null) {
+      const orphanIds = new Set();
+      if (d && d.recordedLessonId != null) orphanIds.add(d.recordedLessonId);
+      if (d && Array.isArray(d.recordedLessonIds)) {
+        d.recordedLessonIds.forEach((id) => {
+          if (id != null) orphanIds.add(id);
+        });
+      }
+      for (const lessonId of orphanIds) {
         try {
-          await api.remove(d.recordedLessonId);
+          await api.remove(lessonId);
         } catch (_) {
           /* orphan cleanup best-effort */
         }
@@ -713,15 +782,20 @@ function syncTeacherCreateRecordedUploadUI(category) {
   const uploadBtn = document.getElementById("teacher-create-recorded-upload-btn");
   const fileWrap = document.getElementById("teacher-create-recorded-file-wrap");
   const fileInput = document.getElementById("teacher-create-recorded-video");
-  const uploaded =
-    draft.recordedLessonId != null ||
-    (draft.recordedVideoFiles && draft.recordedVideoFiles.length > 0) ||
-    !!draft.recordedVideoFile;
+  const videoCount = getRecordedDraftVideoFiles(draft).length;
+  const uploadedIds =
+    draft.recordedLessonIds && draft.recordedLessonIds.length
+      ? draft.recordedLessonIds.length
+      : draft.recordedLessonId != null
+        ? 1
+        : 0;
+  const allVideosUploaded = videoCount > 0 && uploadedIds >= videoCount;
+  const partialUpload = uploadedIds > 0 && !allVideosUploaded;
 
-  if (fileWrap) fileWrap.classList.toggle("hidden", uploaded);
+  if (fileWrap) fileWrap.classList.toggle("hidden", allVideosUploaded);
   if (uploadBtn) {
-    uploadBtn.disabled = uploaded;
-    uploadBtn.classList.toggle("hidden", uploaded);
+    uploadBtn.disabled = allVideosUploaded;
+    uploadBtn.classList.toggle("hidden", allVideosUploaded);
   }
   if (statusEl) {
     statusEl.classList.remove(
@@ -729,17 +803,23 @@ function syncTeacherCreateRecordedUploadUI(category) {
       "teacher-recorded-upload-status--error",
       "teacher-recorded-upload-status--pending",
     );
-    if (uploaded) {
+    if (allVideosUploaded) {
       statusEl.textContent = t("teacher_rec_upload_done", {
         name: draft.recordedLessonFileName || "",
       });
       statusEl.classList.add("teacher-recorded-upload-status--ok");
+    } else if (partialUpload) {
+      statusEl.textContent = t("teacher_rec_upload_partial", {
+        done: uploadedIds,
+        total: videoCount,
+      });
+      statusEl.classList.add("teacher-recorded-upload-status--pending");
     } else {
       statusEl.textContent = t("teacher_rec_upload_first_hint");
       statusEl.classList.add("teacher-recorded-upload-status--pending");
     }
   }
-  if (fileInput && uploaded) fileInput.value = "";
+  if (fileInput && allVideosUploaded) fileInput.value = "";
 }
 
 async function uploadTeacherPendingRecordedVideo(className, category) {
@@ -755,56 +835,70 @@ async function uploadTeacherPendingRecordedVideo(className, category) {
     (className && String(className).trim()) ||
     (taskClassEl && String(taskClassEl.value || "").trim()) ||
     teacherDefaultClassFallback();
-  if (!api || !fileInput || !fileInput.files || !fileInput.files[0]) {
+  if (fileInput && fileInput.files && fileInput.files.length > 0) {
+    mergeRecordedVideosIntoDraft(draft, fileInput.files);
+  }
+  const videoFiles = getRecordedDraftVideoFiles(draft);
+  if (!api || !videoFiles.length) {
     if (statusEl) {
       statusEl.textContent = t("teacher_rec_video_required");
       statusEl.classList.add("teacher-recorded-upload-status--error");
     }
     return null;
   }
-  const files = Array.from(fileInput.files);
-  mergeRecordedVideosIntoDraft(draft, files);
-  const file = draft.recordedVideoFiles[0];
-  if (!file) {
-    if (statusEl) {
-      statusEl.textContent = t("teacher_rec_video_required");
-      statusEl.classList.add("teacher-recorded-upload-status--error");
-    }
-    return null;
-  }
-  const title =
+  const titleBase =
     String(draft.title || "").trim() ||
     (document.getElementById("task-title") &&
       String(document.getElementById("task-title").value || "").trim()) ||
-    file.name;
+    videoFiles[0].name;
   const description = String(draft.description || "").trim();
+  if (!Array.isArray(draft.recordedLessonIds)) draft.recordedLessonIds = [];
+  const startIdx = draft.recordedLessonIds.length;
 
   if (uploadBtn) uploadBtn.disabled = true;
   if (statusEl) {
-    statusEl.textContent = t("trec_uploading");
     statusEl.classList.remove("teacher-recorded-upload-status--ok", "teacher-recorded-upload-status--error");
     statusEl.classList.add("teacher-recorded-upload-status--pending");
   }
 
-  const fd = new FormData();
-  fd.append("class_name", uploadClass);
-  fd.append("title", title);
-  fd.append("description", description);
-  fd.append("file", file);
-
-  const res = await api.upload(fd);
-  const lesson = res && res.lesson ? res.lesson : res;
-  if (!lesson || lesson.id == null) {
-    throw new Error(t("trec_error_generic"));
+  try {
+    for (let i = startIdx; i < videoFiles.length; i += 1) {
+      const file = videoFiles[i];
+      if (statusEl) {
+        statusEl.textContent =
+          videoFiles.length > 1
+            ? t("trec_uploading_progress", { current: i + 1, total: videoFiles.length })
+            : t("trec_uploading");
+      }
+      const vidTitle =
+        videoFiles.length > 1 && i > 0 ? `${titleBase} (${i + 1})` : titleBase;
+      const fd = new FormData();
+      fd.append("class_name", uploadClass);
+      fd.append("title", vidTitle);
+      fd.append("description", i === 0 ? description : "");
+      fd.append("file", file);
+      const res = await api.upload(fd);
+      const lesson = res && res.lesson ? res.lesson : res;
+      if (!lesson || lesson.id == null) {
+        throw new Error(t("trec_error_generic"));
+      }
+      draft.recordedLessonIds.push(lesson.id);
+      if (i === 0) {
+        draft.recordedLessonId = lesson.id;
+        if (!String(draft.title || "").trim()) draft.title = titleBase;
+        const titleEl = document.getElementById("task-title");
+        if (titleEl && !String(titleEl.value || "").trim()) titleEl.value = titleBase;
+      }
+    }
+    const names = videoFiles.map((f) => f.name);
+    draft.recordedLessonFileName =
+      names.length > 1 ? t("teacher_rec_videos_ready", { count: names.length }) : names[0] || "";
+    syncTeacherCreateRecordedUploadUI(cat);
+    syncTeacherCategoryChipDraftIndicators(document.getElementById("teacher-task-category-chips"));
+    return draft.recordedLessonIds[draft.recordedLessonIds.length - 1];
+  } finally {
+    if (uploadBtn) uploadBtn.disabled = false;
   }
-  draft.recordedLessonId = lesson.id;
-  draft.recordedLessonFileName = lesson.file_name || file.name;
-  if (!String(draft.title || "").trim()) draft.title = title;
-  const titleEl = document.getElementById("task-title");
-  if (titleEl && !String(titleEl.value || "").trim()) titleEl.value = title;
-  syncTeacherCreateRecordedUploadUI(cat);
-  syncTeacherCategoryChipDraftIndicators(document.getElementById("teacher-task-category-chips"));
-  return lesson;
 }
 
 async function removeOrphanRecordedLesson(lessonId) {
@@ -823,37 +917,46 @@ async function attachRecordedVideosToTask({
   description,
   videoFiles,
   orphanLessonId,
+  orphanLessonIds,
 }) {
   const cls = class_name || teacherDefaultClassFallback();
   const files = Array.isArray(videoFiles) ? videoFiles.filter(Boolean) : [];
-  if (!files.length) {
-    if (orphanLessonId != null) {
-      await finalizeRecordedLessonForTask({
-        lessonId: orphanLessonId,
-        taskId,
-        title,
-        description,
-      });
-    }
-    return;
+  const linkedIds = [];
+  if (Array.isArray(orphanLessonIds) && orphanLessonIds.length) {
+    orphanLessonIds.forEach((id) => {
+      if (id != null) linkedIds.push(id);
+    });
+  } else if (orphanLessonId != null) {
+    linkedIds.push(orphanLessonId);
   }
-  for (let i = 0; i < files.length; i += 1) {
-    const file = files[i];
+
+  for (let i = 0; i < linkedIds.length; i += 1) {
     const vidTitle =
-      files.length > 1 && i > 0
-        ? `${title || file.name} (${i + 1})`
+      linkedIds.length > 1 && i > 0 ? `${title || t("trec_title")} (${i + 1})` : title;
+    await finalizeRecordedLessonForTask({
+      lessonId: linkedIds[i],
+      taskId,
+      title: vidTitle || title,
+      description: i === 0 ? description : "",
+    });
+  }
+
+  const pendingFiles = files.slice(linkedIds.length);
+  for (let i = 0; i < pendingFiles.length; i += 1) {
+    const file = pendingFiles[i];
+    const idx = linkedIds.length + i;
+    const vidTitle =
+      files.length > 1 && idx > 0
+        ? `${title || file.name} (${idx + 1})`
         : title || file.name;
     await uploadRecordedLessonForTask({
       className: cls,
       taskId,
       title: vidTitle,
-      description: i === 0 ? description : "",
+      description: idx === 0 ? description : "",
       file,
       publish: true,
     });
-  }
-  if (orphanLessonId != null) {
-    await removeOrphanRecordedLesson(orphanLessonId);
   }
 }
 
@@ -884,29 +987,50 @@ async function finalizeRecordedLessonForTask({
   });
 }
 
-async function saveAllTeacherCategoryDrafts({ class_name, date }) {
+async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
   const currentCat = document.getElementById("task-type")?.value;
   if (currentCat) saveFormToCategoryDraft(currentCat);
 
-  const categories = TASK_CATEGORIES.filter((cat) =>
+  const withWork = TASK_CATEGORIES.filter((cat) =>
     categoryDraftHasWork(getTeacherCategoryDraft(cat), cat),
   );
-  if (!categories.length) {
+  if (!withWork.length) {
     throw new Error(t("teacher_batch_save_empty"));
   }
+  const categories = [
+    ...withWork.filter((cat) => !isRecordedLessonCategory(cat)),
+    ...withWork.filter((cat) => isRecordedLessonCategory(cat)),
+  ];
 
   let createdCount = 0;
   const errors = [];
 
   for (let ci = 0; ci < categories.length; ci += 1) {
     const cat = categories[ci];
-    if (ci > 0) await eapSleep(200);
+    if (typeof onProgress === "function") {
+      onProgress(t("teacher_batch_save_progress", { category: translateCategory(cat) }));
+    }
+    if (ci > 0) await eapSleep(150);
     const draft = getTeacherCategoryDraft(cat);
     try {
       if (isRecordedLessonCategory(cat)) {
         const videoFiles = getRecordedDraftVideoFiles(draft);
-        if (!videoFiles.length && !draft.recordedLessonId) {
+        const lessonIds =
+          draft.recordedLessonIds && draft.recordedLessonIds.length
+            ? draft.recordedLessonIds
+            : draft.recordedLessonId != null
+              ? [draft.recordedLessonId]
+              : [];
+        if (!videoFiles.length && !lessonIds.length) {
           errors.push(`${translateCategory(cat)}: ${t("teacher_rec_video_required")}`);
+          continue;
+        }
+        if (
+          videoFiles.length > 0 &&
+          lessonIds.length > 0 &&
+          lessonIds.length < videoFiles.length
+        ) {
+          errors.push(`${translateCategory(cat)}: ${t("teacher_rec_upload_partial_save")}`);
           continue;
         }
         const title =
@@ -932,8 +1056,9 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
             taskId: tid,
             title,
             description: draft.description.trim(),
-            videoFiles,
+            videoFiles: lessonIds.length >= videoFiles.length ? [] : videoFiles,
             orphanLessonId: draft.recordedLessonId,
+            orphanLessonIds: lessonIds,
           });
         } catch (vidErr) {
           errors.push(
@@ -941,13 +1066,26 @@ async function saveAllTeacherCategoryDrafts({ class_name, date }) {
           );
         }
         draft.recordedLessonId = null;
+        draft.recordedLessonIds = [];
         draft.recordedLessonFileName = "";
         draft.recordedVideoFile = null;
         draft.recordedVideoFiles = [];
         continue;
       }
 
-      const title = String(draft.title || "").trim();
+      const matsEarly =
+        draft.materialFiles && draft.materialFiles.length
+          ? draft.materialFiles
+          : draft.materialFile
+            ? [draft.materialFile]
+            : [];
+      let title = String(draft.title || "").trim();
+      if (!title && matsEarly.length) {
+        const first = matsEarly[0];
+        const baseName =
+          first && first.name ? String(first.name).replace(/\.[^.]+$/, "").trim() : "";
+        title = baseName || `${translateCategory(cat)} ${date}`;
+      }
       if (!title) {
         errors.push(`${translateCategory(cat)}: ${t("teacher_create_validation")}`);
         continue;
@@ -1383,20 +1521,8 @@ async function apiPutFeedbackFormData(submissionId, formData) {
  */
 async function apiUploadTaskFile(taskId, file) {
   const formData = new FormData();
-  // Flask expects the part name "file" (see backend upload handler).
   formData.append("file", file);
-
-  let response;
-  try {
-    response = await eapFetch(`${API_BASE}/api/tasks/${taskId}/upload`, {
-      method: "POST",
-      body: formData,
-      credentials: EAP_FETCH_CREDENTIALS,
-    });
-  } catch (err) {
-    throw new Error(apiUnreachableMessage());
-  }
-
+  const response = await eapPostMultipart(`${API_BASE}/api/tasks/${taskId}/upload`, formData);
   const data = await readJsonOrError(response);
   if (!response.ok) {
     const msg =
@@ -1410,16 +1536,7 @@ async function apiUploadTaskFile(taskId, file) {
 async function apiUploadTaskMaterial(taskId, file) {
   const formData = new FormData();
   formData.append("file", file);
-  let response;
-  try {
-    response = await eapFetch(`${API_BASE}/api/tasks/${taskId}/materials`, {
-      method: "POST",
-      body: formData,
-      credentials: EAP_FETCH_CREDENTIALS,
-    });
-  } catch (err) {
-    throw new Error(apiUnreachableMessage());
-  }
+  const response = await eapPostMultipart(`${API_BASE}/api/tasks/${taskId}/materials`, formData);
   const data = await readJsonOrError(response);
   if (!response.ok) {
     const msg =
@@ -1429,34 +1546,88 @@ async function apiUploadTaskMaterial(taskId, file) {
   return data;
 }
 
+/** Upload all teaching materials for a task in one request. */
+async function apiUploadTaskMaterialsBatch(taskId, files) {
+  const formData = new FormData();
+  const list = Array.isArray(files) ? files.filter(Boolean) : [];
+  list.forEach((f) => formData.append("files", f));
+  const response = await eapPostMultipart(
+    `${API_BASE}/api/tasks/${taskId}/materials/batch`,
+    formData,
+  );
+  const data = await readJsonOrError(response);
+  if (!response.ok) {
+    const msg =
+      (data && (data.error || data.message)) ||
+      (data && data.errors && data.errors[0]) ||
+      `Upload failed (${response.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
 function eapSleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Upload each teaching material with retries (reliable after batch Save Task). */
+function normalizeDraftMaterialFiles(files) {
+  const raw = Array.isArray(files) ? files : [];
+  const valid = raw.filter(
+    (f) => f && (f instanceof File || f instanceof Blob) && Number(f.size) > 0,
+  );
+  return { valid, stale: raw.length > 0 && valid.length === 0 };
+}
+
+/** Upload teaching materials after Save Task (batch first, then per-file fallback). */
 async function apiUploadTaskMaterialsReliable(taskId, files) {
-  const list = Array.isArray(files) ? files.filter(Boolean) : [];
-  if (!list.length) return { uploaded: 0, materials: [] };
+  const { valid: list, stale } = normalizeDraftMaterialFiles(files);
+  if (!list.length) {
+    if (stale) throw new Error(t("teacher_material_file_stale"));
+    return { uploaded: 0, materials: [] };
+  }
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await apiUploadTaskMaterialsBatch(taskId, list);
+      return { uploaded: list.length, materials: list.map((f) => ({ file_name: f.name })) };
+    } catch (batchErr) {
+      if (attempt === 0) await eapSleep(500);
+      else {
+        /* fall through to per-file */
+      }
+    }
+  }
+
   const errors = [];
   let uploaded = 0;
-  for (let i = 0; i < list.length; i += 1) {
-    const file = list[i];
+
+  async function uploadOne(file, useLegacyUpload) {
     let ok = false;
     for (let attempt = 0; attempt < 3 && !ok; attempt += 1) {
       try {
-        await apiUploadTaskMaterial(taskId, file);
+        if (useLegacyUpload) {
+          await apiUploadTaskFile(taskId, file);
+        } else {
+          await apiUploadTaskMaterial(taskId, file);
+        }
         uploaded += 1;
         ok = true;
       } catch (err) {
         if (attempt === 2) {
           errors.push(`${file.name}: ${(err && err.message) || t("trec_error_generic")}`);
         } else {
-          await eapSleep(350 * (attempt + 1));
+          await eapSleep(500 * (attempt + 1));
         }
       }
     }
-    if (i < list.length - 1) await eapSleep(120);
   }
+
+  await uploadOne(list[0], true);
+  for (let i = 1; i < list.length; i += 1) {
+    await eapSleep(150);
+    await uploadOne(list[i], false);
+  }
+
   if (!uploaded && errors.length) {
     throw new Error(errors.join(" · "));
   }
@@ -6382,12 +6553,20 @@ function initTeacherPage() {
     }
 
     const submitBtn = form.querySelector('button[type="submit"]');
-    if (submitBtn) submitBtn.disabled = true;
+    const submitBtnLabel = submitBtn ? submitBtn.textContent : "";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = t("teacher_batch_save_working");
+    }
 
     try {
       const { createdCount, errors } = await saveAllTeacherCategoryDrafts({
         class_name: class_name || teacherDefaultClassFallback(),
         date,
+        onProgress: (msg) => {
+          messageEl.textContent = msg;
+          messageEl.classList.remove("form-message--success", "form-message--error");
+        },
       });
 
       let savedMsg = t("teacher_batch_save_ok", { count: createdCount });
@@ -6424,7 +6603,10 @@ function initTeacherPage() {
       messageEl.classList.add("form-message--error");
     } finally {
       const submitBtnDone = form.querySelector('button[type="submit"]');
-      if (submitBtnDone) submitBtnDone.disabled = false;
+      if (submitBtnDone) {
+        submitBtnDone.disabled = false;
+        if (submitBtnLabel) submitBtnDone.textContent = submitBtnLabel;
+      }
     }
   });
 
