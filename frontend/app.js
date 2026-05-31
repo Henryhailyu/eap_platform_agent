@@ -544,7 +544,7 @@ const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 const teacherCategoryDrafts = {};
 let teacherCreateContextKey = "";
 /** Bump when create-form draft logic changes (cache-bust + deploy verification). */
-const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-recorded-multi-link";
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-recorded-link-on-create";
 
 const RECORDED_AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
 
@@ -1070,8 +1070,7 @@ async function ensureRecordedLessonsLinkedToTask(taskId, lessonIds, meta) {
     const row = Array.isArray(rows)
       ? rows.find((r) => Number(r.id, 10) === tid)
       : null;
-    const entries = row ? taskRecordedLessonEntries(row) : [];
-    linked = entries.length > 0;
+    linked = row ? taskRecordedLessonEntries(row).length > 0 : false;
   } catch (_) {
     linked = false;
   }
@@ -1130,6 +1129,7 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
           draft.recordedLessonFileName ||
           (videoFiles[0] && videoFiles[0].name) ||
           t("trec_title");
+        const pendingRecordedFiles = videoFiles.slice(lessonIds.length);
         const created = await apiPost("/api/tasks", {
           date,
           title,
@@ -1139,18 +1139,21 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
           description: draft.description.trim() || null,
           description_zh: draft.description_zh.trim() || null,
           class_name: saveClass,
+          recorded_lesson_ids: lessonIds,
         });
         createdCount += 1;
-        uploadQueue.push({
-          kind: "recorded",
-          cat,
-          taskId: Number(created.id, 10),
-          title,
-          description: draft.description.trim(),
-          videoFiles,
-          lessonIds: [...lessonIds],
-          orphanLessonId: draft.recordedLessonId,
-        });
+        if (pendingRecordedFiles.length) {
+          uploadQueue.push({
+            kind: "recorded",
+            cat,
+            taskId: Number(created.id, 10),
+            title,
+            description: draft.description.trim(),
+            videoFiles: pendingRecordedFiles,
+            lessonIds: [],
+            orphanLessonId: null,
+          });
+        }
         draft.recordedLessonId = null;
         draft.recordedLessonIds = [];
         draft.recordedLessonFileName = "";
@@ -1210,6 +1213,11 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
     }
   }
 
+  if (uploadQueue.length && typeof onProgress === "function") {
+    onProgress(t("teacher_batch_upload_phase"));
+  }
+  await eapSleep(uploadQueue.length ? 400 : 0);
+
   for (let ui = 0; ui < uploadQueue.length; ui += 1) {
     const item = uploadQueue[ui];
     if (typeof onProgress === "function") {
@@ -1217,7 +1225,7 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
         t("teacher_batch_upload_progress", { category: translateCategory(item.cat) }),
       );
     }
-    if (ui > 0) await eapSleep(300);
+    if (ui > 0) await eapSleep(500);
     try {
       if (item.kind === "materials") {
         await apiUploadTaskMaterialsReliable(item.taskId, item.mats);
@@ -1646,7 +1654,7 @@ async function apiPutFeedbackFormData(submissionId, formData) {
 async function apiUploadTaskFile(taskId, file) {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await eapPostMultipart(`${API_BASE}/api/tasks/${taskId}/upload`, formData);
+  const response = await eapPostMultipart(apiPathForUpload(`/api/tasks/${taskId}/upload`), formData);
   const data = await readJsonOrError(response);
   if (!response.ok) {
     const msg =
@@ -1660,7 +1668,7 @@ async function apiUploadTaskFile(taskId, file) {
 async function apiUploadTaskMaterial(taskId, file) {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await eapPostMultipart(`${API_BASE}/api/tasks/${taskId}/materials`, formData);
+  const response = await eapPostMultipart(apiPathForUpload(`/api/tasks/${taskId}/materials`), formData);
   const data = await readJsonOrError(response);
   if (!response.ok) {
     const msg =
@@ -1671,12 +1679,21 @@ async function apiUploadTaskMaterial(taskId, file) {
 }
 
 /** Upload all teaching materials for a task in one request. */
+function apiPathForUpload(path) {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  if (typeof window !== "undefined" && window.location.origin) {
+    const base = String(API_BASE || "").replace(/\/$/, "");
+    if (base === window.location.origin) return p;
+  }
+  return `${String(API_BASE || "").replace(/\/$/, "")}${p}`;
+}
+
 async function apiUploadTaskMaterialsBatch(taskId, files) {
   const formData = new FormData();
   const list = Array.isArray(files) ? files.filter(Boolean) : [];
   list.forEach((f) => formData.append("files", f));
   const response = await eapPostMultipart(
-    `${API_BASE}/api/tasks/${taskId}/materials/batch`,
+    apiPathForUpload(`/api/tasks/${taskId}/materials/batch`),
     formData,
   );
   const data = await readJsonOrError(response);
@@ -5643,12 +5660,22 @@ function initTeacherPage() {
     taskDetailInner.innerHTML = "";
     const ul = document.createElement("ul");
     ul.className = "teacher-task-detail-ul";
-    ul.appendChild(
-      buildTeacherTaskCardElement(task, {
-        viewDate: getTaskListDate(),
-        viewClass: getFilterClass(),
-      }),
-    );
+    try {
+      ul.appendChild(
+        buildTeacherTaskCardElement(task, {
+          viewDate: getTaskListDate(),
+          viewClass: getFilterClass(),
+        }),
+      );
+    } catch (cardErr) {
+      const errLi = document.createElement("li");
+      errLi.className = "task-card task-card--teacher";
+      const errP = document.createElement("p");
+      errP.className = "form-message form-message--error";
+      errP.textContent = (cardErr && cardErr.message) || t("teacher_task_card_render_error");
+      errLi.appendChild(errP);
+      ul.appendChild(errLi);
+    }
     taskDetailInner.appendChild(ul);
     taskDetailEmpty.classList.add("hidden");
     taskDetailInner.classList.remove("hidden");

@@ -133,6 +133,46 @@ def lesson_row_to_dict(row) -> dict:
     }
 
 
+def link_lessons_to_calendar_task(
+    conn, calendar_task_id: int, lesson_ids: list, class_name: str
+) -> int:
+    """Attach existing recorded_lesson rows to a calendar task (same class only)."""
+    from app import normalize_class_name
+
+    linked = 0
+    task_row = conn.execute(
+        "SELECT id, class_name FROM calendar_tasks WHERE id = ?",
+        (int(calendar_task_id),),
+    ).fetchone()
+    if not task_row:
+        return 0
+    task_class = normalize_class_name(task_row["class_name"])
+    now = _now_iso()
+    for raw in lesson_ids or []:
+        try:
+            lid = int(raw)
+        except (TypeError, ValueError):
+            continue
+        row = conn.execute(
+            "SELECT id, class_name FROM recorded_lessons WHERE id = ?",
+            (lid,),
+        ).fetchone()
+        if not row:
+            continue
+        if normalize_class_name(row["class_name"]) != task_class:
+            continue
+        conn.execute(
+            """
+            UPDATE recorded_lessons
+            SET calendar_task_id = ?, visibility = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (int(calendar_task_id), VISIBILITY_PUBLISHED, now, lid),
+        )
+        linked += 1
+    return linked
+
+
 def enrich_task_dicts_with_recordings(conn, task_dicts, *, published_only: bool = False) -> list:
     """Attach recorded_lesson {id, title, visibility} to each task dict when linked."""
     if not task_dicts:

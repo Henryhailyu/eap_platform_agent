@@ -307,6 +307,8 @@ window.EAP_STRINGS_EN = {
   "teacher_batch_save_working": "Saving…",
   "teacher_batch_save_progress": "Saving… {category}",
   "teacher_batch_upload_progress": "Uploading files… {category}",
+  "teacher_batch_upload_phase": "Uploading teaching files…",
+  "teacher_task_card_render_error": "Could not display this task. Refresh the page and try again.",
   "teacher_rec_media_hint":
     "Add multiple files: pick several at once (Ctrl/Cmd+click), or choose files again to add more.",
   "teacher_rec_files_ready": "{count} recording(s) ready",

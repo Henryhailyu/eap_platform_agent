@@ -2511,18 +2511,30 @@ def create_task():
         (date, title, title_zh, category, period, description, description_zh, "Pending", class_name),
     )
 
-    conn.commit()
+    new_task_id = int(cursor.lastrowid)
 
-    new_task_id = cursor.lastrowid
+    recorded_lesson_ids = data.get("recorded_lesson_ids")
+    if recorded_lesson_ids:
+        from recorded_lessons import link_lessons_to_calendar_task
+
+        link_lessons_to_calendar_task(conn, new_task_id, recorded_lesson_ids, class_name)
+
+    conn.commit()
 
     task = conn.execute(
         "SELECT * FROM calendar_tasks WHERE id = ?",
         (new_task_id,),
     ).fetchone()
 
+    out = task_to_dict(task)
+    from recorded_lessons import enrich_task_dicts_with_recordings
+    from task_materials import enrich_task_dicts_with_materials
+
+    enrich_task_dicts_with_recordings(conn, [out])
+    enrich_task_dicts_with_materials(conn, [out])
     conn.close()
 
-    return jsonify(task_to_dict(task)), 201
+    return jsonify(out), 201
 
 
 @app.route("/api/tasks/<int:task_id>/copy", methods=["POST"])

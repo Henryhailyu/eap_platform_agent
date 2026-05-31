@@ -307,6 +307,8 @@ window.EAP_STRINGS_ZH = {
   "teacher_batch_save_working": "正在保存…",
   "teacher_batch_save_progress": "正在保存… {category}",
   "teacher_batch_upload_progress": "正在上传文件… {category}",
+  "teacher_batch_upload_phase": "正在上传教学文件…",
+  "teacher_task_card_render_error": "无法显示该任务，请刷新页面后重试。",
   "teacher_rec_media_hint": "可上传多个文件：一次多选，或多次点击「选择文件」继续添加。",
   "teacher_rec_files_ready": "已选 {count} 个录课文件",
   "teacher_rec_all_uploaded": "已全部上传 {count} 个文件 — 点击「保存任务」发布。",
