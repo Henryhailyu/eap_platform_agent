@@ -68,14 +68,23 @@
     );
   }
 
-  /** Group lessons that belong to the current viewMonth by their calendar_task date. */
+  /** Best date string for a lesson: calendar task date, then created_at, then "". */
+  function lessonDate(lesson) {
+    if (lesson.calendar_task_date && String(lesson.calendar_task_date).trim()) {
+      return String(lesson.calendar_task_date).slice(0, 10);
+    }
+    if (lesson.created_at && String(lesson.created_at).trim()) {
+      return String(lesson.created_at).slice(0, 10);
+    }
+    return "";
+  }
+
+  /** Group lessons that belong to the current viewMonth by date. */
   function lessonsForMonth() {
     const prefix = monthISO();
     const byDate = {};
     allLessons.forEach((lesson) => {
-      const dateStr = lesson.calendar_task_date
-        ? String(lesson.calendar_task_date).slice(0, 10)
-        : "";
+      const dateStr = lessonDate(lesson);
       if (!dateStr.startsWith(prefix)) return;
       if (!byDate[dateStr]) byDate[dateStr] = [];
       byDate[dateStr].push(lesson);
@@ -262,17 +271,17 @@
       const data = await api().listPublishedForStudent(className);
       allLessons = (data.lessons || []).filter((l) => l && l.id != null);
       // Seed month to latest recording
-      if (allLessons.length) {
-        const dates = allLessons
-          .map((l) => l.calendar_task_date ? String(l.calendar_task_date).slice(0, 7) : "")
-          .filter(Boolean)
-          .sort();
-        if (dates.length) {
-          const [y, m] = dates[dates.length - 1].split("-").map(Number);
-          viewYear = y;
-          viewMonth = m - 1;
-        }
+    if (allLessons.length) {
+      const dates = allLessons
+        .map((l) => lessonDate(l).slice(0, 7))
+        .filter(Boolean)
+        .sort();
+      if (dates.length) {
+        const [y, m] = dates[dates.length - 1].split("-").map(Number);
+        viewYear = y;
+        viewMonth = m - 1;
       }
+    }
     } catch (err) {
       showError((err && err.message) || t("srec_load_failed"));
       allLessons = [];

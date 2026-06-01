@@ -224,6 +224,25 @@
   color: var(--color-text-muted, #5c6470);
 }
 
+.eap-inline-recording__subheading {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #5c6470);
+}
+
+.eap-inline-recording__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.eap-inline-recording__fullscreen-btn {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
+}
+
 .task-card__recording-manage-link {
   display: inline-block;
   margin-top: 0.35rem;
