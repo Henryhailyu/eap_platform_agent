@@ -257,9 +257,14 @@ def get_db_connection():
     """
     Create a connection to the SQLite database.
     row_factory allows us to access data like a dictionary.
+    WAL mode allows concurrent reads while a write is in progress,
+    which prevents 503 errors when uploads overlap with read requests.
     """
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=10000")
     return conn
 
 

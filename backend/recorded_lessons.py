@@ -634,6 +634,7 @@ def register_recorded_lessons_routes(app):
             for r in rows:
                 d = lesson_row_to_dict(r)
                 d.pop("file_path", None)
+                _attach_task_meta_to_lesson(conn, d)
                 lessons.append(d)
             return jsonify({"lessons": lessons, "class_name": class_name})
         finally:

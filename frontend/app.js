@@ -544,7 +544,7 @@ const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 const teacherCategoryDrafts = {};
 let teacherCreateContextKey = "";
 /** Bump when create-form draft logic changes (cache-bust + deploy verification). */
-const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260601-student-ux";
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260601-srec-date-fix";
 
 const RECORDED_AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
 
@@ -1829,13 +1829,20 @@ function normalizeTask(t) {
 
 function taskRecordedLessonEntries(task) {
   if (!task) return [];
-  if (Array.isArray(task.recorded_lessons) && task.recorded_lessons.length) {
-    return task.recorded_lessons.filter((r) => r && r.id != null);
+  const out = [];
+  const seen = new Set();
+  const push = (r) => {
+    if (!r || r.id == null) return;
+    const id = Number(r.id);
+    if (!Number.isFinite(id) || seen.has(id)) return;
+    seen.add(id);
+    out.push(r);
+  };
+  if (Array.isArray(task.recorded_lessons)) {
+    task.recorded_lessons.forEach(push);
   }
-  if (task.recorded_lesson && task.recorded_lesson.id != null) {
-    return [task.recorded_lesson];
-  }
-  return [];
+  push(task.recorded_lesson);
+  return out;
 }
 
 function taskMaterialEntries(task) {
@@ -2437,40 +2444,70 @@ function appendTaskRecordedLessonBlock(parent, task, role) {
   const recordings = taskRecordedLessonEntries(task);
   if (!recordings.length) return;
 
-  const api = window.EAP_RECORDED_LESSONS;
+  const visible =
+    role === "student"
+      ? recordings.filter((rec) => !rec.visibility || rec.visibility === "published")
+      : recordings;
 
-  recordings.forEach((rec) => {
-    if (role === "student" && rec.visibility && rec.visibility !== "published") return;
-    const player = buildInlineRecordedVideoBlock(rec, role);
-    if (player) parent.appendChild(player);
+  if (!visible.length) return;
 
-    if (role === "student" && rec.id != null) {
-      const fsWrap = document.createElement("div");
-      fsWrap.className = "eap-inline-recording__actions";
+  if (role === "student") {
+    const block = document.createElement("div");
+    block.className = "student-task-recordings";
+
+    visible.forEach((rec, index) => {
+      if (visible.length > 1) {
+        const sub = document.createElement("p");
+        sub.className = "eap-inline-recording__subheading";
+        sub.textContent = rec.title || rec.file_name || `${t("cat_recorded")} ${index + 1}`;
+        block.appendChild(sub);
+      }
+      const player = buildInlineRecordedVideoBlock(rec, role);
+      if (player) block.appendChild(player);
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "eap-inline-recording__actions student-task-recordings__actions";
+    visible.forEach((rec) => {
+      if (rec.id == null) return;
       const fsBtn = document.createElement("a");
       fsBtn.className = "btn-secondary eap-inline-recording__fullscreen-btn";
       const titleEnc = encodeURIComponent(rec.title || rec.file_name || "");
       fsBtn.href = `player.html?id=${rec.id}&role=student&title=${titleEnc}`;
       fsBtn.target = "_blank";
       fsBtn.rel = "noopener noreferrer";
-      fsBtn.textContent = t("eap_inline_open_fullscreen");
-      fsWrap.appendChild(fsBtn);
-      parent.appendChild(fsWrap);
+      fsBtn.textContent =
+        visible.length > 1
+          ? `${t("eap_inline_open_fullscreen")} — ${rec.title || rec.file_name || rec.id}`
+          : t("eap_inline_open_fullscreen");
+      actions.appendChild(fsBtn);
+    });
+    block.appendChild(actions);
+    parent.appendChild(block);
+    return;
+  }
+
+  visible.forEach((rec, index) => {
+    if (visible.length > 1) {
+      const sub = document.createElement("p");
+      sub.className = "eap-inline-recording__subheading";
+      sub.textContent = rec.title || rec.file_name || `${t("cat_recorded")} ${index + 1}`;
+      parent.appendChild(sub);
     }
+    const player = buildInlineRecordedVideoBlock(rec, role);
+    if (player) parent.appendChild(player);
   });
 
-  const rec = recordings[0];
+  const rec = visible[0];
   if (!rec || rec.id == null) return;
 
-  if (role === "teacher") {
-    const manage = document.createElement("a");
-    manage.className = "task-card__recording-manage-link";
-    manage.href = task.class_name
-      ? `teacher-recorded.html?class_name=${encodeURIComponent(task.class_name)}`
-      : "teacher-recorded.html";
-    manage.textContent = t("task_recording_manage");
-    parent.appendChild(manage);
-  }
+  const manage = document.createElement("a");
+  manage.className = "task-card__recording-manage-link";
+  manage.href = task.class_name
+    ? `teacher-recorded.html?class_name=${encodeURIComponent(task.class_name)}`
+    : "teacher-recorded.html";
+  manage.textContent = t("task_recording_manage");
+  parent.appendChild(manage);
 }
 
 /**
@@ -7178,22 +7215,6 @@ function buildStudentTaskCardElement(task, mySub) {
     material.setAttribute("aria-hidden", "true");
   }
 
-  appendTaskRecordedLessonBlock(li, task, "student");
-  if (isRecordedLessonCategory(task.category || task.type)) {
-    const rec = task.recorded_lesson;
-    if (!rec || rec.id == null) {
-      const pending = document.createElement("p");
-      pending.className = "task-card__recording-pending";
-      pending.textContent = t("student_rec_not_linked");
-      li.appendChild(pending);
-    } else if (rec.visibility && rec.visibility !== "published") {
-      const pending = document.createElement("p");
-      pending.className = "task-card__recording-pending";
-      pending.textContent = t("student_rec_not_published");
-      li.appendChild(pending);
-    }
-  }
-
   const homework = document.createElement("div");
   homework.className = "task-card__homework";
 
@@ -7611,6 +7632,24 @@ function buildStudentTaskCardElement(task, mySub) {
   li.appendChild(workflowStrip);
   li.appendChild(desc);
   li.appendChild(material);
+  appendTaskRecordedLessonBlock(li, task, "student");
+  if (isRecordedLessonCategory(task.category || task.type)) {
+    const recs = taskRecordedLessonEntries(task);
+    const hasPublished = recs.some(
+      (r) => r && r.id != null && (!r.visibility || r.visibility === "published")
+    );
+    if (!recs.length) {
+      const pending = document.createElement("p");
+      pending.className = "task-card__recording-pending";
+      pending.textContent = t("student_rec_not_linked");
+      li.appendChild(pending);
+    } else if (!hasPublished) {
+      const pending = document.createElement("p");
+      pending.className = "task-card__recording-pending";
+      pending.textContent = t("student_rec_not_published");
+      li.appendChild(pending);
+    }
+  }
   if (submissionPanel) li.appendChild(submissionPanel);
   li.appendChild(homeworkNode);
   li.appendChild(tail);

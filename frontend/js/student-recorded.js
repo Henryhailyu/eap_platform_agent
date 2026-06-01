@@ -68,27 +68,37 @@
     );
   }
 
-  /** Best date string for a lesson: calendar task date, then created_at, then "". */
+  /** Best date string for a lesson: task date, then upload time, then "". */
   function lessonDate(lesson) {
-    if (lesson.calendar_task_date && String(lesson.calendar_task_date).trim()) {
-      return String(lesson.calendar_task_date).slice(0, 10);
-    }
-    if (lesson.created_at && String(lesson.created_at).trim()) {
-      return String(lesson.created_at).slice(0, 10);
-    }
-    return "";
+    const pick = (raw) => {
+      const s = raw != null ? String(raw).trim() : "";
+      if (!s) return "";
+      const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+      return m ? m[1] : "";
+    };
+    return (
+      pick(lesson.calendar_task_date) ||
+      pick(lesson.created_at) ||
+      pick(lesson.updated_at)
+    );
   }
 
   /** Group lessons that belong to the current viewMonth by date. */
   function lessonsForMonth() {
     const prefix = monthISO();
     const byDate = {};
+    const undated = [];
     allLessons.forEach((lesson) => {
       const dateStr = lessonDate(lesson);
+      if (!dateStr) {
+        undated.push(lesson);
+        return;
+      }
       if (!dateStr.startsWith(prefix)) return;
       if (!byDate[dateStr]) byDate[dateStr] = [];
       byDate[dateStr].push(lesson);
     });
+    if (undated.length) byDate._undated = undated;
     return byDate;
   }
 
@@ -183,9 +193,11 @@
     listEl.innerHTML = "";
 
     const byDate = lessonsForMonth();
+    const undated = byDate._undated || [];
+    delete byDate._undated;
     const dates = Object.keys(byDate).sort().reverse(); // newest first
 
-    if (!dates.length) {
+    if (!dates.length && !undated.length) {
       if (emptyEl) {
         emptyEl.textContent = t("srec_empty_month");
         emptyEl.classList.remove("hidden");
@@ -193,6 +205,11 @@
       return;
     }
     if (emptyEl) emptyEl.classList.add("hidden");
+
+    if (!dates.length && undated.length && emptyEl) {
+      emptyEl.textContent = t("srec_other_month_hint");
+      emptyEl.classList.remove("hidden");
+    }
 
     dates.forEach((dateStr) => {
       const lessons = byDate[dateStr];
@@ -229,6 +246,27 @@
       group.appendChild(summary);
       listEl.appendChild(group);
     });
+
+    if (undated.length) {
+      const group = document.createElement("div");
+      group.className = "srec-date-group srec-date-group--undated";
+      const summary = document.createElement("details");
+      summary.className = "srec-date-details";
+      summary.open = true;
+      const sumEl = document.createElement("summary");
+      sumEl.className = "srec-date-details__summary";
+      const dateLabel = document.createElement("span");
+      dateLabel.className = "srec-date-details__date";
+      dateLabel.textContent = t("srec_no_date");
+      sumEl.appendChild(dateLabel);
+      const body = document.createElement("div");
+      body.className = "srec-date-details__body";
+      undated.forEach((lesson) => body.appendChild(buildLessonCard(lesson)));
+      summary.appendChild(sumEl);
+      summary.appendChild(body);
+      group.appendChild(summary);
+      listEl.appendChild(group);
+    }
   }
 
   function bindMonthNav() {
@@ -270,18 +308,17 @@
     try {
       const data = await api().listPublishedForStudent(className);
       allLessons = (data.lessons || []).filter((l) => l && l.id != null);
-      // Seed month to latest recording
-    if (allLessons.length) {
-      const dates = allLessons
-        .map((l) => lessonDate(l).slice(0, 7))
-        .filter(Boolean)
-        .sort();
-      if (dates.length) {
-        const [y, m] = dates[dates.length - 1].split("-").map(Number);
-        viewYear = y;
-        viewMonth = m - 1;
+      if (allLessons.length) {
+        const months = allLessons
+          .map((l) => lessonDate(l).slice(0, 7))
+          .filter(Boolean)
+          .sort();
+        if (months.length) {
+          const [y, m] = months[months.length - 1].split("-").map(Number);
+          viewYear = y;
+          viewMonth = m - 1;
+        }
       }
-    }
     } catch (err) {
       showError((err && err.message) || t("srec_load_failed"));
       allLessons = [];

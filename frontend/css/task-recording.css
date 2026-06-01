@@ -243,6 +243,15 @@
   padding: 0.35rem 0.9rem;
 }
 
+.student-task-recordings {
+  margin: 0.75rem 0 1rem;
+  clear: both;
+}
+
+.student-task-recordings__actions {
+  margin-top: 0.5rem;
+}
+
 .task-card__recording-manage-link {
   display: inline-block;
   margin-top: 0.35rem;
