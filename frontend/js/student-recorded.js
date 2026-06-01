@@ -1,5 +1,6 @@
 /**
- * Phase N4 — Student recorded lesson viewer (session-auth stream, no download UI).
+ * Phase N4 — Student recorded lesson viewer: calendar month view.
+ * Recordings are grouped by calendar date; the user can navigate months.
  */
 (function (global) {
   const PAGE = "student-recorded";
@@ -10,22 +11,20 @@
     return key;
   }
 
-  function escapeHtml(text) {
-    return String(text == null ? "" : text)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  function escapeHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
   function resolveClassName() {
-    const fromUrl = new URLSearchParams(global.location.search).get("class_name") ||
-      new URLSearchParams(global.location.search).get("class") ||
-      "";
+    const fromUrl =
+      new URLSearchParams(global.location.search).get("class_name") ||
+      new URLSearchParams(global.location.search).get("class") || "";
     if (fromUrl.trim()) return fromUrl.trim();
     if (typeof global.getLoggedInUser === "function") {
       const u = global.getLoggedInUser();
-      const c = u?.class_name || u?.className || "";
+      const c = (u && (u.class_name || u.className)) || "";
       if (c) return String(c).trim();
     }
     return "EAP047";
@@ -37,6 +36,15 @@
     return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  const AUDIO_EXTS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
+  function isAudio(lesson) {
+    const ext = String(lesson.file_ext || "").toLowerCase();
+    if (ext && AUDIO_EXTS.has(ext)) return true;
+    const name = String(lesson.file_name || lesson.title || "").toLowerCase();
+    for (const e of AUDIO_EXTS) { if (name.endsWith("." + e)) return true; }
+    return false;
+  }
+
   function showError(msg) {
     const el = document.getElementById("srec-error");
     if (!el) return;
@@ -44,83 +52,243 @@
     el.classList.toggle("hidden", !msg);
   }
 
-  function openPlayer(lesson) {
-    const section = document.getElementById("srec-player-section");
-    const video = document.getElementById("srec-player-video");
-    const heading = document.getElementById("srec-player-heading");
-    if (!section || !video || !api()) return;
+  // ── State ────────────────────────────────────────────────────────────────
+  let allLessons = [];
+  let viewYear = new Date().getFullYear();
+  let viewMonth = new Date().getMonth(); // 0-based
 
-    if (heading) heading.textContent = lesson.title || t("srec_list_title");
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-    video.src = api().studentStreamUrl(lesson.id);
-    section.classList.remove("hidden");
-    section.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    void video.play().catch(() => {
-      /* autoplay may be blocked until user interacts */
-    });
+  function monthISO() {
+    return `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
   }
 
-  function renderList(lessons) {
+  function monthLabel() {
+    return new Date(viewYear, viewMonth, 1).toLocaleDateString(
+      typeof global.eapLocale === "function" ? global.eapLocale() : "en",
+      { year: "numeric", month: "long" }
+    );
+  }
+
+  /** Group lessons that belong to the current viewMonth by their calendar_task date. */
+  function lessonsForMonth() {
+    const prefix = monthISO();
+    const byDate = {};
+    allLessons.forEach((lesson) => {
+      const dateStr = lesson.calendar_task_date
+        ? String(lesson.calendar_task_date).slice(0, 10)
+        : "";
+      if (!dateStr.startsWith(prefix)) return;
+      if (!byDate[dateStr]) byDate[dateStr] = [];
+      byDate[dateStr].push(lesson);
+    });
+    return byDate;
+  }
+
+  function formatDate(iso) {
+    if (!iso || iso.length < 10) return t("srec_no_date");
+    const d = new Date(`${iso}T12:00:00`);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(
+      typeof global.eapLocale === "function" ? global.eapLocale() : "en",
+      { weekday: "short", year: "numeric", month: "short", day: "numeric" }
+    );
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function buildLessonCard(lesson) {
+    const card = document.createElement("div");
+    card.className = "srec-lesson-card";
+
+    const typeIcon = isAudio(lesson) ? "🎵" : "🎬";
+    const header = document.createElement("div");
+    header.className = "srec-lesson-card__header";
+
+    const icon = document.createElement("span");
+    icon.className = "srec-lesson-card__icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = typeIcon;
+
+    const info = document.createElement("div");
+    info.className = "srec-lesson-card__info";
+
+    const titleEl = document.createElement("p");
+    titleEl.className = "srec-lesson-card__title";
+    titleEl.textContent = lesson.title || (isAudio(lesson) ? "Audio recording" : "Video recording");
+
+    const meta = document.createElement("p");
+    meta.className = "srec-lesson-card__meta";
+    meta.textContent = [lesson.file_name, formatBytes(lesson.file_size_bytes)]
+      .filter(Boolean).join(" · ");
+
+    info.appendChild(titleEl);
+    info.appendChild(meta);
+    header.appendChild(icon);
+    header.appendChild(info);
+    card.appendChild(header);
+
+    // Inline player
+    if (api() && lesson.id != null) {
+      const playerWrap = document.createElement("div");
+      playerWrap.className = "srec-lesson-card__player";
+      if (isAudio(lesson)) {
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.preload = "metadata";
+        audio.src = api().studentStreamUrl(lesson.id);
+        audio.addEventListener("contextmenu", (e) => e.preventDefault());
+        playerWrap.appendChild(audio);
+      } else {
+        const video = document.createElement("video");
+        video.controls = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+        video.setAttribute("controlsList", "nodownload");
+        video.src = api().studentStreamUrl(lesson.id);
+        video.addEventListener("contextmenu", (e) => e.preventDefault());
+        playerWrap.appendChild(video);
+      }
+      card.appendChild(playerWrap);
+
+      // Full-screen button → player.html
+      const actions = document.createElement("div");
+      actions.className = "srec-lesson-card__actions";
+      const fsBtn = document.createElement("a");
+      fsBtn.className = "btn-secondary srec-lesson-card__fs-btn";
+      fsBtn.href = `player.html?id=${lesson.id}&role=student&title=${encodeURIComponent(lesson.title || "")}`;
+      fsBtn.target = "_blank";
+      fsBtn.rel = "noopener noreferrer";
+      fsBtn.textContent = t("srec_open_player");
+      actions.appendChild(fsBtn);
+      card.appendChild(actions);
+    }
+
+    return card;
+  }
+
+  function renderMonth() {
     const listEl = document.getElementById("srec-list");
     const emptyEl = document.getElementById("srec-empty");
+    const monthLabelEl = document.getElementById("srec-month-label");
     if (!listEl) return;
-    const items = lessons || [];
-    if (emptyEl) emptyEl.classList.toggle("hidden", items.length > 0);
-    listEl.innerHTML = items
-      .map(
-        (lesson) => `
-      <article class="srec-card" role="listitem">
-        <h2 class="srec-card__title">${escapeHtml(lesson.title)}</h2>
-        <p class="srec-card__meta">${escapeHtml(lesson.file_name || "")} · ${escapeHtml(formatBytes(lesson.file_size_bytes))}</p>
-        <button type="button" class="btn-primary" data-watch-id="${lesson.id}">${escapeHtml(t("srec_watch_btn"))}</button>
-      </article>`,
-      )
-      .join("");
-  }
 
-  async function loadList() {
-    const className = resolveClassName();
-    showError("");
-    const data = await api().listPublishedForStudent(className);
-    renderList(data.lessons || []);
-  }
+    if (monthLabelEl) monthLabelEl.textContent = monthLabel();
+    listEl.innerHTML = "";
 
-  function bindList() {
-    const listEl = document.getElementById("srec-list");
-    if (!listEl || listEl.dataset.eapBound === "1") return;
-    listEl.dataset.eapBound = "1";
-    listEl.addEventListener("click", (ev) => {
-      const btn = ev.target.closest("button[data-watch-id]");
-      if (!btn) return;
-      const id = Number(btn.getAttribute("data-watch-id"));
-      const card = btn.closest(".srec-card");
-      const title = card?.querySelector(".srec-card__title")?.textContent || "";
-      openPlayer({ id, title });
+    const byDate = lessonsForMonth();
+    const dates = Object.keys(byDate).sort().reverse(); // newest first
+
+    if (!dates.length) {
+      if (emptyEl) {
+        emptyEl.textContent = t("srec_empty_month");
+        emptyEl.classList.remove("hidden");
+      }
+      return;
+    }
+    if (emptyEl) emptyEl.classList.add("hidden");
+
+    dates.forEach((dateStr) => {
+      const lessons = byDate[dateStr];
+      const group = document.createElement("div");
+      group.className = "srec-date-group";
+
+      const summary = document.createElement("details");
+      summary.className = "srec-date-details";
+      summary.open = true; // expanded by default
+
+      const sumEl = document.createElement("summary");
+      sumEl.className = "srec-date-details__summary";
+
+      const dateLabel = document.createElement("span");
+      dateLabel.className = "srec-date-details__date";
+      dateLabel.textContent = formatDate(dateStr);
+
+      const countBadge = document.createElement("span");
+      countBadge.className = "srec-date-details__count";
+      countBadge.textContent = `${lessons.length} ${t("srec_date_group_toggle")}`;
+
+      sumEl.appendChild(dateLabel);
+      sumEl.appendChild(countBadge);
+      summary.appendChild(sumEl);
+
+      const body = document.createElement("div");
+      body.className = "srec-date-details__body";
+
+      lessons.forEach((lesson) => {
+        body.appendChild(buildLessonCard(lesson));
+      });
+
+      summary.appendChild(body);
+      group.appendChild(summary);
+      listEl.appendChild(group);
     });
   }
 
-  function bindPlayerGuards() {
-    const video = document.getElementById("srec-player-video");
-    if (!video || video.dataset.eapBound === "1") return;
-    video.dataset.eapBound = "1";
-    video.addEventListener("contextmenu", (ev) => ev.preventDefault());
+  function bindMonthNav() {
+    const prevBtn = document.getElementById("srec-prev-month");
+    const nextBtn = document.getElementById("srec-next-month");
+    if (prevBtn && prevBtn.dataset.eapBound !== "1") {
+      prevBtn.dataset.eapBound = "1";
+      prevBtn.addEventListener("click", () => {
+        viewMonth -= 1;
+        if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+        renderMonth();
+        updateNavButtons();
+      });
+    }
+    if (nextBtn && nextBtn.dataset.eapBound !== "1") {
+      nextBtn.dataset.eapBound = "1";
+      nextBtn.addEventListener("click", () => {
+        viewMonth += 1;
+        if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+        renderMonth();
+        updateNavButtons();
+      });
+    }
+  }
+
+  function updateNavButtons() {
+    const nextBtn = document.getElementById("srec-next-month");
+    if (!nextBtn) return;
+    const now = new Date();
+    const isCurrentOrFuture =
+      viewYear > now.getFullYear() ||
+      (viewYear === now.getFullYear() && viewMonth >= now.getMonth());
+    nextBtn.disabled = isCurrentOrFuture;
+  }
+
+  async function loadAndRender() {
+    const className = resolveClassName();
+    showError("");
+    try {
+      const data = await api().listPublishedForStudent(className);
+      allLessons = (data.lessons || []).filter((l) => l && l.id != null);
+      // Seed month to latest recording
+      if (allLessons.length) {
+        const dates = allLessons
+          .map((l) => l.calendar_task_date ? String(l.calendar_task_date).slice(0, 7) : "")
+          .filter(Boolean)
+          .sort();
+        if (dates.length) {
+          const [y, m] = dates[dates.length - 1].split("-").map(Number);
+          viewYear = y;
+          viewMonth = m - 1;
+        }
+      }
+    } catch (err) {
+      showError((err && err.message) || t("srec_load_failed"));
+      allLessons = [];
+    }
+    renderMonth();
+    updateNavButtons();
   }
 
   async function bootPage() {
     if (document.body.getAttribute("data-page") !== PAGE) return;
-    if (typeof global.redirectFilePageToHostedUi === "function" && global.redirectFilePageToHostedUi()) {
-      return;
-    }
+    if (typeof global.redirectFilePageToHostedUi === "function" && global.redirectFilePageToHostedUi()) return;
     if (typeof global.validateSatelliteSessionOrGate !== "function") return;
     const user = await global.validateSatelliteSessionOrGate("student");
     if (!user) return;
     if (typeof global.initAppPageHeader === "function") global.initAppPageHeader();
     if (typeof global.initStudentRecordedNavLink === "function") global.initStudentRecordedNavLink();
-
-    bindList();
-    bindPlayerGuards();
 
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn && logoutBtn.dataset.eapBound !== "1") {
@@ -131,25 +299,13 @@
       });
     }
 
-    const watchId = new URLSearchParams(global.location.search).get("id");
-    try {
-      await loadList();
-      if (watchId && /^\d+$/.test(watchId)) {
-        const lessons = (await api().listPublishedForStudent(resolveClassName())).lessons || [];
-        const lesson = lessons.find((l) => String(l.id) === watchId);
-        if (lesson) openPlayer(lesson);
-      }
-    } catch (err) {
-      showError((err && err.message) || t("srec_load_failed"));
-    }
-
+    bindMonthNav();
+    await loadAndRender();
     if (global.EAP_I18N) global.EAP_I18N.applyStatic();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      void bootPage();
-    });
+    document.addEventListener("DOMContentLoaded", () => { void bootPage(); });
   } else {
     void bootPage();
   }

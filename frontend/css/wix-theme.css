@@ -907,6 +907,15 @@ body.eap-wix .student-task-master-item--action {
   box-shadow: inset 3px 0 0 var(--wix-blue, #0071e3);
 }
 
+body.eap-wix .student-learning-archive-details {
+  background: var(--wix-card);
+  border: 1px solid var(--wix-card-border);
+  border-radius: var(--wix-radius);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  box-shadow: var(--wix-shadow);
+}
+
 body.eap-wix .eap-class-overview,
 body.eap-wix .student-progress-dashboard,
 body.eap-wix .student-learning-archive {

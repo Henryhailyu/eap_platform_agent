@@ -39,22 +39,15 @@
             </p>
           </div>
           <p id="srec-error" class="srec-error hidden" role="alert"></p>
-          <p id="srec-empty" class="srec-empty hidden" data-i18n="srec_empty">No published recordings for your class yet.</p>
-          <div id="srec-list" class="srec-list" role="list"></div>
 
-          <section id="srec-player-section" class="srec-player-section hidden" aria-labelledby="srec-player-heading">
-            <h2 id="srec-player-heading" class="srec-player__title"></h2>
-            <div class="srec-player">
-              <video
-                id="srec-player-video"
-                controls
-                controlsList="nodownload noplaybackrate"
-                playsinline
-                preload="metadata"
-              ></video>
-            </div>
-            <p class="srec-player__hint" data-i18n="srec_player_hint">For study use only. Do not share or download this video.</p>
-          </section>
+          <nav class="srec-month-nav" aria-label="Month navigation">
+            <button type="button" id="srec-prev-month" class="btn-secondary srec-month-nav__btn" data-i18n="srec_prev_month">← Previous month</button>
+            <span id="srec-month-label" class="srec-month-nav__label" aria-live="polite"></span>
+            <button type="button" id="srec-next-month" class="btn-secondary srec-month-nav__btn" data-i18n="srec_next_month">Next month →</button>
+          </nav>
+
+          <p id="srec-empty" class="srec-empty hidden" role="status" aria-live="polite"></p>
+          <div id="srec-list" class="srec-list"></div>
         </main>
       </div>
     </div>

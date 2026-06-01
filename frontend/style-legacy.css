@@ -1180,6 +1180,48 @@ main.app-main--calendar {
 }
 
 /* Student: visual “bridge” from compact progress strip to the calendar. */
+/* ── Learning archive collapsible wrapper ─────────────────────────── */
+.student-learning-archive-details {
+  margin: 1.5rem 0;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+}
+
+.student-learning-archive-details__summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 1rem 1.35rem;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.student-learning-archive-details__summary::-webkit-details-marker { display: none; }
+.student-learning-archive-details__summary::before {
+  content: "▶";
+  font-size: 0.7rem;
+  color: #888;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.student-learning-archive-details[open] > .student-learning-archive-details__summary::before {
+  transform: rotate(90deg);
+}
+.student-learning-archive-details__hint {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #888;
+}
+.student-learning-archive-details > .student-learning-archive {
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 1.1rem 1.35rem 1.25rem;
+}
+
+/* ── Calendar wrapper ─────────────────────────────────────────────── */
 .student-calendar-bridge {
   margin-top: 0.35rem;
   padding: 1.1rem 0.85rem 0;

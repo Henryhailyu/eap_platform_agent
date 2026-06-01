@@ -137,51 +137,6 @@
         </div>
       </section>
 
-      <section
-        id="student-learning-archive"
-        class="student-learning-archive"
-        aria-labelledby="student-learning-archive-heading"
-      >
-        <div class="student-learning-archive__header">
-          <h2 id="student-learning-archive-heading" class="student-learning-archive__title" data-i18n="student_archive_title">
-            Learning archive
-          </h2>
-          <p id="student-archive-scope" class="student-learning-archive__scope" aria-live="polite">—</p>
-          <p class="student-learning-archive__intro" data-i18n="student_archive_intro">
-            Review past tasks, your submissions, teacher feedback, and revisions for this class.
-          </p>
-        </div>
-        <div class="student-learning-archive__filters">
-          <label class="student-learning-archive__filter-check">
-            <input type="checkbox" id="student-archive-all-months" />
-            <span data-i18n="student_archive_all_months">Show all months in this class</span>
-          </label>
-          <div class="student-learning-archive__filter-category">
-            <label for="student-archive-category" data-i18n="filter_by_category">Filter by category</label>
-            <select id="student-archive-category" class="student-archive-category-select">
-              <option value="all" data-i18n="filter_all">All categories</option>
-            </select>
-          </div>
-        </div>
-        <p id="student-archive-error" class="student-learning-archive__error hidden" role="alert" aria-live="polite"></p>
-        <p id="student-archive-empty" class="student-learning-archive__empty hidden" role="status" aria-live="polite" data-i18n="student_archive_empty">
-          No tasks in this scope yet.
-        </p>
-        <div id="student-archive-body" class="student-learning-archive__body hidden">
-          <div class="student-archive-layout">
-            <div class="student-archive-layout__list-wrap">
-              <h3 class="student-archive-layout__list-heading" data-i18n="student_archive_list_heading">Past tasks</h3>
-              <ul id="student-archive-list" class="student-archive-list" aria-label="Learning archive tasks"></ul>
-            </div>
-            <div class="student-archive-layout__detail-wrap">
-              <p id="student-archive-detail-empty" class="student-archive-detail-empty" data-i18n="student_archive_pick_task">
-                Select a task to review your work and feedback.
-              </p>
-              <div id="student-archive-detail" class="student-archive-detail hidden" hidden></div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <section
         id="student-study-plan-progress"
@@ -451,6 +406,63 @@
           </article>
         </div>
       </div>
+
+      <!-- Learning archive — collapsed by default, below the calendar -->
+      <details
+        id="student-learning-archive-details"
+        class="student-learning-archive-details"
+      >
+        <summary class="student-learning-archive-details__summary" id="student-learning-archive-toggle">
+          <span data-i18n="student_archive_title">Learning archive</span>
+          <span class="student-learning-archive-details__hint" data-i18n="student_archive_toggle_hint">Review past work, submissions and feedback</span>
+        </summary>
+        <section
+          id="student-learning-archive"
+          class="student-learning-archive"
+          aria-labelledby="student-learning-archive-heading"
+        >
+          <div class="student-learning-archive__header">
+            <h2 id="student-learning-archive-heading" class="student-learning-archive__title visually-hidden" data-i18n="student_archive_title">
+              Learning archive
+            </h2>
+            <p id="student-archive-scope" class="student-learning-archive__scope" aria-live="polite">—</p>
+            <p class="student-learning-archive__intro" data-i18n="student_archive_intro">
+              Review past tasks, your submissions, teacher feedback, and revisions for this class.
+            </p>
+          </div>
+          <div class="student-learning-archive__filters">
+            <label class="student-learning-archive__filter-check">
+              <input type="checkbox" id="student-archive-all-months" />
+              <span data-i18n="student_archive_all_months">Show all months in this class</span>
+            </label>
+            <div class="student-learning-archive__filter-category">
+              <label for="student-archive-category" data-i18n="filter_by_category">Filter by category</label>
+              <select id="student-archive-category" class="student-archive-category-select">
+                <option value="all" data-i18n="filter_all">All categories</option>
+              </select>
+            </div>
+          </div>
+          <p id="student-archive-error" class="student-learning-archive__error hidden" role="alert" aria-live="polite"></p>
+          <p id="student-archive-empty" class="student-learning-archive__empty hidden" role="status" aria-live="polite" data-i18n="student_archive_empty">
+            No tasks in this scope yet.
+          </p>
+          <div id="student-archive-body" class="student-learning-archive__body hidden">
+            <div class="student-archive-layout">
+              <div class="student-archive-layout__list-wrap">
+                <h3 class="student-archive-layout__list-heading" data-i18n="student_archive_list_heading">Past tasks</h3>
+                <ul id="student-archive-list" class="student-archive-list" aria-label="Learning archive tasks"></ul>
+              </div>
+              <div class="student-archive-layout__detail-wrap">
+                <p id="student-archive-detail-empty" class="student-archive-detail-empty" data-i18n="student_archive_pick_task">
+                  Select a task to review your work and feedback.
+                </p>
+                <div id="student-archive-detail" class="student-archive-detail hidden" hidden></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </details>
+
     </main>
       </div>
     </div>
@@ -459,6 +471,6 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=20260601-student-ux"></script>
   </body>
 </html>

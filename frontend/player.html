@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Recording player — EAP Platform" />
+    <title>Recording — EAP Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@0,400;0,600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      :root {
+        --bg: #0d0d0d;
+        --panel: #181818;
+        --text: #f0f0f0;
+        --muted: #888;
+        --accent: #3d7fef;
+      }
+      html, body {
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Source Sans 3", system-ui, sans-serif;
+        overflow-x: hidden;
+      }
+      body { display: flex; flex-direction: column; min-height: 100vh; }
+
+      #player-header {
+        padding: 0.65rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: var(--panel);
+        border-bottom: 1px solid #2a2a2a;
+        flex-shrink: 0;
+      }
+      #player-back {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        white-space: nowrap;
+      }
+      #player-back:hover { color: var(--text); }
+      #player-title {
+        font-size: 1rem;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+      }
+      #player-hint {
+        font-size: 0.8rem;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      #player-main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem 1rem;
+      }
+
+      #player-wrap {
+        width: 100%;
+        max-width: 900px;
+      }
+
+      #player-media-video {
+        width: 100%;
+        max-height: calc(100vh - 120px);
+        border-radius: 10px;
+        background: #000;
+        display: block;
+      }
+      #player-media-audio {
+        width: 100%;
+        border-radius: 8px;
+        background: var(--panel);
+        display: block;
+        margin-top: 2rem;
+      }
+
+      #player-audio-cover {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        min-height: 260px;
+        background: var(--panel);
+        border-radius: 12px;
+        padding: 2rem;
+      }
+      #player-audio-icon {
+        font-size: 4rem;
+        line-height: 1;
+      }
+      #player-audio-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        text-align: center;
+        color: var(--text);
+      }
+
+      #player-error {
+        text-align: center;
+        color: #e57373;
+        padding: 2rem;
+        display: none;
+      }
+      #player-loading {
+        text-align: center;
+        color: var(--muted);
+        padding: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="player-header">
+      <a id="player-back" href="student.html">← Back to calendar</a>
+      <span id="player-title">Loading…</span>
+      <span id="player-hint">Study only · no download</span>
+    </header>
+    <main id="player-main">
+      <div id="player-wrap">
+        <p id="player-loading">Loading recording…</p>
+        <p id="player-error"></p>
+        <video
+          id="player-media-video"
+          controls
+          playsinline
+          controlsList="nodownload"
+          preload="metadata"
+          style="display:none"
+        ></video>
+        <div id="player-audio-cover" style="display:none">
+          <span id="player-audio-icon">🎵</span>
+          <span id="player-audio-name"></span>
+          <audio
+            id="player-media-audio"
+            controls
+            preload="metadata"
+          ></audio>
+        </div>
+      </div>
+    </main>
+
+    <script src="js/i18n/en.js"></script>
+    <script src="js/i18n/zh.js"></script>
+    <script src="js/i18n-core.js"></script>
+    <script src="api-config.js"></script>
+    <script src="app.js"></script>
+    <script src="js/recorded-lessons-api.js"></script>
+    <script>
+    (function () {
+      var AUDIO_EXTS = ["mp3", "m4a", "aac", "wav", "ogg"];
+      function isAudioUrl(url) {
+        var u = String(url || "").split("?")[0].toLowerCase();
+        return AUDIO_EXTS.some(function (e) { return u.endsWith("." + e); });
+      }
+      function showError(msg) {
+        var el = document.getElementById("player-error");
+        var ld = document.getElementById("player-loading");
+        if (ld) ld.style.display = "none";
+        if (el) { el.textContent = msg; el.style.display = "block"; }
+      }
+      function boot() {
+        var params = new URLSearchParams(location.search);
+        var id = params.get("id");
+        var role = params.get("role") || "student";
+        var titleParam = params.get("title");
+        if (!id || !/^\d+$/.test(id)) {
+          showError("No recording ID in URL.");
+          return;
+        }
+        var api = window.EAP_RECORDED_LESSONS;
+        if (!api) { showError("Player not ready — please reload."); return; }
+        var streamUrl = role === "teacher"
+          ? api.teacherStreamUrl(Number(id))
+          : api.studentStreamUrl(Number(id));
+        var titleEl = document.getElementById("player-title");
+        var loading = document.getElementById("player-loading");
+        if (loading) loading.style.display = "none";
+        if (titleEl && titleParam) {
+          titleEl.textContent = decodeURIComponent(titleParam);
+          document.title = decodeURIComponent(titleParam) + " — EAP Platform";
+        }
+        var ext = streamUrl.split("?")[0].split(".").pop().toLowerCase();
+        var audioExts = AUDIO_EXTS;
+        if (audioExts.includes(ext)) {
+          var cover = document.getElementById("player-audio-cover");
+          var audioEl = document.getElementById("player-media-audio");
+          var audioName = document.getElementById("player-audio-name");
+          if (cover) cover.style.display = "flex";
+          if (audioName && titleParam) audioName.textContent = decodeURIComponent(titleParam);
+          if (audioEl) {
+            audioEl.src = streamUrl;
+            audioEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+          }
+        } else {
+          var videoEl = document.getElementById("player-media-video");
+          if (videoEl) {
+            videoEl.style.display = "block";
+            videoEl.src = streamUrl;
+            videoEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+          }
+        }
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+      } else {
+        boot();
+      }
+    })();
+    </script>
+  </body>
+</html>

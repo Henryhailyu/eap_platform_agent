@@ -25,9 +25,138 @@
   color: var(--color-text-muted, #5c6470);
 }
 
+/* Month navigation */
+.srec-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  flex-wrap: wrap;
+}
+.srec-month-nav__label {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.srec-month-nav__btn {
+  font-size: 0.875rem;
+  padding: 0.4rem 0.9rem;
+}
+.srec-month-nav__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Date groups */
 .srec-list {
-  display: grid;
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.srec-date-group {
+  border-radius: 12px;
+  overflow: hidden;
+}
+.srec-date-details {
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--color-border, #e2e6eb);
+  border-radius: 12px;
+}
+.srec-date-details__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.srec-date-details__summary::-webkit-details-marker { display: none; }
+.srec-date-details__summary::before {
+  content: "▶";
+  font-size: 0.7rem;
+  color: var(--color-text-muted, #5c6470);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.srec-date-details[open] > .srec-date-details__summary::before {
+  transform: rotate(90deg);
+}
+.srec-date-details__date {
+  font-weight: 600;
+  font-size: 1rem;
+  flex: 1;
+}
+.srec-date-details__count {
+  font-size: 0.82rem;
+  color: var(--color-text-muted, #5c6470);
+  background: var(--color-bg-subtle, #f3f4f6);
+  padding: 0.2rem 0.65rem;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.srec-date-details__body {
+  padding: 0 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-top: 1px solid var(--color-border, #e2e6eb);
+}
+
+/* Individual lesson card */
+.srec-lesson-card {
+  padding: 0.9rem 1rem;
+  background: var(--color-bg-subtle, #f9fafb);
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #e2e6eb);
+}
+.srec-lesson-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.7rem;
+}
+.srec-lesson-card__icon {
+  font-size: 1.35rem;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.srec-lesson-card__title {
+  margin: 0 0 0.15rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.srec-lesson-card__meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted, #5c6470);
+}
+.srec-lesson-card__player {
+  margin-bottom: 0.65rem;
+}
+.srec-lesson-card__player video,
+.srec-lesson-card__player audio {
+  width: 100%;
+  border-radius: 8px;
+  background: #000;
+  display: block;
+  max-height: min(52vh, 400px);
+}
+.srec-lesson-card__player audio {
+  background: #fff;
+  max-height: unset;
+}
+.srec-lesson-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.srec-lesson-card__fs-btn {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
 }
 
 .srec-card {

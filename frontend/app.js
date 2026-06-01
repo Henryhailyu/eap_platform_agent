@@ -544,7 +544,7 @@ const RECORDED_LESSON_CATEGORY = "Recorded lesson";
 const teacherCategoryDrafts = {};
 let teacherCreateContextKey = "";
 /** Bump when create-form draft logic changes (cache-bust + deploy verification). */
-const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260531-upload-xhr-abs";
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260601-student-ux";
 
 const RECORDED_AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
 
@@ -2437,11 +2437,28 @@ function appendTaskRecordedLessonBlock(parent, task, role) {
   const recordings = taskRecordedLessonEntries(task);
   if (!recordings.length) return;
 
+  const api = window.EAP_RECORDED_LESSONS;
+
   recordings.forEach((rec) => {
     if (role === "student" && rec.visibility && rec.visibility !== "published") return;
     const player = buildInlineRecordedVideoBlock(rec, role);
     if (player) parent.appendChild(player);
+
+    if (role === "student" && rec.id != null) {
+      const fsWrap = document.createElement("div");
+      fsWrap.className = "eap-inline-recording__actions";
+      const fsBtn = document.createElement("a");
+      fsBtn.className = "btn-secondary eap-inline-recording__fullscreen-btn";
+      const titleEnc = encodeURIComponent(rec.title || rec.file_name || "");
+      fsBtn.href = `player.html?id=${rec.id}&role=student&title=${titleEnc}`;
+      fsBtn.target = "_blank";
+      fsBtn.rel = "noopener noreferrer";
+      fsBtn.textContent = t("eap_inline_open_fullscreen");
+      fsWrap.appendChild(fsBtn);
+      parent.appendChild(fsWrap);
+    }
   });
+
   const rec = recordings[0];
   if (!rec || rec.id == null) return;
 
@@ -9558,9 +9575,15 @@ function initStudentPage() {
     }
   });
 
-  if (progressOpenArchiveBtn && archiveSectionEl) {
+  if (progressOpenArchiveBtn) {
     progressOpenArchiveBtn.addEventListener("click", () => {
-      archiveSectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      const detailsEl = document.getElementById("student-learning-archive-details");
+      if (detailsEl) {
+        detailsEl.open = true;
+        detailsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (archiveSectionEl) {
+        archiveSectionEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
   }
 
