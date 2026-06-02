@@ -628,6 +628,12 @@ window.EAP_STRINGS_EN = {
   "eap_ai_busy_plan": "AI generating plan…",
   "eap_ai_busy_html": "AI generating HTML…",
   "eap_saved_at": "Saved {when}",
+  "eap_btn_saving": "Saving…",
+  "eap_btn_saved": "Saved",
+  "eap_btn_uploading": "Uploading…",
+  "tla_load_meta_only_hint": "Title and notes loaded. Use Open to view the saved HTML in a new tab.",
+  "tla_preview_empty":
+    "Generate a lesson to see the HTML preview here. Saved pages open in a new tab via Open — not in this preview.",
   "tlp_json_toggle": "Edit plan JSON (advanced)",
   "tlp_save_plan_btn": "Save approved plan",
   "tlp_objectives_heading": "Objectives",

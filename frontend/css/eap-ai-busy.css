@@ -63,3 +63,28 @@
 .tlp-plan-view.eap-ai-target--busy {
   min-height: 6rem;
 }
+
+/* Save / upload buttons */
+.eap-btn--saving,
+.eap-btn--saved {
+  pointer-events: none;
+}
+
+.eap-btn--saved {
+  opacity: 0.92;
+  background: #e8f5e9 !important;
+  border-color: rgba(46, 125, 50, 0.35) !important;
+  color: #2e7d32 !important;
+}
+
+.eap-save-btn__spinner {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-right: 0.4rem;
+  vertical-align: -0.12em;
+  border: 2px solid rgba(10, 77, 104, 0.2);
+  border-top-color: #0a4d68;
+  border-radius: 50%;
+  animation: eap-ai-spin 0.75s linear infinite;
+}

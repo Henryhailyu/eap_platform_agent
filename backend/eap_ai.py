@@ -6,7 +6,9 @@ Never import or log API keys in this module.
 """
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Any
 
 from eap_config import config
@@ -120,6 +122,33 @@ _HUNYUAN_MODEL_FALLBACKS = (
     "hunyuan-turbo-latest",
     "hunyuan-turbo",
 )
+
+
+def parse_ai_json_object(raw: str) -> dict[str, Any]:
+    """Parse model JSON output; tolerate markdown fences and minor syntax issues."""
+    text = str(raw or "").strip()
+    if not text:
+        raise ValueError("empty AI response")
+    text = re.sub(r"^```(?:json)?\s*|\s*```\s*$", "", text, flags=re.IGNORECASE | re.MULTILINE).strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    candidates: list[str] = []
+    if start >= 0 and end > start:
+        candidates.append(text[start : end + 1])
+    candidates.append(text)
+    last_exc: json.JSONDecodeError | None = None
+    for candidate in candidates:
+        cleaned = re.sub(r",\s*}", "}", candidate)
+        cleaned = re.sub(r",\s*]", "]", cleaned)
+        for attempt in (candidate, cleaned):
+            try:
+                data = json.loads(attempt)
+            except json.JSONDecodeError as exc:
+                last_exc = exc
+                continue
+            if isinstance(data, dict):
+                return data
+    raise RuntimeError("AI returned invalid JSON") from last_exc
 
 
 def format_ai_error(exc: Exception) -> str:

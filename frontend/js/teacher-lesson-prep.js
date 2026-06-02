@@ -58,6 +58,20 @@
     return fn();
   }
 
+  function runSave(btn, fn) {
+    if (typeof global.EAP_runSaveButton === "function") {
+      return global.EAP_runSaveButton(btn, fn);
+    }
+    return fn();
+  }
+
+  function runUpload(btn, fn) {
+    if (typeof global.EAP_runUploadButton === "function") {
+      return global.EAP_runUploadButton(btn, fn);
+    }
+    return fn();
+  }
+
   function setPlanEphemeralNote(show) {
     const note = document.getElementById("tlp-plan-ephemeral-note");
     if (note) note.classList.toggle("hidden", !show);
@@ -122,27 +136,13 @@
     const topic = document.getElementById("tla-topic");
     if (topic && pack.title && !topic.value.trim()) topic.value = pack.title;
     teachingPageId = pack.teaching_page_id || null;
-    if (pack.has_html && teachingPageId) void loadPackHtmlIntoMainPreview(teachingPageId, pack);
+    clearMainLessonPreview();
     updateLiveLink(pack);
   }
 
-  async function loadPackHtmlIntoMainPreview(pageId, pack) {
-    const prepApi = api();
-    if (!prepApi || !pageId) return;
-    try {
-      const res = await fetch(prepApi.pageViewUrl(pageId), {
-        credentials: "include",
-        headers: typeof global.EAP_getAuthHeaders === "function" ? global.EAP_getAuthHeaders() : {},
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const html = await res.text();
-      applyHtmlToMainPreview(html, {
-        pageId,
-        title: pack?.title || "",
-        className: pack?.class_name || meta?.pilot_class || "EAP047",
-      });
-    } catch (_) {
-      /* preview optional on load */
+  function clearMainLessonPreview() {
+    if (global.EAP_TEACHER_LESSON_AI && typeof global.EAP_TEACHER_LESSON_AI.clearMainPreview === "function") {
+      global.EAP_TEACHER_LESSON_AI.clearMainPreview();
     }
   }
 
@@ -340,34 +340,43 @@
       void loadPack(parseInt(val, 10));
     });
 
-    document.getElementById("tlp-save-pack-btn")?.addEventListener("click", async () => {
-      setStatus(statusEl, t("tlp_saving"), false);
-      try {
-        await ensurePack(statusEl);
-        setStatus(statusEl, t("tlp_saved_pack"), false);
-      } catch (err) {
-        setStatus(statusEl, (err && err.message) || t("tlp_save_failed"), true);
-      }
+    const savePackBtn = document.getElementById("tlp-save-pack-btn");
+    savePackBtn?.addEventListener("click", () => {
+      void runSave(savePackBtn, async () => {
+        setStatus(statusEl, "", false);
+        try {
+          await ensurePack(statusEl);
+          setStatus(statusEl, t("tlp_saved_pack"), false);
+        } catch (err) {
+          if (typeof global.EAP_resetSaveButton === "function") global.EAP_resetSaveButton(savePackBtn);
+          setStatus(statusEl, (err && err.message) || t("tlp_save_failed"), true);
+          throw err;
+        }
+      }).catch(() => {});
     });
 
     document.getElementById("tlp-upload-btn")?.addEventListener("click", () => {
       document.getElementById("tlp-file-input")?.click();
     });
 
-    document.getElementById("tlp-file-input")?.addEventListener("change", async (ev) => {
+    const uploadBtn = document.getElementById("tlp-upload-btn");
+    document.getElementById("tlp-file-input")?.addEventListener("change", (ev) => {
       const files = Array.from(ev.target.files || []);
       ev.target.value = "";
       if (!files.length) return;
-      setStatus(statusEl, t("tlp_uploading"), false);
-      try {
-        const id = await ensurePack(statusEl);
-        await prepApi.uploadPackFiles(id, files, true);
-        const pack = await prepApi.getPack(id);
-        renderPackFiles(pack.files || []);
-        setStatus(statusEl, t("tlp_uploaded", { count: files.length }), false);
-      } catch (err) {
-        setStatus(statusEl, (err && err.message) || t("tlp_upload_failed"), true);
-      }
+      void runUpload(uploadBtn, async () => {
+        setStatus(statusEl, t("tlp_uploading"), false);
+        try {
+          const id = await ensurePack(statusEl);
+          await prepApi.uploadPackFiles(id, files, true);
+          const pack = await prepApi.getPack(id);
+          renderPackFiles(pack.files || []);
+          setStatus(statusEl, t("tlp_uploaded", { count: files.length }), false);
+        } catch (err) {
+          setStatus(statusEl, (err && err.message) || t("tlp_upload_failed"), true);
+          throw err;
+        }
+      }).catch(() => {});
     });
 
     const planBtn = document.getElementById("tlp-generate-plan-btn");
@@ -431,8 +440,6 @@
             className: result.pack?.class_name || meta?.pilot_class,
           });
           document.getElementById("tla-preview-frame")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        } else if (teachingPageId) {
-          await loadPackHtmlIntoMainPreview(teachingPageId, result.pack);
         }
         if (result.pack) updateLiveLink(result.pack);
         setStatus(statusEl, t("tlp_html_generated_ok"), false);

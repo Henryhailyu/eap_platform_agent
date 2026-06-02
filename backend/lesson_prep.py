@@ -58,6 +58,7 @@ WRITING_PLAN_SYSTEM_PROMPT = (
     '    "live_tool" (poll|quiz|game), "live_game" (quiz-battle|board-race|matching-race|vocab-bingo|treasure-hunt),\n'
     '    "description", "question_sketch", "options" (array of 2–4 option strings)\n'
     '- "notes_for_teacher": string (2–4 sentences: pacing, differentiation, common errors)\n'
+    "\nOutput rules: return exactly ONE JSON object. No markdown fences, no commentary before or after.\n"
 )
 
 WRITING_HTML_FROM_PLAN_EXTRA = (
@@ -445,35 +446,77 @@ def _upsert_teaching_page_for_pack(
     return int(cur.lastrowid)
 
 
+def _normalize_writing_plan(plan: dict, pack: dict) -> dict:
+    """Fill required keys when the model omits optional fields."""
+    out = dict(plan) if isinstance(plan, dict) else {}
+    if not str(out.get("title") or "").strip():
+        out["title"] = str(pack.get("title") or "Writing lesson")
+    segments = out.get("segments")
+    if not isinstance(segments, list):
+        segments = []
+    fixed_segments = []
+    for i, seg in enumerate(segments):
+        if not isinstance(seg, dict):
+            continue
+        row = dict(seg)
+        if not str(row.get("title") or "").strip():
+            row["title"] = f"Segment {i + 1}"
+        if row.get("minutes") is None:
+            row["minutes"] = 10
+        fixed_segments.append(row)
+    out["segments"] = fixed_segments
+    if not isinstance(out.get("objectives"), list):
+        out["objectives"] = []
+    if not isinstance(out.get("interaction_slots"), list):
+        out["interaction_slots"] = []
+    return out
+
+
 def generate_writing_lesson_plan(
     pack: dict, materials: str, *, file_manifest: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
-    from eap_ai import create_chat_completion, get_openai_client
+    from eap_ai import create_chat_completion, get_openai_client, parse_ai_json_object
 
     client, profile = get_openai_client()
     user_prompt = build_plan_user_prompt(pack, materials, file_manifest=file_manifest)
-    response = create_chat_completion(
-        client,
-        profile,
-        messages=[
-            {"role": "system", "content": WRITING_PLAN_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        max_tokens=2800,
-        temperature=0.4,
-        response_format={"type": "json_object"},
-    )
-    raw = ""
-    if response.choices:
-        raw = (response.choices[0].message.content or "").strip()
-    if not raw:
-        raise RuntimeError("Empty AI response")
-    try:
-        plan = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("AI returned invalid JSON") from exc
-    if not isinstance(plan.get("segments"), list) or not plan["segments"]:
-        raise RuntimeError("AI plan missing segments")
+    plan: dict | None = None
+    last_err: Exception | None = None
+    for attempt in range(2):
+        extra = ""
+        if attempt > 0:
+            extra = (
+                "\n\nYour previous reply was not valid JSON. "
+                "Reply again with ONLY one JSON object matching the schema. No markdown."
+            )
+        response = create_chat_completion(
+            client,
+            profile,
+            messages=[
+                {"role": "system", "content": WRITING_PLAN_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt + extra},
+            ],
+            max_tokens=3200,
+            temperature=0.35 if attempt == 0 else 0.2,
+            response_format={"type": "json_object"},
+        )
+        raw = ""
+        if response.choices:
+            raw = (response.choices[0].message.content or "").strip()
+        if not raw:
+            last_err = RuntimeError("Empty AI response")
+            continue
+        try:
+            plan = _normalize_writing_plan(parse_ai_json_object(raw), pack)
+        except RuntimeError as exc:
+            last_err = exc
+            continue
+        if not plan.get("segments"):
+            last_err = RuntimeError("AI plan missing segments")
+            plan = None
+            continue
+        break
+    if plan is None:
+        raise last_err or RuntimeError("AI plan generation failed")
     return {
         "plan": plan,
         "provider": profile["id"],

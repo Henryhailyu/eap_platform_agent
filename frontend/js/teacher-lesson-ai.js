@@ -203,12 +203,20 @@
 
   async function handleSourceFilePick(fileList) {
     const api = API();
+    const uploadBtn = document.getElementById("tla-source-upload-btn");
     if (!api || !fileList || !fileList.length) return;
-    setSourceFilesStatus(t("tla_source_uploading"), false);
-    try {
+    const work = async () => {
+      setSourceFilesStatus(t("tla_source_uploading"), false);
       const uploaded = await api.uploadSourceFiles(fileList);
       await refreshSourceFiles();
       setSourceFilesStatus(t("tla_source_uploaded_staged", { count: uploaded.length }), false);
+    };
+    try {
+      if (uploadBtn && typeof global.EAP_runUploadButton === "function") {
+        await global.EAP_runUploadButton(uploadBtn, work);
+      } else {
+        await work();
+      }
     } catch (err) {
       setSourceFilesStatus((err && err.message) || t("tla_source_upload_failed"), true);
     }
@@ -365,14 +373,10 @@
       container.querySelectorAll("[data-load]").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const page = await api.getPage(btn.getAttribute("data-load"));
-          draftHtml = page.html_content;
-          if (typeof global.EAP_polishLessonHtml === "function") {
-            draftHtml = global.EAP_polishLessonHtml(draftHtml);
-          }
           draftTopic = page.topic || page.title;
           draftSource = page.source_text || "";
           draftTemplateKey = page.template_key || "standard";
-          setPreviewHtml(draftHtml);
+          lastSavedPageId = page.id;
           const topicEl = document.getElementById("tla-topic");
           const sourceEl = document.getElementById("tla-source");
           const titleEl = document.getElementById("tla-title");
@@ -383,6 +387,12 @@
           if (titleEl) titleEl.value = page.title;
           if (classEl && page.class_name) classEl.value = page.class_name;
           if (templateEl) templateEl.value = draftTemplateKey;
+          clearMainPreview();
+          setStatus(
+            document.getElementById("tla-status"),
+            t("tla_load_meta_only_hint"),
+            false,
+          );
           if (typeof onSelect === "function") onSelect(page);
         });
       });
@@ -593,7 +603,8 @@
       void runGenerate(statusEl, false);
     });
 
-    document.getElementById("tla-save-btn")?.addEventListener("click", async () => {
+    const saveLibBtn = document.getElementById("tla-save-btn");
+    saveLibBtn?.addEventListener("click", () => {
       const api = API();
       if (!api || !draftHtml) {
         setStatus(statusEl, t("tla_save_no_preview"), true);
@@ -604,8 +615,8 @@
         setStatus(statusEl, t("tla_title_required"), true);
         return;
       }
-      setStatus(statusEl, t("tla_saving"), false);
-      try {
+      const work = async () => {
+        setStatus(statusEl, t("tla_saving"), false);
         const saved = await api.savePage({
           title,
           topic: draftTopic || title,
@@ -618,8 +629,15 @@
         lastSavedPageId = saved?.id || lastSavedPageId;
         setStatus(statusEl, t("tla_saved_ok"), false);
         await refreshSavedList(savedEl);
-      } catch (err) {
-        setStatus(statusEl, (err && err.message) || t("tla_save_failed"), true);
+      };
+      if (typeof global.EAP_runSaveButton === "function") {
+        void global.EAP_runSaveButton(saveLibBtn, work).catch((err) => {
+          setStatus(statusEl, (err && err.message) || t("tla_save_failed"), true);
+        });
+      } else {
+        void work().catch((err) => {
+          setStatus(statusEl, (err && err.message) || t("tla_save_failed"), true);
+        });
       }
     });
 
@@ -698,7 +716,14 @@
       }
     });
 
+    clearMainPreview();
+
     if (global.EAP_I18N) global.EAP_I18N.applyStatic();
+  }
+
+  function clearMainPreview() {
+    draftHtml = "";
+    setPreviewHtml("");
   }
 
   function applyPackGeneratedHtml(opts) {
@@ -730,6 +755,7 @@
     presentHtmlInCanvas,
     pushDraftToClass,
     applyPackGeneratedHtml,
+    clearMainPreview,
     setPreviewHtml,
     setAiAvailable(flag) {
       aiAvailable = !!flag;

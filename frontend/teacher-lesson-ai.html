@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="css/teacher-live.css" />
     <link rel="stylesheet" href="css/teacher-lesson-ai.css?v=20260602-ux3" />
-    <link rel="stylesheet" href="css/eap-ai-busy.css?v=20260602-ux3" />
+    <link rel="stylesheet" href="css/eap-ai-busy.css?v=20260602-ux4" />
   </head>
   <body class="page-app eap-shell-active" data-page="teacher-lesson-ai">
     <div id="page-shell" class="page-shell">
@@ -93,7 +93,15 @@
                   <input id="tlp-ielts" type="text" maxlength="64" placeholder="e.g. 5.5 writing support" />
                 </div>
                 <div class="tla-actions">
-                  <button type="button" class="btn-secondary" id="tlp-save-pack-btn" data-i18n="tlp_save_pack_btn">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    id="tlp-save-pack-btn"
+                    data-eap-default-label="Save pack"
+                    data-eap-saving-key="eap_btn_saving"
+                    data-eap-saved-key="eap_btn_saved"
+                    data-i18n="tlp_save_pack_btn"
+                  >
                     Save pack
                   </button>
                   <button
@@ -115,7 +123,15 @@
                     PDF, DOCX, or TXT — save pack first, then upload. AI uses all files together; remove mistakes with Delete.
                   </p>
                   <input id="tlp-file-input" type="file" class="hidden" multiple accept=".pdf,.docx,.txt,application/pdf,text/plain" />
-                  <button type="button" class="btn-secondary" id="tlp-upload-btn" data-i18n="tlp_upload_btn">Upload to pack</button>
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    id="tlp-upload-btn"
+                    data-eap-saving-key="eap_btn_uploading"
+                    data-i18n="tlp_upload_btn"
+                  >
+                    Upload to pack
+                  </button>
                   <ul id="tlp-file-list" class="tla-source-file-list tlp-file-list" aria-live="polite"></ul>
                 </div>
               </div>
@@ -185,7 +201,15 @@
                 <span class="tla-source-upload__label" data-i18n="tla_source_files_label">Source files (upload)</span>
                 <p class="tla-source-upload__hint" data-i18n="tla_source_files_hint">Upload PDF, Word (.docx), or TXT. Review each file, delete mistakes, then confirm for AI.</p>
                 <input id="tla-source-file-input" type="file" class="hidden" multiple accept=".pdf,.docx,.txt,application/pdf,text/plain" />
-                <button type="button" class="btn-secondary" id="tla-source-upload-btn" data-i18n="tla_source_upload_btn">Upload files</button>
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  id="tla-source-upload-btn"
+                  data-eap-saving-key="eap_btn_uploading"
+                  data-i18n="tla_source_upload_btn"
+                >
+                  Upload files
+                </button>
                 <ul id="tla-source-file-list" class="tla-source-file-list" aria-live="polite"></ul>
                 <button type="button" class="btn-secondary hidden" id="tla-source-confirm-btn" data-i18n="tla_source_confirm_btn">Confirm sources for AI</button>
                 <p id="tla-source-files-status" class="tla-status hidden" role="status"></p>
@@ -228,7 +252,16 @@
                 >
                   Generate HTML lesson
                 </button>
-                <button type="button" class="btn-secondary" id="tla-save-btn" data-i18n="tla_save_btn">Save to library</button>
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  id="tla-save-btn"
+                  data-eap-saving-key="eap_btn_saving"
+                  data-eap-saved-key="eap_btn_saved"
+                  data-i18n="tla_save_btn"
+                >
+                  Save to library
+                </button>
                 <button type="button" class="btn-secondary" id="tla-present-btn" data-i18n="tla_present_btn">Open preview tab</button>
                 <button type="button" class="btn-secondary" id="tla-push-class-btn" data-i18n="tla_push_class">Push to classroom</button>
               </div>
@@ -237,7 +270,9 @@
 
             <section class="tla-panel tla-preview-wrap" aria-labelledby="tla-preview-heading">
               <h2 id="tla-preview-heading" class="tla-panel__title" data-i18n="tla_preview_title">Preview</h2>
-              <p id="tla-preview-empty" class="tla-preview-empty" data-i18n="tla_preview_empty">Generate a lesson to see the HTML preview here.</p>
+              <p id="tla-preview-empty" class="tla-preview-empty" data-i18n="tla_preview_empty">
+                Generate a lesson to see the HTML preview here. Saved pages open in a new tab via Open — not in this preview.
+              </p>
               <iframe
                 id="tla-preview-frame"
                 class="tla-preview-frame hidden"
@@ -261,15 +296,16 @@
     <script src="api-config.js"></script>
     <script src="app.js"></script>
     <script src="js/eap-saved-datetime.js?v=20260602-ux3"></script>
-    <script src="js/eap-ai-busy.js?v=20260602-ux3"></script>
+    <script src="js/eap-ai-busy.js?v=20260602-ux4"></script>
+    <script src="js/eap-button-state.js?v=20260602-ux4"></script>
     <script src="js/teacher-teaching-pages-api.js?v=20260602-ai-detail"></script>
     <script src="js/eap-live-lesson-slots.js?v=20260602-uat1"></script>
     <script src="js/teacher-lesson-prep-api.js?v=20260602-uat2"></script>
-    <script src="js/teacher-lesson-prep.js?v=20260602-ux3"></script>
+    <script src="js/teacher-lesson-prep.js?v=20260602-ux4"></script>
     <script src="js/live-teaching-api.js"></script>
     <script src="js/eap-html-bridge.js"></script>
     <script src="js/eap-file-viewer.js"></script>
     <script src="js/classroom-display-api.js"></script>
-    <script src="js/teacher-lesson-ai.js?v=20260602-ux3"></script>
+    <script src="js/teacher-lesson-ai.js?v=20260602-ux4"></script>
   </body>
 </html>
