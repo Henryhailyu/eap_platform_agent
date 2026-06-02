@@ -78,33 +78,43 @@
     const topic = document.getElementById("tla-topic");
     if (topic && pack.title && !topic.value.trim()) topic.value = pack.title;
     teachingPageId = pack.teaching_page_id || null;
-    if (pack.has_html && teachingPageId) void loadHtmlPreview(teachingPageId);
-    else hideHtmlPreview();
+    if (pack.has_html && teachingPageId) void loadPackHtmlIntoMainPreview(teachingPageId, pack);
     updateLiveLink(pack);
   }
 
-  function hideHtmlPreview() {
-    const frame = document.getElementById("tlp-html-frame");
-    if (frame) {
-      frame.classList.add("hidden");
-      frame.srcdoc = "";
-    }
-  }
-
-  async function loadHtmlPreview(pageId) {
+  async function loadPackHtmlIntoMainPreview(pageId, pack) {
     const prepApi = api();
-    const frame = document.getElementById("tlp-html-frame");
-    if (!prepApi || !frame || !pageId) return;
+    if (!prepApi || !pageId) return;
     try {
       const res = await fetch(prepApi.pageViewUrl(pageId), {
         credentials: "include",
         headers: typeof global.EAP_getAuthHeaders === "function" ? global.EAP_getAuthHeaders() : {},
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      frame.srcdoc = await res.text();
-      frame.classList.remove("hidden");
+      const html = await res.text();
+      applyHtmlToMainPreview(html, {
+        pageId,
+        title: pack?.title || "",
+        className: pack?.class_name || meta?.pilot_class || "EAP047",
+      });
     } catch (_) {
-      hideHtmlPreview();
+      /* preview optional on load */
+    }
+  }
+
+  function applyHtmlToMainPreview(html, opts) {
+    if (!html) return;
+    if (global.EAP_TEACHER_LESSON_AI && typeof global.EAP_TEACHER_LESSON_AI.applyPackGeneratedHtml === "function") {
+      global.EAP_TEACHER_LESSON_AI.applyPackGeneratedHtml({
+        html,
+        pageId: opts?.pageId || teachingPageId,
+        title: opts?.title || (document.getElementById("tlp-title")?.value || "").trim(),
+        className: opts?.className || meta?.pilot_class || "EAP047",
+      });
+      return;
+    }
+    if (typeof global.EAP_syncLessonSlotsFromHtml === "function") {
+      global.EAP_syncLessonSlotsFromHtml(html);
     }
   }
 
@@ -169,12 +179,41 @@
       return;
     }
     list.innerHTML = files
-      .map((f) => {
+      .map((f, idx) => {
         const status = f.extract_status === "ok" ? t("tlp_file_ok") : t("tlp_file_failed");
         const err = f.extract_error ? ` — ${escapeHtml(f.extract_error)}` : "";
-        return `<li><span>${escapeHtml(f.original_name)}</span> <span class="tlp-file-meta">${escapeHtml(status)} (${f.char_count || 0} chars)${err}</span></li>`;
+        return `<li class="tla-source-file-list__item tlp-file-row" data-file-id="${f.id}">
+          <span class="tlp-file-row__index" aria-hidden="true">${idx + 1}.</span>
+          <span class="tla-source-file-list__name">${escapeHtml(f.original_name)}</span>
+          <span class="tlp-file-meta">${escapeHtml(status)} (${f.char_count || 0} chars)${err}</span>
+          <button type="button" class="btn-secondary btn-small tlp-file-delete-btn" data-tlp-delete-file="${f.id}" aria-label="${escapeHtml(t("tlp_file_delete_btn"))}">${escapeHtml(t("tlp_file_delete_btn"))}</button>
+        </li>`;
       })
       .join("");
+    list.querySelectorAll("[data-tlp-delete-file]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        void deletePackFile(parseInt(btn.getAttribute("data-tlp-delete-file"), 10));
+      });
+    });
+  }
+
+  async function deletePackFile(fileId) {
+    const prepApi = api();
+    const statusEl = document.getElementById("tlp-status");
+    if (!prepApi || !packId || !fileId) {
+      setStatus(statusEl, t("tlp_save_pack_first"), true);
+      return;
+    }
+    if (!global.confirm(t("tlp_file_delete_confirm"))) return;
+    setStatus(statusEl, t("tlp_file_deleting"), false);
+    try {
+      await prepApi.deletePackFile(packId, fileId);
+      const pack = await prepApi.getPack(packId);
+      renderPackFiles(pack.files || []);
+      setStatus(statusEl, t("tlp_file_deleted"), false);
+    } catch (err) {
+      setStatus(statusEl, (err && err.message) || t("tlp_file_delete_failed"), true);
+    }
   }
 
   async function refreshPackSelect(selectedId) {
@@ -246,7 +285,6 @@
         document.getElementById("tlp-pack-id-label").textContent = "—";
         renderPlan(null);
         renderPackFiles([]);
-        hideHtmlPreview();
         return;
       }
       void loadPack(parseInt(val, 10));
@@ -328,14 +366,16 @@
         });
         const result = await prepApi.generateHtml(id);
         teachingPageId = result.page?.id || result.pack?.teaching_page_id || teachingPageId;
-        if (result.html) {
-          const frame = document.getElementById("tlp-html-frame");
-          if (frame) {
-            frame.srcdoc = result.html;
-            frame.classList.remove("hidden");
-          }
+        const html = result.html || "";
+        if (html) {
+          applyHtmlToMainPreview(html, {
+            pageId: teachingPageId,
+            title: result.page?.title || result.pack?.title,
+            className: result.pack?.class_name || meta?.pilot_class,
+          });
+          document.getElementById("tla-preview-frame")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         } else if (teachingPageId) {
-          await loadHtmlPreview(teachingPageId);
+          await loadPackHtmlIntoMainPreview(teachingPageId, result.pack);
         }
         if (result.pack) updateLiveLink(result.pack);
         setStatus(statusEl, t("tlp_html_generated_ok"), false);

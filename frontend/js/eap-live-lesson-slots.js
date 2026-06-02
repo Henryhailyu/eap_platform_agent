@@ -178,7 +178,54 @@
       }
     });
 
+    const meta = parseLessonMetaFromHtml(text);
+    (meta.interaction_slots || []).forEach((row, i) => {
+      const tool = normalizeTool(row.live_tool || row.activity_type);
+      if (tool !== "poll" && tool !== "quiz") return;
+      const opts = Array.isArray(row.options) ? row.options.map((o) => String(o).trim()).filter(Boolean) : [];
+      const question = String(row.question_sketch || row.description || "").trim();
+      if (!question && !opts.length) return;
+      const id = `plan-${tool}-${i}`;
+      if (seen.has(id)) return;
+      seen.add(id);
+      let segmentIndex = null;
+      if (row.segment_index != null && String(row.segment_index).trim() !== "") {
+        const n = parseInt(String(row.segment_index), 10);
+        if (!Number.isNaN(n)) segmentIndex = n;
+      }
+      slots.push({
+        id,
+        tool,
+        gameId: "",
+        segmentIndex,
+        label: question.slice(0, 80),
+        textEn: question,
+        textZh: question,
+        optionsEn: opts.length ? opts : ["Agree", "Disagree", "Not sure"],
+        optionsZh: opts.length ? opts : ["Agree", "Disagree", "Not sure"],
+        correctIndex: 0,
+        source: "plan-meta",
+      });
+    });
+
     return slots;
+  }
+
+  function syncLessonSlotsFromHtml(html) {
+    const text = String(html || "");
+    if (!text) return;
+    if (typeof global.EAP_parseLessonMetaFromHtml === "function") {
+      const meta = global.EAP_parseLessonMetaFromHtml(text);
+      global.__tliveLessonPlanSegments = meta.segments || [];
+    }
+    if (typeof global.EAP_parseLiveLessonSlots === "function") {
+      global.__tliveLessonSlots = global.EAP_parseLiveLessonSlots(text);
+    }
+    try {
+      global.sessionStorage?.setItem("eap_last_lesson_html", text);
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   function slotToQuestion(slot) {
@@ -229,4 +276,5 @@
   global.EAP_slotsForTool = slotsForTool;
   global.EAP_gameSlotsPhase1 = gameSlotsPhase1;
   global.EAP_liveSlotLabel = slotLabel;
+  global.EAP_syncLessonSlotsFromHtml = syncLessonSlotsFromHtml;
 })(typeof window !== "undefined" ? window : globalThis);

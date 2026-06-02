@@ -51,6 +51,7 @@ WRITING_PLAN_SYSTEM_PROMPT = (
     '    "title", "minutes" (integer), "teacher_action", "student_action", '
     '    "materials_ref" (optional string referencing uploaded materials)\n'
     '  Segments must sum to the requested class duration in minutes.\n'
+    "- When multiple pack files are provided, integrate content from ALL of them (not just one).\n"
     '- "homework_sketch": string (brief follow-up homework idea)\n'
     '- "interaction_slots": array of objects with:\n'
     '    "segment_title", "segment_index" (0-based), "activity_type" (poll|quiz|game|discussion),\n'
@@ -206,20 +207,50 @@ def assert_pilot_class(class_name: str) -> str | None:
     return None
 
 
+def collect_pack_file_manifest(conn, pack_id: int) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT id, original_name, extract_status, char_count, use_in_ai
+        FROM lesson_prep_pack_files
+        WHERE pack_id = ?
+        ORDER BY id ASC
+        """,
+        (pack_id,),
+    ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "original_name": row["original_name"],
+            "extract_status": row["extract_status"],
+            "char_count": row["char_count"] or 0,
+            "use_in_ai": bool(row["use_in_ai"]),
+        }
+        for row in rows
+    ]
+
+
 def collect_materials_text(conn, pack_id: int) -> str:
     rows = conn.execute(
         """
-        SELECT extracted_text FROM lesson_prep_pack_files
+        SELECT original_name, extracted_text FROM lesson_prep_pack_files
         WHERE pack_id = ? AND use_in_ai = 1 AND extract_status = 'ok'
         ORDER BY id ASC
         """,
         (pack_id,),
     ).fetchall()
-    blocks = [r["extracted_text"] or "" for r in rows]
+    blocks = []
+    for row in rows:
+        text = (row["extracted_text"] or "").strip()
+        if not text:
+            continue
+        name = (row["original_name"] or "material").strip()
+        blocks.append(f"=== File: {name} ===\n{text}")
     return merge_source_text("", blocks, MAX_MATERIALS_FOR_AI)
 
 
-def build_plan_user_prompt(pack: dict, materials: str) -> str:
+def build_plan_user_prompt(
+    pack: dict, materials: str, *, file_manifest: list[dict[str, Any]] | None = None
+) -> str:
     style = pack.get("teaching_style") or "interactive"
     style_labels = {
         "interactive": "Interactive (pair/group tasks, discussion)",
@@ -242,10 +273,22 @@ def build_plan_user_prompt(pack: dict, materials: str) -> str:
         lines.append(f"Teacher objectives (input): {pack['objectives']}")
     if pack.get("ielts_band_target"):
         lines.append(f"IELTS / level target: {pack['ielts_band_target']}")
+    manifest = file_manifest or []
+    if manifest:
+        lines.append(
+            "\nUploaded pack files (use ALL listed files together when planning; "
+            "synthesise across readings — do not pick only one file):"
+        )
+        for i, f in enumerate(manifest, 1):
+            flag = "included in AI" if f.get("use_in_ai") and f.get("extract_status") == "ok" else "not used"
+            lines.append(
+                f"  {i}. {f.get('original_name')} — {f.get('extract_status')} "
+                f"({f.get('char_count', 0)} chars) [{flag}]"
+            )
     if materials:
-        lines.append("\n--- UPLOADED MATERIALS (excerpts) ---\n" + materials)
+        lines.append("\n--- UPLOADED MATERIALS (excerpts, all files) ---\n" + materials)
     else:
-        lines.append("\n(No uploaded materials — plan from title and objectives only.)")
+        lines.append("\n(No extracted text from pack files — plan from title and objectives only.)")
     return "\n".join(lines)
 
 
@@ -299,11 +342,13 @@ def generate_writing_lesson_html(pack: dict, plan: dict, materials: str, system_
     return result
 
 
-def generate_writing_lesson_plan(pack: dict, materials: str) -> dict[str, Any]:
+def generate_writing_lesson_plan(
+    pack: dict, materials: str, *, file_manifest: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     from eap_ai import create_chat_completion, get_openai_client
 
     client, profile = get_openai_client()
-    user_prompt = build_plan_user_prompt(pack, materials)
+    user_prompt = build_plan_user_prompt(pack, materials, file_manifest=file_manifest)
     response = create_chat_completion(
         client,
         profile,
@@ -596,6 +641,43 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
         conn.close()
         return jsonify({"files": created}), 201
 
+    @app.route(
+        "/api/teacher/lesson-prep/packs/<int:pack_id>/files/<int:file_id>",
+        methods=["DELETE"],
+    )
+    def lesson_prep_pack_file_delete(pack_id: int, file_id: int):
+        pair, err = _teacher_conn()
+        if err:
+            return err
+        conn, teacher = pair
+        row = fetch_pack(conn, pack_id, teacher)
+        if row is None:
+            conn.close()
+            return jsonify({"error": "Not found"}), 404
+
+        file_row = conn.execute(
+            "SELECT * FROM lesson_prep_pack_files WHERE id = ? AND pack_id = ?",
+            (file_id, pack_id),
+        ).fetchone()
+        if file_row is None:
+            conn.close()
+            return jsonify({"error": "File not found"}), 404
+
+        upload_dir_path = lesson_prep_upload_dir(upload_dir, pack_id)
+        delete_stored_file(upload_dir_path, file_row["stored_name"])
+        conn.execute(
+            "DELETE FROM lesson_prep_pack_files WHERE id = ? AND pack_id = ?",
+            (file_id, pack_id),
+        )
+        now = _now_iso()
+        conn.execute(
+            "UPDATE lesson_prep_packs SET updated_at = ? WHERE id = ?",
+            (now, pack_id),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "deleted_id": file_id})
+
     @app.route("/api/teacher/lesson-prep/packs/<int:pack_id>/plan", methods=["POST"])
     def lesson_prep_pack_generate_plan(pack_id: int):
         pair, err = _teacher_conn()
@@ -612,9 +694,12 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
             return jsonify({"error": "AI is not configured on this server"}), 503
 
         materials = collect_materials_text(conn, pack_id)
+        file_manifest = collect_pack_file_manifest(conn, pack_id)
         pack_dict = pack_row_to_dict(row)
         try:
-            result = generate_writing_lesson_plan(pack_dict, materials)
+            result = generate_writing_lesson_plan(
+                pack_dict, materials, file_manifest=file_manifest
+            )
         except Exception as exc:
             conn.close()
             detail = format_ai_error(exc) if format_ai_error else str(exc)

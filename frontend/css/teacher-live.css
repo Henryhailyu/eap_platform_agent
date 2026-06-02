@@ -3142,6 +3142,73 @@ body.tlive-modal-open {
   cursor: pointer;
 }
 
+.tlive-pq-slot-card {
+  margin-bottom: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  background: #fafcfd;
+}
+
+.tlive-pq-slot-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tlive-pq-slot-card__num {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0a4d68;
+  margin-bottom: 0.2rem;
+}
+
+.tlive-pq-slot-card__label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.tlive-pq-slot-card__q {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #333;
+}
+
+.tlive-pq-slot-card__opts {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.tlive-pq-ai-lead {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  color: #666;
+}
+
+.tlive-pq-manual-details {
+  margin-bottom: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem 0.65rem;
+  background: #f8fafb;
+}
+
+.tlive-pq-manual-summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0a4d68;
+  padding: 0.35rem 0;
+}
+
+.tlive-pq-manual-body {
+  padding-top: 0.5rem;
+}
+
 .tlive-pq-label {
   display: block;
   font-size: 0.8125rem;

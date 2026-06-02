@@ -9,19 +9,32 @@
   }
 
   function refreshLessonSlotsFromHtml(html) {
-    if (typeof window.EAP_parseLessonMetaFromHtml === "function") {
+    if (typeof window.EAP_syncLessonSlotsFromHtml === "function") {
+      window.EAP_syncLessonSlotsFromHtml(html);
+    } else if (typeof window.EAP_parseLessonMetaFromHtml === "function") {
       const meta = window.EAP_parseLessonMetaFromHtml(html);
       window.__tliveLessonPlanSegments = meta.segments || [];
+      window.__tliveLessonSlots =
+        typeof window.EAP_parseLiveLessonSlots === "function"
+          ? window.EAP_parseLiveLessonSlots(html)
+          : [];
     } else {
       window.__tliveLessonPlanSegments = [];
-    }
-    if (typeof window.EAP_parseLiveLessonSlots === "function") {
-      window.__tliveLessonSlots = window.EAP_parseLiveLessonSlots(html);
-    } else {
       window.__tliveLessonSlots = [];
     }
     if (window.__tliveLessonSegmentFilter == null) {
       window.__tliveLessonSegmentFilter = "all";
+    }
+  }
+
+  function restoreLessonSlotsFromSession() {
+    try {
+      const html = window.sessionStorage?.getItem("eap_last_lesson_html");
+      if (html && (!window.__tliveLessonSlots || !window.__tliveLessonSlots.length)) {
+        refreshLessonSlotsFromHtml(html);
+      }
+    } catch (_) {
+      /* ignore */
     }
   }
 
@@ -3067,6 +3080,7 @@
   }
 
   function boot() {
+    restoreLessonSlotsFromSession();
     if (document.body.getAttribute("data-page") !== PAGE) return;
     if (window.EAP_TEACHER_LIVE_ENABLED === false) {
       window.location.replace("teacher.html");

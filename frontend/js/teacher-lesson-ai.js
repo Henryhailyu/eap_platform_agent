@@ -675,10 +675,36 @@
     if (global.EAP_I18N) global.EAP_I18N.applyStatic();
   }
 
+  function applyPackGeneratedHtml(opts) {
+    const o = opts && typeof opts === "object" ? opts : {};
+    const html = o.html || "";
+    if (!html) return;
+    draftHtml = html;
+    if (typeof global.EAP_polishLessonHtml === "function") {
+      draftHtml = global.EAP_polishLessonHtml(draftHtml);
+    }
+    draftTopic = (o.title || draftTopic || "").trim();
+    if (o.pageId) lastSavedPageId = o.pageId;
+    const titleEl = document.getElementById("tla-title");
+    const topicEl = document.getElementById("tla-topic");
+    const classEl = document.getElementById("tla-class");
+    if (titleEl && o.title) titleEl.value = o.title;
+    if (topicEl && o.title) topicEl.value = o.title;
+    if (classEl && o.className) classEl.value = o.className;
+    setPreviewHtml(draftHtml);
+    if (typeof global.EAP_syncLessonSlotsFromHtml === "function") {
+      global.EAP_syncLessonSlotsFromHtml(draftHtml);
+    }
+    const listEl = document.getElementById("tla-saved-list");
+    if (listEl) void refreshSavedList(listEl);
+  }
+
   global.EAP_TEACHER_LESSON_AI = {
     mountLivePanel,
     presentHtmlInCanvas,
     pushDraftToClass,
+    applyPackGeneratedHtml,
+    setPreviewHtml,
     setAiAvailable(flag) {
       aiAvailable = !!flag;
     },

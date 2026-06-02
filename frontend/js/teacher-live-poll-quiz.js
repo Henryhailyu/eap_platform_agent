@@ -118,7 +118,17 @@
     return MOCK && MOCK.MOCK_QUESTIONS ? MOCK.MOCK_QUESTIONS[0] : null;
   }
 
-  function renderAiPicker(tool, MOCK, onPick) {
+  function renderSlotOptionPreview(slot) {
+    if (!slot) return "";
+    const q = slot.textEn || slot.label || "";
+    const opts = (slot.optionsEn || []).slice(0, 4);
+    const optsHtml = opts.length
+      ? `<ul class="tlive-pq-slot-card__opts">${opts.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ul>`
+      : "";
+    return `<p class="tlive-pq-slot-card__q">${escapeHtml(q.slice(0, 200))}</p>${optsHtml}`;
+  }
+
+  function renderAiPicker(tool, MOCK) {
     const slots = global.EAP_slotsForTool ? global.EAP_slotsForTool(getSlots(), tool) : [];
     if (!slots.length) {
       return `<p class="tlive-pq-empty">${escapeHtml(t("tlive_pq_no_ai_slots"))}</p>`;
@@ -127,13 +137,17 @@
     return `
       <ul class="tlive-pq-slot-list" role="list">
         ${slots
-          .map((slot) => {
+          .map((slot, idx) => {
             const checked = draft.slotId === slot.id && draft.mode === "ai" ? " checked" : "";
             const label = global.EAP_liveSlotLabel ? global.EAP_liveSlotLabel(slot) : slot.id;
-            return `<li>
+            return `<li class="tlive-pq-slot-card">
               <label class="tlive-pq-slot-item">
                 <input type="radio" name="tlive-pq-slot" value="${escapeHtml(slot.id)}"${checked} />
-                <span>${escapeHtml(label)}</span>
+                <span class="tlive-pq-slot-card__body">
+                  <span class="tlive-pq-slot-card__num">${escapeHtml(t("tlive_pq_question_n", { n: idx + 1 }))}</span>
+                  <span class="tlive-pq-slot-card__label">${escapeHtml(label)}</span>
+                  ${renderSlotOptionPreview(slot)}
+                </span>
               </label>
             </li>`;
           })
@@ -157,12 +171,22 @@
     const onViewResponses = opts.onViewResponses;
     if (!canvas || !MOCK) return;
 
-    if (!getDraft(tool)) setDraft(tool, defaultDraft(tool, MOCK));
+    try {
+      const cached = global.sessionStorage?.getItem("eap_last_lesson_html");
+      if (cached && typeof global.EAP_syncLessonSlotsFromHtml === "function") {
+        global.EAP_syncLessonSlotsFromHtml(cached);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    const toolSlots = global.EAP_slotsForTool ? global.EAP_slotsForTool(getSlots(), tool) : [];
+    setDraft(tool, defaultDraft(tool, MOCK));
 
     const titleKey = tool === "quiz" ? "tlive_quiz_title" : "tlive_poll_title";
     const lessonHint =
-      getSlots().length > 0
-        ? t("tlive_pq_lesson_hint", { count: global.EAP_slotsForTool(getSlots(), tool).length })
+      toolSlots.length > 0
+        ? t("tlive_pq_lesson_hint", { count: toolSlots.length })
         : t("tlive_pq_no_lesson_html");
 
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
@@ -174,32 +198,35 @@
 
         <section class="tlive-pq-section" aria-labelledby="tlive-pq-ai-heading">
           <h3 id="tlive-pq-ai-heading" class="tlive-pq-section__title">${escapeHtml(t("tlive_pq_ai_heading"))}</h3>
-          <div id="tlive-pq-ai-list">${renderAiPicker(tool, MOCK, null)}</div>
+          <p class="tlive-pq-ai-lead">${escapeHtml(t("tlive_pq_ai_lead"))}</p>
+          <div id="tlive-pq-ai-list">${renderAiPicker(tool, MOCK)}</div>
         </section>
 
-        <section class="tlive-pq-section" aria-labelledby="tlive-pq-manual-heading">
-          <h3 id="tlive-pq-manual-heading" class="tlive-pq-section__title">${escapeHtml(t("tlive_pq_manual_heading"))}</h3>
-          <p class="tlive-pq-manual-lead">${escapeHtml(t("tlive_pq_manual_lead"))}</p>
-          <label class="tlive-pq-label" for="tlive-mq-text">${escapeHtml(t("tlive_pq_question_label"))}</label>
-          <textarea id="tlive-mq-text" class="tlive-pq-textarea" rows="3"></textarea>
-          <div class="tlive-pq-opts">
-            ${[0, 1, 2, 3]
-              .map(
-                (i) => `
-              <label class="tlive-pq-label" for="tlive-mq-opt-${i}">${escapeHtml(t("tlive_pq_option_label", { n: i + 1 }))}</label>
-              <input id="tlive-mq-opt-${i}" type="text" class="tlive-pq-input" />`,
-              )
-              .join("")}
+        <details class="tlive-pq-manual-details">
+          <summary class="tlive-pq-manual-summary">${escapeHtml(t("tlive_pq_manual_heading"))}</summary>
+          <div class="tlive-pq-manual-body">
+            <p class="tlive-pq-manual-lead">${escapeHtml(t("tlive_pq_manual_lead"))}</p>
+            <label class="tlive-pq-label" for="tlive-mq-text">${escapeHtml(t("tlive_pq_question_label"))}</label>
+            <textarea id="tlive-mq-text" class="tlive-pq-textarea" rows="3"></textarea>
+            <div class="tlive-pq-opts">
+              ${[0, 1, 2, 3]
+                .map(
+                  (i) => `
+                <label class="tlive-pq-label" for="tlive-mq-opt-${i}">${escapeHtml(t("tlive_pq_option_label", { n: i + 1 }))}</label>
+                <input id="tlive-mq-opt-${i}" type="text" class="tlive-pq-input" />`,
+                )
+                .join("")}
+            </div>
+            <label class="tlive-pq-label" for="tlive-mq-correct">${escapeHtml(t("tlive_pq_correct_label"))}</label>
+            <select id="tlive-mq-correct" class="tlive-pq-input">
+              <option value="0">A / 1</option>
+              <option value="1">B / 2</option>
+              <option value="2">C / 3</option>
+              <option value="3">D / 4</option>
+            </select>
+            <button type="button" class="btn-secondary tlive-pq-use-manual" id="tlive-pq-use-manual">${escapeHtml(t("tlive_pq_use_manual"))}</button>
           </div>
-          <label class="tlive-pq-label" for="tlive-mq-correct">${escapeHtml(t("tlive_pq_correct_label"))}</label>
-          <select id="tlive-mq-correct" class="tlive-pq-input">
-            <option value="0">A / 1</option>
-            <option value="1">B / 2</option>
-            <option value="2">C / 3</option>
-            <option value="3">D / 4</option>
-          </select>
-          <button type="button" class="btn-secondary tlive-pq-use-manual" id="tlive-pq-use-manual">${escapeHtml(t("tlive_pq_use_manual"))}</button>
-        </section>
+        </details>
 
         <section class="tlive-pq-section tlive-pq-preview-wrap">
           <h3 class="tlive-pq-section__title">${escapeHtml(t("tlive_pq_preview_heading"))}</h3>
@@ -222,7 +249,7 @@
 
     function refreshAiList() {
       const list = document.getElementById("tlive-pq-ai-list");
-      if (list) list.innerHTML = renderAiPicker(tool, MOCK, null);
+      if (list) list.innerHTML = renderAiPicker(tool, MOCK);
       list?.querySelectorAll('input[name="tlive-pq-slot"]').forEach((radio) => {
         radio.addEventListener("change", onSlotRadioChange);
       });
