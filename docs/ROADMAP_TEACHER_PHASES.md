@@ -21,7 +21,7 @@
 
 | ID | Task | Doc |
 |----|------|-----|
-| **LP-M1** | Lesson prep **pack** + multi-file + duration/style + **AI lesson plan JSON** | [`VISION_LESSON_PREP.md`](VISION_LESSON_PREP.md) |
+| **LP-M1** | Lesson prep **pack** + multi-file + duration/style + **AI lesson plan JSON** + **teacher wizard UI** on `teacher-lesson-ai.html` | [`VISION_LESSON_PREP.md`](VISION_LESSON_PREP.md) |
 
 ---
 

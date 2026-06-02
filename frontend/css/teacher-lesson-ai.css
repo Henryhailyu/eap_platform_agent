@@ -4,6 +4,138 @@
   padding: 0 1rem 2rem;
 }
 
+/* LP-M1 — Writing lesson prep */
+.tlp-section__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.35rem;
+}
+
+.tlp-pilot-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: #e8f4f8;
+  color: #0a4d68;
+}
+
+.tlp-lead {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #444;
+  line-height: 1.45;
+}
+
+.tlp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.tlp-toolbar__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.tlp-pack-select {
+  min-width: 12rem;
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.tlp-pack-id {
+  font-size: 0.875rem;
+  color: #555;
+}
+
+.tlp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 800px) {
+  .tlp-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tlp-plan-block {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.tlp-plan-block__title {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+  color: #0a4d68;
+}
+
+.tlp-plan-view {
+  max-height: 22rem;
+  overflow: auto;
+  padding: 0.75rem;
+  background: #f8fafb;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.tlp-plan-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.tlp-plan-sub {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.85rem;
+  color: #0a4d68;
+}
+
+.tlp-segments p {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.tlp-plan-empty {
+  margin: 0;
+  color: #666;
+}
+
+.tlp-json-details {
+  margin-top: 0.75rem;
+}
+
+.tlp-plan-json {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  margin: 0.5rem 0;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 0.5rem;
+}
+
+.tlp-file-list .tlp-file-meta {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.tlp-file-empty {
+  color: #666;
+  font-size: 0.875rem;
+}
+
 .tla-layout {
   display: grid;
   grid-template-columns: minmax(280px, 340px) 1fr;

@@ -42,6 +42,88 @@
             </div>
           </div>
 
+          <section
+            id="tlp-section"
+            class="tla-panel tlp-section"
+            aria-labelledby="tlp-heading"
+            style="margin-bottom: 1.25rem"
+          >
+            <div class="tlp-section__head">
+              <h2 id="tlp-heading" class="tla-panel__title" data-i18n="tlp_title">Writing lesson prep</h2>
+              <span id="tlp-pilot-badge" class="tlp-pilot-badge" aria-label="Pilot class">EAP047</span>
+            </div>
+            <p class="tlp-lead" data-i18n="tlp_lead">
+              Step 1: save pack details, upload materials, generate a timed lesson plan (JSON). Step 2: use HTML
+              builder below (LP-M2 will link plan → HTML).
+            </p>
+            <div class="tlp-toolbar">
+              <label class="tlp-toolbar__label" for="tlp-pack-select" data-i18n="tlp_pack_label">Open pack</label>
+              <select id="tlp-pack-select" class="tlp-pack-select"></select>
+              <span class="tlp-pack-id"
+                ><span data-i18n="tlp_pack_id">Pack</span> <strong id="tlp-pack-id-label">—</strong></span
+              >
+            </div>
+            <div class="tlp-grid">
+              <div class="tlp-col">
+                <div class="tla-field">
+                  <label for="tlp-title" data-i18n="tlp_title_label">Lesson title</label>
+                  <input id="tlp-title" type="text" maxlength="200" placeholder="e.g. Argument essay — thesis &amp; cohesion" />
+                </div>
+                <div class="tla-field">
+                  <label for="tlp-date" data-i18n="tlp_date_label">Lesson date (optional)</label>
+                  <input id="tlp-date" type="date" />
+                </div>
+                <div class="tla-field">
+                  <label for="tlp-duration" data-i18n="tlp_duration_label">Class duration</label>
+                  <select id="tlp-duration"></select>
+                </div>
+                <div class="tla-field">
+                  <label for="tlp-style" data-i18n="tlp_style_label">Teaching style</label>
+                  <select id="tlp-style"></select>
+                </div>
+                <div class="tla-field">
+                  <label for="tlp-objectives" data-i18n="tlp_objectives_label">Learning objectives (optional)</label>
+                  <textarea id="tlp-objectives" rows="3" placeholder="e.g. Write a clear thesis; use topic sentences…"></textarea>
+                </div>
+                <div class="tla-field">
+                  <label for="tlp-ielts" data-i18n="tlp_ielts_label">IELTS / level target (optional)</label>
+                  <input id="tlp-ielts" type="text" maxlength="64" placeholder="e.g. 5.5 writing support" />
+                </div>
+                <div class="tla-actions">
+                  <button type="button" class="btn-secondary" id="tlp-save-pack-btn" data-i18n="tlp_save_pack_btn">
+                    Save pack
+                  </button>
+                  <button type="button" class="btn-primary" id="tlp-generate-plan-btn" data-i18n="tlp_generate_plan_btn">
+                    Generate lesson plan (AI)
+                  </button>
+                </div>
+              </div>
+              <div class="tlp-col">
+                <div class="tla-field tla-source-upload">
+                  <span class="tla-source-upload__label" data-i18n="tlp_files_label">Pack materials (for AI plan)</span>
+                  <p class="tla-source-upload__hint" data-i18n="tlp_files_hint">PDF, DOCX, or TXT — save pack first, then upload.</p>
+                  <input id="tlp-file-input" type="file" class="hidden" multiple accept=".pdf,.docx,.txt,application/pdf,text/plain" />
+                  <button type="button" class="btn-secondary" id="tlp-upload-btn" data-i18n="tlp_upload_btn">Upload to pack</button>
+                  <ul id="tlp-file-list" class="tla-source-file-list tlp-file-list" aria-live="polite"></ul>
+                </div>
+              </div>
+            </div>
+            <div class="tlp-plan-block">
+              <h3 class="tlp-plan-block__title" data-i18n="tlp_plan_title">Lesson plan preview</h3>
+              <div id="tlp-plan-view" class="tlp-plan-view" aria-live="polite">
+                <p class="tlp-plan-empty" data-i18n="tlp_plan_empty">Generate a plan to see segments here.</p>
+              </div>
+              <details class="tlp-json-details">
+                <summary data-i18n="tlp_json_toggle">Edit plan JSON (advanced)</summary>
+                <textarea id="tlp-plan-json" class="tlp-plan-json" rows="12" spellcheck="false"></textarea>
+                <button type="button" class="btn-secondary" id="tlp-save-plan-btn" data-i18n="tlp_save_plan_btn">
+                  Save approved plan
+                </button>
+              </details>
+            </div>
+            <p id="tlp-status" class="tla-status hidden" role="status" aria-live="polite"></p>
+          </section>
+
           <div class="tla-layout">
             <aside class="tla-panel" aria-labelledby="tla-form-heading">
               <h2 id="tla-form-heading" class="tla-panel__title" data-i18n="tla_form_title">Lesson inputs</h2>
@@ -128,6 +210,8 @@
     <script src="api-config.js"></script>
     <script src="app.js"></script>
     <script src="js/teacher-teaching-pages-api.js?v=20260602-ai-detail"></script>
+    <script src="js/teacher-lesson-prep-api.js?v=20260602-lp1"></script>
+    <script src="js/teacher-lesson-prep.js?v=20260602-lp1"></script>
     <script src="js/live-teaching-api.js"></script>
     <script src="js/eap-html-bridge.js"></script>
     <script src="js/eap-file-viewer.js"></script>
