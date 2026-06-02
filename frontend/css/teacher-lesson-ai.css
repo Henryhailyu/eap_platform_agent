@@ -4,13 +4,80 @@
   padding: 0 1rem 2rem;
 }
 
-/* LP-M1 — Writing lesson prep */
-.tlp-section__head {
+/* LP-M1b — AI-aided lesson prep (collapsible) */
+.tlp-accordion {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tlp-accordion__trigger {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.65rem;
-  margin-bottom: 0.35rem;
+  gap: 0.65rem 1rem;
+  padding: 0.85rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.tlp-accordion__trigger::-webkit-details-marker {
+  display: none;
+}
+
+.tlp-accordion__trigger:hover {
+  background: rgba(10, 77, 104, 0.04);
+}
+
+.tlp-accordion[open] .tlp-accordion__trigger {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(232, 244, 248, 0.45);
+}
+
+.tlp-accordion__chevron {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid #0a4d68;
+  border-bottom: 2px solid #0a4d68;
+  transform: rotate(-45deg);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.tlp-accordion[open] .tlp-accordion__chevron {
+  transform: rotate(45deg);
+  margin-top: 0;
+}
+
+.tlp-accordion__titles {
+  flex: 1;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tlp-accordion__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #0a4d68;
+}
+
+.tlp-accordion__hint {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #555;
+  line-height: 1.35;
+}
+
+.tlp-accordion[open] .tlp-accordion__hint {
+  display: none;
+}
+
+.tlp-accordion__body {
+  padding: 1rem 1.1rem 1.1rem;
 }
 
 .tlp-pilot-badge {
@@ -69,10 +136,27 @@
   }
 }
 
-.tlp-plan-block {
+.tlp-plan-block,
+.tlp-html-block {
   margin-top: 1.25rem;
   padding-top: 1rem;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.tlp-lead--tight {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: #555;
+}
+
+.tlp-html-frame {
+  display: block;
+  width: 100%;
+  min-height: min(48vh, 520px);
+  margin-top: 0.85rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: #fff;
 }
 
 .tlp-plan-block__title {

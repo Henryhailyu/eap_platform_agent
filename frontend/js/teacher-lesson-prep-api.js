@@ -101,6 +101,36 @@
     return data.files || [];
   }
 
+  function pageViewUrl(pageId) {
+    return `${API_BASE}/api/teacher/teaching-pages/${encodeURIComponent(pageId)}/view`;
+  }
+
+  async function generateHtml(packId) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/teacher/lesson-prep/packs/${encodeURIComponent(packId)}/html`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: "{}",
+      },
+    );
+    return readJson(response);
+  }
+
+  async function publishPack(packId, payload) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/teacher/lesson-prep/packs/${encodeURIComponent(packId)}/publish`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload || {}),
+      },
+    );
+    return readJson(response);
+  }
+
   async function generatePlan(packId) {
     const response = await fetchFn()(
       `${API_BASE}/api/teacher/lesson-prep/packs/${encodeURIComponent(packId)}/plan`,
@@ -122,5 +152,8 @@
     updatePack,
     uploadPackFiles,
     generatePlan,
+    generateHtml,
+    publishPack,
+    pageViewUrl,
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -109,9 +109,39 @@
     });
   }
 
+  function wireLiveLaunchToParent(root) {
+    if (!root || !global.parent || global.parent === global) return;
+    root.querySelectorAll("[data-eap-live-tool]").forEach((block) => {
+      const tool = (block.getAttribute("data-eap-live-tool") || "").trim().toLowerCase();
+      const slotId = block.getAttribute("data-eap-live-id") || block.getAttribute("data-eap-id") || "";
+      const targets = block.querySelectorAll(".eap-live-launch, [data-eap-live-launch]");
+      targets.forEach((btn) => {
+        if (btn.dataset.eapLiveBound === "1") return;
+        btn.dataset.eapLiveBound = "1";
+        btn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          try {
+            global.parent.postMessage(
+              {
+                type: "eap-live-pick",
+                tool,
+                slotId,
+                gameId: block.getAttribute("data-eap-live-game") || "",
+              },
+              "*",
+            );
+          } catch (_) {
+            /* ignore */
+          }
+        });
+      });
+    });
+  }
+
   function boot() {
     wireRevealButtons(document);
     wireActivities(document);
+    wireLiveLaunchToParent(document);
     document.querySelectorAll(".eap-reveal-target, [data-eap-answer-block]").forEach((el) => {
       if (!el.classList.contains("eap-revealed")) {
         el.hidden = true;

@@ -3097,3 +3097,113 @@ body.tlive-modal-open {
     max-height: 160px;
   }
 }
+
+/* LT-M1 — Poll / Quiz panel + lesson game suggestions */
+.tlive-pq-panel {
+  max-width: 42rem;
+  width: 100%;
+}
+
+.tlive-pq-title {
+  margin: 0 0 0.5rem;
+  color: #0a4d68;
+}
+
+.tlive-pq-lead {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: #555;
+}
+
+.tlive-pq-section {
+  margin-bottom: 1.1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.tlive-pq-section__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: #0a4d68;
+}
+
+.tlive-pq-slot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tlive-pq-slot-item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.35rem 0;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.tlive-pq-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.tlive-pq-textarea,
+.tlive-pq-input {
+  width: 100%;
+  font: inherit;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+}
+
+.tlive-pq-textarea {
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.tlive-pq-empty {
+  font-size: 0.875rem;
+  color: #666;
+  margin: 0;
+}
+
+.tlive-pq-preview-q {
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.tlive-lesson-games {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  background: rgba(232, 244, 248, 0.5);
+  border-radius: 8px;
+}
+
+.tlive-lesson-games__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  color: #0a4d68;
+}
+
+.tlive-lesson-games__lead {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  color: #555;
+}
+
+.tlive-lesson-games__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tlive-lesson-game-btn {
+  width: 100%;
+  text-align: left;
+  font-size: 0.875rem;
+}

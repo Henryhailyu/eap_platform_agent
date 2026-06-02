@@ -29,6 +29,16 @@ _INTERACTIVE_HTML_RULES = (
     "- Use CSS transitions on .eap-reveal-target (opacity/transform) for smooth reveal.\n"
     "- Style .eap-activity, .eap-options button, .eap-selected, .eap-revealed in the same <style> block.\n"
     "- Prefer data-eap-* markup over inline onclick (platform wires interactivity automatically).\n"
+    "\nLive Teaching launch slots (LT-M1) — include 2–3 poll + 2–3 quiz blocks AND 1 game block:\n"
+    "- Wrap each in: <div class=\"eap-activity eap-live-slot\" data-eap-id=\"live-poll-1\" "
+    "data-eap-type=\"mcq\" data-eap-live-tool=\"poll\" data-eap-answer=\"B\"> … </div>\n"
+    "- Quiz: data-eap-live-tool=\"quiz\". Game: data-eap-live-tool=\"game\" "
+    "data-eap-live-game=\"quiz-battle\" | \"board-race\" | \"matching-race\" | "
+    "\"vocab-bingo\" | \"treasure-hunt\".\n"
+    "- Optional: data-eap-live-segment=\"N\" (0-based segment index from lesson plan).\n"
+    "- Inside each slot: .eap-question, .eap-options with button[data-eap-option=\"A\"] etc., "
+    "and <button type=\"button\" class=\"eap-live-launch btn-secondary\">Launch to class</button>.\n"
+    "- Poll/quiz slots must have 3–4 options and a valid data-eap-answer letter.\n"
 )
 
 _CONTENT_RULES = (

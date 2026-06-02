@@ -1,0 +1,306 @@
+/**
+ * LT-M1 — Poll / Quiz tool panel: AI lesson slots + manual entry.
+ */
+(function (global) {
+  function t(key, params) {
+    if (typeof global.t === "function") return global.t(key, params);
+    return key;
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function getSegmentFilter() {
+    const v = global.__tliveLessonSegmentFilter;
+    return v == null || v === "" ? "all" : v;
+  }
+
+  function getSlots() {
+    const all = Array.isArray(global.__tliveLessonSlots) ? global.__tliveLessonSlots : [];
+    if (typeof global.EAP_slotsForSegment === "function") {
+      return global.EAP_slotsForSegment(all, getSegmentFilter());
+    }
+    return all;
+  }
+
+  function renderSegmentFilter() {
+    const segs = Array.isArray(global.__tliveLessonPlanSegments) ? global.__tliveLessonPlanSegments : [];
+    if (!segs.length) return "";
+    const cur = getSegmentFilter();
+    const opts = [
+      `<option value="all"${cur === "all" ? " selected" : ""}>${escapeHtml(t("tlive_pq_segment_all"))}</option>`,
+      ...segs.map((seg, i) => {
+        const title = (seg && (seg.title || seg.name)) || t("tlive_pq_segment_n", { n: i + 1 });
+        const sel = String(cur) === String(i) ? " selected" : "";
+        return `<option value="${i}"${sel}>${escapeHtml(String(title).slice(0, 64))}</option>`;
+      }),
+    ];
+    return `
+      <div class="tlive-pq-segment">
+        <label class="tlive-pq-label" for="tlive-pq-segment">${escapeHtml(t("tlive_pq_segment_label"))}</label>
+        <select id="tlive-pq-segment" class="tlive-pq-input">${opts.join("")}</select>
+      </div>`;
+  }
+
+  function getDraftKey(tool) {
+    return tool === "quiz" ? "__tliveQuizDraft" : "__tlivePollDraft";
+  }
+
+  function getDraft(tool) {
+    return global[getDraftKey(tool)] || null;
+  }
+
+  function setDraft(tool, draft) {
+    global[getDraftKey(tool)] = draft;
+  }
+
+  function defaultDraft(tool, MOCK) {
+    const slots = global.EAP_slotsForTool
+      ? global.EAP_slotsForTool(getSlots(), tool)
+      : [];
+    if (slots.length && global.EAP_slotToLaunchQuestion) {
+      const q = global.EAP_slotToLaunchQuestion(slots[0]);
+      if (q) {
+        return { mode: "ai", slotId: slots[0].id, question: q };
+      }
+    }
+    const fallback = MOCK && MOCK.MOCK_QUESTIONS ? MOCK.MOCK_QUESTIONS[0] : null;
+    if (fallback) {
+      return { mode: "manual", slotId: "", question: { ...fallback, source: "mock" } };
+    }
+    return { mode: "manual", slotId: "", question: null };
+  }
+
+  function questionFromManualForm() {
+    const text = (document.getElementById("tlive-mq-text")?.value || "").trim();
+    const opts = [0, 1, 2, 3].map((i) =>
+      (document.getElementById(`tlive-mq-opt-${i}`)?.value || "").trim(),
+    );
+    const filled = opts.filter(Boolean);
+    if (!text || filled.length < 2) return null;
+    const correct = parseInt(document.getElementById("tlive-mq-correct")?.value || "0", 10);
+    return {
+      id: "manual",
+      textEn: text,
+      textZh: text,
+      optionsEn: filled,
+      optionsZh: filled,
+      correctIndex: Number.isNaN(correct) ? 0 : Math.max(0, Math.min(correct, filled.length - 1)),
+      source: "manual",
+    };
+  }
+
+  function syncManualFormFromQuestion(q) {
+    if (!q) return;
+    const textEl = document.getElementById("tlive-mq-text");
+    if (textEl) textEl.value = q.textEn || "";
+    const opts = q.optionsEn || [];
+    for (let i = 0; i < 4; i++) {
+      const el = document.getElementById(`tlive-mq-opt-${i}`);
+      if (el) el.value = opts[i] || "";
+    }
+    const corr = document.getElementById("tlive-mq-correct");
+    if (corr) corr.value = String(q.correctIndex != null ? q.correctIndex : 0);
+  }
+
+  function resolveQuestion(tool, MOCK) {
+    const draft = getDraft(tool) || defaultDraft(tool, MOCK);
+    if (draft.mode === "manual") {
+      const manual = questionFromManualForm();
+      if (manual) return manual;
+    }
+    if (draft.question) return draft.question;
+    return MOCK && MOCK.MOCK_QUESTIONS ? MOCK.MOCK_QUESTIONS[0] : null;
+  }
+
+  function renderAiPicker(tool, MOCK, onPick) {
+    const slots = global.EAP_slotsForTool ? global.EAP_slotsForTool(getSlots(), tool) : [];
+    if (!slots.length) {
+      return `<p class="tlive-pq-empty">${escapeHtml(t("tlive_pq_no_ai_slots"))}</p>`;
+    }
+    const draft = getDraft(tool) || defaultDraft(tool, MOCK);
+    return `
+      <ul class="tlive-pq-slot-list" role="list">
+        ${slots
+          .map((slot) => {
+            const checked = draft.slotId === slot.id && draft.mode === "ai" ? " checked" : "";
+            const label = global.EAP_liveSlotLabel ? global.EAP_liveSlotLabel(slot) : slot.id;
+            return `<li>
+              <label class="tlive-pq-slot-item">
+                <input type="radio" name="tlive-pq-slot" value="${escapeHtml(slot.id)}"${checked} />
+                <span>${escapeHtml(label)}</span>
+              </label>
+            </li>`;
+          })
+          .join("")}
+      </ul>`;
+  }
+
+  function renderPreview(q, MOCK) {
+    if (!q) return `<p class="tlive-pq-empty">${escapeHtml(t("tlive_pq_preview_empty"))}</p>`;
+    const opts = MOCK ? MOCK.questionOptions(q) : q.optionsEn || [];
+    return `
+      <p class="tlive-pq-preview-q">${escapeHtml(MOCK ? MOCK.questionText(q) : q.textEn)}</p>
+      <ol class="tlive-question-box__opts">${opts.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ol>`;
+  }
+
+  function mountPollQuizTool(opts) {
+    const tool = opts.tool === "quiz" ? "quiz" : "poll";
+    const MOCK = opts.mock;
+    const canvas = opts.canvas;
+    const onLaunch = opts.onLaunch;
+    const onViewResponses = opts.onViewResponses;
+    if (!canvas || !MOCK) return;
+
+    if (!getDraft(tool)) setDraft(tool, defaultDraft(tool, MOCK));
+
+    const titleKey = tool === "quiz" ? "tlive_quiz_title" : "tlive_poll_title";
+    const lessonHint =
+      getSlots().length > 0
+        ? t("tlive_pq_lesson_hint", { count: global.EAP_slotsForTool(getSlots(), tool).length })
+        : t("tlive_pq_no_lesson_html");
+
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
+    canvas.innerHTML = `
+      <div class="tlive-pq-panel">
+        <h2 class="tlive-pq-title">${escapeHtml(t(titleKey))}</h2>
+        <p class="tlive-pq-lead">${escapeHtml(lessonHint)}</p>
+        ${renderSegmentFilter()}
+
+        <section class="tlive-pq-section" aria-labelledby="tlive-pq-ai-heading">
+          <h3 id="tlive-pq-ai-heading" class="tlive-pq-section__title">${escapeHtml(t("tlive_pq_ai_heading"))}</h3>
+          <div id="tlive-pq-ai-list">${renderAiPicker(tool, MOCK, null)}</div>
+        </section>
+
+        <section class="tlive-pq-section" aria-labelledby="tlive-pq-manual-heading">
+          <h3 id="tlive-pq-manual-heading" class="tlive-pq-section__title">${escapeHtml(t("tlive_pq_manual_heading"))}</h3>
+          <p class="tlive-pq-manual-lead">${escapeHtml(t("tlive_pq_manual_lead"))}</p>
+          <label class="tlive-pq-label" for="tlive-mq-text">${escapeHtml(t("tlive_pq_question_label"))}</label>
+          <textarea id="tlive-mq-text" class="tlive-pq-textarea" rows="3"></textarea>
+          <div class="tlive-pq-opts">
+            ${[0, 1, 2, 3]
+              .map(
+                (i) => `
+              <label class="tlive-pq-label" for="tlive-mq-opt-${i}">${escapeHtml(t("tlive_pq_option_label", { n: i + 1 }))}</label>
+              <input id="tlive-mq-opt-${i}" type="text" class="tlive-pq-input" />`,
+              )
+              .join("")}
+          </div>
+          <label class="tlive-pq-label" for="tlive-mq-correct">${escapeHtml(t("tlive_pq_correct_label"))}</label>
+          <select id="tlive-mq-correct" class="tlive-pq-input">
+            <option value="0">A / 1</option>
+            <option value="1">B / 2</option>
+            <option value="2">C / 3</option>
+            <option value="3">D / 4</option>
+          </select>
+          <button type="button" class="btn-secondary tlive-pq-use-manual" id="tlive-pq-use-manual">${escapeHtml(t("tlive_pq_use_manual"))}</button>
+        </section>
+
+        <section class="tlive-pq-section tlive-pq-preview-wrap">
+          <h3 class="tlive-pq-section__title">${escapeHtml(t("tlive_pq_preview_heading"))}</h3>
+          <div id="tlive-pq-preview">${renderPreview(resolveQuestion(tool, MOCK), MOCK)}</div>
+        </section>
+
+        <div class="tlive-board__controls">
+          <button type="button" class="btn-primary" id="tlive-pq-launch">${escapeHtml(t("tlive_launch_question"))}</button>
+          <button type="button" class="btn-secondary" id="tlive-pq-view-resp">${escapeHtml(t("tlive_view_responses"))}</button>
+        </div>
+      </div>
+    `;
+
+    const draft = getDraft(tool);
+    if (draft && draft.mode === "manual" && draft.question) {
+      syncManualFormFromQuestion(draft.question);
+    } else if (draft && draft.question) {
+      syncManualFormFromQuestion(draft.question);
+    }
+
+    function refreshAiList() {
+      const list = document.getElementById("tlive-pq-ai-list");
+      if (list) list.innerHTML = renderAiPicker(tool, MOCK, null);
+      list?.querySelectorAll('input[name="tlive-pq-slot"]').forEach((radio) => {
+        radio.addEventListener("change", onSlotRadioChange);
+      });
+    }
+
+    function onSlotRadioChange() {
+      const radio = this;
+      const slotId = radio.value;
+      const slot = getSlots().find((s) => s.id === slotId);
+      if (!slot || !global.EAP_slotToLaunchQuestion) return;
+      const q = global.EAP_slotToLaunchQuestion(slot);
+      setDraft(tool, { mode: "ai", slotId, question: q });
+      syncManualFormFromQuestion(q);
+      refreshPreview();
+    }
+
+    function refreshPreview() {
+      const prev = document.getElementById("tlive-pq-preview");
+      if (prev) prev.innerHTML = renderPreview(resolveQuestion(tool, MOCK), MOCK);
+    }
+
+    document.getElementById("tlive-pq-segment")?.addEventListener("change", (ev) => {
+      global.__tliveLessonSegmentFilter = ev.target.value;
+      setDraft(tool, defaultDraft(tool, MOCK));
+      refreshAiList();
+      refreshPreview();
+    });
+
+    canvas.querySelectorAll('input[name="tlive-pq-slot"]').forEach((radio) => {
+      radio.addEventListener("change", onSlotRadioChange);
+    });
+
+    document.getElementById("tlive-pq-use-manual")?.addEventListener("click", () => {
+      const q = questionFromManualForm();
+      if (!q) {
+        if (typeof opts.onStatus === "function") opts.onStatus(t("tlive_pq_manual_incomplete"), true);
+        return;
+      }
+      setDraft(tool, { mode: "manual", slotId: "", question: q });
+      refreshPreview();
+      if (typeof opts.onStatus === "function") opts.onStatus(t("tlive_pq_manual_ready"), false);
+    });
+
+    ["tlive-mq-text", "tlive-mq-opt-0", "tlive-mq-opt-1", "tlive-mq-opt-2", "tlive-mq-opt-3", "tlive-mq-correct"].forEach(
+      (id) => {
+        document.getElementById(id)?.addEventListener("input", () => {
+          const q = questionFromManualForm();
+          if (q) setDraft(tool, { mode: "manual", slotId: "", question: q });
+          refreshPreview();
+        });
+      },
+    );
+
+    document.getElementById("tlive-pq-launch")?.addEventListener("click", () => {
+      const q = resolveQuestion(tool, MOCK);
+      if (onLaunch) onLaunch(q, tool);
+    });
+
+    document.getElementById("tlive-pq-view-resp")?.addEventListener("click", () => {
+      const q = resolveQuestion(tool, MOCK);
+      if (onViewResponses) onViewResponses(q);
+    });
+  }
+
+  function applySlotPick(tool, slotId, MOCK) {
+    const slot = getSlots().find((s) => String(s.id) === String(slotId));
+    if (!slot || !global.EAP_slotToLaunchQuestion) return false;
+    const q = global.EAP_slotToLaunchQuestion(slot);
+    setDraft(tool, { mode: "ai", slotId: slot.id, question: q });
+    return true;
+  }
+
+  global.EAP_LIVE_POLL_QUIZ = {
+    mountPollQuizTool,
+    applySlotPick,
+    getDraft,
+    setDraft,
+    resolveQuestion,
+    defaultDraft,
+  };
+})(typeof window !== "undefined" ? window : globalThis);

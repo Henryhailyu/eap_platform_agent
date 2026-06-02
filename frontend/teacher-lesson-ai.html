@@ -42,19 +42,21 @@
             </div>
           </div>
 
-          <section
-            id="tlp-section"
-            class="tla-panel tlp-section"
-            aria-labelledby="tlp-heading"
-            style="margin-bottom: 1.25rem"
-          >
-            <div class="tlp-section__head">
-              <h2 id="tlp-heading" class="tla-panel__title" data-i18n="tlp_title">Writing lesson prep</h2>
+          <details id="tlp-section" class="tla-panel tlp-accordion" style="margin-bottom: 1.25rem">
+            <summary class="tlp-accordion__trigger" aria-labelledby="tlp-heading">
+              <span class="tlp-accordion__chevron" aria-hidden="true"></span>
+              <span class="tlp-accordion__titles">
+                <span id="tlp-heading" class="tlp-accordion__title" data-i18n="tlp_title">AI-aided lesson prep</span>
+                <span class="tlp-accordion__hint" data-i18n="tlp_collapsed_hint"
+                  >Tap to open — pack, materials, and AI lesson plan</span
+                >
+              </span>
               <span id="tlp-pilot-badge" class="tlp-pilot-badge" aria-label="Pilot class">EAP047</span>
-            </div>
+            </summary>
+            <div class="tlp-accordion__body">
             <p class="tlp-lead" data-i18n="tlp_lead">
-              Step 1: save pack details, upload materials, generate a timed lesson plan (JSON). Step 2: use HTML
-              builder below (LP-M2 will link plan → HTML).
+              Step 1: save pack details, upload materials, generate a timed lesson plan. Step 2: use the HTML builder
+              below (plan → HTML publishing comes in LP-M2).
             </p>
             <div class="tlp-toolbar">
               <label class="tlp-toolbar__label" for="tlp-pack-select" data-i18n="tlp_pack_label">Open pack</label>
@@ -121,8 +123,36 @@
                 </button>
               </details>
             </div>
+            <div class="tlp-html-block">
+              <h3 class="tlp-plan-block__title" data-i18n="tlp_html_title">Interactive HTML (from plan)</h3>
+              <p class="tlp-lead tlp-lead--tight" data-i18n="tlp_html_lead">
+                After you save the plan, generate HTML, preview, then publish to the class calendar.
+              </p>
+              <div class="tla-actions">
+                <button type="button" class="btn-primary" id="tlp-generate-html-btn" data-i18n="tlp_generate_html_btn">
+                  Generate HTML from plan
+                </button>
+                <button type="button" class="btn-secondary" id="tlp-publish-btn" data-i18n="tlp_publish_btn">
+                  Publish to calendar + students
+                </button>
+                <a
+                  id="tlp-open-live"
+                  class="btn-secondary hidden"
+                  href="teacher-live.html?class=EAP047"
+                  data-i18n="tlp_open_live"
+                  >Open Live Teaching</a
+                >
+              </div>
+              <iframe
+                id="tlp-html-frame"
+                class="tlp-html-frame hidden"
+                title="HTML lesson preview"
+                sandbox="allow-scripts"
+              ></iframe>
+            </div>
             <p id="tlp-status" class="tla-status hidden" role="status" aria-live="polite"></p>
-          </section>
+            </div>
+          </details>
 
           <div class="tla-layout">
             <aside class="tla-panel" aria-labelledby="tla-form-heading">
@@ -210,8 +240,8 @@
     <script src="api-config.js"></script>
     <script src="app.js"></script>
     <script src="js/teacher-teaching-pages-api.js?v=20260602-ai-detail"></script>
-    <script src="js/teacher-lesson-prep-api.js?v=20260602-lp1"></script>
-    <script src="js/teacher-lesson-prep.js?v=20260602-lp1"></script>
+    <script src="js/teacher-lesson-prep-api.js?v=20260602-lp2"></script>
+    <script src="js/teacher-lesson-prep.js?v=20260602-lp2m2"></script>
     <script src="js/live-teaching-api.js"></script>
     <script src="js/eap-html-bridge.js"></script>
     <script src="js/eap-file-viewer.js"></script>

@@ -17,11 +17,15 @@
 
 ---
 
-## In progress
+## Recently done
 
-| ID | Task | Doc |
-|----|------|-----|
-| **LP-M1** | Lesson prep **pack** + multi-file + duration/style + **AI lesson plan JSON** + **teacher wizard UI** on `teacher-lesson-ai.html` | [`VISION_LESSON_PREP.md`](VISION_LESSON_PREP.md) |
+| ID | Task |
+|----|------|
+| **LP-M2** | Plan → HTML → preview → publish to calendar + teaching page | [`VISION_LESSON_PREP.md`](VISION_LESSON_PREP.md) |
+| **LT-M2** | Segment filter on Poll/Quiz; 5 phase-1 games; `#eap-lesson-meta` sync | [`VISION_LIVE_INTERACTIONS.md`](VISION_LIVE_INTERACTIONS.md) |
+| **LT-M1** | Live Poll/Quiz: AI slots + manual; Games suggestions | [`VISION_LIVE_INTERACTIONS.md`](VISION_LIVE_INTERACTIONS.md) |
+| **LP-M1** | Lesson prep pack API + AI plan JSON + wizard UI |
+| **LP-M1b** | Rename **AI-aided lesson prep**, default **collapsed** accordion |
 
 ---
 
@@ -29,7 +33,6 @@
 
 | ID | Task | Depends on |
 |----|------|------------|
-| **LP-M2** | Plan → interactive HTML → publish (calendar + teaching page) | LP-M1 |
 | **LP-M3** | PPT/Excel ingest, bilingual hints, copy last week | LP-M2 |
 | **LP-M4** | Real-time class sync (Phase B, ~35 students) | LP-M2+ |
 | **HM-M1b** | Teacher **AI homework report** panel + approve → feedback | HM-M1a (Manager) |

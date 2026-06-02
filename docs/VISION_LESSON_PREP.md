@@ -164,4 +164,4 @@ All scoped to teacher membership for `EAP047` in pilot.
 
 ---
 
-*In progress: **LP-M1** on `main`, test with `teacher1` + class `EAP047`. AI: Token Plan `hy3-preview`.*
+*Done on `main`: **LP-M1** (plan JSON + wizard), **LP-M2** (plan → HTML → calendar publish + `#eap-lesson-meta`). UAT: `teacher1` + `EAP047`. AI: Token Plan `hy3-preview`.*

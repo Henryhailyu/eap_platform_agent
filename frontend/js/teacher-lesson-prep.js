@@ -47,6 +47,7 @@
   let meta = null;
   let packId = null;
   let currentPlan = null;
+  let teachingPageId = null;
 
   function readForm() {
     return {
@@ -76,6 +77,43 @@
     if (ielts) ielts.value = pack.ielts_band_target || "";
     const topic = document.getElementById("tla-topic");
     if (topic && pack.title && !topic.value.trim()) topic.value = pack.title;
+    teachingPageId = pack.teaching_page_id || null;
+    if (pack.has_html && teachingPageId) void loadHtmlPreview(teachingPageId);
+    else hideHtmlPreview();
+    updateLiveLink(pack);
+  }
+
+  function hideHtmlPreview() {
+    const frame = document.getElementById("tlp-html-frame");
+    if (frame) {
+      frame.classList.add("hidden");
+      frame.srcdoc = "";
+    }
+  }
+
+  async function loadHtmlPreview(pageId) {
+    const prepApi = api();
+    const frame = document.getElementById("tlp-html-frame");
+    if (!prepApi || !frame || !pageId) return;
+    try {
+      const res = await fetch(prepApi.pageViewUrl(pageId), {
+        credentials: "include",
+        headers: typeof global.EAP_getAuthHeaders === "function" ? global.EAP_getAuthHeaders() : {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      frame.srcdoc = await res.text();
+      frame.classList.remove("hidden");
+    } catch (_) {
+      hideHtmlPreview();
+    }
+  }
+
+  function updateLiveLink(pack) {
+    const link = document.getElementById("tlp-open-live");
+    if (!link || !meta) return;
+    const cls = pack?.class_name || meta.pilot_class || "EAP047";
+    link.href = `teacher-live.html?class=${encodeURIComponent(cls)}`;
+    link.classList.toggle("hidden", !pack?.has_html);
   }
 
   function renderPlan(plan) {
@@ -204,9 +242,11 @@
       if (!val) {
         packId = null;
         currentPlan = null;
+        teachingPageId = null;
         document.getElementById("tlp-pack-id-label").textContent = "—";
         renderPlan(null);
         renderPackFiles([]);
+        hideHtmlPreview();
         return;
       }
       void loadPack(parseInt(val, 10));
@@ -277,6 +317,60 @@
         setStatus(statusEl, (err && err.message) || t("tlp_save_failed"), true);
       }
     });
+
+    document.getElementById("tlp-generate-html-btn")?.addEventListener("click", async () => {
+      setStatus(statusEl, t("tlp_generating_html"), false);
+      try {
+        const id = await ensurePack(statusEl);
+        await prepApi.updatePack(id, {
+          plan: currentPlan,
+          plan_status: "approved",
+        });
+        const result = await prepApi.generateHtml(id);
+        teachingPageId = result.page?.id || result.pack?.teaching_page_id || teachingPageId;
+        if (result.html) {
+          const frame = document.getElementById("tlp-html-frame");
+          if (frame) {
+            frame.srcdoc = result.html;
+            frame.classList.remove("hidden");
+          }
+        } else if (teachingPageId) {
+          await loadHtmlPreview(teachingPageId);
+        }
+        if (result.pack) updateLiveLink(result.pack);
+        setStatus(statusEl, t("tlp_html_generated_ok"), false);
+        await refreshPackSelect(id);
+      } catch (err) {
+        setStatus(statusEl, (err && err.message) || t("tlp_html_failed"), true);
+      }
+    });
+
+    document.getElementById("tlp-publish-btn")?.addEventListener("click", async () => {
+      if (!packId) {
+        setStatus(statusEl, t("tlp_save_pack_first"), true);
+        return;
+      }
+      const lessonDate = (document.getElementById("tlp-date")?.value || "").trim();
+      if (!lessonDate) {
+        setStatus(statusEl, t("tlp_date_required_publish"), true);
+        return;
+      }
+      setStatus(statusEl, t("tlp_publishing"), false);
+      try {
+        const result = await prepApi.publishPack(packId, { lesson_date: lessonDate });
+        setStatus(
+          statusEl,
+          t("tlp_published_ok", {
+            date: result.task?.date || lessonDate,
+            taskId: result.task?.id || "",
+          }),
+          false,
+        );
+        if (result.pack) updateLiveLink(result.pack);
+      } catch (err) {
+        setStatus(statusEl, (err && err.message) || t("tlp_publish_failed"), true);
+      }
+    });
   }
 
   async function boot() {
@@ -330,7 +424,10 @@
 
     const params = new URLSearchParams(global.location.search);
     const loadId = params.get("pack");
-    if (loadId) void loadPack(parseInt(loadId, 10));
+    if (loadId) {
+      section.open = true;
+      void loadPack(parseInt(loadId, 10));
+    }
   }
 
   if (document.readyState === "loading") {

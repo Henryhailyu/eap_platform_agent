@@ -52,9 +52,19 @@ WRITING_PLAN_SYSTEM_PROMPT = (
     '    "materials_ref" (optional string referencing uploaded materials)\n'
     '  Segments must sum to the requested class duration in minutes.\n'
     '- "homework_sketch": string (brief follow-up homework idea)\n'
-    '- "interaction_slots": array of objects with "segment_title", "activity_type", '
-    '"description" (for later HTML interactives)\n'
+    '- "interaction_slots": array of objects with:\n'
+    '    "segment_title", "segment_index" (0-based), "activity_type" (poll|quiz|game|discussion),\n'
+    '    "live_tool" (poll|quiz|game), "live_game" (quiz-battle|board-race|matching-race|vocab-bingo|treasure-hunt),\n'
+    '    "description", "question_sketch", "options" (array of 2–4 option strings)\n'
     '- "notes_for_teacher": string (2–4 sentences: pacing, differentiation, common errors)\n'
+)
+
+WRITING_HTML_FROM_PLAN_EXTRA = (
+    "\nYou are converting an APPROVED lesson plan JSON into one HTML document.\n"
+    "- Follow the plan segments in order; use <h2> per segment with minutes in subtitle.\n"
+    "- Build live poll/quiz/game blocks from interaction_slots (use question_sketch + options).\n"
+    "- Each live block MUST include data-eap-live-segment=\"N\" (segment_index from plan).\n"
+    "- Match segment_title in a visible heading before each live block.\n"
 )
 
 
@@ -84,6 +94,13 @@ def migrate_lesson_prep_tables(conn) -> None:
         )
         """
     )
+    rows = conn.execute("PRAGMA table_info(lesson_prep_packs)").fetchall()
+    col_names = {r[1] for r in rows} if rows else set()
+    if "teaching_page_id" not in col_names:
+        conn.execute("ALTER TABLE lesson_prep_packs ADD COLUMN teaching_page_id INTEGER")
+    if "calendar_task_id" not in col_names:
+        conn.execute("ALTER TABLE lesson_prep_packs ADD COLUMN calendar_task_id INTEGER")
+
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS lesson_prep_pack_files (
@@ -144,6 +161,9 @@ def pack_row_to_dict(row, *, include_plan: bool = False) -> dict[str, Any]:
         "status": row["status"],
         "has_plan": bool(row["plan_json"]),
         "plan": plan if include_plan else None,
+        "teaching_page_id": row["teaching_page_id"] if "teaching_page_id" in row.keys() else None,
+        "calendar_task_id": row["calendar_task_id"] if "calendar_task_id" in row.keys() else None,
+        "has_html": bool(row["teaching_page_id"]) if "teaching_page_id" in row.keys() else False,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -229,6 +249,56 @@ def build_plan_user_prompt(pack: dict, materials: str) -> str:
     return "\n".join(lines)
 
 
+def inject_lesson_meta_script(html: str, plan: dict, pack: dict) -> str:
+    """Embed plan segments for LT-M2 Live Teaching segment filter."""
+    meta = {
+        "title": plan.get("title") or pack.get("title"),
+        "segments": plan.get("segments") or [],
+        "interaction_slots": plan.get("interaction_slots") or [],
+    }
+    snippet = (
+        f'<script type="application/json" id="eap-lesson-meta">'
+        f"{json.dumps(meta, ensure_ascii=False)}</script>"
+    )
+    text = str(html or "")
+    lower = text.lower()
+    if "</body>" in lower:
+        idx = lower.rindex("</body>")
+        return text[:idx] + snippet + text[idx:]
+    return text + snippet
+
+
+def build_html_from_plan_prompt(pack: dict, plan: dict, materials: str) -> str:
+    return (
+        f"Approved lesson plan JSON:\n{json.dumps(plan, ensure_ascii=False, indent=2)}\n\n"
+        f"Pack title: {pack.get('title')}\n"
+        f"Class: {pack.get('class_name')} · Duration: {pack.get('duration_minutes')} min · "
+        f"Style: {pack.get('teaching_style')}\n"
+        f"Teacher objectives: {pack.get('objectives') or '(none)'}\n"
+        f"IELTS target: {pack.get('ielts_band_target') or '(none)'}\n"
+        + (f"\nMaterial excerpts:\n{materials}\n" if materials else "")
+        + "\nGenerate the full HTML lesson now. Use interaction_slots for live poll/quiz/game blocks."
+    )
+
+
+def generate_writing_lesson_html(pack: dict, plan: dict, materials: str, system_prompt: str) -> dict[str, Any]:
+    from eap_ai import generate_teaching_page_html
+
+    topic = str(plan.get("title") or pack.get("title") or "Writing lesson").strip()
+    combined_prompt = (system_prompt or "").strip() + WRITING_HTML_FROM_PLAN_EXTRA
+    result = generate_teaching_page_html(
+        topic,
+        source_text=build_html_from_plan_prompt(pack, plan, materials),
+        level="intermediate",
+        lang="en",
+        custom_instructions="",
+        system_prompt=combined_prompt,
+    )
+    html = inject_lesson_meta_script(result.get("html") or "", plan, pack)
+    result["html"] = html
+    return result
+
+
 def generate_writing_lesson_plan(pack: dict, materials: str) -> dict[str, Any]:
     from eap_ai import create_chat_completion, get_openai_client
 
@@ -261,6 +331,16 @@ def generate_writing_lesson_plan(pack: dict, materials: str) -> dict[str, Any]:
         "provider": profile["id"],
         "model": profile["model"],
     }
+
+
+def _load_plan_row(row) -> dict | None:
+    if not row or not row["plan_json"]:
+        return None
+    try:
+        plan = json.loads(row["plan_json"])
+    except json.JSONDecodeError:
+        return None
+    return plan if isinstance(plan, dict) else None
 
 
 def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_if_enabled, get_current_authenticated_user, upload_dir: str, ai_is_configured, format_ai_error):
@@ -558,5 +638,199 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
             {
                 "pack": pack_row_to_dict(row, include_plan=True),
                 "ai": {"provider": result["provider"], "model": result["model"]},
+            }
+        )
+
+    @app.route("/api/teacher/lesson-prep/packs/<int:pack_id>/html", methods=["POST"])
+    def lesson_prep_pack_generate_html(pack_id: int):
+        """LP-M2: generate HTML from approved plan → save teaching page."""
+        pair, err = _teacher_conn()
+        if err:
+            return err
+        conn, teacher = pair
+        row = fetch_pack(conn, pack_id, teacher)
+        if row is None:
+            conn.close()
+            return jsonify({"error": "Not found"}), 404
+
+        plan = _load_plan_row(row)
+        if not plan:
+            conn.close()
+            return jsonify({"error": "Generate and approve a lesson plan first"}), 400
+        if row["plan_status"] not in ("approved", "planned"):
+            conn.close()
+            return jsonify({"error": "Plan must be approved before HTML generation"}), 400
+
+        if not ai_is_configured or not ai_is_configured():
+            conn.close()
+            return jsonify({"error": "AI is not configured on this server"}), 503
+
+        from teaching_page_templates import get_prompt as get_teaching_template_prompt
+        from teaching_page_templates import normalize_template_key
+        from teacher_teaching_pages import polish_teaching_html
+
+        pack_dict = pack_row_to_dict(row, include_plan=True)
+        materials = collect_materials_text(conn, pack_id)
+        tkey = normalize_template_key("standard")
+        prompt_row = get_teaching_template_prompt(conn, tkey)
+        try:
+            result = generate_writing_lesson_html(
+                pack_dict,
+                plan,
+                materials,
+                prompt_row["system_prompt"],
+            )
+        except Exception as exc:
+            conn.close()
+            detail = format_ai_error(exc) if format_ai_error else str(exc)
+            return jsonify({"error": "AI HTML generation failed", "detail": detail[:300]}), 502
+
+        html_content = polish_teaching_html(result.get("html") or "")
+        if not html_content:
+            conn.close()
+            return jsonify({"error": "AI returned empty HTML"}), 502
+
+        title = str(plan.get("title") or pack_dict["title"])[:200]
+        class_name = pack_dict["class_name"]
+        now = _now_iso()
+        page_id = row["teaching_page_id"] if "teaching_page_id" in row.keys() else None
+
+        if page_id:
+            conn.execute(
+                """
+                UPDATE teacher_teaching_pages SET
+                    title = ?, class_name = ?, topic = ?, html_content = ?,
+                    template_key = ?, updated_at = ?
+                WHERE id = ? AND teacher_username = ?
+                """,
+                (title, class_name, title, html_content, tkey, now, page_id, teacher),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO teacher_teaching_pages
+                    (title, class_name, task_id, topic, source_text, html_content, template_key,
+                     published, published_at, teacher_username, created_at, updated_at)
+                VALUES (?, ?, NULL, ?, NULL, ?, ?, 0, NULL, ?, ?, ?)
+                """,
+                (title, class_name, title, html_content, tkey, teacher, now, now),
+            )
+            page_id = cur.lastrowid
+
+        conn.execute(
+            """
+            UPDATE lesson_prep_packs SET
+                teaching_page_id = ?, plan_status = 'approved', status = 'html_ready', updated_at = ?
+            WHERE id = ? AND teacher_username = ?
+            """,
+            (page_id, now, pack_id, teacher),
+        )
+        conn.commit()
+        page_row = conn.execute(
+            "SELECT id, title, class_name, published, published_at FROM teacher_teaching_pages WHERE id = ?",
+            (page_id,),
+        ).fetchone()
+        row = fetch_pack(conn, pack_id, teacher)
+        conn.close()
+        return jsonify(
+            {
+                "pack": pack_row_to_dict(row, include_plan=True),
+                "page": {
+                    "id": page_row["id"],
+                    "title": page_row["title"],
+                    "class_name": page_row["class_name"],
+                    "published": bool(page_row["published"]),
+                    "view_path": f"/api/teacher/teaching-pages/{page_row['id']}/view",
+                },
+                "html": html_content,
+                "ai": {"provider": result.get("provider"), "model": result.get("model")},
+            }
+        )
+
+    @app.route("/api/teacher/lesson-prep/packs/<int:pack_id>/publish", methods=["POST"])
+    def lesson_prep_pack_publish(pack_id: int):
+        """LP-M2: calendar task + publish teaching page for students."""
+        pair, err = _teacher_conn()
+        if err:
+            return err
+        conn, teacher = pair
+        row = fetch_pack(conn, pack_id, teacher)
+        if row is None:
+            conn.close()
+            return jsonify({"error": "Not found"}), 404
+
+        page_id = row["teaching_page_id"] if "teaching_page_id" in row.keys() else None
+        if not page_id:
+            conn.close()
+            return jsonify({"error": "Generate HTML before publishing"}), 400
+
+        page = conn.execute(
+            "SELECT * FROM teacher_teaching_pages WHERE id = ? AND teacher_username = ?",
+            (page_id, teacher),
+        ).fetchone()
+        if page is None:
+            conn.close()
+            return jsonify({"error": "Teaching page not found"}), 404
+
+        data = request.get_json(silent=True) or {}
+        lesson_date = str(data.get("lesson_date") or row["lesson_date"] or "").strip()[:10]
+        if not lesson_date:
+            conn.close()
+            return jsonify({"error": "lesson_date is required (YYYY-MM-DD)"}), 400
+
+        class_name = str(row["class_name"] or PILOT_CLASS).strip()
+        task_id = row["calendar_task_id"] if "calendar_task_id" in row.keys() else None
+        now = _now_iso()
+
+        if not task_id:
+            plan = _load_plan_row(row)
+            desc_parts = []
+            if plan and plan.get("objectives"):
+                objs = plan["objectives"]
+                if isinstance(objs, list):
+                    desc_parts.append("Objectives: " + "; ".join(str(x) for x in objs[:4]))
+            desc_parts.append(f"Interactive lesson page (pack #{pack_id}).")
+            description = " ".join(desc_parts)[:2000]
+            cur = conn.execute(
+                """
+                INSERT INTO calendar_tasks
+                    (date, title, title_zh, category, period, description, description_zh, status, class_name)
+                VALUES (?, ?, NULL, ?, '', ?, NULL, 'Pending', ?)
+                """,
+                (lesson_date, page["title"], "Writing", description, class_name),
+            )
+            task_id = cur.lastrowid
+
+        conn.execute(
+            """
+            UPDATE teacher_teaching_pages SET
+                class_name = ?, task_id = ?, published = 1, published_at = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (class_name, task_id, now, now, page_id),
+        )
+        conn.execute(
+            """
+            UPDATE lesson_prep_packs SET
+                lesson_date = ?, calendar_task_id = ?, status = 'published', updated_at = ?
+            WHERE id = ? AND teacher_username = ?
+            """,
+            (lesson_date, task_id, now, pack_id, teacher),
+        )
+        conn.commit()
+        task = conn.execute("SELECT * FROM calendar_tasks WHERE id = ?", (task_id,)).fetchone()
+        row = fetch_pack(conn, pack_id, teacher)
+        conn.close()
+        return jsonify(
+            {
+                "pack": pack_row_to_dict(row, include_plan=True),
+                "task": {
+                    "id": task["id"],
+                    "date": task["date"],
+                    "title": task["title"],
+                    "category": task["category"],
+                    "class_name": task["class_name"],
+                },
+                "page": {"id": page_id, "published": True},
             }
         )
