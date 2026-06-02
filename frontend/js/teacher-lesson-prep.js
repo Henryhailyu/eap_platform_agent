@@ -360,10 +360,20 @@
       setStatus(statusEl, t("tlp_generating_html"), false);
       try {
         const id = await ensurePack(statusEl);
+        let planToSave = currentPlan;
+        if (!planToSave) {
+          try {
+            planToSave = JSON.parse(document.getElementById("tlp-plan-json")?.value || "{}");
+          } catch (_) {
+            setStatus(statusEl, t("tlp_json_invalid"), true);
+            return;
+          }
+        }
         await prepApi.updatePack(id, {
-          plan: currentPlan,
+          plan: planToSave,
           plan_status: "approved",
         });
+        currentPlan = planToSave;
         const result = await prepApi.generateHtml(id);
         teachingPageId = result.page?.id || result.pack?.teaching_page_id || teachingPageId;
         const html = result.html || "";
