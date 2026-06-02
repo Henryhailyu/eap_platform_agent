@@ -111,6 +111,78 @@ def ai_public_status() -> dict[str, Any]:
     }
 
 
+def _is_hunyuan_profile(profile: dict[str, Any]) -> bool:
+    return "hunyuan.cloud.tencent.com" in (profile.get("base_url") or "")
+
+
+_HUNYUAN_MODEL_FALLBACKS = (
+    "hunyuan-turbos-latest",
+    "hunyuan-turbo-latest",
+    "hunyuan-turbo",
+)
+
+
+def format_ai_error(exc: Exception) -> str:
+    """Short, safe error text for JSON responses (no API keys)."""
+    try:
+        from openai import APIStatusError
+
+        if isinstance(exc, APIStatusError):
+            code = getattr(exc, "status_code", None)
+            body = getattr(exc, "body", None)
+            if isinstance(body, dict):
+                err = body.get("error")
+                if isinstance(err, dict):
+                    msg = err.get("message") or err.get("code")
+                    if msg:
+                        return f"{code}: {msg}"[:200]
+                msg = body.get("message")
+                if msg:
+                    return f"{code}: {msg}"[:200]
+            return f"HTTP {code}: {str(exc)}"[:200]
+    except ImportError:
+        pass
+    text = str(exc).strip()
+    return text[:200] if text else type(exc).__name__
+
+
+def _should_try_next_model(exc: Exception) -> bool:
+    text = format_ai_error(exc).lower()
+    return (
+        "model" in text
+        and ("not found" in text or "not exist" in text or "invalid" in text or "unknown" in text)
+    ) or "modelnotfound" in text.replace(" ", "")
+
+
+def create_chat_completion(client, profile: dict[str, Any], **kwargs: Any):
+    """Call chat.completions with Hunyuan extras and model fallbacks."""
+    models: list[str] = []
+    primary = (profile.get("model") or "").strip()
+    if primary:
+        models.append(primary)
+    if _is_hunyuan_profile(profile):
+        for name in _HUNYUAN_MODEL_FALLBACKS:
+            if name not in models:
+                models.append(name)
+
+    last_exc: Exception | None = None
+    for model in models:
+        req = dict(kwargs)
+        req["model"] = model
+        if _is_hunyuan_profile(profile):
+            req["extra_body"] = {"enable_enhancement": True}
+        try:
+            return client.chat.completions.create(**req)
+        except Exception as exc:
+            last_exc = exc
+            log.warning("AI chat failed model=%s: %s", model, format_ai_error(exc))
+            if not _should_try_next_model(exc) or model == models[-1]:
+                raise
+    if last_exc:
+        raise last_exc
+    raise RuntimeError("No AI model configured")
+
+
 def get_openai_client(provider: str | None = None):
     resolved = _effective_provider(provider)
     profile = _provider_profile(resolved)
@@ -122,7 +194,7 @@ def get_openai_client(provider: str | None = None):
         )
     from openai import OpenAI
 
-    kwargs: dict[str, Any] = {"api_key": profile["api_key"]}
+    kwargs: dict[str, Any] = {"api_key": profile["api_key"], "timeout": 180.0}
     if profile.get("base_url"):
         kwargs["base_url"] = profile["base_url"]
     return OpenAI(**kwargs), profile
@@ -131,8 +203,9 @@ def get_openai_client(provider: str | None = None):
 def ai_ping(provider: str | None = None) -> dict[str, Any]:
     """Minimal chat completion to verify key + base URL."""
     client, profile = get_openai_client(provider)
-    response = client.chat.completions.create(
-        model=profile["model"],
+    response = create_chat_completion(
+        client,
+        profile,
         messages=[{"role": "user", "content": "Reply with exactly: EAP_OK"}],
         max_tokens=16,
         temperature=0,
@@ -167,8 +240,9 @@ def _coach_json_reply(
         raise ValueError("json_keys required")
 
     client, profile = get_openai_client(provider)
-    response = client.chat.completions.create(
-        model=profile["model"],
+    response = create_chat_completion(
+        client,
+        profile,
         messages=[
             {"role": "system", "content": system_prompt.strip()},
             {"role": "user", "content": user_prompt},
@@ -349,8 +423,9 @@ def generate_teaching_page_html(
     user_prompt = "\n\n".join(user_parts)
 
     client, profile = get_openai_client(provider)
-    response = client.chat.completions.create(
-        model=profile["model"],
+    response = create_chat_completion(
+        client,
+        profile,
         messages=[
             {"role": "system", "content": prompt},
             {"role": "user", "content": user_prompt},

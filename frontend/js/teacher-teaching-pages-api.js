@@ -23,7 +23,9 @@
   async function readJson(response) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const msg = (data && (data.error || data.message)) || `HTTP ${response.status}`;
+      const base = (data && (data.error || data.message)) || `HTTP ${response.status}`;
+      const detail = data && data.detail ? String(data.detail).trim() : "";
+      const msg = detail && detail !== base ? `${base}: ${detail}` : base;
       throw new Error(msg);
     }
     return data;

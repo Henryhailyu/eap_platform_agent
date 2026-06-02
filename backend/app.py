@@ -62,6 +62,7 @@ try:
         ai_is_configured,
         ai_ping,
         ai_public_status,
+        format_ai_error,
         generate_teaching_page_html,
         module_coach_reply,
         vocabulary_explain,
@@ -70,9 +71,16 @@ except ImportError:
     ai_is_configured = None  # type: ignore[assignment,misc]
     ai_ping = None  # type: ignore[assignment,misc]
     ai_public_status = None  # type: ignore[assignment,misc]
+    format_ai_error = None  # type: ignore[assignment,misc]
     generate_teaching_page_html = None  # type: ignore[assignment,misc]
     module_coach_reply = None  # type: ignore[assignment,misc]
     vocabulary_explain = None  # type: ignore[assignment,misc]
+
+
+def _ai_error_detail(exc: Exception) -> str:
+    if format_ai_error:
+        return format_ai_error(exc)
+    return str(exc)[:200]
 
 setup_logging()
 validate_production_config()
@@ -7242,7 +7250,7 @@ def student_self_study_ai_coach(module):
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
         conn.close()
-        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+        return jsonify({"error": "AI request failed", "detail": _ai_error_detail(exc)}), 502
 
 
 @app.route("/api/student/self-study/ai/vocabulary-explain", methods=["POST"])
@@ -7282,7 +7290,7 @@ def student_self_study_vocabulary_explain():
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001 — provider errors for student UI
         conn.close()
-        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+        return jsonify({"error": "AI request failed", "detail": _ai_error_detail(exc)}), 502
 
 
 @app.route("/api/admin/self-study/ai/prompts", methods=["GET"])
@@ -7408,7 +7416,7 @@ def admin_self_study_ai_prompt_preview(module):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
-        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+        return jsonify({"error": "AI request failed", "detail": _ai_error_detail(exc)}), 502
 
 
 # --- Phase K3–K5: Teacher AI HTML teaching pages ---
@@ -7751,7 +7759,25 @@ def admin_teaching_page_template_preview(template_key):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
-        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+        return jsonify({"error": "AI request failed", "detail": _ai_error_detail(exc)}), 502
+
+
+@app.route("/api/teacher/teaching-pages/ai/ping", methods=["POST"])
+def teacher_teaching_pages_ai_ping():
+    """Verify Hunyuan/OpenAI credentials from the server (teacher session)."""
+    conn = get_db_connection()
+    err = require_session_role_if_enabled(conn, "teacher")
+    if err is not None:
+        conn.close()
+        return err
+    conn.close()
+    if not ai_ping or not ai_is_configured or not ai_is_configured():
+        return jsonify({"error": "AI not configured", "status": ai_public_status()}), 503
+    try:
+        result = ai_ping()
+        return jsonify(result)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": "AI ping failed", "detail": _ai_error_detail(exc)}), 502
 
 
 @app.route("/api/teacher/teaching-pages/templates", methods=["GET"])
@@ -7850,7 +7876,7 @@ def teacher_teaching_pages_generate():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001
-        return jsonify({"error": "AI request failed", "detail": str(exc)[:200]}), 502
+        return jsonify({"error": "AI request failed", "detail": _ai_error_detail(exc)}), 502
 
 
 @app.route("/api/teacher/teaching-pages", methods=["GET", "POST"])
