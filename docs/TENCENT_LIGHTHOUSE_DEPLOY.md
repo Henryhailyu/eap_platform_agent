@@ -260,14 +260,38 @@ Nginx 简要：对外 443 → 本机 `127.0.0.1:5051`，并设置 `EAP_TRUST_PRO
 
 ## 第 10 步：AI（可选）
 
-在 `.env` 增加（与 Render 相同）：
+在项目根目录的 `.env` 增加（**不要提交 Git**）。混元用 OpenAI 兼容接口：
 
 ```env
 EAP_AI_ENABLED=1
+EAP_AI_PROVIDER=openai
+EAP_OPENAI_API_KEY=sk-你的混元密钥
+EAP_OPENAI_BASE_URL=https://api.hunyuan.cloud.tencent.com/v1
+EAP_OPENAI_MODEL=hunyuan-turbos-latest
+```
+
+DeepSeek 备选：
+
+```env
+EAP_AI_ENABLED=1
+EAP_AI_PROVIDER=deepseek
 EAP_DEEPSEEK_API_KEY=你的密钥
 ```
 
-然后 `docker compose up -d` 重启。
+保存后加载环境变量并重启（**必须** `source .env`，否则 Docker 读不到密钥）：
+
+```bash
+cd ~/eap_platform_agent
+set -a && source .env && set +a
+sudo docker compose up -d --build
+```
+
+验证（不应打印完整 key）：
+
+```bash
+sudo docker compose exec eap printenv EAP_AI_ENABLED EAP_AI_PROVIDER EAP_OPENAI_BASE_URL
+curl -s http://127.0.0.1:5051/api/health | head -c 400
+```
 
 ---
 

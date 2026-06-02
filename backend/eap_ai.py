@@ -16,13 +16,31 @@ log = logging.getLogger("eap.ai")
 _PROVIDER_ALIASES = {
     "openai": "openai",
     "gptsapi": "openai",
+    "hunyuan": "openai",
+    "tencent": "openai",
+    "混元": "openai",
     "deepseek": "deepseek",
 }
 
+_DEFAULT_HUNYUAN_BASE = "https://api.hunyuan.cloud.tencent.com/v1"
+_DEFAULT_HUNYUAN_MODEL = "hunyuan-turbos-latest"
+
 
 def _normalize_provider(name: str | None) -> str:
-    raw = (name or config.AI_PROVIDER or "deepseek").strip().lower()
+    raw = (name or config.AI_PROVIDER or "openai").strip().lower()
     return _PROVIDER_ALIASES.get(raw, raw)
+
+
+def _effective_provider(requested: str | None = None) -> str:
+    """Pick a provider that has credentials (Hunyuan uses openai-compatible env vars)."""
+    preferred = _normalize_provider(requested or config.AI_PROVIDER)
+    if _provider_profile(preferred):
+        return preferred
+    if _provider_profile("openai"):
+        return "openai"
+    if _provider_profile("deepseek"):
+        return "deepseek"
+    return preferred
 
 
 def _provider_profile(name: str | None = None) -> dict[str, Any] | None:
@@ -39,11 +57,17 @@ def _provider_profile(name: str | None = None) -> dict[str, Any] | None:
     if provider == "openai":
         if not config.OPENAI_API_KEY:
             return None
+        base = config.OPENAI_BASE_URL or ""
+        model = config.OPENAI_MODEL or config.AI_MODEL or "gpt-4o-mini"
+        if "hunyuan.cloud.tencent.com" in base and model == "gpt-4o-mini":
+            model = _DEFAULT_HUNYUAN_MODEL
+        if not base and model.startswith("hunyuan"):
+            base = _DEFAULT_HUNYUAN_BASE
         return {
             "id": "openai",
             "api_key": config.OPENAI_API_KEY,
-            "base_url": config.OPENAI_BASE_URL or None,
-            "model": config.OPENAI_MODEL or config.AI_MODEL or "gpt-4o-mini",
+            "base_url": base or None,
+            "model": model,
         }
     return None
 
@@ -63,22 +87,23 @@ def ai_is_configured(provider: str | None = None) -> bool:
     if not config.AI_ENABLED:
         return False
     if provider:
-        return _provider_profile(provider) is not None
-    if _provider_profile(config.AI_PROVIDER):
-        return True
-    return _provider_profile("deepseek") is not None or _provider_profile("openai") is not None
+        return _provider_profile(_normalize_provider(provider)) is not None
+    return _provider_profile(_effective_provider()) is not None
 
 
 def ai_public_status() -> dict[str, Any]:
     """Safe status for health/admin routes — never includes keys."""
-    active = _normalize_provider(config.AI_PROVIDER)
-    active_profile = _provider_profile(active)
+    configured_provider = _effective_provider()
+    active_profile = _provider_profile(configured_provider)
     return {
         "enabled": config.AI_ENABLED,
         "configured": ai_is_configured(),
-        "active_provider": active,
+        "configured_provider": configured_provider,
+        "active_provider": _normalize_provider(config.AI_PROVIDER),
         "active_configured": active_profile is not None,
         "model": active_profile["model"] if active_profile else None,
+        "openai_key_set": bool(config.OPENAI_API_KEY),
+        "deepseek_key_set": bool(config.DEEPSEEK_API_KEY),
         "providers": {
             "deepseek": _provider_public("deepseek"),
             "openai": _provider_public("openai"),
@@ -87,10 +112,14 @@ def ai_public_status() -> dict[str, Any]:
 
 
 def get_openai_client(provider: str | None = None):
-    profile = _provider_profile(provider)
+    resolved = _effective_provider(provider)
+    profile = _provider_profile(resolved)
     if not profile:
         wanted = _normalize_provider(provider or config.AI_PROVIDER)
-        raise RuntimeError(f"AI provider '{wanted}' is not configured")
+        raise RuntimeError(
+            f"AI provider '{wanted}' is not configured "
+            "(set EAP_OPENAI_API_KEY for Hunyuan or EAP_DEEPSEEK_API_KEY)"
+        )
     from openai import OpenAI
 
     kwargs: dict[str, Any] = {"api_key": profile["api_key"]}
