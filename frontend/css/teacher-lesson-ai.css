@@ -383,6 +383,23 @@
   font-size: 0.9rem;
 }
 
+.tla-saved-list__when {
+  flex: 1 1 100%;
+  font-size: 0.8rem;
+  color: #6e6e73;
+}
+
+.tlp-plan-ephemeral-note {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #5c4a00;
+  background: #fffbeb;
+  border: 1px solid rgba(180, 140, 0, 0.25);
+  border-radius: 8px;
+}
+
 .tla-live-panel {
   max-width: 48rem;
   width: 100%;

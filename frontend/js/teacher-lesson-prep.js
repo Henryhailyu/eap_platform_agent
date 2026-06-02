@@ -48,6 +48,50 @@
   let packId = null;
   let currentPlan = null;
   let teachingPageId = null;
+  /** In-session only: shown until teacher collapses AI prep accordion */
+  let planFlash = null;
+
+  function runAi(btn, fn) {
+    if (typeof global.EAP_runAiButton === "function") {
+      return global.EAP_runAiButton(btn, fn);
+    }
+    return fn();
+  }
+
+  function setPlanEphemeralNote(show) {
+    const note = document.getElementById("tlp-plan-ephemeral-note");
+    if (note) note.classList.toggle("hidden", !show);
+  }
+
+  function showPlanFlash(plan) {
+    if (!packId || !plan) {
+      clearPlanPreview();
+      return;
+    }
+    planFlash = { packId, plan };
+    currentPlan = plan;
+    renderPlan(plan, { ephemeral: true });
+  }
+
+  function clearPlanPreview() {
+    planFlash = null;
+    currentPlan = null;
+    renderPlan(null);
+  }
+
+  async function resolvePlanForHtml(prepApi, id) {
+    if (currentPlan && (currentPlan.segments || currentPlan.objectives)) return currentPlan;
+    if (planFlash && planFlash.packId === id && planFlash.plan) return planFlash.plan;
+    try {
+      const parsed = JSON.parse(document.getElementById("tlp-plan-json")?.value || "{}");
+      if (parsed && (parsed.segments || parsed.objectives)) return parsed;
+    } catch (_) {
+      /* fall through */
+    }
+    const pack = await prepApi.getPack(id);
+    if (pack.plan && (pack.plan.segments || pack.plan.objectives)) return pack.plan;
+    throw new Error(t("tlp_no_plan_for_html"));
+  }
 
   function readForm() {
     return {
@@ -126,17 +170,20 @@
     link.classList.toggle("hidden", !pack?.has_html);
   }
 
-  function renderPlan(plan) {
-    currentPlan = plan;
+  function renderPlan(plan, opts) {
+    const ephemeral = !!(opts && opts.ephemeral);
+    if (plan) currentPlan = plan;
     const wrap = document.getElementById("tlp-plan-view");
     const jsonEl = document.getElementById("tlp-plan-json");
     if (!wrap) return;
     if (!plan) {
       wrap.innerHTML = `<p class="tlp-plan-empty">${escapeHtml(t("tlp_plan_empty"))}</p>`;
       if (jsonEl) jsonEl.value = "";
+      setPlanEphemeralNote(false);
       return;
     }
     if (jsonEl) jsonEl.value = JSON.stringify(plan, null, 2);
+    setPlanEphemeralNote(ephemeral);
 
     const segments = Array.isArray(plan.segments) ? plan.segments : [];
     const objectives = Array.isArray(plan.objectives) ? plan.objectives : [];
@@ -245,7 +292,9 @@
       packId = pack.id;
       fillForm(pack);
       renderPackFiles(pack.files || []);
-      renderPlan(pack.plan);
+      planFlash = null;
+      currentPlan = null;
+      renderPlan(null);
       document.getElementById("tlp-pack-id-label").textContent = `#${pack.id}`;
       await refreshPackSelect(pack.id);
       setStatus(statusEl, "", false);
@@ -280,10 +329,11 @@
       const val = ev.target.value;
       if (!val) {
         packId = null;
+        planFlash = null;
         currentPlan = null;
         teachingPageId = null;
         document.getElementById("tlp-pack-id-label").textContent = "—";
-        renderPlan(null);
+        clearPlanPreview();
         renderPackFiles([]);
         return;
       }
@@ -320,17 +370,20 @@
       }
     });
 
-    document.getElementById("tlp-generate-plan-btn")?.addEventListener("click", async () => {
-      setStatus(statusEl, t("tlp_generating"), false);
-      try {
-        const id = await ensurePack(statusEl);
-        const result = await prepApi.generatePlan(id);
-        renderPlan(result.pack?.plan || result.plan);
-        setStatus(statusEl, t("tlp_generated_ok"), false);
-        await refreshPackSelect(id);
-      } catch (err) {
-        setStatus(statusEl, (err && err.message) || t("tlp_generate_failed"), true);
-      }
+    const planBtn = document.getElementById("tlp-generate-plan-btn");
+    planBtn?.addEventListener("click", () => {
+      void runAi(planBtn, async () => {
+        setStatus(statusEl, t("tlp_generating"), false);
+        try {
+          const id = await ensurePack(statusEl);
+          const result = await prepApi.generatePlan(id);
+          showPlanFlash(result.pack?.plan || result.plan);
+          setStatus(statusEl, t("tlp_generated_ok"), false);
+          await refreshPackSelect(id);
+        } catch (err) {
+          setStatus(statusEl, (err && err.message) || t("tlp_generate_failed"), true);
+        }
+      });
     });
 
     document.getElementById("tlp-save-plan-btn")?.addEventListener("click", async () => {
@@ -349,32 +402,26 @@
       setStatus(statusEl, t("tlp_saving"), false);
       try {
         const pack = await prepApi.updatePack(packId, { plan, plan_status: "approved" });
-        renderPlan(pack.plan);
+        showPlanFlash(pack.plan || plan);
         setStatus(statusEl, t("tlp_plan_saved"), false);
       } catch (err) {
         setStatus(statusEl, (err && err.message) || t("tlp_save_failed"), true);
       }
     });
 
-    document.getElementById("tlp-generate-html-btn")?.addEventListener("click", async () => {
-      setStatus(statusEl, t("tlp_generating_html"), false);
-      try {
-        const id = await ensurePack(statusEl);
-        let planToSave = currentPlan;
-        if (!planToSave) {
-          try {
-            planToSave = JSON.parse(document.getElementById("tlp-plan-json")?.value || "{}");
-          } catch (_) {
-            setStatus(statusEl, t("tlp_json_invalid"), true);
-            return;
-          }
-        }
-        await prepApi.updatePack(id, {
-          plan: planToSave,
-          plan_status: "approved",
-        });
-        currentPlan = planToSave;
-        const result = await prepApi.generateHtml(id);
+    const htmlBtn = document.getElementById("tlp-generate-html-btn");
+    htmlBtn?.addEventListener("click", () => {
+      void runAi(htmlBtn, async () => {
+        setStatus(statusEl, t("tlp_generating_html"), false);
+        try {
+          const id = await ensurePack(statusEl);
+          const planToSave = await resolvePlanForHtml(prepApi, id);
+          await prepApi.updatePack(id, {
+            plan: planToSave,
+            plan_status: "approved",
+          });
+          currentPlan = planToSave;
+          const result = await prepApi.generateHtml(id);
         teachingPageId = result.page?.id || result.pack?.teaching_page_id || teachingPageId;
         const html = result.html || "";
         if (html) {
@@ -390,9 +437,10 @@
         if (result.pack) updateLiveLink(result.pack);
         setStatus(statusEl, t("tlp_html_generated_ok"), false);
         await refreshPackSelect(id);
-      } catch (err) {
-        setStatus(statusEl, (err && err.message) || t("tlp_html_failed"), true);
-      }
+        } catch (err) {
+          setStatus(statusEl, (err && err.message) || t("tlp_html_failed"), true);
+        }
+      });
     });
 
     document.getElementById("tlp-publish-btn")?.addEventListener("click", async () => {
@@ -471,6 +519,18 @@
 
     await refreshPackSelect(null);
     bind();
+
+    section?.addEventListener("toggle", () => {
+      if (!section.open) {
+        clearPlanPreview();
+        return;
+      }
+      if (planFlash && planFlash.packId === packId) {
+        renderPlan(planFlash.plan, { ephemeral: true });
+      } else {
+        renderPlan(null);
+      }
+    });
 
     const params = new URLSearchParams(global.location.search);
     const loadId = params.get("pack");

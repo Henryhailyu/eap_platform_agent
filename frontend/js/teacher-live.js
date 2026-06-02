@@ -683,7 +683,11 @@
     displayLibrary.className = ctx.className || "EAP047";
     try {
       const data = await api.listItems(displayLibrary.className);
-      displayLibrary.items = data.items || [];
+      displayLibrary.items = (data.items || []).slice().sort((a, b) => {
+        const ta = String(a.updated_at || a.created_at || "");
+        const tb = String(b.updated_at || b.created_at || "");
+        return tb.localeCompare(ta);
+      });
       displayLibrary.activeId = data.active_item_id || null;
       renderDisplayLibraryList();
     } catch (_) {
@@ -702,8 +706,16 @@
       .map((item) => {
         const active = item.id === displayLibrary.activeId ? " tlive-display-list__item--active" : "";
         const badge = item.item_type === "html" ? t("tlive_display_type_html") : t("tlive_display_type_file");
+        const when =
+          typeof window.EAP_savedAtLabel === "function"
+            ? window.EAP_savedAtLabel(item.updated_at || item.created_at)
+            : "";
+        const whenHtml = when
+          ? `<span class="tlive-display-list__when">${escapeHtml(when)}</span>`
+          : "";
         return `<li class="tlive-display-list__item${active}">
           <button type="button" class="tlive-display-list__show" data-show="${item.id}">${escapeHtml(item.title)}</button>
+          ${whenHtml}
           <span class="tlive-display-list__badge">${escapeHtml(badge)}</span>
           <button type="button" class="btn-secondary btn-small" data-del-display="${item.id}">${escapeHtml(t("tla_delete"))}</button>
         </li>`;

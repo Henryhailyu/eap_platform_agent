@@ -621,6 +621,13 @@ window.EAP_STRINGS_EN = {
   "tlp_file_failed": "Extract failed",
   "tlp_plan_title": "Lesson plan preview",
   "tlp_plan_empty": "Generate a plan to see segments here.",
+  "tlp_plan_ephemeral_note":
+    "This lesson plan is shown only until you collapse this section. To keep a copy, paste it into your own document now. Generate HTML still uses the saved plan on the server after you approve it.",
+  "tlp_no_plan_for_html": "Generate a lesson plan first (or open Edit plan JSON and save an approved plan).",
+  "eap_ai_busy_generating": "AI generating…",
+  "eap_ai_busy_plan": "AI generating plan…",
+  "eap_ai_busy_html": "AI generating HTML…",
+  "eap_saved_at": "Saved {when}",
   "tlp_json_toggle": "Edit plan JSON (advanced)",
   "tlp_save_plan_btn": "Save approved plan",
   "tlp_objectives_heading": "Objectives",

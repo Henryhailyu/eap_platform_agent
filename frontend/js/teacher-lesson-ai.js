@@ -22,6 +22,20 @@
     return !!(global.EAP_I18N && global.EAP_I18N.getLang() === "zh");
   }
 
+  function savedAtHtml(page) {
+    if (typeof global.EAP_savedAtLabel !== "function") return "";
+    const when = page.updated_at || page.created_at;
+    const label = global.EAP_savedAtLabel(when);
+    return label ? `<span class="tla-saved-list__when">${escapeHtml(label)}</span>` : "";
+  }
+
+  function runAi(btn, fn) {
+    if (typeof global.EAP_runAiButton === "function") {
+      return global.EAP_runAiButton(btn, fn);
+    }
+    return fn();
+  }
+
   let draftHtml = "";
   let draftTopic = "";
   let draftSource = "";
@@ -315,7 +329,11 @@
     const api = API();
     if (!container || !api) return;
     try {
-      const pages = await api.listPages();
+      const pages = (await api.listPages()).slice().sort((a, b) => {
+        const ta = String(a.updated_at || a.created_at || "");
+        const tb = String(b.updated_at || b.created_at || "");
+        return tb.localeCompare(ta);
+      });
       if (!pages.length) {
         container.innerHTML = `<p class="tla-status">${escapeHtml(t("tla_saved_empty"))}</p>`;
         return;
@@ -331,7 +349,8 @@
               : `<button type="button" class="btn-secondary btn-small" data-publish="${p.id}">${escapeHtml(t("tla_publish"))}</button>`;
             return `
         <li>
-          <span class="tla-saved-list__title">${escapeHtml(p.title)}</span>${pub}
+          <span class="tla-saved-list__title">${escapeHtml(p.title)}</span>
+          ${savedAtHtml(p)}${pub}
           <button type="button" class="btn-secondary btn-small" data-load="${p.id}">${escapeHtml(t("tla_load"))}</button>
           <button type="button" class="btn-secondary btn-small" data-present="${p.id}">${escapeHtml(t("tla_present"))}</button>
           <button type="button" class="btn-secondary btn-small" data-push="${p.id}">${escapeHtml(t("tla_push_class"))}</button>
@@ -437,7 +456,10 @@
       return;
     }
     setStatus(statusEl, t("tla_generating"), false);
-    try {
+    const generateBtn = compact
+      ? document.getElementById("tla-live-generate")
+      : document.getElementById("tla-generate-btn");
+    const work = async () => {
       const page = await api.generatePage({
         topic,
         source_text: (sourceEl?.value || "").trim(),
@@ -467,6 +489,10 @@
         !activityCount,
       );
       if (compact) presentHtmlInCanvas(draftHtml, page.title || topic);
+    };
+    try {
+      if (generateBtn) await runAi(generateBtn, work);
+      else await work();
     } catch (err) {
       setStatus(statusEl, (err && err.message) || t("tla_generate_failed"), true);
     }
@@ -505,7 +531,7 @@
           </select>
         </div>
         <div class="tla-actions">
-          <button type="button" class="btn-primary" id="tla-live-generate">${escapeHtml(t("tla_generate_btn"))}</button>
+          <button type="button" class="btn-primary" id="tla-live-generate" data-eap-ai-busy-key="eap_ai_busy_html">${escapeHtml(t("tla_generate_btn"))}</button>
           <a class="btn-secondary" href="teacher-lesson-ai.html">${escapeHtml(t("tla_open_full"))}</a>
         </div>
         <p id="tla-live-status" class="tla-status hidden" role="status"></p>

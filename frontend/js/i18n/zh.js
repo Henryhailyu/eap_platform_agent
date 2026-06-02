@@ -623,6 +623,13 @@ window.EAP_STRINGS_ZH = {
   "tlp_file_failed": "提取失败",
   "tlp_plan_title": "教案预览",
   "tlp_plan_empty": "生成教案后在此显示分段。",
+  "tlp_plan_ephemeral_note":
+    "本次生成的教案仅在收起本区块前显示。若要长期保存，请现在复制粘贴到您的文档。生成 HTML 仍会使用您确认并保存在服务器上的教案。",
+  "tlp_no_plan_for_html": "请先生成教案，或在「编辑教案 JSON」中保存已确认的教案。",
+  "eap_ai_busy_generating": "AI 正在生成…",
+  "eap_ai_busy_plan": "AI 正在生成教案…",
+  "eap_ai_busy_html": "AI 正在生成 HTML…",
+  "eap_saved_at": "保存于 {when}",
   "tlp_json_toggle": "编辑教案 JSON（高级）",
   "tlp_save_plan_btn": "保存已确认的教案",
   "tlp_objectives_heading": "学习目标",

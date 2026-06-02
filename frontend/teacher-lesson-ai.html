@@ -13,7 +13,8 @@
     />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="css/teacher-live.css" />
-    <link rel="stylesheet" href="css/teacher-lesson-ai.css?v=20260602-uat2" />
+    <link rel="stylesheet" href="css/teacher-lesson-ai.css?v=20260602-ux3" />
+    <link rel="stylesheet" href="css/eap-ai-busy.css?v=20260602-ux3" />
   </head>
   <body class="page-app eap-shell-active" data-page="teacher-lesson-ai">
     <div id="page-shell" class="page-shell">
@@ -95,7 +96,14 @@
                   <button type="button" class="btn-secondary" id="tlp-save-pack-btn" data-i18n="tlp_save_pack_btn">
                     Save pack
                   </button>
-                  <button type="button" class="btn-primary" id="tlp-generate-plan-btn" data-i18n="tlp_generate_plan_btn">
+                  <button
+                    type="button"
+                    class="btn-primary"
+                    id="tlp-generate-plan-btn"
+                    data-eap-ai-target="#tlp-plan-view"
+                    data-eap-ai-busy-key="eap_ai_busy_plan"
+                    data-i18n="tlp_generate_plan_btn"
+                  >
                     Generate lesson plan (AI)
                   </button>
                 </div>
@@ -114,6 +122,7 @@
             </div>
             <div class="tlp-plan-block">
               <h3 class="tlp-plan-block__title" data-i18n="tlp_plan_title">Lesson plan preview</h3>
+              <p id="tlp-plan-ephemeral-note" class="tlp-plan-ephemeral-note hidden" data-i18n="tlp_plan_ephemeral_note"></p>
               <div id="tlp-plan-view" class="tlp-plan-view" aria-live="polite">
                 <p class="tlp-plan-empty" data-i18n="tlp_plan_empty">Generate a plan to see segments here.</p>
               </div>
@@ -131,7 +140,14 @@
                 After you save the plan, generate HTML, preview, then publish to the class calendar.
               </p>
               <div class="tla-actions">
-                <button type="button" class="btn-primary" id="tlp-generate-html-btn" data-i18n="tlp_generate_html_btn">
+                <button
+                  type="button"
+                  class="btn-primary"
+                  id="tlp-generate-html-btn"
+                  data-eap-ai-target=".tla-preview-wrap"
+                  data-eap-ai-busy-key="eap_ai_busy_html"
+                  data-i18n="tlp_generate_html_btn"
+                >
                   Generate HTML from plan
                 </button>
                 <button type="button" class="btn-secondary" id="tlp-publish-btn" data-i18n="tlp_publish_btn">
@@ -202,7 +218,16 @@
                 <input id="tla-class" type="text" maxlength="80" placeholder="e.g. EAP047" />
               </div>
               <div class="tla-actions">
-                <button type="button" class="btn-primary" id="tla-generate-btn" data-i18n="tla_generate_btn">Generate HTML lesson</button>
+                <button
+                  type="button"
+                  class="btn-primary"
+                  id="tla-generate-btn"
+                  data-eap-ai-target=".tla-preview-wrap"
+                  data-eap-ai-busy-key="eap_ai_busy_html"
+                  data-i18n="tla_generate_btn"
+                >
+                  Generate HTML lesson
+                </button>
                 <button type="button" class="btn-secondary" id="tla-save-btn" data-i18n="tla_save_btn">Save to library</button>
                 <button type="button" class="btn-secondary" id="tla-present-btn" data-i18n="tla_present_btn">Open preview tab</button>
                 <button type="button" class="btn-secondary" id="tla-push-class-btn" data-i18n="tla_push_class">Push to classroom</button>
@@ -235,14 +260,16 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="app.js"></script>
+    <script src="js/eap-saved-datetime.js?v=20260602-ux3"></script>
+    <script src="js/eap-ai-busy.js?v=20260602-ux3"></script>
     <script src="js/teacher-teaching-pages-api.js?v=20260602-ai-detail"></script>
     <script src="js/eap-live-lesson-slots.js?v=20260602-uat1"></script>
     <script src="js/teacher-lesson-prep-api.js?v=20260602-uat2"></script>
-    <script src="js/teacher-lesson-prep.js?v=20260602-htmlfix"></script>
+    <script src="js/teacher-lesson-prep.js?v=20260602-ux3"></script>
     <script src="js/live-teaching-api.js"></script>
     <script src="js/eap-html-bridge.js"></script>
     <script src="js/eap-file-viewer.js"></script>
     <script src="js/classroom-display-api.js"></script>
-    <script src="js/teacher-lesson-ai.js?v=20260602-uat1"></script>
+    <script src="js/teacher-lesson-ai.js?v=20260602-ux3"></script>
   </body>
 </html>
