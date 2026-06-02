@@ -808,6 +808,10 @@ def init_database():
 
     migrate_teacher_teaching_pages_k45(conn)
 
+    from lesson_prep import migrate_lesson_prep_tables
+
+    migrate_lesson_prep_tables(conn)
+
     seed_default_users(conn)
     ensure_e1_demo_users(conn)
     seed_academic_calendar(conn)
@@ -8155,6 +8159,18 @@ from task_materials import register_task_materials_routes
 
 register_recorded_lessons_routes(app)
 register_task_materials_routes(app)
+
+from lesson_prep import register_lesson_prep_routes
+
+register_lesson_prep_routes(
+    app,
+    get_db_connection=get_db_connection,
+    require_session_role_if_enabled=require_session_role_if_enabled,
+    get_current_authenticated_user=get_current_authenticated_user,
+    upload_dir=UPLOAD_DIR,
+    ai_is_configured=ai_is_configured,
+    format_ai_error=format_ai_error,
+)
 
 # Start the Flask server
 if __name__ == "__main__":
