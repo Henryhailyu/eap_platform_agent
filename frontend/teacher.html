@@ -496,6 +496,50 @@
                       placeholder="Instructions, links, or notes for students…"
                     ></textarea>
                   </div>
+                  <div
+                    class="field teacher-task-ai-marking-panel hidden"
+                    id="teacher-task-ai-marking-panel"
+                    aria-hidden="true"
+                  >
+                    <div class="field field--checkbox">
+                      <input
+                        type="checkbox"
+                        id="teacher-task-ai-marking-enabled"
+                        name="ai_marking_enabled"
+                      />
+                      <label for="teacher-task-ai-marking-enabled" data-i18n="teacher_ai_marking_checkbox"
+                        >Request AI report for student submissions (requires marking descriptor)</label
+                      >
+                    </div>
+                    <p class="field-hint" data-i18n="teacher_ai_marking_hint">
+                      If this assignment uses a marking descriptor and you want an English AI draft report for each
+                      submission, check the box and upload the descriptor file(s) below.
+                    </p>
+                    <div id="teacher-task-marking-descriptor-wrap" class="field hidden" aria-hidden="true">
+                      <label for="teacher-task-marking-descriptor" data-i18n="teacher_ai_marking_upload_label"
+                        >Marking descriptor file(s)</label
+                      >
+                      <p class="field-hint" data-i18n="teacher_ai_marking_upload_hint">
+                        PDF, Word, PowerPoint, Excel, or plain text. You can add multiple files.
+                      </p>
+                      <input
+                        id="teacher-task-marking-descriptor"
+                        type="file"
+                        multiple
+                        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.rtf"
+                      />
+                      <p
+                        id="teacher-task-marking-descriptor-summary"
+                        class="file-selection-summary"
+                        aria-live="polite"
+                      ></p>
+                      <ul
+                        id="teacher-task-marking-descriptor-list"
+                        class="teacher-create-material-list"
+                        aria-live="polite"
+                      ></ul>
+                    </div>
+                  </div>
                   <div class="field teacher-task-create-material" id="teacher-task-create-material-field">
                     <label for="teacher-task-create-material" data-i18n="teacher_create_material_label"
                       >Teaching material (optional)</label
@@ -719,7 +763,7 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="js/recorded-lessons-api.js"></script>
-    <script src="js/teacher-homework-marking.js?v=20260602-abc"></script>
-    <script src="app.js?v=20260602-abc"></script>
+    <script src="js/teacher-homework-marking.js?v=20260603-hm-fix"></script>
+    <script src="app.js?v=20260603-hm-fix"></script>
   </body>
 </html>

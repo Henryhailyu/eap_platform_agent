@@ -21,6 +21,7 @@ from teaching_page_source_files import (
 log = logging.getLogger("eap.homework_marking")
 
 DESCRIPTOR_SUBDIR = "homework-marking-descriptors"
+TASK_DESCRIPTOR_SUBDIR = "task-marking-descriptors"
 MAX_DESCRIPTOR_BYTES = 10 * 1024 * 1024
 MAX_STUDENT_TEXT = 12000
 MAX_DESCRIPTOR_TEXT = 14000
@@ -107,7 +108,94 @@ def migrate_homework_marking_tables(conn) -> None:
         )
         """
     )
+    rows = conn.execute("PRAGMA table_info(calendar_tasks)").fetchall()
+    col_names = [r[1] for r in rows]
+    if "ai_marking_enabled" not in col_names:
+        conn.execute(
+            "ALTER TABLE calendar_tasks ADD COLUMN ai_marking_enabled INTEGER NOT NULL DEFAULT 0"
+        )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS task_marking_descriptor_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            original_name TEXT NOT NULL,
+            stored_name TEXT NOT NULL,
+            extract_status TEXT NOT NULL DEFAULT 'pending',
+            extract_error TEXT,
+            extracted_text TEXT,
+            char_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (task_id) REFERENCES calendar_tasks(id) ON DELETE CASCADE
+        )
+        """
+    )
     _seed_default_profile(conn)
+
+
+def task_descriptor_upload_dir(upload_dir: str, task_id: int) -> str:
+    path = os.path.join(upload_dir, TASK_DESCRIPTOR_SUBDIR, str(task_id))
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _task_ai_marking_enabled(conn, task_id: int) -> bool:
+    row = conn.execute(
+        "SELECT ai_marking_enabled FROM calendar_tasks WHERE id = ?",
+        (int(task_id),),
+    ).fetchone()
+    if row is None:
+        return False
+    try:
+        return bool(row["ai_marking_enabled"])
+    except (KeyError, IndexError):
+        return False
+
+
+def _task_allows_ai_marking(conn, task_id: int, task_row) -> bool:
+    """Task opted in, has per-task descriptors, or legacy Homework/Writing pilot profile."""
+    if _task_ai_marking_enabled(conn, task_id):
+        return True
+    if _descriptor_text_for_task(conn, task_id):
+        return True
+    cat = str(task_row["category"] or "").strip()
+    if cat in ("Homework", "Writing"):
+        profile = _pick_profile_for_task(conn, cat)
+        return profile is not None and bool(profile["auto_generate"])
+    return False
+
+
+def task_descriptor_row_to_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "task_id": row["task_id"],
+        "original_name": row["original_name"],
+        "stored_name": row["stored_name"],
+        "extract_status": row["extract_status"],
+        "extract_error": row["extract_error"] or "",
+        "char_count": row["char_count"],
+        "created_at": row["created_at"],
+    }
+
+
+def _descriptor_text_for_task(conn, task_id: int) -> str:
+    rows = conn.execute(
+        """
+        SELECT extracted_text FROM task_marking_descriptor_files
+        WHERE task_id = ? AND extract_status = 'ok'
+        ORDER BY id ASC
+        """,
+        (int(task_id),),
+    ).fetchall()
+    blocks = []
+    for row in rows:
+        text = (row["extracted_text"] or "").strip()
+        if text:
+            blocks.append(text)
+    merged = "\n\n---\n\n".join(blocks)
+    if len(merged) > MAX_DESCRIPTOR_TEXT:
+        merged = merged[:MAX_DESCRIPTOR_TEXT]
+    return merged
 
 
 def _seed_default_profile(conn) -> None:
@@ -255,7 +343,9 @@ def _descriptor_text_for_profile(conn, profile_id: int) -> str:
     return merged
 
 
-def _student_submission_text(conn, submission_row, upload_dir: str) -> str:
+def _student_submission_text(
+    conn, submission_row, upload_dir: str, submissions_dir: str | None = None
+) -> str:
     parts = []
     answer = (submission_row["answer_text"] or "").strip()
     if answer:
@@ -263,15 +353,29 @@ def _student_submission_text(conn, submission_row, upload_dir: str) -> str:
     fp = submission_row["file_path"]
     if fp:
         path = os.path.join(upload_dir, os.path.basename(str(fp)))
+        if submissions_dir is None:
+            submissions_dir = os.path.join(os.path.dirname(upload_dir), "submissions")
+        if not os.path.isfile(path) and submissions_dir and os.path.isdir(submissions_dir):
+            alt = os.path.join(submissions_dir, os.path.basename(str(fp)))
+            if os.path.isfile(alt):
+                path = alt
         if os.path.isfile(path):
             ext = path.rsplit(".", 1)[-1].lower()
             try:
                 with open(path, "rb") as fh:
-                    extracted = normalize_extracted_text(
-                        extract_text_from_bytes(fh.read(), ext)
+                    raw = fh.read()
+                if ext in ("jpg", "jpeg", "png"):
+                    parts.append(
+                        f"[Attachment image: {submission_row['file_name'] or fp} — text not extracted]"
                     )
-                if extracted:
-                    parts.append(f"[Attachment: {submission_row['file_name'] or fp}]\n{extracted}")
+                else:
+                    extracted = normalize_extracted_text(
+                        extract_text_from_bytes(raw, ext)
+                    )
+                    if extracted:
+                        parts.append(
+                            f"[Attachment: {submission_row['file_name'] or fp}]\n{extracted}"
+                        )
             except Exception as exc:
                 parts.append(f"[Attachment could not be read: {exc}]")
     merged = "\n\n".join(parts).strip()
@@ -285,6 +389,7 @@ def generate_report_for_submission(
     *,
     get_db_connection,
     upload_dir: str,
+    submissions_dir: str | None = None,
     ai_is_configured,
     format_ai_error,
 ) -> None:
@@ -303,6 +408,37 @@ def generate_report_for_submission(
             (sub["task_id"],),
         ).fetchone()
         if task is None:
+            return
+        if not _task_allows_ai_marking(conn, int(sub["task_id"]), task):
+            now = _now_iso()
+            msg = (
+                "AI marking is not enabled for this task. When creating homework, "
+                "check “AI report” and upload marking descriptors, or ask your manager "
+                "to configure a class profile."
+            )
+            existing = conn.execute(
+                "SELECT id FROM submission_ai_reports WHERE submission_id = ?",
+                (submission_id,),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    """
+                    UPDATE submission_ai_reports SET status = 'failed',
+                        error_message = ?, updated_at = ?
+                    WHERE submission_id = ?
+                    """,
+                    (msg, now, submission_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO submission_ai_reports
+                        (submission_id, status, error_message, created_at, updated_at)
+                    VALUES (?, 'failed', ?, ?, ?)
+                    """,
+                    (submission_id, msg, now, now),
+                )
+            conn.commit()
             return
         profile = _pick_profile_for_task(conn, task["category"])
         if profile is None or not profile["auto_generate"]:
@@ -336,7 +472,7 @@ def generate_report_for_submission(
             )
         conn.commit()
 
-        student_text = _student_submission_text(conn, sub, upload_dir)
+        student_text = _student_submission_text(conn, sub, upload_dir, submissions_dir)
         if not student_text:
             conn.execute(
                 """
@@ -348,7 +484,9 @@ def generate_report_for_submission(
             conn.commit()
             return
 
-        descriptors = _descriptor_text_for_profile(conn, profile["id"])
+        descriptors = _descriptor_text_for_task(conn, int(sub["task_id"]))
+        if not descriptors:
+            descriptors = _descriptor_text_for_profile(conn, profile["id"])
         user_prompt = (
             f"Task title: {task['title']}\n"
             f"Category: {task['category']}\n"
@@ -430,22 +568,25 @@ def register_homework_marking_routes(
     require_session_role_if_enabled,
     get_current_authenticated_user,
     upload_dir: str,
+    submissions_dir: str | None = None,
     ai_is_configured,
     format_ai_error,
 ):
     gen_kwargs = {
         "get_db_connection": get_db_connection,
         "upload_dir": upload_dir,
+        "submissions_dir": submissions_dir,
         "ai_is_configured": ai_is_configured,
         "format_ai_error": format_ai_error,
     }
 
     @app.route("/api/admin/homework-marking/profiles", methods=["GET"])
     def admin_hm_profiles_list():
-        err = require_session_role_if_enabled("manager")
-        if err:
-            return err
         conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "manager")
+        if err:
+            conn.close()
+            return err
         rows = conn.execute(
             "SELECT * FROM homework_marking_profiles ORDER BY id ASC"
         ).fetchall()
@@ -463,8 +604,10 @@ def register_homework_marking_routes(
 
     @app.route("/api/admin/homework-marking/profiles", methods=["POST"])
     def admin_hm_profiles_create():
-        err = require_session_role_if_enabled("manager")
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "manager")
         if err:
+            conn.close()
             return err
         data = request.get_json(silent=True) or {}
         key = str(data.get("profile_key") or "").strip()[:80]
@@ -473,7 +616,6 @@ def register_homework_marking_routes(
         if not key or not title or not prompt:
             return jsonify({"error": "profile_key, title, and system_prompt are required"}), 400
         now = _now_iso()
-        conn = get_db_connection()
         try:
             cur = conn.execute(
                 """
@@ -504,11 +646,12 @@ def register_homework_marking_routes(
 
     @app.route("/api/admin/homework-marking/profiles/<int:profile_id>", methods=["PUT"])
     def admin_hm_profiles_update(profile_id: int):
-        err = require_session_role_if_enabled("manager")
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "manager")
         if err:
+            conn.close()
             return err
         data = request.get_json(silent=True) or {}
-        conn = get_db_connection()
         row = conn.execute(
             "SELECT * FROM homework_marking_profiles WHERE id = ?",
             (profile_id,),
@@ -548,10 +691,11 @@ def register_homework_marking_routes(
 
     @app.route("/api/admin/homework-marking/profiles/<int:profile_id>/descriptors", methods=["POST"])
     def admin_hm_descriptor_upload(profile_id: int):
-        err = require_session_role_if_enabled("manager")
-        if err:
-            return err
         conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "manager")
+        if err:
+            conn.close()
+            return err
         profile = conn.execute(
             "SELECT id FROM homework_marking_profiles WHERE id = ?",
             (profile_id,),
@@ -617,10 +761,11 @@ def register_homework_marking_routes(
 
     @app.route("/api/admin/homework-marking/descriptors/<int:descriptor_id>", methods=["DELETE"])
     def admin_hm_descriptor_delete(descriptor_id: int):
-        err = require_session_role_if_enabled("manager")
-        if err:
-            return err
         conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "manager")
+        if err:
+            conn.close()
+            return err
         row = conn.execute(
             "SELECT * FROM homework_marking_descriptors WHERE id = ?",
             (descriptor_id,),
@@ -636,6 +781,92 @@ def register_homework_marking_routes(
         conn.commit()
         conn.close()
         return jsonify({"ok": True})
+
+    def _teacher_task_access(conn, task_id: int, teacher: str):
+        task = conn.execute("SELECT * FROM calendar_tasks WHERE id = ?", (task_id,)).fetchone()
+        if task is None:
+            return None, (jsonify({"error": "Task not found"}), 404)
+        from app import resolve_teacher_with_optional_enforcement, normalize_class_name
+
+        _, guard = resolve_teacher_with_optional_enforcement(
+            conn, teacher, normalize_class_name(task["class_name"])
+        )
+        if guard is not None:
+            return None, guard
+        return task, None
+
+    @app.route("/api/tasks/<int:task_id>/marking-descriptors", methods=["POST"])
+    def teacher_task_marking_descriptors_upload(task_id: int):
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "teacher")
+        if err:
+            conn.close()
+            return err
+        actor = get_current_authenticated_user(conn)
+        if actor is None:
+            conn.close()
+            return jsonify({"error": "Not logged in"}), 401
+        teacher = str(actor["username"] or "").strip()
+        task, guard = _teacher_task_access(conn, task_id, teacher)
+        if guard:
+            conn.close()
+            return guard
+        up = request.files.get("file")
+        if not up or not up.filename:
+            conn.close()
+            return jsonify({"error": "No file provided"}), 400
+        name = os.path.basename(str(up.filename).strip())
+        if not allowed_source_extension(name):
+            conn.close()
+            return jsonify({"error": f"Unsupported file type: {name}"}), 400
+        data_bytes = up.read()
+        if len(data_bytes) > MAX_DESCRIPTOR_BYTES:
+            conn.close()
+            return jsonify({"error": "File too large"}), 400
+        ext = name.rsplit(".", 1)[-1].lower()
+        extract_status = "ok"
+        extract_error = None
+        extracted = ""
+        try:
+            extracted = normalize_extracted_text(extract_text_from_bytes(data_bytes, ext))
+        except Exception as exc:
+            extract_status = "failed"
+            extract_error = str(exc)[:300]
+        if extract_status == "ok" and not extracted:
+            extract_status = "failed"
+            extract_error = "No text could be extracted"
+        upload_path = task_descriptor_upload_dir(upload_dir, task_id)
+        stored_name, _dest = save_source_file(upload_path, name, data_bytes)
+        now = _now_iso()
+        cur = conn.execute(
+            """
+            INSERT INTO task_marking_descriptor_files
+                (task_id, original_name, stored_name, extract_status, extract_error,
+                 extracted_text, char_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                task_id,
+                name[:512],
+                stored_name,
+                extract_status,
+                extract_error,
+                extracted,
+                len(extracted),
+                now,
+            ),
+        )
+        conn.execute(
+            "UPDATE calendar_tasks SET ai_marking_enabled = 1 WHERE id = ?",
+            (task_id,),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM task_marking_descriptor_files WHERE id = ?",
+            (cur.lastrowid,),
+        ).fetchone()
+        conn.close()
+        return jsonify({"descriptor": task_descriptor_row_to_dict(row)}), 201
 
     def _teacher_submission_access(conn, submission_id: int, teacher: str):
         sub = conn.execute("SELECT * FROM submissions WHERE id = ?", (submission_id,)).fetchone()
@@ -658,10 +889,11 @@ def register_homework_marking_routes(
 
     @app.route("/api/teacher/submissions/<int:submission_id>/ai-report", methods=["GET"])
     def teacher_submission_ai_report(submission_id: int):
-        err = require_session_role_if_enabled("teacher")
-        if err:
-            return err
         conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "teacher")
+        if err:
+            conn.close()
+            return err
         actor = get_current_authenticated_user(conn)
         if actor is None:
             conn.close()
@@ -680,12 +912,13 @@ def register_homework_marking_routes(
 
     @app.route("/api/teacher/submissions/<int:submission_id>/ai-report/generate", methods=["POST"])
     def teacher_submission_ai_report_generate(submission_id: int):
-        err = require_session_role_if_enabled("teacher")
-        if err:
-            return err
         if not ai_is_configured or not ai_is_configured():
-            return jsonify({"error": "AI is not configured"}), 503
+            return jsonify({"error": "AI is not configured on the server"}), 503
         conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "teacher")
+        if err:
+            conn.close()
+            return err
         actor = get_current_authenticated_user(conn)
         if actor is None:
             conn.close()
@@ -707,10 +940,11 @@ def register_homework_marking_routes(
 
     @app.route("/api/teacher/submissions/<int:submission_id>/ai-report/approve", methods=["PUT"])
     def teacher_submission_ai_report_approve(submission_id: int):
-        err = require_session_role_if_enabled("teacher")
-        if err:
-            return err
         conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "teacher")
+        if err:
+            conn.close()
+            return err
         actor = get_current_authenticated_user(conn)
         if actor is None:
             conn.close()

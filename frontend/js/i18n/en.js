@@ -785,6 +785,17 @@ window.EAP_STRINGS_EN = {
   "hm_report_issues": "Issues",
   "hm_report_revisions": "Actionable revisions",
   "hm_report_band": "Suggested level",
+  "hm_report_route_missing": "AI report API not found — deploy the latest server build and refresh.",
+  "teacher_ai_marking_checkbox":
+    "This assignment needs an AI report on student work (marking descriptor required)",
+  "teacher_ai_marking_hint":
+    "Check this if you have a marking descriptor and want an English AI draft report for each submission. Upload the descriptor file(s) below.",
+  "teacher_ai_marking_upload_label": "Marking descriptor file(s)",
+  "teacher_ai_marking_upload_hint":
+    "PDF, Word, PowerPoint, Excel, or plain text. Add multiple files if needed.",
+  "teacher_ai_marking_descriptor_kept": "Descriptor ready: {name}",
+  "teacher_ai_marking_descriptors_kept": "{count} descriptor file(s): {names}",
+  "teacher_ai_marking_upload_label_short": "AI marking descriptors",
   "admin_hm_heading": "Homework AI marking",
   "admin_hm_hint": "English AI reports for teachers. Upload marking descriptors to guide the model.",
   "admin_hm_profile": "Report profile",

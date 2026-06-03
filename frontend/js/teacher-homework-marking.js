@@ -20,12 +20,22 @@
   }
 
   async function apiFetch(path, options) {
-    const base = API_BASE();
+    const base = String(API_BASE() || "").replace(/\/$/, "");
+    const url = `${base}${path}`;
+    const fn =
+      typeof global.EAP_fetch === "function" ? global.EAP_fetch : global.fetch.bind(global);
     const opts = { credentials: "include", ...(options || {}) };
-    const response = await fetch(`${base}${path}`, opts);
+    if (typeof global.EAP_getAuthHeaders === "function") {
+      opts.headers = global.EAP_getAuthHeaders(opts.headers);
+    }
+    const response = await fn(url, opts);
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data.error || data.detail || response.statusText);
+      const fallback =
+        response.status === 404
+          ? t("hm_report_route_missing")
+          : response.statusText;
+      throw new Error(data.error || data.detail || fallback);
     }
     return data;
   }

@@ -539,12 +539,17 @@ const TASK_CATEGORIES = [
 ];
 
 const RECORDED_LESSON_CATEGORY = "Recorded lesson";
+const AI_MARKING_TASK_CATEGORIES = new Set(["Homework", "Writing"]);
+
+function isAiMarkingTaskCategory(category) {
+  return AI_MARKING_TASK_CATEGORIES.has(String(category || "").trim());
+}
 
 /** Per-category drafts for Create New Task (same class + date). */
 const teacherCategoryDrafts = {};
 let teacherCreateContextKey = "";
 /** Bump when create-form draft logic changes (cache-bust + deploy verification). */
-const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260601-srec-date-fix";
+const EAP_TEACHER_CREATE_DRAFT_BUILD = "20260601-hm-task-descriptor";
 
 const RECORDED_AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg"]);
 
@@ -588,6 +593,9 @@ function createEmptyTeacherCategoryDraft() {
     materialFileName: "",
     materialFiles: [],
     materialFileNames: [],
+    aiMarkingEnabled: false,
+    markingDescriptorFiles: [],
+    markingDescriptorFileNames: [],
   };
 }
 
@@ -618,7 +626,9 @@ function categoryDraftHasWork(draft, category) {
     String(draft.description_zh || "").trim() ||
     String(draft.period || "").trim() ||
     draft.materialFile ||
-    mats.length > 0
+    mats.length > 0 ||
+    draft.aiMarkingEnabled ||
+    (draft.markingDescriptorFiles && draft.markingDescriptorFiles.length > 0)
   );
 }
 
@@ -638,6 +648,14 @@ function saveFormToCategoryDraft(category) {
     const matInput = document.getElementById("teacher-task-create-material");
     if (matInput && matInput.files && matInput.files.length > 0) {
       mergeMaterialFilesIntoDraft(d, matInput.files);
+    }
+    if (isAiMarkingTaskCategory(category)) {
+      const aiChk = document.getElementById("teacher-task-ai-marking-enabled");
+      d.aiMarkingEnabled = !!(aiChk && aiChk.checked);
+      const descInput = document.getElementById("teacher-task-marking-descriptor");
+      if (descInput && descInput.files && descInput.files.length > 0) {
+        mergeMarkingDescriptorFilesIntoDraft(d, descInput.files);
+      }
     }
   }
 }
@@ -666,6 +684,85 @@ function formatMaterialDraftSummary(draft) {
 function fileIdentityKey(file) {
   if (!file) return "";
   return `${file.name}|${file.size}|${file.lastModified}`;
+}
+
+function mergeMarkingDescriptorFilesIntoDraft(draft, newFiles) {
+  if (!draft) return;
+  const existing = Array.isArray(draft.markingDescriptorFiles)
+    ? [...draft.markingDescriptorFiles]
+    : [];
+  const keys = new Set(existing.map(fileIdentityKey));
+  Array.from(newFiles || []).forEach((f) => {
+    const k = fileIdentityKey(f);
+    if (!k || keys.has(k)) return;
+    keys.add(k);
+    existing.push(f);
+  });
+  draft.markingDescriptorFiles = existing;
+  draft.markingDescriptorFileNames = existing.map((f) => f.name);
+}
+
+function formatMarkingDescriptorDraftSummary(draft) {
+  const names =
+    draft.markingDescriptorFileNames && draft.markingDescriptorFileNames.length
+      ? draft.markingDescriptorFileNames
+      : [];
+  if (!names.length) return t("no_file_selected");
+  if (names.length === 1) {
+    return t("teacher_ai_marking_descriptor_kept", { name: names[0] });
+  }
+  return t("teacher_ai_marking_descriptors_kept", {
+    count: names.length,
+    names: names.join(", "),
+  });
+}
+
+function renderTeacherMarkingDescriptorDraftList(category) {
+  const listEl = document.getElementById("teacher-task-marking-descriptor-list");
+  const summaryEl = document.getElementById("teacher-task-marking-descriptor-summary");
+  if (!listEl) return;
+  const d = getTeacherCategoryDraft(category);
+  listEl.innerHTML = "";
+  const files =
+    d.markingDescriptorFiles && d.markingDescriptorFiles.length
+      ? d.markingDescriptorFiles
+      : [];
+  if (!files.length) {
+    if (summaryEl) summaryEl.textContent = t("no_file_selected");
+    return;
+  }
+  if (summaryEl) summaryEl.textContent = formatMarkingDescriptorDraftSummary(d);
+  files.forEach((file, index) => {
+    const li = document.createElement("li");
+    li.className = "teacher-create-material-list__item";
+    const name = document.createElement("span");
+    name.className = "teacher-create-material-list__name";
+    name.textContent = file.name;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn-secondary teacher-create-material-list__remove";
+    removeBtn.textContent = t("remove_file_btn");
+    removeBtn.addEventListener("click", () => {
+      d.markingDescriptorFiles.splice(index, 1);
+      d.markingDescriptorFileNames = d.markingDescriptorFiles.map((f) => f.name);
+      renderTeacherMarkingDescriptorDraftList(category);
+      syncTeacherCategoryChipDraftIndicators(
+        document.getElementById("teacher-task-category-chips"),
+      );
+    });
+    li.appendChild(name);
+    li.appendChild(removeBtn);
+    listEl.appendChild(li);
+  });
+}
+
+function syncTeacherAiMarkingUploadUI(category) {
+  const wrap = document.getElementById("teacher-task-marking-descriptor-wrap");
+  const chk = document.getElementById("teacher-task-ai-marking-enabled");
+  if (!wrap || !chk) return;
+  const show = isAiMarkingTaskCategory(category) && chk.checked;
+  wrap.classList.toggle("hidden", !show);
+  wrap.setAttribute("aria-hidden", show ? "false" : "true");
 }
 
 function mergeMaterialFilesIntoDraft(draft, newFiles) {
@@ -819,6 +916,14 @@ function loadCategoryDraftToForm(category) {
   if (periodEl) periodEl.value = d.period || "";
   if (matInput) matInput.value = "";
   renderTeacherMaterialDraftList(category);
+  const aiChk = document.getElementById("teacher-task-ai-marking-enabled");
+  const descInput = document.getElementById("teacher-task-marking-descriptor");
+  if (aiChk) aiChk.checked = !!d.aiMarkingEnabled;
+  if (descInput) descInput.value = "";
+  if (isAiMarkingTaskCategory(category)) {
+    renderTeacherMarkingDescriptorDraftList(category);
+    syncTeacherAiMarkingUploadUI(category);
+  }
   if (isRecordedLessonCategory(category)) {
     syncTeacherCreateRecordedUploadUI(category);
   }
@@ -1182,6 +1287,10 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
         errors.push(`${translateCategory(cat)}: ${t("teacher_create_validation")}`);
         continue;
       }
+      const aiEnabled =
+        isAiMarkingTaskCategory(cat) &&
+        (draft.aiMarkingEnabled ||
+          (draft.markingDescriptorFiles && draft.markingDescriptorFiles.length > 0));
       const created = await apiPost("/api/tasks", {
         date,
         title,
@@ -1191,6 +1300,7 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
         description: draft.description.trim() || null,
         description_zh: draft.description_zh.trim() || null,
         class_name: saveClass,
+        ai_marking_enabled: aiEnabled,
       });
       const mats =
         draft.materialFiles && draft.materialFiles.length
@@ -1198,6 +1308,10 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
           : draft.materialFile
             ? [draft.materialFile]
             : [];
+      const descriptors =
+        draft.markingDescriptorFiles && draft.markingDescriptorFiles.length
+          ? draft.markingDescriptorFiles
+          : [];
       createdCount += 1;
       if (mats.length) {
         uploadQueue.push({
@@ -1207,10 +1321,21 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
           mats,
         });
       }
+      if (descriptors.length) {
+        uploadQueue.push({
+          kind: "marking_descriptors",
+          cat,
+          taskId: Number(created.id, 10),
+          files: descriptors,
+        });
+      }
       draft.materialFile = null;
       draft.materialFileName = "";
       draft.materialFiles = [];
       draft.materialFileNames = [];
+      draft.aiMarkingEnabled = false;
+      draft.markingDescriptorFiles = [];
+      draft.markingDescriptorFileNames = [];
     } catch (err) {
       errors.push(`${translateCategory(cat)}: ${(err && err.message) || t("trec_error_generic")}`);
     }
@@ -1232,6 +1357,8 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
     try {
       if (item.kind === "materials") {
         await apiUploadTaskMaterialsReliable(item.taskId, item.mats);
+      } else if (item.kind === "marking_descriptors") {
+        await apiUploadTaskMarkingDescriptorsReliable(item.taskId, item.files);
       } else if (item.kind === "recorded") {
         const allIds = await attachRecordedVideosToTask({
           class_name: saveClass,
@@ -1253,7 +1380,9 @@ async function saveAllTeacherCategoryDrafts({ class_name, date, onProgress }) {
       const label =
         item.kind === "recorded"
           ? t("cat_recorded")
-          : t("teacher_material_upload_label");
+          : item.kind === "marking_descriptors"
+            ? t("teacher_ai_marking_upload_label_short")
+            : t("teacher_material_upload_label");
       errors.push(
         `${translateCategory(item.cat)} (${label}): ${(upErr && upErr.message) || t("trec_error_generic")}`,
       );
@@ -1740,6 +1869,69 @@ async function apiUploadTaskMaterialsReliable(taskId, files) {
   return { uploaded, materials: list.map((f) => ({ file_name: f.name })) };
 }
 
+function eapXhrUploadMarkingDescriptor(taskId, file) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const base = String(API_BASE || "").replace(/\/$/, "");
+    const url = `${base}/api/tasks/${taskId}/marking-descriptors`;
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.withCredentials = true;
+    const token = getAccessToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.timeout = 120000;
+    xhr.onload = () => {
+      let data;
+      try {
+        data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+      } catch (_) {
+        data = { error: (xhr.responseText || "").slice(0, 200) };
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const msg = (data && (data.error || data.message)) || `Upload failed (${xhr.status})`;
+        reject(new Error(msg));
+      }
+    };
+    xhr.onerror = () => reject(new Error(apiUnreachableMessage()));
+    xhr.ontimeout = () => reject(new Error(t("teacher_upload_timeout")));
+    xhr.send(formData);
+  });
+}
+
+async function apiUploadTaskMarkingDescriptorsReliable(taskId, files) {
+  const { valid: list, stale } = normalizeDraftMaterialFiles(files);
+  if (!list.length) {
+    if (stale) throw new Error(t("teacher_material_file_stale"));
+    return { uploaded: 0 };
+  }
+  const errors = [];
+  let uploaded = 0;
+  for (let i = 0; i < list.length; i += 1) {
+    const file = list[i];
+    let ok = false;
+    for (let attempt = 0; attempt < 3 && !ok; attempt += 1) {
+      try {
+        await eapXhrUploadMarkingDescriptor(taskId, file);
+        uploaded += 1;
+        ok = true;
+      } catch (err) {
+        if (attempt === 2) {
+          errors.push(`${file.name}: ${(err && err.message) || t("trec_error_generic")}`);
+        } else {
+          await eapSleep(800 * (attempt + 1));
+        }
+      }
+    }
+    if (i < list.length - 1) await eapSleep(300);
+  }
+  if (!uploaded && errors.length) throw new Error(errors.join(" · "));
+  if (errors.length) throw new Error(errors.join(" · "));
+  return { uploaded };
+}
+
 /**
  * POST student homework: multipart FormData to Flask `POST /api/tasks/<id>/submit`.
  *
@@ -2033,6 +2225,14 @@ function bindTeacherCreateTaskDraftAutosave(form, typeSelect, categoryChipsEl) {
       el.addEventListener("change", persistNow);
     },
   );
+  const aiChk = document.getElementById("teacher-task-ai-marking-enabled");
+  if (aiChk && aiChk.dataset.eapDraftBound !== "1") {
+    aiChk.dataset.eapDraftBound = "1";
+    aiChk.addEventListener("change", () => {
+      persistNow();
+      syncTeacherAiMarkingUploadUI(String(typeSelect.value || "").trim());
+    });
+  }
 
   typeSelect.addEventListener("change", () => {
     const next = String(typeSelect.value || "").trim();
@@ -2047,6 +2247,7 @@ function bindTeacherCreateTaskDraftAutosave(form, typeSelect, categoryChipsEl) {
 function syncTeacherCreateTaskFormMode(category) {
   const isRec = isRecordedLessonCategory(category);
   const recordedPanel = document.getElementById("teacher-create-recorded-panel");
+  const aiMarkingPanel = document.getElementById("teacher-task-ai-marking-panel");
   const materialField = document.getElementById("teacher-task-create-material-field");
   const periodField = document.getElementById("task-period")?.closest(".field");
   const titleLabel = document.getElementById("task-title-label");
@@ -2061,6 +2262,12 @@ function syncTeacherCreateTaskFormMode(category) {
   if (isRec) syncTeacherCreateRecordedUploadUI(category);
   if (materialField) materialField.classList.toggle("hidden", isRec);
   if (periodField) periodField.classList.toggle("hidden", isRec);
+  if (aiMarkingPanel) {
+    const showAi = !isRec && isAiMarkingTaskCategory(category);
+    aiMarkingPanel.classList.toggle("hidden", !showAi);
+    aiMarkingPanel.setAttribute("aria-hidden", showAi ? "false" : "true");
+    if (showAi) syncTeacherAiMarkingUploadUI(category);
+  }
 
   if (titleLabel) {
     titleLabel.textContent = isRec ? t("teacher_rec_title_label") : t("task_title_en");
@@ -5141,6 +5348,24 @@ function initTeacherPage() {
     };
     createMaterialInput.addEventListener("change", refreshMaterialSummary);
     refreshMaterialSummary();
+  }
+
+  const markingDescriptorInput = document.getElementById("teacher-task-marking-descriptor");
+  if (markingDescriptorInput && markingDescriptorInput.dataset.eapBound !== "1") {
+    markingDescriptorInput.dataset.eapBound = "1";
+    markingDescriptorInput.addEventListener("change", () => {
+      const cat = typeSelect.value;
+      if (!isAiMarkingTaskCategory(cat) || !markingDescriptorInput.files?.length) return;
+      const d = getTeacherCategoryDraft(cat);
+      mergeMarkingDescriptorFilesIntoDraft(d, markingDescriptorInput.files);
+      const aiChkEl = document.getElementById("teacher-task-ai-marking-enabled");
+      if (aiChkEl) aiChkEl.checked = true;
+      d.aiMarkingEnabled = true;
+      markingDescriptorInput.value = "";
+      renderTeacherMarkingDescriptorDraftList(cat);
+      syncTeacherAiMarkingUploadUI(cat);
+      syncTeacherCategoryChipDraftIndicators(categoryChipsEl);
+    });
   }
 
   const recordedVideoInput = document.getElementById("teacher-create-recorded-video");

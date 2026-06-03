@@ -1272,6 +1272,9 @@ def task_to_dict(task):
         "class_name": task["class_name"] if task["class_name"] is not None else "EAP047",
         "file_path": task["file_path"],
         "file_name": task["file_name"],
+        "ai_marking_enabled": bool(task["ai_marking_enabled"])
+        if "ai_marking_enabled" in task.keys()
+        else False,
     }
 
 
@@ -2510,6 +2513,7 @@ def create_task():
         ), 400
 
     class_name = normalize_class_name(data.get("class_name"))
+    ai_marking_enabled = 1 if data.get("ai_marking_enabled") else 0
 
     conn = get_db_connection()
     _, d19_guard_err = resolve_teacher_with_optional_enforcement(
@@ -2524,10 +2528,22 @@ def create_task():
     cursor = conn.execute(
         """
         INSERT INTO calendar_tasks
-            (date, title, title_zh, category, period, description, description_zh, status, class_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (date, title, title_zh, category, period, description, description_zh, status, class_name,
+             ai_marking_enabled)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (date, title, title_zh, category, period, description, description_zh, "Pending", class_name),
+        (
+            date,
+            title,
+            title_zh,
+            category,
+            period,
+            description,
+            description_zh,
+            "Pending",
+            class_name,
+            ai_marking_enabled,
+        ),
     )
 
     new_task_id = int(cursor.lastrowid)
@@ -3672,11 +3688,20 @@ def submit_task_homework(task_id):
     conn.close()
 
     try:
-        from homework_marking import queue_report_generation
+        from homework_marking import queue_report_generation, _task_allows_ai_marking
 
         gen_kw = app.config.get("EAP_HOMEWORK_MARKING_GEN_KWARGS")
         if gen_kw:
-            queue_report_generation(new_id, **gen_kw)
+            conn_hm = get_db_connection()
+            try:
+                task_row = conn_hm.execute(
+                    "SELECT * FROM calendar_tasks WHERE id = ?",
+                    (int(task_id),),
+                ).fetchone()
+                if task_row and _task_allows_ai_marking(conn_hm, int(task_id), task_row):
+                    queue_report_generation(new_id, **gen_kw)
+            finally:
+                conn_hm.close()
     except Exception:
         pass
 
@@ -8199,6 +8224,7 @@ register_homework_marking_routes(
     require_session_role_if_enabled=require_session_role_if_enabled,
     get_current_authenticated_user=get_current_authenticated_user,
     upload_dir=UPLOAD_DIR,
+    submissions_dir=SUBMISSIONS_DIR,
     ai_is_configured=ai_is_configured,
     format_ai_error=format_ai_error,
 )
