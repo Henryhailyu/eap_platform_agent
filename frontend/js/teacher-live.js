@@ -562,29 +562,30 @@
     void loop();
   }
 
-  async function pushDisplayToClass(payload) {
+  async function pushDisplayToClass(payload, opts) {
+    const silent = !!(opts && opts.silent);
     const api = getLiveApi();
     if (!api || typeof api.pushDisplay !== "function") {
-      updateLaunchStatus(t("tlive_push_fail_no_api"), false);
+      if (!silent) updateLaunchStatus(t("tlive_push_fail_no_api"), false);
       return false;
     }
     const teacher = await liveTeacherContext();
     if (!teacher) {
-      updateLaunchStatus(t("tlive_launch_fail_login"), false);
+      if (!silent) updateLaunchStatus(t("tlive_launch_fail_login"), false);
       return false;
     }
     const ctx = contextFromUrl();
     if (!(await ensureLiveSession(ctx))) {
-      updateLaunchStatus(t("tlive_launch_fail_no_session"), false);
+      if (!silent) updateLaunchStatus(t("tlive_launch_fail_no_session"), false);
       return false;
     }
     const sess = window.__tliveLiveSession;
     try {
       await api.pushDisplay(sess.code, payload || {}, { teacher_username: teacher.username });
-      updateLaunchStatus(t("tlive_push_ok"), true);
+      if (!silent) updateLaunchStatus(t("tlive_push_ok"), true);
       return true;
     } catch (err) {
-      updateLaunchStatus(launchErrorMessage(err), false);
+      if (!silent) updateLaunchStatus(launchErrorMessage(err), false);
       return false;
     }
   }
@@ -2993,7 +2994,12 @@
     }
     clearLiveGameState();
     stopLiveTimerIfMounted();
-    const api = timerMod.mount(canvas, { t, escapeHtml });
+    const api = timerMod.mount(canvas, {
+      t,
+      escapeHtml,
+      onPush: (payload) => pushDisplayToClass(payload),
+      onSync: (payload) => pushDisplayToClass(payload, { silent: true }),
+    });
     window.__tliveTimerUnmount = api && typeof api.unmount === "function" ? api.unmount : null;
     if (window.EAP_I18N) window.EAP_I18N.applyStatic();
   }

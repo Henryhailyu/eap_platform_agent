@@ -2,20 +2,9 @@
  * Teacher Live — Countdown timer & stopwatch (max 24 hours each).
  */
 (function (global) {
+  const sh = () => global.EAP_LIVE_TIMER_SHARED || {};
   const MAX_TOTAL_SEC = 24 * 60 * 60;
-
-  function pad2(n) {
-    return String(n).padStart(2, "0");
-  }
-
-  function formatClock(totalSec) {
-    const sec = Math.max(0, Math.floor(totalSec));
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const s = sec % 60;
-    if (h > 0) return `${h}:${pad2(m)}:${pad2(s)}`;
-    return `${pad2(m)}:${pad2(s)}`;
-  }
+  const formatClock = (sec) => (sh().formatClock ? sh().formatClock(sec) : String(sec));
 
   function readDurationFromInputs(root) {
     const h = Number(root.querySelector('[data-tlive-timer-hours]')?.value || 0);
@@ -40,6 +29,8 @@
 
   function mount(container, opts) {
     const t = (opts && opts.t) || ((k) => k);
+    const onPush = opts && typeof opts.onPush === "function" ? opts.onPush : null;
+    const onSync = opts && typeof opts.onSync === "function" ? opts.onSync : null;
     const escapeHtml =
       (opts && opts.escapeHtml) ||
       ((x) =>
@@ -56,6 +47,9 @@
     let stopwatchElapsedMs = 0;
     let stopwatchStartMs = 0;
     let countdownDone = false;
+    let lastPushAt = 0;
+    let syncAfterPush = false;
+    let pushInFlight = false;
 
     function stopTick() {
       if (tickId != null) {
@@ -67,6 +61,61 @@
     function unmount() {
       stopTick();
       running = false;
+    }
+
+    function buildPushPayload() {
+      let elapsedSec = Math.floor(stopwatchElapsedMs / 1000);
+      if (mode === "stopwatch" && running && stopwatchStartMs) {
+        elapsedSec = Math.min(
+          MAX_TOTAL_SEC,
+          Math.floor((stopwatchElapsedMs + global.Date.now() - stopwatchStartMs) / 1000),
+        );
+      }
+      const title =
+        mode === "countdown" ? t("tlive_timer_mode_countdown") : t("tlive_timer_mode_stopwatch");
+      return sh().buildTimerDisplayPayload
+        ? sh().buildTimerDisplayPayload({
+            kind: mode,
+            running,
+            done: countdownDone,
+            remaining_sec: countdownRemainSec,
+            duration_sec: countdownSetSec,
+            elapsed_sec: elapsedSec,
+            title,
+          })
+        : { mode: "timer" };
+    }
+
+    function pushToStudentsSilent(force) {
+      if (!onSync || !syncAfterPush) return;
+      const now = Date.now();
+      if (!force && running && now - lastPushAt < 950) return;
+      lastPushAt = now;
+      void onSync(buildPushPayload());
+    }
+
+    async function pushToStudentsManual(root) {
+      if (!onPush || pushInFlight) return;
+      const btn = root.querySelector("[data-tlive-timer-push]");
+      const hint = root.querySelector("[data-tlive-timer-push-hint]");
+      pushInFlight = true;
+      if (btn) btn.disabled = true;
+      if (hint) hint.textContent = t("tlive_timer_pushing");
+      try {
+        const ok = await onPush(buildPushPayload());
+        if (ok) {
+          syncAfterPush = true;
+          lastPushAt = Date.now();
+          if (hint) hint.textContent = t("tlive_timer_push_ok_hint");
+        } else if (hint) {
+          hint.textContent = t("tlive_timer_push_fail_hint");
+        }
+      } catch (_) {
+        if (hint) hint.textContent = t("tlive_timer_push_fail_hint");
+      } finally {
+        pushInFlight = false;
+        if (btn) btn.disabled = false;
+      }
     }
 
     function syncControls(root) {
@@ -159,9 +208,11 @@
           countdownDone = true;
           running = false;
           stopTick();
+          pushToStudentsSilent(true);
         }
       }
       renderDisplay(root);
+      if (running) pushToStudentsSilent();
     }
 
     function startTimer(root) {
@@ -182,6 +233,7 @@
         tickId = global.setInterval(tick, 50);
       }
       renderDisplay(root);
+      pushToStudentsSilent(true);
     }
 
     function pauseTimer(root) {
@@ -193,6 +245,7 @@
       running = false;
       stopTick();
       renderDisplay(root);
+      pushToStudentsSilent(true);
     }
 
     function resetTimer(root) {
@@ -209,6 +262,7 @@
         stopwatchStartMs = 0;
       }
       renderDisplay(root);
+      pushToStudentsSilent(true);
     }
 
     container.className = "tlive-canvas__inner tlive-canvas__inner--timer";
@@ -217,6 +271,7 @@
         <aside class="tlive-timer-sidebar">
           <h2 class="tlive-timer-sidebar__title">${escapeHtml(t("tlive_timer_title"))}</h2>
           <p class="tlive-timer-sidebar__hint">${escapeHtml(t("tlive_timer_max_hint"))}</p>
+          <p class="tlive-timer-sidebar__hint">${escapeHtml(t("tlive_timer_sync_hint"))}</p>
           <div class="tlive-timer-mode-tabs" role="tablist">
             <button type="button" class="tlive-timer-mode-tab tlive-timer-mode-tab--active" data-tlive-timer-mode-tab="countdown" role="tab" aria-selected="true">${escapeHtml(t("tlive_timer_mode_countdown"))}</button>
             <button type="button" class="tlive-timer-mode-tab" data-tlive-timer-mode-tab="stopwatch" role="tab" aria-selected="false">${escapeHtml(t("tlive_timer_mode_stopwatch"))}</button>
@@ -234,6 +289,10 @@
           </div>
           <div data-tlive-timer-mode-panel="stopwatch" class="tlive-timer-stopwatch-setup hidden" aria-hidden="true">
             <p class="tlive-timer-setup-label">${escapeHtml(t("tlive_stopwatch_lead"))}</p>
+          </div>
+          <div class="tlive-timer-push-block">
+            <button type="button" class="btn-primary tlive-timer-push-btn" data-tlive-timer-push>${escapeHtml(t("tlive_timer_push_students"))}</button>
+            <p class="tlive-timer-push-hint" data-tlive-timer-push-hint>${escapeHtml(t("tlive_timer_push_lead"))}</p>
           </div>
           <div class="tlive-timer-actions">
             <button type="button" class="btn-primary" data-tlive-timer-start>${escapeHtml(t("tlive_timer_start"))}</button>
@@ -264,6 +323,7 @@
         }
         syncControls(root);
         renderDisplay(root);
+        pushToStudentsSilent(true);
       });
     });
 
@@ -280,6 +340,9 @@
     root.querySelector("[data-tlive-timer-start]")?.addEventListener("click", () => startTimer(root));
     root.querySelector("[data-tlive-timer-pause]")?.addEventListener("click", () => pauseTimer(root));
     root.querySelector("[data-tlive-timer-reset]")?.addEventListener("click", () => resetTimer(root));
+    root.querySelector("[data-tlive-timer-push]")?.addEventListener("click", () => {
+      void pushToStudentsManual(root);
+    });
 
     renderDisplay(root);
 

@@ -155,6 +155,8 @@
     }
   }
 
+  let studentTimerApi = null;
+
   const state = {
     code: "",
     teamId: null,
@@ -181,7 +183,18 @@
     if (!data) return "";
     const q = data.question;
     const d = data.display || {};
-    const displayPart = `${d.mode || ""}|${d.version != null ? d.version : ""}|${d.page_id || ""}`;
+    const tm = d.timer || {};
+    const displayPart = [
+      d.mode || "",
+      d.version != null ? d.version : "",
+      d.page_id || "",
+      tm.kind || "",
+      tm.running ? "1" : "0",
+      tm.done ? "1" : "0",
+      tm.remaining_sec != null ? tm.remaining_sec : "",
+      tm.elapsed_sec != null ? tm.elapsed_sec : "",
+      tm.synced_at || "",
+    ].join("|");
     if (!q) return `wait:${data.session_code || state.code || ""}|${displayPart}`;
     const opts = Array.isArray(q.optionsEn) ? q.optionsEn.join("\x1e") : "";
     return [
@@ -290,6 +303,33 @@
     const lessonTitle = document.getElementById("slive-lesson-title");
     const lessonFrame = document.getElementById("slive-lesson-frame");
     const hintEl = document.getElementById("slive-lesson-hint");
+
+    if (mode === "timer" && display.timer) {
+      if (wait) wait.classList.add("hidden");
+      if (slides) slides.classList.add("hidden");
+      if (lesson) lesson.classList.add("hidden");
+      const qCard = document.getElementById("slive-question");
+      if (qCard) qCard.classList.add("hidden");
+      clearGameChrome();
+      const timerHost = document.getElementById("slive-timer");
+      if (timerHost) timerHost.classList.remove("hidden");
+      const mod = window.EAP_STUDENT_LIVE_TIMER;
+      if (mod && typeof mod.mount === "function" && timerHost) {
+        if (!studentTimerApi) {
+          studentTimerApi = mod.mount(timerHost, display.timer, { t, escapeHtml });
+        } else if (typeof studentTimerApi.update === "function") {
+          studentTimerApi.update(display.timer);
+        }
+      }
+      return;
+    }
+
+    if (studentTimerApi && typeof studentTimerApi.unmount === "function") {
+      studentTimerApi.unmount();
+      studentTimerApi = null;
+    }
+    const timerHostHide = document.getElementById("slive-timer");
+    if (timerHostHide) timerHostHide.classList.add("hidden");
 
     if (mode === "html" && display.page_id) {
       if (wait) wait.classList.add("hidden");
@@ -468,8 +508,13 @@
     if (!wait || !card || !textEl || !optsEl) return;
 
     const q = payload.question;
+    const displayMode = String((payload.display && payload.display.mode) || "").toLowerCase();
     if (!q) {
-      wait.classList.remove("hidden");
+      if (displayMode === "timer") {
+        wait.classList.add("hidden");
+      } else {
+        wait.classList.remove("hidden");
+      }
       card.classList.add("hidden");
       clearGameChrome();
       if (sentEl) sentEl.classList.add("hidden");

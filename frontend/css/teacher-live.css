@@ -3440,3 +3440,69 @@ body.tlive-modal-open {
   font-weight: 600;
   font-size: 1.15rem;
 }
+
+.tlive-timer-push-block {
+  margin: 1rem 0 1.25rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid rgba(10, 77, 104, 0.12);
+  border-bottom: 1px solid rgba(10, 77, 104, 0.12);
+}
+
+.tlive-timer-push-btn {
+  width: 100%;
+}
+
+.tlive-timer-push-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #6e6e73;
+}
+
+/* Student live — synced timer */
+.slive-timer-card {
+  text-align: center;
+  padding: 1.5rem 1rem 2rem;
+}
+
+.slive-timer__lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: #6e6e73;
+}
+
+.slive-timer__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0a4d68;
+}
+
+.slive-timer-display {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2.5rem, 14vw, 5rem);
+  font-weight: 700;
+  color: #0a4d68;
+  line-height: 1.1;
+}
+
+.slive-timer-display--done {
+  color: #9b2c2c;
+  animation: tlive-timer-pulse 0.9s ease-in-out 2;
+}
+
+.slive-timer-status {
+  margin: 1rem 0 0;
+  font-size: 1rem;
+  color: #555;
+}
+
+.slive-timer-status--running {
+  color: #0a7ea4;
+}
+
+.slive-timer-status--done {
+  font-weight: 600;
+  color: #9b2c2c;
+}

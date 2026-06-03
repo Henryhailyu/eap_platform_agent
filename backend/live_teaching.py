@@ -182,6 +182,17 @@ def _display_payload(sess, request_host_url: str = ""):
         "preview_pdf_url": preview_pdf_url,
         "file_ext": file_ext,
     }
+    if mode == "timer":
+        timer_raw = meta.get("timer") if isinstance(meta.get("timer"), dict) else {}
+        payload["timer"] = {
+            "kind": str(timer_raw.get("kind") or "countdown").strip().lower(),
+            "running": bool(timer_raw.get("running")),
+            "done": bool(timer_raw.get("done")),
+            "remaining_sec": int(timer_raw.get("remaining_sec") or 0),
+            "duration_sec": int(timer_raw.get("duration_sec") or 0),
+            "elapsed_sec": int(timer_raw.get("elapsed_sec") or 0),
+            "synced_at": str(timer_raw.get("synced_at") or "").strip(),
+        }
     code = str(sess["session_code"] or "").strip().upper()
     host = str(request_host_url or "").rstrip("/")
     if not host:
@@ -755,7 +766,18 @@ def register_live_teaching_routes(app):
 
         data = request.get_json(silent=True) or {}
         mode = str(data.get("mode") or "welcome").strip().lower()
-        if mode not in {"welcome", "slides", "html", "material", "upload", "pdf", "text", "presentation", "office"}:
+        if mode not in {
+            "welcome",
+            "slides",
+            "html",
+            "material",
+            "upload",
+            "pdf",
+            "text",
+            "presentation",
+            "office",
+            "timer",
+        }:
             return jsonify({"error": "Invalid display mode"}), 400
         if mode in {"presentation", "office", "upload"} and str(data.get("preview_pdf_url") or "").strip():
             mode = "pdf"
@@ -820,6 +842,20 @@ def register_live_teaching_routes(app):
                 meta["file_ext"] = file_ext
             if mode in {"welcome", "slides"}:
                 meta = {"title": title or "Classroom display"}
+            elif mode == "timer":
+                timer_obj = data.get("timer") if isinstance(data.get("timer"), dict) else {}
+                meta = {
+                    "title": title or "Timer",
+                    "timer": {
+                        "kind": str(timer_obj.get("kind") or "countdown").strip().lower(),
+                        "running": bool(timer_obj.get("running")),
+                        "done": bool(timer_obj.get("done")),
+                        "remaining_sec": int(timer_obj.get("remaining_sec") or 0),
+                        "duration_sec": int(timer_obj.get("duration_sec") or 0),
+                        "elapsed_sec": int(timer_obj.get("elapsed_sec") or 0),
+                        "synced_at": str(timer_obj.get("synced_at") or utc_now_iso()),
+                    },
+                }
 
             version = int(sess["display_version"] or 0) + 1
             now = utc_now_iso()
