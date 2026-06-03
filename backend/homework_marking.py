@@ -977,7 +977,7 @@ def register_homework_marking_routes(
         now = _now_iso()
         conn.execute(
             "UPDATE submissions SET teacher_feedback = ?, status = ? WHERE id = ?",
-            (feedback, "Reviewed", submission_id),
+            (feedback, "Feedback Given", submission_id),
         )
         conn.execute(
             """

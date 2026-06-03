@@ -7307,7 +7307,8 @@ function computeStudentDailyChipCounts(tasksNorm, subMap) {
   for (let i = 0; i < tasksNorm.length; i += 1) {
     const t = tasksNorm[i];
     if (isStudentTaskCompleted(t)) completed += 1;
-    const mySub = map.get(t.id);
+    const tid = Number(t.id, 10);
+    const mySub = Number.isFinite(tid) ? map.get(tid) : undefined;
     if (mySub && mySub.id != null) submitted += 1;
     const hasFb =
       mySub &&
@@ -7370,7 +7371,8 @@ function renderStudentTaskMasterList(masterEl, tasksForDay, subMap) {
   masterEl.innerHTML = "";
   const sorted = [...tasksForDay].sort(compareTasksForSort);
   sorted.forEach((task) => {
-    const mySub = m.get(task.id);
+    const tid = Number(task.id, 10);
+    const mySub = Number.isFinite(tid) ? m.get(tid) : undefined;
     const wfState = getStudentTaskWorkflowState(task, mySub);
     const needsAction = studentTaskNeedsAction(task, mySub);
     const hasMaterial = taskMaterialEntries(task).length > 0;
@@ -8851,7 +8853,8 @@ function initStudentPage() {
   function selectStudentTaskById(taskId) {
     const task = lastStudentFilteredTasks.find((t) => Number(t.id) === Number(taskId));
     if (!task) return;
-    const mySub = lastSubmissionsByTaskId.get(task.id);
+    const tid = Number(task.id, 10);
+    const mySub = Number.isFinite(tid) ? lastSubmissionsByTaskId.get(tid) : undefined;
     selectedStudentTaskId = task.id;
     setStudentMasterListSelection(masterListEl, task.id);
 
@@ -9282,8 +9285,9 @@ function initStudentPage() {
               mq.set("student_username", uname);
               mq.set("class_name", studentClassName);
               const data = await apiGet(`/api/tasks/${t.id}/my-submission?${mq.toString()}`);
-              if (data && typeof data === "object" && data.id != null) {
-                nextSubMap.set(t.id, data);
+              const tid = Number(t.id, 10);
+              if (Number.isFinite(tid) && data && typeof data === "object" && data.id != null) {
+                nextSubMap.set(tid, data);
               }
             } catch {
               /* ignore per-task errors so the rest of the day still loads */

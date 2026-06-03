@@ -1970,6 +1970,36 @@ def parse_study_plan_planned_minutes(raw):
     return n, None
 
 
+def _submission_row_for_student_task(conn, task_id, student_username):
+    """
+    One effective homework row per student per task.
+
+    If duplicate rows exist (legacy double-submit), prefer the row that already has
+    teacher feedback so students still see pushed comments on my-submission.
+    """
+    return conn.execute(
+        """
+        SELECT * FROM submissions
+        WHERE task_id = ? AND student_username = ?
+        ORDER BY
+            CASE
+                WHEN TRIM(COALESCE(teacher_feedback, '')) != ''
+                  OR TRIM(COALESCE(feedback_file_path, '')) != ''
+                  OR EXISTS (
+                      SELECT 1 FROM submission_attachments a
+                      WHERE a.submission_id = submissions.id
+                        AND a.attachment_type = ?
+                  )
+                THEN 0
+                ELSE 1
+            END,
+            id DESC
+        LIMIT 1
+        """,
+        (int(task_id), student_username, ATTACHMENT_TYPE_TEACHER_FEEDBACK),
+    ).fetchone()
+
+
 def submission_to_dict(row):
     """Convert a submissions table row to JSON-friendly dict."""
     return {
@@ -3645,31 +3675,66 @@ def submit_task_homework(task_id):
 
     submitted_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    existing = _submission_row_for_student_task(conn, task_id, student_username)
+
     try:
-        cursor = conn.execute(
-            """
-            INSERT INTO submissions (
-                task_id, student_id, student_username, student_name, class_name,
-                answer_text, file_path, file_name, submitted_at, teacher_feedback, status
+        if existing is not None:
+            prev_path = existing["file_path"]
+            if has_file and prev_path and str(prev_path).strip() != str(stored_name or "").strip():
+                remove_homework_disk_file(prev_path)
+            if not has_file:
+                stored_name = existing["file_path"]
+                display_name = existing["file_name"]
+            conn.execute(
+                """
+                UPDATE submissions SET
+                    student_id = ?,
+                    student_name = ?,
+                    answer_text = ?,
+                    file_path = ?,
+                    file_name = ?,
+                    submitted_at = ?
+                WHERE id = ?
+                """,
+                (
+                    student_id,
+                    student_name,
+                    answer_text,
+                    stored_name,
+                    display_name,
+                    submitted_at,
+                    existing["id"],
+                ),
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                task_id,
-                student_id,
-                student_username,
-                student_name,
-                form_class_name,
-                answer_text,
-                stored_name,
-                display_name,
-                submitted_at,
-                None,
-                "Submitted",
-            ),
-        )
-        conn.commit()
-        new_id = cursor.lastrowid
+            conn.commit()
+            new_id = existing["id"]
+            created = False
+        else:
+            cursor = conn.execute(
+                """
+                INSERT INTO submissions (
+                    task_id, student_id, student_username, student_name, class_name,
+                    answer_text, file_path, file_name, submitted_at, teacher_feedback, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    task_id,
+                    student_id,
+                    student_username,
+                    student_name,
+                    form_class_name,
+                    answer_text,
+                    stored_name,
+                    display_name,
+                    submitted_at,
+                    None,
+                    "Submitted",
+                ),
+            )
+            conn.commit()
+            new_id = cursor.lastrowid
+            created = True
     except sqlite3.Error:
         conn.rollback()
         conn.close()
@@ -3705,7 +3770,7 @@ def submit_task_homework(task_id):
     except Exception:
         pass
 
-    return jsonify(payload), 201
+    return jsonify(payload), (201 if created else 200)
 
 
 @app.route("/api/tasks/<int:task_id>/submissions", methods=["GET"])
@@ -3780,15 +3845,7 @@ def get_my_submission_for_task(task_id):
         conn.close()
         return jsonify({"error": "class_name does not match this task's class"}), 403
 
-    row = conn.execute(
-        """
-        SELECT * FROM submissions
-        WHERE task_id = ? AND student_username = ?
-        ORDER BY id DESC
-        LIMIT 1
-        """,
-        (task_id, student_username),
-    ).fetchone()
+    row = _submission_row_for_student_task(conn, task_id, student_username)
 
     if row is None:
         conn.close()
