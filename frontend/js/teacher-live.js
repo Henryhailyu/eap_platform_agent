@@ -161,10 +161,18 @@
     });
   }
 
+  function stopLiveTimerIfMounted() {
+    if (typeof window.__tliveTimerUnmount === "function") {
+      window.__tliveTimerUnmount();
+      window.__tliveTimerUnmount = null;
+    }
+  }
+
   function renderWelcome(ctx) {
     const MOCK = getMock();
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas || !MOCK) return;
+    stopLiveTimerIfMounted();
     stopActivityStatsPoll();
     canvas.className = "tlive-canvas__inner";
     canvas.innerHTML = `
@@ -2859,6 +2867,7 @@
   }
 
   function showGamesTool() {
+    stopLiveTimerIfMounted();
     renderGamesLibrary();
   }
 
@@ -2965,12 +2974,27 @@
       return;
     }
     clearLiveGameState();
+    stopLiveTimerIfMounted();
     window.__tliveWheelUnmount = null;
     wheel.mount(canvas, {
       className: ctx.className,
       t,
       escapeHtml,
     });
+    if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+  }
+
+  function renderTimerTool() {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    const timerMod = window.EAP_LIVE_TIMER;
+    if (!canvas || !timerMod || typeof timerMod.mount !== "function") {
+      showBootError(t("tlive_timer_load_error"));
+      return;
+    }
+    clearLiveGameState();
+    stopLiveTimerIfMounted();
+    const api = timerMod.mount(canvas, { t, escapeHtml });
+    window.__tliveTimerUnmount = api && typeof api.unmount === "function" ? api.unmount : null;
     if (window.EAP_I18N) window.EAP_I18N.applyStatic();
   }
 
@@ -2985,6 +3009,7 @@
         const tool = btn.getAttribute("data-tool");
         setActiveTool(tool);
         if (tool === "games") showGamesTool();
+        else if (tool === "timer") renderTimerTool();
         else if (tool === "wheel") renderNameWheelTool(ctx);
         else if (tool === "slides") {
           void pushSlidesDisplay();
@@ -3158,6 +3183,8 @@
         renderRankingChallenge(window.__tliveRanking);
       } else if (tool === "wheel") {
         renderNameWheelTool(ctx);
+      } else if (tool === "timer") {
+        renderTimerTool();
       } else if (tool === "slides") {
         renderWelcome(ctx);
       }

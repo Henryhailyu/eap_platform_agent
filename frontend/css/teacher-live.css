@@ -3280,3 +3280,163 @@ body.tlive-modal-open {
   text-align: left;
   font-size: 0.875rem;
 }
+
+/* Timer & stopwatch */
+.tlive-canvas__inner--timer {
+  padding: 0;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.tlive-timer-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 1.25rem;
+  width: 100%;
+  min-height: min(70vh, 520px);
+}
+
+@media (max-width: 768px) {
+  .tlive-timer-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tlive-timer-sidebar {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tlive-timer-sidebar__title {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--tlive-primary, #0a4d68);
+}
+
+.tlive-timer-sidebar__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6e6e73;
+  line-height: 1.45;
+}
+
+.tlive-timer-mode-tabs {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.tlive-timer-mode-tab {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(10, 77, 104, 0.25);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--tlive-primary, #0a4d68);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tlive-timer-mode-tab--active {
+  background: rgba(10, 77, 104, 0.1);
+  border-color: var(--tlive-primary, #0a4d68);
+}
+
+.tlive-timer-setup-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  color: #444;
+}
+
+.tlive-timer-duration-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.tlive-timer-duration-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #555;
+}
+
+.tlive-timer-duration-row input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.tlive-timer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.tlive-timer-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #0a4d68 0%, #0a7ea4 100%);
+  border-radius: 12px;
+  padding: 2rem 1.5rem;
+  color: #fff;
+  text-align: center;
+}
+
+.tlive-timer-stage__label {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.tlive-timer-display {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(3rem, 12vw, 6.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+.tlive-timer-display--done {
+  animation: tlive-timer-pulse 0.9s ease-in-out 3;
+}
+
+@keyframes tlive-timer-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+.tlive-timer-status {
+  margin: 1rem 0 0;
+  font-size: 1rem;
+  opacity: 0.92;
+}
+
+.tlive-timer-status--running {
+  opacity: 1;
+}
+
+.tlive-timer-status--done {
+  font-weight: 600;
+  font-size: 1.15rem;
+}
