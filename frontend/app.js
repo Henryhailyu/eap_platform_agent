@@ -314,6 +314,7 @@ function eapFetch(url, options) {
 }
 
 if (typeof window !== "undefined") {
+  window.EAP_API_BASE_RESOLVED = API_BASE;
   window.EAP_getAuthHeaders = getAuthHeaders;
   window.EAP_fetch = eapFetch;
   window.eapPostMultipart = eapPostMultipart;

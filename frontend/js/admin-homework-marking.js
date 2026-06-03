@@ -7,10 +7,23 @@
     return key;
   }
 
-  const API_BASE = () => window.EAP_API_BASE || "";
+  function resolveApiBase() {
+    if (window.EAP_API_BASE_RESOLVED) {
+      return String(window.EAP_API_BASE_RESOLVED).replace(/\/$/, "");
+    }
+    const custom = window.EAP_API_BASE;
+    if (custom != null && String(custom).trim() !== "") {
+      return String(custom).trim().replace(/\/$/, "");
+    }
+    if (window.location && /^https?:$/i.test(window.location.protocol)) {
+      return window.location.origin.replace(/\/$/, "");
+    }
+    return "http://127.0.0.1:5051";
+  }
 
   async function apiFetch(path, options) {
-    const response = await fetch(`${API_BASE()}${path}`, {
+    const fn = typeof window.EAP_fetch === "function" ? window.EAP_fetch : fetch;
+    const response = await fn(`${resolveApiBase()}${path}`, {
       credentials: "include",
       ...(options || {}),
     });

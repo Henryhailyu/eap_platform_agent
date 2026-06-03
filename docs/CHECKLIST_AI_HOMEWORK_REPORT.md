@@ -73,10 +73,11 @@ cd backend && python3 scripts/test_ai_key.py
 1. Open **`http://124.222.124.42:5051/ui/teacher.html`** (same host as API — do not open HTML via Live Server on another port unless `api-config.js` sets `EAP_API_BASE`).
 2. Log in as **teacher** (e.g. Demo Teacher).
 3. **Hard refresh:** Mac `Cmd+Shift+R`, Windows `Ctrl+Shift+R`.
-4. Confirm scripts loaded new cache keys:
-   - View page source or Network → `teacher-homework-marking.js?v=20260603-hm-fix`
-   - `app.js?v=20260603-hm-fix`
-5. Open **DevTools → Network**, filter `ai-report`:
+4. Confirm scripts loaded new cache keys (order matters: **app.js before** homework marking):
+   - `app.js?v=20260603-hm-api`
+   - `teacher-homework-marking.js?v=20260603-hm-api`
+5. In Network, `ai-report` request URL must start with `http://124.222.124.42:5051/api/...` — **not** `/ui/api/...` (wrong base causes false “API not found”).
+6. Open **DevTools → Network**, filter `ai-report`:
    - **Generate** click → `POST .../ai-report/generate`
    - Status **200** + JSON `ai_report` → OK
    - **500** → server not updated or AI crash — see logs

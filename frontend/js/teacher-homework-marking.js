@@ -2,25 +2,35 @@
  * HM-M1b — Teacher AI homework report panel on submission review.
  */
 (function (global) {
-  const API_BASE = () =>
-    (typeof window !== "undefined" && window.EAP_API_BASE) ||
-    (typeof API_BASE !== "undefined" ? API_BASE : "");
+  function resolveApiBase() {
+    if (global.EAP_API_BASE_RESOLVED) {
+      return String(global.EAP_API_BASE_RESOLVED).replace(/\/$/, "");
+    }
+    const custom = global.EAP_API_BASE;
+    if (custom != null && String(custom).trim() !== "") {
+      return String(custom).trim().replace(/\/$/, "");
+    }
+    if (
+      global.location &&
+      global.location.protocol &&
+      /^https?:$/i.test(global.location.protocol)
+    ) {
+      return global.location.origin.replace(/\/$/, "");
+    }
+    return "http://127.0.0.1:5051";
+  }
 
   function t(key, params) {
     if (typeof global.t === "function") return global.t(key, params);
     return key;
   }
 
-  function escapeHtml(text) {
-    return String(text == null ? "" : text)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async function apiFetch(path, options) {
-    const base = String(API_BASE() || "").replace(/\/$/, "");
+    const base = resolveApiBase();
     const url = `${base}${path}`;
     const fn =
       typeof global.EAP_fetch === "function" ? global.EAP_fetch : global.fetch.bind(global);
@@ -31,10 +41,14 @@
     const response = await fn(url, opts);
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const fallback =
-        response.status === 404
-          ? t("hm_report_route_missing")
-          : response.statusText;
+      let fallback = response.statusText;
+      if (response.status === 404) {
+        const errText = String((data && data.error) || "").toLowerCase();
+        fallback =
+          errText.includes("not found") && !errText.includes("route")
+            ? t("hm_report_submission_missing")
+            : t("hm_report_route_missing");
+      }
       throw new Error(data.error || data.detail || fallback);
     }
     return data;
@@ -68,6 +82,7 @@
 
   async function mountHomeworkAiReportPanel(container, submissionId) {
     if (!container || !submissionId) return;
+    const sid = encodeURIComponent(String(submissionId).trim());
 
     const section = document.createElement("div");
     section.className = "hm-report-panel";
@@ -76,8 +91,9 @@
     title.className = "task-submission-section__title";
     title.textContent = t("hm_report_title");
 
-    const statusEl = document.createElement("p");
+    const statusEl = document.createElement("div");
     statusEl.className = "hm-report-panel__status";
+    statusEl.setAttribute("role", "status");
     statusEl.setAttribute("aria-live", "polite");
 
     const bodyEl = document.createElement("div");
@@ -105,82 +121,180 @@
     section.appendChild(actions);
     container.appendChild(section);
 
-    const refresh = async () => {
-      statusEl.textContent = t("hm_report_loading");
-      bodyEl.innerHTML = "";
-      try {
-        const data = await apiFetch(`/api/teacher/submissions/${submissionId}/ai-report`);
-        const row = data.ai_report;
-        if (!row) {
-          statusEl.textContent = t("hm_report_none");
-          approveBtn.disabled = true;
-          return;
-        }
-        const st = row.status || "pending";
-        if (st === "pending") {
-          statusEl.textContent = t("hm_report_pending");
-          approveBtn.disabled = true;
-          return;
-        }
-        if (st === "failed") {
-          statusEl.textContent = row.error_message || t("hm_report_failed");
-          approveBtn.disabled = true;
-          return;
-        }
-        if (st === "ready" && row.report) {
-          statusEl.textContent = row.approved_at
-            ? t("hm_report_approved")
-            : t("hm_report_ready");
+    let pollTimer = null;
+    let successFlashTimer = null;
+
+    function clearPoll() {
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function setVisualState(mode, message) {
+      statusEl.className = "hm-report-panel__status";
+      if (mode) statusEl.classList.add(`hm-report-panel__status--${mode}`);
+      statusEl.replaceChildren();
+      if (mode === "loading" || mode === "generating" || mode === "pending") {
+        const spinner = document.createElement("span");
+        spinner.className = "hm-report-spinner";
+        spinner.setAttribute("aria-hidden", "true");
+        statusEl.appendChild(spinner);
+      }
+      if (mode === "success") {
+        const icon = document.createElement("span");
+        icon.className = "hm-report-success-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.textContent = "✓";
+        statusEl.appendChild(icon);
+      }
+      const text = document.createElement("span");
+      text.className = "hm-report-panel__status-text";
+      text.textContent = message || "";
+      statusEl.appendChild(text);
+    }
+
+    function flashSuccessThen(message, onDone) {
+      setVisualState("success", t("hm_report_done_flash"));
+      if (successFlashTimer) clearTimeout(successFlashTimer);
+      successFlashTimer = setTimeout(() => {
+        successFlashTimer = null;
+        if (typeof onDone === "function") onDone();
+        else setVisualState("", message);
+      }, 2200);
+    }
+
+    async function fetchReport() {
+      const data = await apiFetch(`/api/teacher/submissions/${sid}/ai-report`);
+      return data.ai_report;
+    }
+
+    async function applyReportRow(row, options) {
+      const opts = options || {};
+      const wasGenerating = !!opts.wasGenerating;
+      if (!row) {
+        clearPoll();
+        setVisualState("", t("hm_report_none"));
+        approveBtn.disabled = true;
+        return "none";
+      }
+      const st = row.status || "pending";
+      if (st === "pending") {
+        setVisualState("pending", t("hm_report_generating_wait"));
+        approveBtn.disabled = true;
+        return "pending";
+      }
+      if (st === "failed") {
+        clearPoll();
+        setVisualState("error", row.error_message || t("hm_report_failed"));
+        approveBtn.disabled = true;
+        return "failed";
+      }
+      if (st === "ready" && row.report) {
+        clearPoll();
+        const readyMsg = row.approved_at ? t("hm_report_approved") : t("hm_report_ready");
+        const showBody = () => {
+          setVisualState("", readyMsg);
           renderReportBody(bodyEl, row.report);
           approveBtn.disabled = !!row.approved_at;
-          return;
+        };
+        if (wasGenerating) {
+          flashSuccessThen(readyMsg, showBody);
+        } else {
+          showBody();
         }
-        statusEl.textContent = t("hm_report_none");
-        approveBtn.disabled = true;
+        return "ready";
+      }
+      clearPoll();
+      setVisualState("", t("hm_report_none"));
+      approveBtn.disabled = true;
+      return "none";
+    };
+
+    const refresh = async (options) => {
+      const opts = options || {};
+      if (!opts.silent) {
+        setVisualState("loading", t("hm_report_loading"));
+        bodyEl.innerHTML = "";
+      }
+      try {
+        const row = await fetchReport();
+        return await applyReportRow(row, opts);
       } catch (err) {
-        statusEl.textContent = (err && err.message) || t("hm_report_failed");
+        clearPoll();
+        setVisualState("error", (err && err.message) || t("hm_report_failed"));
         approveBtn.disabled = true;
+        return "error";
       }
     };
 
+    const pollUntilSettled = async (wasGenerating) => {
+      const maxAttempts = 45;
+      for (let i = 0; i < maxAttempts; i += 1) {
+        setVisualState("generating", t("hm_report_generating_wait"));
+        genBtn.disabled = true;
+        try {
+          const row = await fetchReport();
+          const st = row ? row.status : "none";
+          if (st === "ready" || st === "failed" || !row) {
+            genBtn.disabled = false;
+            await applyReportRow(row, { wasGenerating: wasGenerating || st === "ready" });
+            return;
+          }
+        } catch (err) {
+          genBtn.disabled = false;
+          setVisualState("error", (err && err.message) || t("hm_report_failed"));
+          return;
+        }
+        await sleep(2000);
+      }
+      genBtn.disabled = false;
+      setVisualState("pending", t("hm_report_still_running"));
+    };
+
     genBtn.addEventListener("click", () => {
+      clearPoll();
       genBtn.disabled = true;
-      statusEl.textContent = t("hm_report_generating");
-      void apiFetch(`/api/teacher/submissions/${submissionId}/ai-report/generate`, {
+      approveBtn.disabled = true;
+      bodyEl.innerHTML = "";
+      setVisualState("generating", t("hm_report_generating_wait"));
+      void apiFetch(`/api/teacher/submissions/${sid}/ai-report/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",
       })
-        .then(() => refresh())
+        .then(() => pollUntilSettled(true))
         .catch((err) => {
-          statusEl.textContent = (err && err.message) || t("hm_report_failed");
-        })
-        .finally(() => {
+          setVisualState("error", (err && err.message) || t("hm_report_failed"));
           genBtn.disabled = false;
         });
     });
 
     approveBtn.addEventListener("click", () => {
       approveBtn.disabled = true;
-      void apiFetch(`/api/teacher/submissions/${submissionId}/ai-report/approve`, {
+      void apiFetch(`/api/teacher/submissions/${sid}/ai-report/approve`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "replace" }),
       })
         .then((data) => {
-          statusEl.textContent = t("hm_report_approved_ok");
-          const ta = document.getElementById(`teacher-fb-draft-${submissionId}`);
-          const fb = data?.submission?.teacher_feedback;
-          if (ta && fb) ta.value = String(fb);
-          return refresh();
+          flashSuccessThen(t("hm_report_approved_ok"), () => {
+            const ta = document.getElementById(`teacher-fb-draft-${submissionId}`);
+            const fb = data?.submission?.teacher_feedback;
+            if (ta && fb) ta.value = String(fb);
+            void refresh({ silent: true });
+          });
         })
         .catch((err) => {
-          statusEl.textContent = (err && err.message) || t("hm_report_failed");
+          setVisualState("error", (err && err.message) || t("hm_report_failed"));
           approveBtn.disabled = false;
         });
     });
 
-    await refresh();
+    const initial = await refresh();
+    if (initial === "pending") {
+      void pollUntilSettled(false);
+    }
   }
 
   global.EAP_mountHomeworkAiReportPanel = mountHomeworkAiReportPanel;
