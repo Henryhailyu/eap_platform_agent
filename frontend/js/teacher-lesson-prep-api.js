@@ -143,6 +143,17 @@
     return readJson(response);
   }
 
+  async function copyLastPack(payload) {
+    const response = await fetchFn()(`${API_BASE}/api/teacher/lesson-prep/packs/copy-last`, {
+      method: "POST",
+      credentials: "include",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(payload || {}),
+    });
+    const data = await readJson(response);
+    return data.pack;
+  }
+
   async function generatePlan(packId) {
     const response = await fetchFn()(
       `${API_BASE}/api/teacher/lesson-prep/packs/${encodeURIComponent(packId)}/plan`,
@@ -167,6 +178,7 @@
     generatePlan,
     generateHtml,
     publishPack,
+    copyLastPack,
     pageViewUrl,
   };
 })(typeof window !== "undefined" ? window : globalThis);

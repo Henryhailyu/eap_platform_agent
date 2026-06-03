@@ -2510,6 +2510,46 @@ function appendTaskRecordedLessonBlock(parent, task, role) {
   parent.appendChild(manage);
 }
 
+function taskTeachingPageEntry(task) {
+  if (!task) return null;
+  if (task.teaching_page && task.teaching_page.id != null) return task.teaching_page;
+  const pages = Array.isArray(task.teaching_pages) ? task.teaching_pages : [];
+  return pages.length ? pages[0] : null;
+}
+
+/** LP-M2 / Phase A — published HTML lesson linked to a calendar task. */
+function appendTaskTeachingPageBlock(parent, task, role) {
+  const page = taskTeachingPageEntry(task);
+  if (!page || page.id == null) return;
+  if (role === "student" && page.published === false) return;
+
+  const block = document.createElement("div");
+  block.className = "student-task-teaching-page";
+
+  const label = document.createElement("p");
+  label.className = "student-task-teaching-page__label";
+  label.textContent = t("task_teaching_page_label");
+
+  const link = document.createElement("a");
+  link.className = "btn-primary student-task-teaching-page__open";
+  const classQ =
+    task.class_name != null && String(task.class_name).trim()
+      ? `&class=${encodeURIComponent(String(task.class_name).trim())}`
+      : "";
+  link.href = `student-teaching-page.html?id=${encodeURIComponent(page.id)}${classQ}`;
+  link.textContent = page.title
+    ? t("task_open_teaching_page_named", { title: page.title })
+    : t("task_open_teaching_page");
+  if (role === "teacher") {
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+  }
+
+  block.appendChild(label);
+  block.appendChild(link);
+  parent.appendChild(block);
+}
+
 /**
  * Build `{ "YYYY-MM-DD": [tasks…] }` from a flat task list returned by Flask.
  */
@@ -3648,6 +3688,12 @@ function renderTeacherSubmissionsInto(container, submissions, taskId) {
     const MAX_TEACHER_FEEDBACK_FILES = 3;
     const feedbackAttachments = Array.isArray(s.feedback_attachments) ? s.feedback_attachments : [];
 
+    const aiReportSection = document.createElement("div");
+    aiReportSection.className = "task-submission-section task-submission-section--ai-report";
+    if (submissionId && typeof window.EAP_mountHomeworkAiReportPanel === "function") {
+      void window.EAP_mountHomeworkAiReportPanel(aiReportSection, submissionId);
+    }
+
     const feedbackSection = document.createElement("div");
     feedbackSection.className = "task-submission-section task-submission-section--feedback";
 
@@ -3901,6 +3947,7 @@ function renderTeacherSubmissionsInto(container, submissions, taskId) {
 
     article.appendChild(dl);
     article.appendChild(originalSection);
+    article.appendChild(aiReportSection);
     article.appendChild(feedbackSection);
     article.appendChild(revisionSection);
 
@@ -4107,6 +4154,7 @@ function buildTeacherTaskCardElement(task, copyContext) {
   if (!isRecordedTask) {
     appendTaskRecordedLessonBlock(li, task, "teacher");
   }
+  appendTaskTeachingPageBlock(li, task, "teacher");
 
   const copyWrap = document.createElement("div");
   copyWrap.className = "task-card__copy-wrap";
@@ -7633,6 +7681,7 @@ function buildStudentTaskCardElement(task, mySub) {
   li.appendChild(desc);
   li.appendChild(material);
   appendTaskRecordedLessonBlock(li, task, "student");
+  appendTaskTeachingPageBlock(li, task, "student");
   if (isRecordedLessonCategory(task.category || task.type)) {
     const recs = taskRecordedLessonEntries(task);
     const hasPublished = recs.some(

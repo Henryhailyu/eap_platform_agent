@@ -340,6 +340,50 @@
             </div>
           </section>
 
+          <section class="content-section admin-panel" id="admin-hm-section" aria-labelledby="admin-hm-heading">
+            <h2 id="admin-hm-heading" class="section-heading" data-i18n="admin_hm_heading">
+              Homework AI marking
+            </h2>
+            <p class="admin-panel__hint" data-i18n="admin_hm_hint">
+              Set English report instructions and upload marking descriptors (PDF, Word, PPT, Excel, TXT).
+            </p>
+            <p id="admin-hm-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            <div class="field">
+              <label for="admin-hm-profile-select" data-i18n="admin_hm_profile">Report profile</label>
+              <select id="admin-hm-profile-select"></select>
+            </div>
+            <div class="field">
+              <label for="admin-hm-title" data-i18n="admin_hm_title">Display title</label>
+              <input id="admin-hm-title" type="text" maxlength="200" />
+            </div>
+            <div class="field">
+              <label for="admin-hm-category" data-i18n="admin_hm_category">Calendar task category</label>
+              <input id="admin-hm-category" type="text" maxlength="80" placeholder="Writing" />
+            </div>
+            <div class="field">
+              <label for="admin-hm-prompt" data-i18n="admin_hm_prompt">AI system instruction</label>
+              <textarea id="admin-hm-prompt" class="admin-ai-prompt" rows="10" spellcheck="false"></textarea>
+            </div>
+            <button type="button" class="btn-primary" id="admin-hm-save-btn" data-i18n="admin_ai_save">
+              Save instruction
+            </button>
+            <h3 class="admin-hm-descriptors__title" data-i18n="admin_hm_descriptors">Marking descriptors</h3>
+            <ul id="admin-hm-descriptors" class="admin-hm-descriptors"></ul>
+            <div class="admin-inline-form admin-ai-form__row">
+              <div class="field">
+                <label for="admin-hm-file-label" data-i18n="admin_hm_file_label">Label (optional)</label>
+                <input id="admin-hm-file-label" type="text" maxlength="120" />
+              </div>
+              <div class="field">
+                <label for="admin-hm-file" data-i18n="admin_hm_file">Upload descriptor</label>
+                <input id="admin-hm-file" type="file" accept=".pdf,.docx,.txt,.ppt,.pptx,.xlsx" />
+              </div>
+              <button type="button" class="btn-secondary" id="admin-hm-upload-btn" data-i18n="admin_hm_upload">
+                Upload
+              </button>
+            </div>
+          </section>
+
           <section class="content-section admin-panel" aria-labelledby="admin-students-heading">
             <h2 id="admin-students-heading" class="section-heading" data-i18n="admin_students_heading">
               Students
@@ -377,5 +421,6 @@
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>
+    <script src="js/admin-homework-marking.js"></script>
   </body>
 </html>

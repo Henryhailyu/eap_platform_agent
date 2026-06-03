@@ -274,6 +274,10 @@ def build_plan_user_prompt(
         lines.append(f"Teacher objectives (input): {pack['objectives']}")
     if pack.get("ielts_band_target"):
         lines.append(f"IELTS / level target: {pack['ielts_band_target']}")
+    if style == "support_bilingual":
+        lines.append(
+            "Include bilingual_hints: true in JSON and add brief 中文 hints in segment notes where helpful."
+        )
     manifest = file_manifest or []
     if manifest:
         lines.append(
@@ -357,6 +361,12 @@ def build_html_from_plan_prompt(pack: dict, plan: dict, materials: str) -> str:
         + "\nGenerate the full HTML lesson now. Build every interaction_slot as a live "
         "poll/quiz/game block with data-eap-live-tool and 3–4 options."
     )
+    if str(pack.get("teaching_style") or "") == "support_bilingual":
+        body += (
+            "\n\nBilingual support: include short Chinese hints (简体) in "
+            "elements with class data-bilingual-hint or data-zh-hint alongside English "
+            "main content — especially instructions and key vocabulary."
+        )
     if len(body) > MAX_SOURCE_TEXT:
         body = body[:MAX_SOURCE_TEXT]
     return body
@@ -534,6 +544,83 @@ def _load_plan_row(row) -> dict | None:
     return plan if isinstance(plan, dict) else None
 
 
+def duplicate_lesson_pack(
+    conn,
+    teacher: str,
+    pack_id: int,
+    upload_dir: str,
+    *,
+    title: str | None = None,
+    copy_files: bool = True,
+) -> dict | None:
+    """Clone pack as new draft (no plan / HTML / publish state). Returns pack dict or None."""
+    row = fetch_pack(conn, pack_id, teacher)
+    if row is None:
+        return None
+    base_title = str(row["title"] or "Lesson").strip()[:180]
+    new_title = (title or f"{base_title} (copy)").strip()[:200]
+    now = _now_iso()
+    cur = conn.execute(
+        """
+        INSERT INTO lesson_prep_packs
+            (teacher_username, class_name, title, lesson_date, duration_minutes,
+             teaching_style, category, objectives, ielts_band_target,
+             plan_status, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'draft', ?, ?)
+        """,
+        (
+            teacher,
+            row["class_name"],
+            new_title,
+            row["lesson_date"],
+            row["duration_minutes"],
+            row["teaching_style"],
+            row["category"],
+            row["objectives"],
+            row["ielts_band_target"],
+            now,
+            now,
+        ),
+    )
+    new_id = int(cur.lastrowid)
+    if copy_files:
+        file_rows = conn.execute(
+            "SELECT * FROM lesson_prep_pack_files WHERE pack_id = ? ORDER BY id ASC",
+            (pack_id,),
+        ).fetchall()
+        src_dir = lesson_prep_upload_dir(upload_dir, pack_id)
+        dest_dir = lesson_prep_upload_dir(upload_dir, new_id)
+        for fr in file_rows:
+            src_path = os.path.join(src_dir, os.path.basename(fr["stored_name"]))
+            if not os.path.isfile(src_path):
+                continue
+            with open(src_path, "rb") as fh:
+                data_bytes = fh.read()
+            new_stored, _dest = save_source_file(dest_dir, fr["original_name"], data_bytes)
+            conn.execute(
+                """
+                INSERT INTO lesson_prep_pack_files
+                    (pack_id, original_name, stored_name, use_in_ai, extract_status,
+                     extract_error, extracted_text, char_count, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    new_id,
+                    fr["original_name"],
+                    new_stored,
+                    fr["use_in_ai"],
+                    fr["extract_status"],
+                    fr["extract_error"],
+                    fr["extracted_text"],
+                    fr["char_count"],
+                    now,
+                ),
+            )
+    conn.commit()
+    new_row = fetch_pack(conn, new_id, teacher)
+    return pack_row_to_dict(new_row)
+
+
 def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_if_enabled, get_current_authenticated_user, upload_dir: str, ai_is_configured, format_ai_error):
     """Register /api/teacher/lesson-prep/* routes on the Flask app."""
 
@@ -698,6 +785,62 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
         row = fetch_pack(conn, pack_id, teacher)
         conn.close()
         return jsonify({"pack": pack_row_to_dict(row, include_plan=True)})
+
+    @app.route("/api/teacher/lesson-prep/packs/<int:pack_id>/duplicate", methods=["POST"])
+    def lesson_prep_pack_duplicate(pack_id: int):
+        """LP-M3: copy pack metadata and files (fresh draft, no plan/HTML)."""
+        pair, err = _teacher_conn()
+        if err:
+            return err
+        conn, teacher = pair
+        data = request.get_json(silent=True) or {}
+        payload = duplicate_lesson_pack(
+            conn,
+            teacher,
+            pack_id,
+            upload_dir,
+            title=str(data.get("title") or "").strip() or None,
+            copy_files=data.get("copy_files", True) is not False,
+        )
+        conn.close()
+        if payload is None:
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"pack": payload}), 201
+
+    @app.route("/api/teacher/lesson-prep/packs/copy-last", methods=["POST"])
+    def lesson_prep_pack_copy_last():
+        """LP-M3: duplicate the teacher's most recent pack for this class."""
+        pair, err = _teacher_conn()
+        if err:
+            return err
+        conn, teacher = pair
+        data = request.get_json(silent=True) or {}
+        class_name = str(data.get("class_name") or PILOT_CLASS).strip()
+        pilot_err = assert_pilot_class(class_name)
+        if pilot_err:
+            conn.close()
+            return jsonify({"error": pilot_err}), 400
+        row = conn.execute(
+            """
+            SELECT id FROM lesson_prep_packs
+            WHERE teacher_username = ? AND class_name = ?
+            ORDER BY datetime(updated_at) DESC, id DESC LIMIT 1
+            """,
+            (teacher, class_name),
+        ).fetchone()
+        if row is None:
+            conn.close()
+            return jsonify({"error": "No previous pack to copy"}), 404
+        payload = duplicate_lesson_pack(
+            conn,
+            teacher,
+            int(row["id"]),
+            upload_dir,
+            title=str(data.get("title") or "").strip() or None,
+            copy_files=data.get("copy_files", True) is not False,
+        )
+        conn.close()
+        return jsonify({"pack": payload}), 201
 
     @app.route("/api/teacher/lesson-prep/packs/<int:pack_id>/files", methods=["POST"])
     def lesson_prep_pack_files_upload(pack_id: int):

@@ -809,8 +809,10 @@ def init_database():
     migrate_teacher_teaching_pages_k45(conn)
 
     from lesson_prep import migrate_lesson_prep_tables
+    from homework_marking import migrate_homework_marking_tables
 
     migrate_lesson_prep_tables(conn)
+    migrate_homework_marking_tables(conn)
 
     seed_default_users(conn)
     ensure_e1_demo_users(conn)
@@ -3035,8 +3037,12 @@ def get_tasks():
             conn, out, published_only=(role == "student")
         )
         from task_materials import enrich_task_dicts_with_materials
+        from teaching_page_tasks import enrich_task_dicts_with_teaching_pages
 
         enrich_task_dicts_with_materials(conn, out)
+        enrich_task_dicts_with_teaching_pages(
+            conn, out, published_only=(role == "student")
+        )
         conn.close()
         return jsonify(out)
 
@@ -3074,8 +3080,12 @@ def get_tasks():
             conn, out, published_only=(role == "student")
         )
         from task_materials import enrich_task_dicts_with_materials
+        from teaching_page_tasks import enrich_task_dicts_with_teaching_pages
 
         enrich_task_dicts_with_materials(conn, out)
+        enrich_task_dicts_with_teaching_pages(
+            conn, out, published_only=(role == "student")
+        )
     conn.close()
 
     return jsonify(out)
@@ -3660,6 +3670,15 @@ def submit_task_homework(task_id):
     ).fetchone()
     payload = submission_with_attachments(conn, row)
     conn.close()
+
+    try:
+        from homework_marking import queue_report_generation
+
+        gen_kw = app.config.get("EAP_HOMEWORK_MARKING_GEN_KWARGS")
+        if gen_kw:
+            queue_report_generation(new_id, **gen_kw)
+    except Exception:
+        pass
 
     return jsonify(payload), 201
 
@@ -8163,6 +8182,18 @@ register_task_materials_routes(app)
 from lesson_prep import register_lesson_prep_routes
 
 register_lesson_prep_routes(
+    app,
+    get_db_connection=get_db_connection,
+    require_session_role_if_enabled=require_session_role_if_enabled,
+    get_current_authenticated_user=get_current_authenticated_user,
+    upload_dir=UPLOAD_DIR,
+    ai_is_configured=ai_is_configured,
+    format_ai_error=format_ai_error,
+)
+
+from homework_marking import register_homework_marking_routes
+
+register_homework_marking_routes(
     app,
     get_db_connection=get_db_connection,
     require_session_role_if_enabled=require_session_role_if_enabled,

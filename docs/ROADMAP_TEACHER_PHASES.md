@@ -21,6 +21,10 @@
 
 | ID | Task |
 |----|------|
+| **LP-M3** | PPT/PPTX/XLSX ingest, bilingual HTML hints, copy last pack | LP-M2 |
+| **HM-M1a** | Manager homework marking profiles + descriptor upload | — |
+| **HM-M1b** | Teacher AI Report panel + approve → feedback | HM-M1a |
+| **Phase A** | Student calendar → published teaching page link | LP-M2 |
 | **LP-M2** | Plan → HTML → preview → publish to calendar + teaching page | [`VISION_LESSON_PREP.md`](VISION_LESSON_PREP.md) |
 | **LT-M2** | Segment filter on Poll/Quiz; 5 phase-1 games; `#eap-lesson-meta` sync | [`VISION_LIVE_INTERACTIONS.md`](VISION_LIVE_INTERACTIONS.md) |
 | **LT-M1** | Live Poll/Quiz: AI slots + manual; Games suggestions | [`VISION_LIVE_INTERACTIONS.md`](VISION_LIVE_INTERACTIONS.md) |
@@ -33,18 +37,11 @@
 
 | ID | Task | Depends on |
 |----|------|------------|
-| **LP-M3** | PPT/Excel ingest, bilingual hints, copy last week | LP-M2 |
+| **LP-M3+** | Further LP-M3 polish (xls, richer Excel tables in HTML) | LP-M3 |
 | **LP-M4** | Real-time class sync (Phase B, ~35 students) | LP-M2+ |
-| **HM-M1b** | Teacher **AI homework report** panel + approve → feedback | HM-M1a (Manager) |
-| **HM-M2+** | Richer reports, regenerate, analytics | HM-M1b |
+| **HM-M2+** | Richer reports, regenerate, analytics | HM-M1b ✅ |
 
 ---
-
-## Manager-first (blocks teacher HM UI)
-
-| ID | Task | Doc |
-|----|------|-----|
-| **HM-M1a** | Marking **profiles**, **descriptor** uploads, prompts | [`VISION_AI_HOMEWORK_MARKING.md`](VISION_AI_HOMEWORK_MARKING.md) |
 
 ---
 
@@ -57,10 +54,12 @@
 
 ## After teacher LP-M2 UAT
 
-1. Student端 — teaching page viewer, homework loop polish  
-2. Manager端 — templates, HM-M1a, academic calendar  
-3. HM-M1b on teacher submissions  
+1. ~~Student端 — teaching page on calendar task~~ ✅ Phase A  
+2. ~~Manager端 — HM-M1a marking profiles~~ ✅  
+3. ~~HM-M1b on teacher submissions~~ ✅  
+
+**Next:** EAP047 联合彩排（备课 → 发布 → 学生打开 → Live → 作业提交 → AI 报告审阅）
 
 ---
 
-*Current sprint: **LP-M1** (backend + wizard UI).*
+*Current sprint: **EAP047 pilot rehearsal** + LP-M4 (real-time sync) when ready.*

@@ -341,6 +341,23 @@
     });
 
     const savePackBtn = document.getElementById("tlp-save-pack-btn");
+    document.getElementById("tlp-copy-last-btn")?.addEventListener("click", () => {
+      void (async () => {
+        setStatus(statusEl, t("tlp_copying_last"), false);
+        try {
+          const pack = await prepApi.copyLastPack({
+            class_name: meta?.pilot_class || "EAP047",
+          });
+          packId = pack.id;
+          await refreshPackSelect(pack.id);
+          await loadPack(pack.id);
+          setStatus(statusEl, t("tlp_copy_last_ok"), false);
+        } catch (err) {
+          setStatus(statusEl, (err && err.message) || t("tlp_copy_last_failed"), true);
+        }
+      })();
+    });
+
     savePackBtn?.addEventListener("click", () => {
       void runSave(savePackBtn, async () => {
         setStatus(statusEl, "", false);

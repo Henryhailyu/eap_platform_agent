@@ -5,12 +5,16 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import uuid
 from datetime import datetime, timezone
 
 from teacher_teaching_pages import MAX_SOURCE_TEXT
 
-ALLOWED_SOURCE_EXTENSIONS = frozenset({"pdf", "docx", "txt"})
+ALLOWED_SOURCE_EXTENSIONS = frozenset({"pdf", "docx", "txt", "ppt", "pptx", "xlsx"})
+OFFICE_TO_PDF_EXTS = frozenset({"ppt", "pptx"})
 MAX_SOURCE_FILE_BYTES = 10 * 1024 * 1024
 MAX_SOURCE_FILES_PER_TEACHER = 12
 PREVIEW_CHARS = 600
@@ -60,7 +64,95 @@ def extract_text_from_bytes(data: bytes, ext: str) -> str:
         doc = Document(io.BytesIO(data))
         return "\n".join(p.text for p in doc.paragraphs if p.text)
 
+    if ext in OFFICE_TO_PDF_EXTS:
+        return _extract_text_via_office_pdf(data, ext)
+
+    if ext == "xlsx":
+        return _extract_text_from_xlsx(data)
+
     raise ValueError(f"Unsupported file type: {ext}")
+
+
+def _find_soffice_binary() -> str | None:
+    for name in ("soffice", "libreoffice"):
+        found = shutil.which(name)
+        if found:
+            return found
+    for path in (
+        "/usr/bin/soffice",
+        "/usr/bin/libreoffice",
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    ):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return None
+
+
+def _extract_text_via_office_pdf(data: bytes, ext: str) -> str:
+    soffice = _find_soffice_binary()
+    if not soffice:
+        raise RuntimeError(
+            "PowerPoint support requires LibreOffice (soffice) on the server"
+        )
+    with tempfile.TemporaryDirectory() as td:
+        src = os.path.join(td, f"source.{ext}")
+        out_dir = os.path.join(td, "out")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(src, "wb") as fh:
+            fh.write(data)
+        profile_dir = os.path.join(td, "lo_profile")
+        os.makedirs(profile_dir, exist_ok=True)
+        cmd = [
+            soffice,
+            "--headless",
+            "--norestore",
+            "--invisible",
+            f"-env:UserInstallation=file://{profile_dir}",
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            out_dir,
+            src,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, timeout=120, check=False)
+        if proc.returncode != 0:
+            err = (proc.stderr or proc.stdout or b"").decode("utf-8", errors="replace")[:300]
+            raise RuntimeError(f"Could not convert {ext} to PDF: {err}")
+        pdf_path = os.path.join(out_dir, "source.pdf")
+        if not os.path.isfile(pdf_path):
+            for name in os.listdir(out_dir):
+                if name.lower().endswith(".pdf"):
+                    pdf_path = os.path.join(out_dir, name)
+                    break
+        if not os.path.isfile(pdf_path):
+            raise RuntimeError("PDF conversion produced no output file")
+        with open(pdf_path, "rb") as fh:
+            return extract_text_from_bytes(fh.read(), "pdf")
+
+
+def _extract_text_from_xlsx(data: bytes) -> str:
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:
+        raise RuntimeError("Excel support requires openpyxl on the server") from exc
+    import io
+
+    wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    parts: list[str] = []
+    for sheet_name in wb.sheetnames[:6]:
+        ws = wb[sheet_name]
+        parts.append(f"=== Sheet: {sheet_name} ===")
+        row_count = 0
+        for row in ws.iter_rows(values_only=True):
+            if row_count >= 80:
+                parts.append("… (truncated)")
+                break
+            cells = [str(c).strip() if c is not None else "" for c in row]
+            if any(cells):
+                parts.append("\t".join(cells))
+                row_count += 1
+    wb.close()
+    return "\n".join(parts)
 
 
 def normalize_extracted_text(text: str) -> str:

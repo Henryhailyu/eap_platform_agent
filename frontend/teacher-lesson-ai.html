@@ -106,6 +106,14 @@
                   </button>
                   <button
                     type="button"
+                    class="btn-secondary"
+                    id="tlp-copy-last-btn"
+                    data-i18n="tlp_copy_last_btn"
+                  >
+                    Copy last week
+                  </button>
+                  <button
+                    type="button"
                     class="btn-primary"
                     id="tlp-generate-plan-btn"
                     data-eap-ai-target="#tlp-plan-view"
@@ -120,9 +128,15 @@
                 <div class="tla-field tla-source-upload">
                   <span class="tla-source-upload__label" data-i18n="tlp_files_label">Pack materials (for AI plan)</span>
                   <p class="tla-source-upload__hint" data-i18n="tlp_files_hint">
-                    PDF, DOCX, or TXT — save pack first, then upload. AI uses all files together; remove mistakes with Delete.
+                    PDF, Word, PowerPoint, Excel, or TXT — save pack first, then upload. AI uses all files together.
                   </p>
-                  <input id="tlp-file-input" type="file" class="hidden" multiple accept=".pdf,.docx,.txt,application/pdf,text/plain" />
+                  <input
+                    id="tlp-file-input"
+                    type="file"
+                    class="hidden"
+                    multiple
+                    accept=".pdf,.docx,.txt,.ppt,.pptx,.xlsx,application/pdf,text/plain"
+                  />
                   <button
                     type="button"
                     class="btn-secondary"
