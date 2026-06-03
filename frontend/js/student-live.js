@@ -484,10 +484,12 @@
       D: t("slive_team_d"),
     };
     teams.innerHTML = ["A", "B", "C", "D"]
-      .map(
-        (id) =>
-          `<button type="button" class="btn-secondary slive-team-btn${state.teamId === id ? " slive-team-btn--active" : ""}" data-team="${id}" style="border-color:${colors[id]}">${escapeHtml(labels[id])}</button>`,
-      )
+      .map((id) => {
+        const active = state.teamId === id;
+        return `<button type="button" class="btn-secondary slive-team-btn${
+          active ? " slive-team-btn--active" : ""
+        }" data-team="${id}" style="--team-color:${colors[id]}" aria-pressed="${active ? "true" : "false"}">${escapeHtml(labels[id])}</button>`;
+      })
       .join("");
     wrap.classList.remove("hidden");
     teams.querySelectorAll("[data-team]").forEach((btn) => {

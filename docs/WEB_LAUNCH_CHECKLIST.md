@@ -2,7 +2,7 @@
 
 **Pilot URL:** https://eap-platform-pilot.onrender.com  
 **Repo:** `Henryhailyu/eap_platform_agent` · branch `main`  
-**Last updated:** 2026-05-26  
+**Last updated:** 2026-06-03  
 
 Use this list to move from **“demo works”** to **“real classes can use the website reliably.”**
 
@@ -37,11 +37,14 @@ Use this list to move from **“demo works”** to **“real classes can use the
 
 ### QA — full teacher → student path (high)
 
+**EAP047 scripted rehearsal (recommended):** [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md) — lesson prep → student teaching page → Live (timer push) → homework → AI report.
+
 Run on **HTTPS pilot** (not only localhost):
 
 - [ ] Manager: login `manager1` → calendar / classes / AI template settings  
 - [ ] Teacher: login `teacher1` → create task → upload material → feedback on submission  
 - [ ] Teacher: **Live Teaching** → launch session → student join code works  
+- [ ] Teacher: **Timer** → **Push timer to students** → student sees sync + bell at 0 (EAP047-R §3)  
 - [ ] Teacher: **Display library** → upload PDF, DOCX, **PPT** → inline preview + download  
 - [ ] Teacher: **AI Lesson Builder** → generate HTML → preview (no AI preamble) → push to classroom  
 - [ ] Student: login `student1` → calendar → submit homework  

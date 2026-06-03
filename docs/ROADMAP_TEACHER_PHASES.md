@@ -1,6 +1,6 @@
 # Teacher-side roadmap (execution order)
 
-**Updated:** 2026-06-02  
+**Updated:** 2026-06-03  
 **Pilot class:** `EAP047` · **Pilot skill:** Writing  
 
 ---
@@ -30,6 +30,15 @@
 | **LT-M1** | Live Poll/Quiz: AI slots + manual; Games suggestions | [`VISION_LIVE_INTERACTIONS.md`](VISION_LIVE_INTERACTIONS.md) |
 | **LP-M1** | Lesson prep pack API + AI plan JSON + wizard UI |
 | **LP-M1b** | Rename **AI-aided lesson prep**, default **collapsed** accordion |
+| **Live timer** | Teacher push + student sync + 3s bell (`cc576b7`) | — |
+
+---
+
+## In progress (this sprint)
+
+| ID | Task | Doc |
+|----|------|-----|
+| **EAP047-R** | **联合彩排** — lesson → student page → Live (incl. timer push) → homework → AI report | [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md) |
 
 ---
 
@@ -58,8 +67,8 @@
 2. ~~Manager端 — HM-M1a marking profiles~~ ✅  
 3. ~~HM-M1b on teacher submissions~~ ✅  
 
-**Next:** EAP047 联合彩排（备课 → 发布 → 学生打开 → Live → 作业提交 → AI 报告审阅）
+**Next:** Complete **EAP047-R** checklist → then **LP-M4** (real-time sync) unless rehearsal logs blockers.
 
 ---
 
-*Current sprint: **EAP047 pilot rehearsal** + LP-M4 (real-time sync) when ready.*
+*Current sprint: **EAP047-R rehearsal** (active) → **LP-M4** when signed off.*
