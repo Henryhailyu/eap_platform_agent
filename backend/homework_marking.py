@@ -1,16 +1,18 @@
 """
-HM-M1a / HM-M1b / HM-M2 — AI homework marking reports (Manager config + teacher review).
+HM-M1a / HM-M1b / HM-M2 / HM-M4 — AI homework marking reports (Manager config + teacher review).
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from flask import jsonify, request
+from flask import Response, jsonify, request
 from teaching_page_source_files import (
     allowed_source_extension,
     extract_text_from_bytes,
@@ -413,13 +415,56 @@ def _pick_profile_for_task(conn, category: str, class_name: str = "") -> Any:
     ).fetchone()
 
 
-def _homework_marking_analytics(conn, class_name: str = "") -> dict:
-    cls = str(class_name or "").strip()
-    where = ""
+def _analytics_report_filters(class_name: str = "", days: int = 0) -> tuple[str, list[Any]]:
+    clauses: list[str] = []
     params: list[Any] = []
+    cls = str(class_name or "").strip()
     if cls:
-        where = " AND t.class_name = ?"
+        clauses.append(" AND t.class_name = ?")
         params.append(cls)
+    if days and days > 0:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=int(days))).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
+        clauses.append(" AND r.created_at >= ?")
+        params.append(cutoff)
+    return "".join(clauses), params
+
+
+def _homework_marking_report_join_sql() -> str:
+    return """
+        FROM submission_ai_reports r
+        JOIN submissions s ON s.id = r.submission_id
+        JOIN calendar_tasks t ON t.id = s.task_id
+        WHERE 1=1
+    """
+
+
+def _homework_marking_available_classes(conn) -> list[str]:
+    rows = conn.execute(
+        f"""
+        SELECT DISTINCT TRIM(t.class_name) AS class_name
+        {_homework_marking_report_join_sql()}
+          AND TRIM(COALESCE(t.class_name, '')) != ''
+        ORDER BY class_name ASC
+        """
+    ).fetchall()
+    seen: set[str] = set()
+    out: list[str] = []
+    for row in rows:
+        name = str(row["class_name"] or "").strip()
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    if "EAP047" not in seen:
+        out.insert(0, "EAP047")
+    return out
+
+
+def _homework_marking_analytics(conn, class_name: str = "", days: int = 0) -> dict:
+    cls = str(class_name or "").strip()
+    where, params = _analytics_report_filters(cls, days)
+    join = _homework_marking_report_join_sql()
     row = conn.execute(
         f"""
         SELECT
@@ -429,10 +474,7 @@ def _homework_marking_analytics(conn, class_name: str = "") -> dict:
             SUM(CASE WHEN r.status = 'failed' THEN 1 ELSE 0 END) AS failed,
             SUM(CASE WHEN r.approved_at IS NOT NULL AND TRIM(r.approved_at) != '' THEN 1 ELSE 0 END) AS approved,
             SUM(CASE WHEN r.previous_report_json IS NOT NULL AND TRIM(r.previous_report_json) != '' THEN 1 ELSE 0 END) AS regenerated
-        FROM submission_ai_reports r
-        JOIN submissions s ON s.id = r.submission_id
-        JOIN calendar_tasks t ON t.id = s.task_id
-        WHERE 1=1{where}
+        {join}{where}
         """,
         params,
     ).fetchone()
@@ -444,8 +486,47 @@ def _homework_marking_analytics(conn, class_name: str = "") -> dict:
     total = int(row["total_reports"] if row else 0)
     approved = int(row["approved"] if row else 0)
     accept_rate = round(100.0 * approved / total, 1) if total else 0.0
+
+    by_status = [
+        {"key": "ready", "count": int(row["ready"] if row else 0)},
+        {"key": "pending", "count": int(row["pending"] if row else 0)},
+        {"key": "failed", "count": int(row["failed"] if row else 0)},
+        {"key": "approved", "count": approved},
+    ]
+
+    cat_rows = conn.execute(
+        f"""
+        SELECT COALESCE(NULLIF(TRIM(t.category), ''), '(none)') AS category,
+               COUNT(*) AS c
+        {join}{where}
+        GROUP BY category
+        ORDER BY c DESC, category ASC
+        LIMIT 8
+        """,
+        params,
+    ).fetchall()
+    by_category = [
+        {"category": str(r["category"]), "count": int(r["c"])} for r in cat_rows
+    ]
+
+    daily_rows = conn.execute(
+        f"""
+        SELECT substr(r.created_at, 1, 10) AS day, COUNT(*) AS c
+        {join}{where}
+        GROUP BY day
+        ORDER BY day DESC
+        LIMIT 14
+        """,
+        params,
+    ).fetchall()
+    daily = [
+        {"day": str(r["day"]), "count": int(r["c"])}
+        for r in reversed(list(daily_rows))
+    ]
+
     return {
         "class_name": cls or None,
+        "days": int(days) if days and days > 0 else None,
         "total_reports": total,
         "ready": int(row["ready"] if row else 0),
         "pending": int(row["pending"] if row else 0),
@@ -454,7 +535,74 @@ def _homework_marking_analytics(conn, class_name: str = "") -> dict:
         "regenerated": int(row["regenerated"] if row else 0),
         "accept_rate_pct": accept_rate,
         "active_profiles": int(profiles["c"] if profiles else 0),
+        "by_status": by_status,
+        "by_category": by_category,
+        "daily": daily,
+        "available_classes": _homework_marking_available_classes(conn),
     }
+
+
+def _homework_marking_analytics_csv(conn, class_name: str = "", days: int = 0) -> str:
+    where, params = _analytics_report_filters(class_name, days)
+    rows = conn.execute(
+        f"""
+        SELECT
+            r.id AS report_id,
+            r.submission_id,
+            t.class_name,
+            t.category,
+            t.title AS task_title,
+            t.date AS task_date,
+            s.student_username,
+            r.status,
+            CASE WHEN r.approved_at IS NOT NULL AND TRIM(r.approved_at) != ''
+                 THEN 'yes' ELSE 'no' END AS approved,
+            CASE WHEN r.previous_report_json IS NOT NULL
+                      AND TRIM(r.previous_report_json) != ''
+                 THEN 'yes' ELSE 'no' END AS regenerated,
+            r.created_at,
+            r.approved_at
+        {_homework_marking_report_join_sql()}{where}
+        ORDER BY r.created_at DESC, r.id DESC
+        """,
+        params,
+    ).fetchall()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "report_id",
+            "submission_id",
+            "class_name",
+            "task_category",
+            "task_title",
+            "task_date",
+            "student_username",
+            "status",
+            "approved",
+            "regenerated",
+            "created_at",
+            "approved_at",
+        ]
+    )
+    for row in rows:
+        writer.writerow(
+            [
+                row["report_id"],
+                row["submission_id"],
+                row["class_name"] or "",
+                row["category"] or "",
+                row["task_title"] or "",
+                row["task_date"] or "",
+                row["student_username"] or "",
+                row["status"] or "",
+                row["approved"],
+                row["regenerated"],
+                row["created_at"] or "",
+                row["approved_at"] or "",
+            ]
+        )
+    return buf.getvalue()
 
 
 def _descriptor_text_for_profile(conn, profile_id: int) -> str:
@@ -768,9 +916,43 @@ def register_homework_marking_routes(
             conn.close()
             return err
         class_name = str(request.args.get("class_name") or "").strip()[:80]
-        payload = _homework_marking_analytics(conn, class_name)
+        try:
+            days = int(request.args.get("days") or 0)
+        except (TypeError, ValueError):
+            days = 0
+        if days < 0:
+            days = 0
+        if days > 365:
+            days = 365
+        payload = _homework_marking_analytics(conn, class_name, days)
         conn.close()
         return jsonify({"analytics": payload})
+
+    @app.route("/api/admin/homework-marking/analytics/export.csv", methods=["GET"])
+    def admin_hm_analytics_export():
+        conn = get_db_connection()
+        err = require_manager_console_role(conn)
+        if err:
+            conn.close()
+            return err
+        class_name = str(request.args.get("class_name") or "").strip()[:80]
+        try:
+            days = int(request.args.get("days") or 0)
+        except (TypeError, ValueError):
+            days = 0
+        if days < 0:
+            days = 0
+        if days > 365:
+            days = 365
+        csv_text = _homework_marking_analytics_csv(conn, class_name, days)
+        conn.close()
+        suffix = class_name or "all"
+        filename = f"homework-marking-{suffix}.csv"
+        return Response(
+            csv_text,
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     @app.route("/api/admin/homework-marking/profiles", methods=["POST"])
     def admin_hm_profiles_create():

@@ -133,6 +133,7 @@ Reuse `submissions` + `submission_attachments` for student work text/files.
 | **HM-M1b** | Teacher: AI Report panel + approve-to-feedback; async generate on submit |
 | **HM-M2** | Richer report schema (criterion tags, excerpt anchors); regenerate + diff ✅ |
 | **HM-M3** | Profile `class_name` + manager analytics (accept rate, regenerate count) ✅ |
+| **HM-M4** | Manager dashboard: class/period filters, bar charts, CSV export ✅ |
 
 **Dependency:** Manager profiles/descriptors before teacher UI is useful. Can run **after LP-M2 teacher UAT** or in parallel once HM-M1a is done.
 

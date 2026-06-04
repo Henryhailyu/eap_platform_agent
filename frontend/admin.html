@@ -348,7 +348,36 @@
               Set English report instructions and upload marking descriptors (PDF, Word, PPT, Excel, TXT).
             </p>
             <p id="admin-hm-status" class="form-message hidden" role="status" aria-live="polite"></p>
-            <div id="admin-hm-analytics" class="admin-hm-analytics" aria-live="polite"></div>
+            <div class="admin-hm-analytics-panel" aria-labelledby="admin-hm-analytics-heading">
+              <h3 id="admin-hm-analytics-heading" class="admin-hm-analytics-panel__heading" data-i18n="admin_hm_analytics_heading">
+                Marking statistics
+              </h3>
+              <div class="admin-hm-analytics-toolbar">
+                <div class="field admin-hm-analytics-toolbar__field">
+                  <label for="admin-hm-analytics-class" data-i18n="admin_hm_analytics_class">Class</label>
+                  <select id="admin-hm-analytics-class" aria-describedby="admin-hm-analytics-hint"></select>
+                </div>
+                <div class="field admin-hm-analytics-toolbar__field">
+                  <label for="admin-hm-analytics-days" data-i18n="admin_hm_analytics_days">Period</label>
+                  <select id="admin-hm-analytics-days">
+                    <option value="0" data-i18n="admin_hm_analytics_days_all">All time</option>
+                    <option value="7" data-i18n="admin_hm_analytics_days_7">Last 7 days</option>
+                    <option value="30" data-i18n="admin_hm_analytics_days_30">Last 30 days</option>
+                    <option value="90" data-i18n="admin_hm_analytics_days_90">Last 90 days</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-secondary" id="admin-hm-analytics-refresh" data-i18n="admin_hm_analytics_refresh">
+                  Refresh
+                </button>
+                <button type="button" class="btn-secondary" id="admin-hm-analytics-export" data-i18n="admin_hm_analytics_export">
+                  Export CSV
+                </button>
+              </div>
+              <p id="admin-hm-analytics-hint" class="admin-panel__hint admin-hm-analytics-hint" data-i18n="admin_hm_analytics_hint">
+                Filter by class and period. Charts update when you change filters.
+              </p>
+              <div id="admin-hm-analytics" class="admin-hm-analytics" aria-live="polite"></div>
+            </div>
             <div class="field">
               <label for="admin-hm-profile-select" data-i18n="admin_hm_profile">Report profile</label>
               <select id="admin-hm-profile-select"></select>
@@ -434,6 +463,6 @@
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>
     <script src="js/eap-button-state.js"></script>
-    <script src="js/admin-homework-marking.js?v=20260604-hm3"></script>
+    <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
   </body>
 </html>
