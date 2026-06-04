@@ -348,6 +348,7 @@
               Set English report instructions and upload marking descriptors (PDF, Word, PPT, Excel, TXT).
             </p>
             <p id="admin-hm-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            <div id="admin-hm-analytics" class="admin-hm-analytics" aria-live="polite"></div>
             <div class="field">
               <label for="admin-hm-profile-select" data-i18n="admin_hm_profile">Report profile</label>
               <select id="admin-hm-profile-select"></select>
@@ -359,6 +360,10 @@
             <div class="field">
               <label for="admin-hm-category" data-i18n="admin_hm_category">Calendar task category</label>
               <input id="admin-hm-category" type="text" maxlength="80" placeholder="Writing" />
+            </div>
+            <div class="field">
+              <label for="admin-hm-class" data-i18n="admin_hm_class">Class (optional)</label>
+              <input id="admin-hm-class" type="text" maxlength="80" placeholder="EAP047" />
             </div>
             <div class="field">
               <label for="admin-hm-prompt" data-i18n="admin_hm_prompt">AI system instruction</label>
@@ -383,7 +388,7 @@
               </div>
               <div class="field">
                 <label for="admin-hm-file" data-i18n="admin_hm_file">Upload descriptor</label>
-                <input id="admin-hm-file" type="file" accept=".pdf,.docx,.txt,.ppt,.pptx,.xlsx" />
+                <input id="admin-hm-file" type="file" accept=".pdf,.docx,.txt,.ppt,.pptx,.xls,.xlsx" />
               </div>
               <button type="button" class="btn-secondary" id="admin-hm-upload-btn" data-i18n="admin_hm_upload">
                 Upload
@@ -429,6 +434,6 @@
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>
     <script src="js/eap-button-state.js"></script>
-    <script src="js/admin-homework-marking.js?v=20260604-hm1"></script>
+    <script src="js/admin-homework-marking.js?v=20260604-hm3"></script>
   </body>
 </html>

@@ -1,5 +1,5 @@
 """
-HM-M1a / HM-M1b — AI homework marking reports (Manager config + teacher review).
+HM-M1a / HM-M1b / HM-M2 — AI homework marking reports (Manager config + teacher review).
 """
 from __future__ import annotations
 
@@ -38,6 +38,7 @@ Structure your reply as ONE JSON object with these keys (all strings; use Markdo
 - issues (numbered issues with criterion labels: Task response, Coherence, Vocabulary, Grammar, etc.)
 - actionable_revisions (concrete steps the student should take)
 - suggested_band (informational IELTS-style band or level estimate; teacher decides final grade)
+- criteria_issues (JSON array, optional but recommended: up to 8 objects, each with "criterion", "excerpt", "comment" — quote short student excerpts)
 Do not invent facts not present in the submission. If the submission is too short, say so.""",
 }
 
@@ -130,7 +131,40 @@ def migrate_homework_marking_tables(conn) -> None:
         )
         """
     )
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(submission_ai_reports)").fetchall()}
+    if "previous_report_json" not in cols:
+        conn.execute("ALTER TABLE submission_ai_reports ADD COLUMN previous_report_json TEXT")
+    prof_cols = {r[1] for r in conn.execute("PRAGMA table_info(homework_marking_profiles)").fetchall()}
+    if "class_name" not in prof_cols:
+        conn.execute("ALTER TABLE homework_marking_profiles ADD COLUMN class_name TEXT")
     _seed_default_profile(conn)
+    conn.execute(
+        """
+        UPDATE homework_marking_profiles SET class_name = 'EAP047'
+        WHERE profile_key = ? AND (class_name IS NULL OR TRIM(class_name) = '')
+        """,
+        (DEFAULT_WRITING_PROFILE["profile_key"],),
+    )
+
+
+def _normalize_report_payload(payload: dict) -> dict:
+    report = {k: str(payload.get(k) or "").strip() for k in REPORT_JSON_KEYS}
+    raw_issues = payload.get("criteria_issues")
+    if isinstance(raw_issues, list):
+        cleaned = []
+        for item in raw_issues[:12]:
+            if not isinstance(item, dict):
+                continue
+            criterion = str(item.get("criterion") or "").strip()[:80]
+            excerpt = str(item.get("excerpt") or "").strip()[:400]
+            comment = str(item.get("comment") or "").strip()[:800]
+            if criterion or excerpt or comment:
+                cleaned.append(
+                    {"criterion": criterion, "excerpt": excerpt, "comment": comment}
+                )
+        if cleaned:
+            report["criteria_issues"] = cleaned
+    return report
 
 
 def task_descriptor_upload_dir(upload_dir: str, task_id: int) -> str:
@@ -159,8 +193,9 @@ def _task_allows_ai_marking(conn, task_id: int, task_row) -> bool:
     if _descriptor_text_for_task(conn, task_id):
         return True
     cat = str(task_row["category"] or "").strip()
+    cls = str(task_row["class_name"] or "").strip()
     if cat in ("Homework", "Writing"):
-        profile = _pick_profile_for_task(conn, cat)
+        profile = _pick_profile_for_task(conn, cat, cls)
         return profile is not None and bool(profile["auto_generate"])
     return False
 
@@ -230,11 +265,15 @@ def descriptor_upload_dir(base_upload_dir: str, profile_id: int) -> str:
 
 
 def profile_row_to_dict(row) -> dict:
+    class_name = ""
+    if "class_name" in row.keys():
+        class_name = str(row["class_name"] or "").strip()
     return {
         "id": row["id"],
         "profile_key": row["profile_key"],
         "title": row["title"],
         "task_category": row["task_category"] or "",
+        "class_name": class_name,
         "system_prompt": row["system_prompt"],
         "auto_generate": bool(row["auto_generate"]),
         "is_active": bool(row["is_active"]),
@@ -267,12 +306,20 @@ def report_row_to_dict(row) -> dict | None:
             report = json.loads(row["report_json"])
         except json.JSONDecodeError:
             report = {"raw": row["report_json"]}
+    previous_report = None
+    prev_raw = row["previous_report_json"] if "previous_report_json" in row.keys() else None
+    if prev_raw:
+        try:
+            previous_report = json.loads(prev_raw)
+        except json.JSONDecodeError:
+            previous_report = None
     return {
         "id": row["id"],
         "submission_id": row["submission_id"],
         "profile_id": row["profile_id"],
         "status": row["status"],
         "report": report,
+        "previous_report": previous_report,
         "error_message": row["error_message"] or "",
         "provider": row["provider"] or "",
         "model": row["model"] or "",
@@ -297,19 +344,62 @@ def format_report_as_feedback(report: dict) -> str:
         val = str(report.get(key) or "").strip()
         if val:
             parts.append(f"## {label}\n\n{val}")
+    crit = report.get("criteria_issues")
+    if isinstance(crit, list) and crit:
+        lines = ["## Issues by criterion\n"]
+        for item in crit:
+            if not isinstance(item, dict):
+                continue
+            criterion = str(item.get("criterion") or "").strip()
+            excerpt = str(item.get("excerpt") or "").strip()
+            comment = str(item.get("comment") or "").strip()
+            if criterion:
+                lines.append(f"### {criterion}")
+            if excerpt:
+                lines.append(f"> {excerpt}")
+            if comment:
+                lines.append(comment)
+            lines.append("")
+        if len(lines) > 1:
+            parts.append("\n".join(lines).strip())
     return "\n\n".join(parts).strip()
 
 
-def _pick_profile_for_task(conn, category: str) -> Any:
+def _pick_profile_for_task(conn, category: str, class_name: str = "") -> Any:
     cat = str(category or "").strip()
+    cls = str(class_name or "").strip()
+    if cls and cat:
+        row = conn.execute(
+            """
+            SELECT * FROM homework_marking_profiles
+            WHERE is_active = 1 AND task_category = ? AND class_name = ?
+            ORDER BY id ASC LIMIT 1
+            """,
+            (cat, cls),
+        ).fetchone()
+        if row:
+            return row
     if cat:
         row = conn.execute(
             """
             SELECT * FROM homework_marking_profiles
             WHERE is_active = 1 AND task_category = ?
+              AND (class_name IS NULL OR TRIM(class_name) = '')
             ORDER BY id ASC LIMIT 1
             """,
             (cat,),
+        ).fetchone()
+        if row:
+            return row
+    if cls:
+        row = conn.execute(
+            """
+            SELECT * FROM homework_marking_profiles
+            WHERE is_active = 1 AND class_name = ?
+              AND (task_category IS NULL OR TRIM(task_category) = '')
+            ORDER BY id ASC LIMIT 1
+            """,
+            (cls,),
         ).fetchone()
         if row:
             return row
@@ -321,6 +411,50 @@ def _pick_profile_for_task(conn, category: str) -> Any:
         """,
         (DEFAULT_WRITING_PROFILE["profile_key"],),
     ).fetchone()
+
+
+def _homework_marking_analytics(conn, class_name: str = "") -> dict:
+    cls = str(class_name or "").strip()
+    where = ""
+    params: list[Any] = []
+    if cls:
+        where = " AND t.class_name = ?"
+        params.append(cls)
+    row = conn.execute(
+        f"""
+        SELECT
+            COUNT(*) AS total_reports,
+            SUM(CASE WHEN r.status = 'ready' THEN 1 ELSE 0 END) AS ready,
+            SUM(CASE WHEN r.status = 'pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN r.status = 'failed' THEN 1 ELSE 0 END) AS failed,
+            SUM(CASE WHEN r.approved_at IS NOT NULL AND TRIM(r.approved_at) != '' THEN 1 ELSE 0 END) AS approved,
+            SUM(CASE WHEN r.previous_report_json IS NOT NULL AND TRIM(r.previous_report_json) != '' THEN 1 ELSE 0 END) AS regenerated
+        FROM submission_ai_reports r
+        JOIN submissions s ON s.id = r.submission_id
+        JOIN calendar_tasks t ON t.id = s.task_id
+        WHERE 1=1{where}
+        """,
+        params,
+    ).fetchone()
+    profiles = conn.execute(
+        """
+        SELECT COUNT(*) AS c FROM homework_marking_profiles WHERE is_active = 1
+        """
+    ).fetchone()
+    total = int(row["total_reports"] if row else 0)
+    approved = int(row["approved"] if row else 0)
+    accept_rate = round(100.0 * approved / total, 1) if total else 0.0
+    return {
+        "class_name": cls or None,
+        "total_reports": total,
+        "ready": int(row["ready"] if row else 0),
+        "pending": int(row["pending"] if row else 0),
+        "failed": int(row["failed"] if row else 0),
+        "approved": approved,
+        "regenerated": int(row["regenerated"] if row else 0),
+        "accept_rate_pct": accept_rate,
+        "active_profiles": int(profiles["c"] if profiles else 0),
+    }
 
 
 def _descriptor_text_for_profile(conn, profile_id: int) -> str:
@@ -392,6 +526,7 @@ def generate_report_for_submission(
     submissions_dir: str | None = None,
     ai_is_configured,
     format_ai_error,
+    force_regenerate: bool = False,
 ) -> None:
     if not ai_is_configured or not ai_is_configured():
         return
@@ -440,17 +575,31 @@ def generate_report_for_submission(
                 )
             conn.commit()
             return
-        profile = _pick_profile_for_task(conn, task["category"])
+        profile = _pick_profile_for_task(conn, task["category"], task["class_name"])
         if profile is None or not profile["auto_generate"]:
             return
 
         now = _now_iso()
         existing = conn.execute(
-            "SELECT id, status FROM submission_ai_reports WHERE submission_id = ?",
+            "SELECT id, status, report_json FROM submission_ai_reports WHERE submission_id = ?",
             (submission_id,),
         ).fetchone()
-        if existing and existing["status"] == "ready":
+        if existing and existing["status"] == "ready" and not force_regenerate:
             return
+
+        if (
+            force_regenerate
+            and existing
+            and existing["status"] == "ready"
+            and existing["report_json"]
+        ):
+            conn.execute(
+                """
+                UPDATE submission_ai_reports SET previous_report_json = ?
+                WHERE submission_id = ?
+                """,
+                (existing["report_json"], submission_id),
+            )
 
         if existing:
             conn.execute(
@@ -515,7 +664,7 @@ def generate_report_for_submission(
         if response.choices:
             raw = (response.choices[0].message.content or "").strip()
         payload = parse_ai_json_object(raw)
-        report = {k: str(payload.get(k) or "").strip() for k in REPORT_JSON_KEYS}
+        report = _normalize_report_payload(payload)
 
         conn.execute(
             """
@@ -611,6 +760,18 @@ def register_homework_marking_routes(
         conn.close()
         return jsonify({"profiles": profiles})
 
+    @app.route("/api/admin/homework-marking/analytics", methods=["GET"])
+    def admin_hm_analytics():
+        conn = get_db_connection()
+        err = require_manager_console_role(conn)
+        if err:
+            conn.close()
+            return err
+        class_name = str(request.args.get("class_name") or "").strip()[:80]
+        payload = _homework_marking_analytics(conn, class_name)
+        conn.close()
+        return jsonify({"analytics": payload})
+
     @app.route("/api/admin/homework-marking/profiles", methods=["POST"])
     def admin_hm_profiles_create():
         conn = get_db_connection()
@@ -629,13 +790,14 @@ def register_homework_marking_routes(
             cur = conn.execute(
                 """
                 INSERT INTO homework_marking_profiles
-                    (profile_key, title, task_category, system_prompt, auto_generate, is_active, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+                    (profile_key, title, task_category, class_name, system_prompt, auto_generate, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
                 """,
                 (
                     key,
                     title,
                     str(data.get("task_category") or "").strip()[:80] or None,
+                    str(data.get("class_name") or "").strip()[:80] or None,
                     prompt,
                     1 if data.get("auto_generate", True) else 0,
                     now,
@@ -671,18 +833,22 @@ def register_homework_marking_routes(
         title = str(data.get("title") or row["title"]).strip()[:200]
         prompt = str(data.get("system_prompt") or row["system_prompt"]).strip()
         category = str(data.get("task_category") if "task_category" in data else row["task_category"] or "").strip()[:80]
+        class_name = str(
+            data.get("class_name") if "class_name" in data else (row["class_name"] if "class_name" in row.keys() else "") or ""
+        ).strip()[:80]
         auto_gen = data.get("auto_generate", row["auto_generate"])
         is_active = data.get("is_active", row["is_active"])
         conn.execute(
             """
             UPDATE homework_marking_profiles SET
-                title = ?, task_category = ?, system_prompt = ?,
+                title = ?, task_category = ?, class_name = ?, system_prompt = ?,
                 auto_generate = ?, is_active = ?, updated_at = ?
             WHERE id = ?
             """,
             (
                 title,
                 category or None,
+                class_name or None,
                 prompt,
                 1 if auto_gen else 0,
                 1 if is_active else 0,
@@ -938,7 +1104,7 @@ def register_homework_marking_routes(
             conn.close()
             return guard
         conn.close()
-        generate_report_for_submission(submission_id, **gen_kwargs)
+        generate_report_for_submission(submission_id, force_regenerate=True, **gen_kwargs)
         conn = get_db_connection()
         row = conn.execute(
             "SELECT * FROM submission_ai_reports WHERE submission_id = ?",

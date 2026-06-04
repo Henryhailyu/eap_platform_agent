@@ -3,7 +3,7 @@
 **Purpose:** One full teacher → student run before real-class pilot or starting **LP-M4**.  
 **Class:** `EAP047` · **Skill:** Writing  
 **Accounts (pilot default):** `teacher1` / `student1` / `manager1` — password `123456` (rotate before public pilot)  
-**Updated:** 2026-06-03  
+**Updated:** 2026-06-04 (§6–§7 sign-off recorded)  
 
 **Related:** [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) · [`CHECKLIST_AI_HOMEWORK_REPORT.md`](CHECKLIST_AI_HOMEWORK_REPORT.md) · [`I0_PHONE_PILOT.md`](I0_PHONE_PILOT.md)
 
@@ -105,11 +105,12 @@
 
 | Criterion | Done |
 |-----------|------|
-| All §1–§5 critical steps ☐ (§3.4–3.7 timer required if Live is in scope) | ☐ |
-| No blocker logged in § Failures | ☐ |
-| Ready for **1–2 real classes** (2–4 weeks) per [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) | ☐ |
+| All §1–§5 critical steps ☐ (§3.4–3.7 timer required if Live is in scope) | ✅ |
+| §6 phone spot-check | ✅ |
+| No blocker logged in § Failures | ✅ |
+| Ready for **1–2 real classes** (2–4 weeks) per [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) | ✅ |
 
-**After sign-off → engineering next:** [**LP-M4** real-time lesson HTML sync](VISION_LESSON_PREP.md#phase-b-m3--real-time-sync-35-students) (unless rehearsal finds higher-priority fixes).
+**After sign-off → engineering:** **LP-M4** ✅ · next **HM-M2** ([`ROADMAP_TEACHER_PHASES.md`](ROADMAP_TEACHER_PHASES.md)).
 
 ---
 

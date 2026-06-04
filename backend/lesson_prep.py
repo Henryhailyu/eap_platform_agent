@@ -67,6 +67,9 @@ WRITING_HTML_FROM_PLAN_EXTRA = (
     "- Build live poll/quiz/game blocks from interaction_slots (use question_sketch + options).\n"
     "- Each live block MUST include data-eap-live-segment=\"N\" (segment_index from plan).\n"
     "- Match segment_title in a visible heading before each live block.\n"
+    "- Source text may include Excel sheets marked [TABLE] with pipe-separated rows; "
+    "render important tables as accessible HTML <table> with <thead> when the first row is a header.\n"
+    "- Keep tables responsive (simple borders, readable on mobile); do not paste raw TSV only.\n"
 )
 
 

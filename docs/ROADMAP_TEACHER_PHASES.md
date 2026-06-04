@@ -1,6 +1,6 @@
 # Teacher-side roadmap (execution order)
 
-**Updated:** 2026-06-03  
+**Updated:** 2026-06-04  
 **Pilot class:** `EAP047` · **Pilot skill:** Writing  
 
 ---
@@ -31,14 +31,19 @@
 | **LP-M1** | Lesson prep pack API + AI plan JSON + wizard UI |
 | **LP-M1b** | Rename **AI-aided lesson prep**, default **collapsed** accordion |
 | **Live timer** | Teacher push + student sync + 3s bell (`cc576b7`) | — |
+| **LP-M4** | Real-time lesson HTML sync (reveal + segment focus) | [`LP-M4_LESSON_HTML_SYNC.md`](LP-M4_LESSON_HTML_SYNC.md) |
+| **EAP047-R** | Full pilot rehearsal + §6 phone + §7 sign-off | [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md) |
 
 ---
 
-## In progress (this sprint)
+## Recently shipped (2026-06-04 batch)
 
 | ID | Task | Doc |
 |----|------|-----|
-| **EAP047-R** | **联合彩排** — lesson → student page → Live (incl. timer push) → homework → AI report | [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md) |
+| **HM-M2** | Regenerate + diff + `criteria_issues` | [`VISION_AI_HOMEWORK_MARKING.md`](VISION_AI_HOMEWORK_MARKING.md) |
+| **HM-M3** | Profile `class_name` + manager analytics panel | same |
+| **LP-M3+** | Excel `.xls`/`.xlsx` table extract + HTML table prompt | [`VISION_LESSON_PREP.md`](VISION_LESSON_PREP.md) |
+| **WEB_LAUNCH ops** | [`WEB_LAUNCH_OPS_RUNBOOK.md`](WEB_LAUNCH_OPS_RUNBOOK.md) + `backup_lighthouse_data.sh` | — |
 
 ---
 
@@ -46,9 +51,8 @@
 
 | ID | Task | Depends on |
 |----|------|------------|
-| **LP-M3+** | Further LP-M3 polish (xls, richer Excel tables in HTML) | LP-M3 |
-| ~~**LP-M4**~~ | ~~Real-time lesson HTML sync (reveal + segment focus, long-poll)~~ ✅ | [`LP-M4_LESSON_HTML_SYNC.md`](LP-M4_LESSON_HTML_SYNC.md) |
-| **HM-M2+** | Richer reports, regenerate, analytics | HM-M1b ✅ |
+| **LP-M3++** | Deeper Excel→HTML rendering (server-side table embed) | LP-M3+ |
+| **HM-M4** | Full analytics dashboard, export | HM-M3 |
 
 ---
 
@@ -67,8 +71,8 @@
 2. ~~Manager端 — HM-M1a marking profiles~~ ✅  
 3. ~~HM-M1b on teacher submissions~~ ✅  
 
-**Next:** **EAP047 UAT** for LP-M4 on Lighthouse; then HM-M2+ or LP-M3+ polish.
+**Next:** Batch UAT on Lighthouse after deploy; run [`WEB_LAUNCH_OPS_RUNBOOK.md`](WEB_LAUNCH_OPS_RUNBOOK.md) on server.
 
 ---
 
-*Current sprint: **LP-M4** shipped (2026-06-04) — UAT on EAP047 Live HTML lessons.*
+*EAP047-R + LP-M4 signed off. Latest batch: HM-M2, HM-M3, LP-M3+, ops runbook.*

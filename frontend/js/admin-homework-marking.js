@@ -105,10 +105,32 @@
     const promptEl = document.getElementById("admin-hm-prompt");
     const catEl = document.getElementById("admin-hm-category");
     const titleEl = document.getElementById("admin-hm-title");
+    const classEl = document.getElementById("admin-hm-class");
     if (promptEl) promptEl.value = p.system_prompt || "";
     if (catEl) catEl.value = p.task_category || "";
+    if (classEl) classEl.value = p.class_name || "";
     if (titleEl) titleEl.value = p.title || "";
     renderDescriptors(document.getElementById("admin-hm-descriptors"), p.descriptors || []);
+  }
+
+  async function loadAnalytics() {
+    const el = document.getElementById("admin-hm-analytics");
+    if (!el) return;
+    try {
+      const data = await apiFetch("/api/admin/homework-marking/analytics?class_name=EAP047");
+      const a = data.analytics || {};
+      el.innerHTML = `
+        <p class="admin-hm-analytics__title">${escapeHtml(t("admin_hm_analytics_title"))}</p>
+        <ul class="admin-hm-analytics__list">
+          <li>${escapeHtml(t("admin_hm_analytics_total", { n: a.total_reports || 0 }))}</li>
+          <li>${escapeHtml(t("admin_hm_analytics_ready", { n: a.ready || 0 }))}</li>
+          <li>${escapeHtml(t("admin_hm_analytics_approved", { n: a.approved || 0, pct: a.accept_rate_pct || 0 }))}</li>
+          <li>${escapeHtml(t("admin_hm_analytics_regenerated", { n: a.regenerated || 0 }))}</li>
+          <li>${escapeHtml(t("admin_hm_analytics_profiles", { n: a.active_profiles || 0 }))}</li>
+        </ul>`;
+    } catch (err) {
+      el.textContent = (err && err.message) || t("admin_hm_load_failed");
+    }
   }
 
   async function boot() {
@@ -121,7 +143,7 @@
       showProfile(Number(ev.target.value));
     });
 
-    ["admin-hm-prompt", "admin-hm-category", "admin-hm-title"].forEach((id) => {
+    ["admin-hm-prompt", "admin-hm-category", "admin-hm-title", "admin-hm-class"].forEach((id) => {
       document.getElementById(id)?.addEventListener("input", resetSaveButton);
     });
 
@@ -131,6 +153,7 @@
       const body = {
         title: document.getElementById("admin-hm-title")?.value || "",
         task_category: document.getElementById("admin-hm-category")?.value || "",
+        class_name: document.getElementById("admin-hm-class")?.value || "",
         system_prompt: document.getElementById("admin-hm-prompt")?.value || "",
       };
       const save = () =>
@@ -140,7 +163,7 @@
           body: JSON.stringify(body),
         }).then(() => {
           setStatus(t("admin_hm_saved"), false);
-          return loadProfiles();
+          return Promise.all([loadProfiles(), loadAnalytics()]);
         });
       const run = typeof window.EAP_runSaveButton === "function" ? window.EAP_runSaveButton : null;
       if (run && btn) {
@@ -170,7 +193,7 @@
     });
 
     try {
-      await loadProfiles();
+      await Promise.all([loadProfiles(), loadAnalytics()]);
     } catch (err) {
       setStatus((err && err.message) || t("admin_hm_load_failed"), true);
     }

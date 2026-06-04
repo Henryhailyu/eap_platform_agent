@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 from teacher_teaching_pages import MAX_SOURCE_TEXT
 
-ALLOWED_SOURCE_EXTENSIONS = frozenset({"pdf", "docx", "txt", "ppt", "pptx", "xlsx"})
+ALLOWED_SOURCE_EXTENSIONS = frozenset({"pdf", "docx", "txt", "ppt", "pptx", "xls", "xlsx"})
 OFFICE_TO_PDF_EXTS = frozenset({"ppt", "pptx"})
 MAX_SOURCE_FILE_BYTES = 10 * 1024 * 1024
 MAX_SOURCE_FILES_PER_TEACHER = 12
@@ -67,8 +67,8 @@ def extract_text_from_bytes(data: bytes, ext: str) -> str:
     if ext in OFFICE_TO_PDF_EXTS:
         return _extract_text_via_office_pdf(data, ext)
 
-    if ext == "xlsx":
-        return _extract_text_from_xlsx(data)
+    if ext in ("xlsx", "xls"):
+        return _extract_text_from_xlsx(data, ext)
 
     raise ValueError(f"Unsupported file type: {ext}")
 
@@ -130,7 +130,28 @@ def _extract_text_via_office_pdf(data: bytes, ext: str) -> str:
             return extract_text_from_bytes(fh.read(), "pdf")
 
 
-def _extract_text_from_xlsx(data: bytes) -> str:
+def _extract_text_from_xlsx(data: bytes, ext: str = "xlsx") -> str:
+    if ext == "xls":
+        try:
+            import xlrd
+        except ImportError as exc:
+            raise RuntimeError("Legacy .xls requires xlrd on the server") from exc
+        book = xlrd.open_workbook(file_contents=data)
+        parts: list[str] = []
+        for sheet in book.sheets()[:6]:
+            parts.append(f"=== Sheet: {sheet.name} ===")
+            parts.append("[TABLE]")
+            for rx in range(min(sheet.nrows, 80)):
+                cells = [
+                    str(sheet.cell_value(rx, cx)).strip()
+                    for cx in range(sheet.ncols)
+                ]
+                if any(cells):
+                    parts.append("| " + " | ".join(cells) + " |")
+            if sheet.nrows > 80:
+                parts.append("… (truncated)")
+        return "\n".join(parts)
+
     try:
         from openpyxl import load_workbook
     except ImportError as exc:
@@ -142,6 +163,7 @@ def _extract_text_from_xlsx(data: bytes) -> str:
     for sheet_name in wb.sheetnames[:6]:
         ws = wb[sheet_name]
         parts.append(f"=== Sheet: {sheet_name} ===")
+        parts.append("[TABLE]")
         row_count = 0
         for row in ws.iter_rows(values_only=True):
             if row_count >= 80:
@@ -149,7 +171,7 @@ def _extract_text_from_xlsx(data: bytes) -> str:
                 break
             cells = [str(c).strip() if c is not None else "" for c in row]
             if any(cells):
-                parts.append("\t".join(cells))
+                parts.append("| " + " | ".join(cells) + " |")
                 row_count += 1
     wb.close()
     return "\n".join(parts)

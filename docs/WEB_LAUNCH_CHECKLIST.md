@@ -27,6 +27,8 @@ Use this list to move from **“demo works”** to **“real classes can use the
 
 ## Before real-class pilot — do these first
 
+**Step-by-step ops (password, backup, AI keys):** [`WEB_LAUNCH_OPS_RUNBOOK.md`](WEB_LAUNCH_OPS_RUNBOOK.md)
+
 ### Ops & security (high)
 
 - [ ] **Confirm Render deploy Live** — latest commit `bd5a81e` (or newer) shows **Deployed** in dashboard  

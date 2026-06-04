@@ -375,6 +375,62 @@
   margin-top: 0.75rem;
 }
 
+.hm-report-diff {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(10, 126, 164, 0.08);
+  border: 1px solid rgba(10, 126, 164, 0.2);
+}
+
+.hm-report-diff__label {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #0a4d68;
+}
+
+.hm-report-criteria {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.hm-report-criteria__excerpt {
+  margin: 0.35rem 0;
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid rgba(10, 126, 164, 0.35);
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.hm-report-criteria__comment {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.admin-hm-analytics {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: rgba(10, 126, 164, 0.06);
+  border: 1px solid rgba(10, 126, 164, 0.15);
+}
+
+.admin-hm-analytics__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0a4d68;
+}
+
+.admin-hm-analytics__list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #333;
+}
+
 .admin-hm-descriptors {
   list-style: none;
   padding: 0;

@@ -54,7 +54,84 @@
     return data;
   }
 
-  function renderReportBody(container, report) {
+  function sectionText(report, key) {
+    if (!report || !report[key]) return "";
+    return String(report[key]).trim();
+  }
+
+  function renderCriteriaIssues(container, report) {
+    const items = report && report.criteria_issues;
+    if (!Array.isArray(items) || !items.length) return;
+    const block = document.createElement("div");
+    block.className = "hm-report-block";
+    const h = document.createElement("h6");
+    h.className = "hm-report-block__title";
+    h.textContent = t("hm_report_criteria");
+    block.appendChild(h);
+    const list = document.createElement("ul");
+    list.className = "hm-report-criteria";
+    items.forEach((item) => {
+      if (!item || typeof item !== "object") return;
+      const li = document.createElement("li");
+      li.className = "hm-report-criteria__item";
+      const criterion = String(item.criterion || "").trim();
+      const excerpt = String(item.excerpt || "").trim();
+      const comment = String(item.comment || "").trim();
+      if (criterion) {
+        const strong = document.createElement("strong");
+        strong.textContent = criterion;
+        li.appendChild(strong);
+      }
+      if (excerpt) {
+        const q = document.createElement("blockquote");
+        q.className = "hm-report-criteria__excerpt";
+        q.textContent = excerpt;
+        li.appendChild(q);
+      }
+      if (comment) {
+        const p = document.createElement("p");
+        p.className = "hm-report-criteria__comment";
+        p.textContent = comment;
+        li.appendChild(p);
+      }
+      if (li.childNodes.length) list.appendChild(li);
+    });
+    if (list.childNodes.length) {
+      block.appendChild(list);
+      container.appendChild(block);
+    }
+  }
+
+  function renderReportDiff(container, previous, current) {
+    if (!previous || !current) return;
+    const keys = [
+      ["executive_summary", "hm_report_summary"],
+      ["strengths", "hm_report_strengths"],
+      ["issues", "hm_report_issues"],
+      ["actionable_revisions", "hm_report_revisions"],
+      ["suggested_band", "hm_report_band"],
+    ];
+    const changed = [];
+    keys.forEach(([key, i18nKey]) => {
+      const a = sectionText(previous, key);
+      const b = sectionText(current, key);
+      if (a && b && a !== b) changed.push(t(i18nKey));
+    });
+    const prevCrit = Array.isArray(previous.criteria_issues) ? previous.criteria_issues.length : 0;
+    const curCrit = Array.isArray(current.criteria_issues) ? current.criteria_issues.length : 0;
+    if (prevCrit !== curCrit) changed.push(t("hm_report_criteria"));
+    if (!changed.length) return;
+    const box = document.createElement("div");
+    box.className = "hm-report-diff";
+    box.setAttribute("role", "note");
+    const label = document.createElement("p");
+    label.className = "hm-report-diff__label";
+    label.textContent = t("hm_report_diff_label", { sections: changed.join(", ") });
+    box.appendChild(label);
+    container.appendChild(box);
+  }
+
+  function renderReportBody(container, report, previousReport) {
     const sections = [
       ["executive_summary", "hm_report_summary"],
       ["strengths", "hm_report_strengths"],
@@ -63,8 +140,9 @@
       ["suggested_band", "hm_report_band"],
     ];
     container.innerHTML = "";
+    if (previousReport) renderReportDiff(container, previousReport, report);
     sections.forEach(([key, i18nKey]) => {
-      const val = report && report[key] ? String(report[key]).trim() : "";
+      const val = sectionText(report, key);
       if (!val) return;
       const block = document.createElement("div");
       block.className = "hm-report-block";
@@ -78,6 +156,13 @@
       block.appendChild(body);
       container.appendChild(block);
     });
+    renderCriteriaIssues(container, report);
+  }
+
+  function updateGenerateButtonLabel(btn, row) {
+    if (!btn) return;
+    const hasReady = row && row.status === "ready" && row.report;
+    btn.textContent = hasReady ? t("hm_report_regenerate") : t("hm_report_generate");
   }
 
   async function mountHomeworkAiReportPanel(container, submissionId) {
@@ -175,9 +260,11 @@
       if (!row) {
         clearPoll();
         setVisualState("", t("hm_report_none"));
+        updateGenerateButtonLabel(genBtn, null);
         approveBtn.disabled = true;
         return "none";
       }
+      updateGenerateButtonLabel(genBtn, row);
       const st = row.status || "pending";
       if (st === "pending") {
         setVisualState("pending", t("hm_report_generating_wait"));
@@ -195,7 +282,8 @@
         const readyMsg = row.approved_at ? t("hm_report_approved") : t("hm_report_ready");
         const showBody = () => {
           setVisualState("", readyMsg);
-          renderReportBody(bodyEl, row.report);
+          renderReportBody(bodyEl, row.report, row.previous_report);
+          updateGenerateButtonLabel(genBtn, row);
           approveBtn.disabled = !!row.approved_at;
         };
         if (wasGenerating) {

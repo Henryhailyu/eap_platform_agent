@@ -137,6 +137,7 @@ Separate track: **AI homework marking reports** — see [`VISION_AI_HOMEWORK_MAR
 | **LP-M2** | HTML gen + preview + publish to EAP047; student viewer |
 | **LP-M3** | PPT/Excel; bilingual hint layer; copy last week |
 | **LP-M4** | Real-time sync (Phase B) — reveal + segment focus via long-poll ✅ |
+| **LP-M3+** | Excel table-friendly extract + HTML `<table>` generation hints ✅ |
 | **HM-M1** | Homework marking scripts (parallel track) |
 
 ---
