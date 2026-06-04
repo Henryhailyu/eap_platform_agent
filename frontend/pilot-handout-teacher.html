@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="EAP Platform teacher pilot quick reference — printable" />
+    <title>EAP Platform — Teacher quick start (EAP047)</title>
+    <style>
+      :root {
+        --ink: #1a2a33;
+        --muted: #5a6b75;
+        --accent: #0a7ea4;
+        --line: #d8e4ea;
+        --paper: #fafbfc;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        font-size: 11pt;
+        line-height: 1.45;
+        color: var(--ink);
+        background: #eef2f5;
+      }
+      .sheet {
+        max-width: 210mm;
+        margin: 1rem auto;
+        padding: 14mm 16mm;
+        background: var(--paper);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      }
+      .no-print {
+        text-align: center;
+        margin-bottom: 0.75rem;
+      }
+      .no-print button {
+        font: inherit;
+        padding: 0.45rem 1.1rem;
+        border-radius: 8px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+      .no-print button:hover {
+        filter: brightness(1.05);
+      }
+      header {
+        border-bottom: 2px solid var(--accent);
+        padding-bottom: 0.6rem;
+        margin-bottom: 0.75rem;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .subtitle {
+        margin: 0.2rem 0 0;
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.65rem 1rem;
+        margin-bottom: 0.75rem;
+      }
+      .box {
+        padding: 0.55rem 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+      }
+      .box strong {
+        display: block;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin-bottom: 0.15rem;
+      }
+      .box a {
+        color: var(--accent);
+        word-break: break-all;
+        font-size: 0.95rem;
+      }
+      .steps {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .steps li {
+        display: grid;
+        grid-template-columns: 1.6rem 1fr;
+        gap: 0.35rem 0.5rem;
+        padding: 0.45rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .steps li:last-child {
+        border-bottom: none;
+      }
+      .step-num {
+        font-weight: 700;
+        color: var(--accent);
+        font-size: 1rem;
+      }
+      .step-title {
+        font-weight: 600;
+        margin: 0 0 0.1rem;
+      }
+      .step-en {
+        margin: 0;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+      .step-link {
+        margin: 0.2rem 0 0;
+        font-size: 0.82rem;
+      }
+      .step-link a {
+        color: var(--accent);
+      }
+      .tips {
+        margin-top: 0.65rem;
+        padding: 0.5rem 0.6rem;
+        border-left: 3px solid var(--accent);
+        background: rgba(10, 126, 164, 0.06);
+        font-size: 0.9rem;
+      }
+      .tips ul {
+        margin: 0.25rem 0 0;
+        padding-left: 1.1rem;
+      }
+      footer {
+        margin-top: 0.65rem;
+        font-size: 0.82rem;
+        color: var(--muted);
+        text-align: center;
+      }
+      @media print {
+        body {
+          background: #fff;
+        }
+        .sheet {
+          margin: 0;
+          box-shadow: none;
+          max-width: none;
+          padding: 10mm 12mm;
+        }
+        .no-print {
+          display: none;
+        }
+        a {
+          color: var(--ink);
+          text-decoration: none;
+        }
+      }
+      @media (max-width: 520px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <p class="no-print">
+        <button type="button" onclick="window.print()">打印 / Print</button>
+      </p>
+
+      <header>
+        <h1>EAP Platform — 教师快速上手（试点 EAP047）</h1>
+        <p class="subtitle">Teacher quick start · Lighthouse pilot · One page</p>
+      </header>
+
+      <div class="grid-2">
+        <div class="box">
+          <strong>网址 / URL</strong>
+          <a id="link-home" href="#">—</a>
+        </div>
+        <div class="box">
+          <strong>登录 / Sign in</strong>
+          <span id="login-line">账号 <code>teacher1</code> · 密码由教务私下发放</span>
+          <br />
+          <span class="step-en">Account <code>teacher1</code> · password from coordinator (not on public posters)</span>
+        </div>
+        <div class="box">
+          <strong>班级 / Class</strong>
+          <code>EAP047</code>
+        </div>
+        <div class="box">
+          <strong>学生入口 / Students</strong>
+          <span>同一网址，账号 <code>student1</code></span>
+          <br />
+          <span class="step-en">Same URL · student account from coordinator</span>
+        </div>
+      </div>
+
+      <ol class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <div>
+            <p class="step-title">备课并发布到日历 · Lesson prep → calendar</p>
+            <p class="step-en">AI Lesson Builder → generate plan & HTML → Publish → check teacher calendar.</p>
+            <p class="step-link"><a id="link-lp" href="#">备课 / Lesson prep</a></p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <div>
+            <p class="step-title">课堂 Live · Live teaching</p>
+            <p class="step-en">
+              Open Live → share <strong>session code</strong> with class → push slides/HTML → optional timer
+              <strong>推送给学生</strong>.
+            </p>
+            <p class="step-link"><a id="link-live" href="#">Live 授课</a> · 学生页输入课堂码</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <div>
+            <p class="step-title">布置作业 · Homework</p>
+            <p class="step-en">
+              Calendar → <strong>New task</strong> (Writing/Homework, EAP047) → enable <strong>AI marking</strong> if
+              needed → upload descriptor.
+            </p>
+            <p class="step-link"><a id="link-cal" href="#">教师日历</a></p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">4</span>
+          <div>
+            <p class="step-title">批改 · Marking</p>
+            <p class="step-en">
+              <strong>View submissions</strong> → Generate/refresh <strong>AI report</strong> → review →
+              <strong>Approve</strong> (writes feedback to student).
+            </p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="tips">
+        <strong>提示 / Tips</strong>
+        <ul>
+          <li>系统更新后请 <strong>硬刷新</strong>（Ctrl+Shift+R 或清空缓存）。After updates: hard refresh.</li>
+          <li>Live 计时器推送到学生后，学生端需与教师同步显示；首次可点页面以允许提示音。</li>
+          <li>遇问题请记录：设备、浏览器、操作步骤、截图。Report: device, browser, steps, screenshot.</li>
+        </ul>
+      </div>
+
+      <footer>
+        <span id="footer-host"></span> ·
+        <a id="link-doc" href="#">Full checklist (EAP047 rehearsal)</a>
+        · v2026-06-01
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var base = (params.get("base") || "").trim().replace(/\/$/, "");
+        if (!base) {
+          if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+            base = window.location.origin.replace(/\/$/, "");
+          } else {
+            base = "http://124.222.124.42:5051";
+          }
+        }
+        var ui = base + "/ui";
+        function setHref(id, path) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.href = ui + path;
+          if (id === "link-home") el.textContent = ui + "/index.html";
+        }
+        setHref("link-home", "/index.html");
+        setHref("link-lp", "/teacher-lesson-ai.html?class=EAP047");
+        setHref("link-live", "/teacher-live.html?class=EAP047");
+        setHref("link-cal", "/teacher.html");
+        var doc = document.getElementById("link-doc");
+        if (doc) {
+          doc.href =
+            "https://github.com/Henryhailyu/eap_platform_agent/blob/main/docs/CHECKLIST_EAP047_PILOT_REHEARSAL.md";
+          doc.target = "_blank";
+          doc.rel = "noopener";
+        }
+        var pw = params.get("show_demo_password");
+        if (pw === "1") {
+          document.getElementById("login-line").innerHTML =
+            '账号 <code>teacher1</code> · 演示密码 <code>123456</code>（公开课前必须更换）';
+        }
+        var foot = document.getElementById("footer-host");
+        if (foot) foot.textContent = base;
+      })();
+    </script>
+  </body>
+</html>

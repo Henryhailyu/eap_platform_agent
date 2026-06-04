@@ -1,20 +1,60 @@
-# EAP pilot — quick reference (share with teachers)
+# PILOT-HANDOUT — Teacher one-page quick start
 
-**Web app (phones & laptops)**  
-https://eap-platform-pilot.onrender.com/ui/index.html
+**Purpose:** Printable handout for Lighthouse / classroom pilot (**EAP047**).  
+**Printable page:** `/ui/pilot-handout-teacher.html`  
+**Updated:** 2026-06-01
 
-| Role | Login | Password |
-|------|-------|----------|
-| Student | `student1` | `123456` |
-| Teacher | `teacher1` | `123456` |
-| Manager | `manager1` | `123456` |
+---
 
-**Class code:** EAP047
+## Open & print
 
-**Notes**
+| Host | Handout URL |
+|------|-------------|
+| **Lighthouse (recommended)** | `http://124.222.124.42:5051/ui/pilot-handout-teacher.html` |
+| Custom base | `.../ui/pilot-handout-teacher.html?base=http://YOUR_HOST:5051` |
+| Demo password on sheet (internal only) | Add `&show_demo_password=1` — **do not** distribute publicly |
 
-- First visit after idle may show **502** for up to ~1 min — wait, then refresh once (server waking).
-- Students can use the student link on a phone browser.
-- WeChat mini-program: coming after platform authorization.
+1. Open the URL in Chrome / Edge / Safari.  
+2. Click **打印 / Print** (or browser Print → Save as PDF).  
+3. Share PDF or paper with teachers; send **password separately** (not on the poster).
 
-**Support:** Report device, browser, and what you clicked if something fails.
+---
+
+## What the handout covers
+
+1. **Sign-in** — `teacher1` (password from coordinator)  
+2. **Lesson prep** → publish to calendar (`teacher-lesson-ai.html?class=EAP047`)  
+3. **Live teaching** — session code, push display, timer to students (`teacher-live.html`)  
+4. **Homework** — new task, optional AI marking  
+5. **Marking** — submissions → AI report → Approve  
+
+---
+
+## Accounts (pilot)
+
+| Role | Username | Password |
+|------|----------|----------|
+| Teacher | `teacher1` | Set via `EAP_PILOT_DEFAULT_PASSWORD` on server (see [`WEB_LAUNCH_OPS_RUNBOOK.md`](WEB_LAUNCH_OPS_RUNBOOK.md)) |
+| Student | `student1` | Same rotation |
+| Manager | `manager1` | Same rotation |
+
+**Class code:** `EAP047`
+
+**Render fallback (cold start):** `https://eap-platform-pilot.onrender.com/ui/index.html` — first visit after idle may show **502** for ~1 min; refresh once.
+
+---
+
+## Related docs
+
+- [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md) — full rehearsal steps  
+- [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) — launch criteria  
+- [`I0_PHONE_PILOT.md`](I0_PHONE_PILOT.md) — phone spot-check  
+
+---
+
+## Coordinator checklist
+
+- [ ] Rotate passwords off `123456` before real classes  
+- [ ] Print or PDF handout with correct `?base=` URL  
+- [ ] Walk through §1–§4 once in a demo session  
+- [ ] Keep [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md) for sign-off  

@@ -60,7 +60,7 @@
 | ID | Task | Doc |
 |----|------|-----|
 | **HM-M4** | Manager marking dashboard: charts, CSV export, class filter ✅ | [`HM-M4_MANAGER_MARKING_DASHBOARD.md`](HM-M4_MANAGER_MARKING_DASHBOARD.md) |
-| **PILOT-HANDOUT** | 教师一页纸（Lighthouse URL、登录、Live/作业流程，可打印） | [`PILOT_HANDOUT.md`](PILOT_HANDOUT.md) |
+| **PILOT-HANDOUT** | 教师一页纸（Lighthouse URL、登录、Live/作业流程，可打印） ✅ | [`PILOT_HANDOUT.md`](PILOT_HANDOUT.md) · `/ui/pilot-handout-teacher.html` |
 
 ---
 
@@ -91,4 +91,4 @@
 
 ---
 
-*Next: **PILOT-HANDOUT**. WEB-J deferred.*
+*Next: batch UAT / real-class pilot; **WEB-J** deferred.*
