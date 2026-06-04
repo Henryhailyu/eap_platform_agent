@@ -390,7 +390,15 @@ function initAppPageHeader() {
 
 function initStudentTeachingPagesNavLink() {
   const link = document.getElementById("student-teaching-pages-link");
-  if (link) link.classList.remove("hidden");
+  if (!link) return;
+  link.classList.remove("hidden");
+  const u = typeof getLoggedInUser === "function" ? getLoggedInUser() : null;
+  const cls =
+    (typeof studentClassName === "string" && studentClassName.trim()) ||
+    (typeof resolveStudentClassNameFromLogin === "function"
+      ? resolveStudentClassNameFromLogin(u)
+      : STUDENT_CLASS_FALLBACK);
+  link.href = `student-teaching-pages.html?class=${encodeURIComponent(cls)}`;
 }
 
 /** Phase N4 — student recorded lesson viewer. */

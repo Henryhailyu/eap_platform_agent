@@ -23,6 +23,50 @@
     return new URLSearchParams(window.location.search).get("class") || "";
   }
 
+  function resolveClassName() {
+    const fromUrl = getClassFromUrl();
+    if (fromUrl) return fromUrl;
+    if (typeof resolveStudentClassNameFromLogin === "function") {
+      const u = typeof getLoggedInUser === "function" ? getLoggedInUser() : null;
+      return resolveStudentClassNameFromLogin(u);
+    }
+    return "EAP047";
+  }
+
+  function apiBase() {
+    const raw =
+      (window.EAP_API_BASE && String(window.EAP_API_BASE).trim()) ||
+      (window.location && window.location.origin) ||
+      "";
+    return String(raw).replace(/\/$/, "");
+  }
+
+  function studentViewFetchUrl(id, className) {
+    const q = className ? `?class_name=${encodeURIComponent(className)}` : "";
+    return `${apiBase()}/api/student/teaching-pages/${encodeURIComponent(id)}/view${q}`;
+  }
+
+  async function loadHtmlIntoFrame(frame, id, className) {
+    const url = studentViewFetchUrl(id, className);
+    const fetchFn = typeof window.EAP_fetch === "function" ? window.EAP_fetch : window.fetch.bind(window);
+    const headers =
+      typeof window.EAP_getAuthHeaders === "function" ? window.EAP_getAuthHeaders() : {};
+    const res = await fetchFn(url, { credentials: "include", headers });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try {
+        const data = await res.json();
+        if (data && data.error) msg = String(data.error);
+      } catch (_) {
+        /* HTML error body */
+      }
+      throw new Error(msg);
+    }
+    const html = await res.text();
+    frame.removeAttribute("src");
+    frame.srcdoc = html;
+  }
+
   function getPageIdFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return params.get("id") || params.get("page") || "";
@@ -42,11 +86,7 @@
     const api = API();
     if (!listEl || !api) return;
 
-    let className = getClassFromUrl();
-    if (!className && typeof getLoggedInUser === "function") {
-      const u = getLoggedInUser();
-      className = u?.class_name || u?.className || "";
-    }
+    const className = resolveClassName();
 
     try {
       const pages = await api.listPages(className);
@@ -99,7 +139,7 @@
     try {
       const page = await api.getPageMeta(id, className);
       if (titleEl) titleEl.textContent = page.title || t("stp_view_title");
-      frame.src = api.viewUrl(id, className);
+      await loadHtmlIntoFrame(frame, id, className);
     } catch (err) {
       if (errEl) {
         errEl.textContent = (err && err.message) || t("stp_load_failed");

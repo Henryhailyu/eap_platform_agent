@@ -1744,40 +1744,49 @@ body.tlive-modal-open {
 }
 
 .slive-team-btn {
-  --team-color: #0a7ea4;
+  font: inherit;
   font-size: 0.9375rem;
+  font-weight: 600;
   padding: 0.5rem 1.1rem;
   border-radius: 999px;
-  border: 2px solid var(--team-color);
-  background: #fff;
-  color: var(--team-color);
+  border: 2px solid #0a7ea4;
+  background: #fff !important;
+  color: #0a7ea4 !important;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-body.eap-shell-active .slive-team-btn.btn-secondary {
-  border-color: var(--team-color);
-  color: var(--team-color);
-  background: #fff;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .slive-team-btn--active,
-.slive-team-btn[aria-pressed="true"],
-body.eap-shell-active .slive-team-btn.btn-secondary.slive-team-btn--active {
-  background: var(--team-color);
-  color: #fff;
-  border-color: var(--team-color);
-  font-weight: 600;
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--team-color) 40%, transparent);
+.slive-team-btn[aria-pressed="true"] {
+  font-weight: 600 !important;
 }
 
-.slive-team-btn--active:hover,
-.slive-team-btn[aria-pressed="true"]:hover {
-  filter: brightness(1.05);
+.slive-team-btn[data-team="A"].slive-team-btn--active,
+.slive-team-btn[data-team="A"][aria-pressed="true"] {
+  background: rgba(0, 113, 227, 0.12) !important;
+  color: #0071e3 !important;
+  border-color: #0071e3 !important;
+}
+
+.slive-team-btn[data-team="B"].slive-team-btn--active,
+.slive-team-btn[data-team="B"][aria-pressed="true"] {
+  background: rgba(10, 126, 164, 0.12) !important;
+  color: #0a7ea4 !important;
+  border-color: #0a7ea4 !important;
+}
+
+.slive-team-btn[data-team="C"].slive-team-btn--active,
+.slive-team-btn[data-team="C"][aria-pressed="true"] {
+  background: rgba(255, 149, 0, 0.14) !important;
+  color: #c93400 !important;
+  border-color: #ff9500 !important;
+}
+
+.slive-team-btn[data-team="D"].slive-team-btn--active,
+.slive-team-btn[data-team="D"][aria-pressed="true"] {
+  background: rgba(175, 82, 222, 0.12) !important;
+  color: #8944ab !important;
+  border-color: #af52de !important;
 }
 
 .slive-game-badge {
@@ -3536,4 +3545,11 @@ body.eap-shell-active .slive-team-btn.btn-secondary.slive-team-btn--active {
 .slive-timer-status--done {
   font-weight: 600;
   color: #9b2c2c;
+}
+
+.slive-timer-sound-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: #6e6e73;
+  text-align: center;
 }

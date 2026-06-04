@@ -1147,8 +1147,31 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
             (page_id, teacher),
         ).fetchone()
         if page is None:
+            now = _now_iso()
+            conn.execute(
+                """
+                UPDATE lesson_prep_packs
+                SET teaching_page_id = NULL, status = 'plan_ready', updated_at = ?
+                WHERE id = ? AND teacher_username = ?
+                """,
+                (now, pack_id, teacher),
+            )
+            conn.commit()
             conn.close()
-            return jsonify({"error": "Teaching page not found"}), 404
+            return (
+                jsonify(
+                    {
+                        "error": "Teaching page not found",
+                        "detail": (
+                            "The saved HTML link for this pack is missing (often after a database "
+                            "reset or Docker rebuild). Click «Generate HTML from plan» again, wait "
+                            "until preview appears, then publish."
+                        ),
+                        "code": "stale_teaching_page",
+                    }
+                ),
+                404,
+            )
 
         data = request.get_json(silent=True) or {}
         lesson_date = str(data.get("lesson_date") or row["lesson_date"] or "").strip()[:10]

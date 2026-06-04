@@ -156,6 +156,7 @@
   }
 
   let studentTimerApi = null;
+  let sliveTimerWasDone = false;
 
   const state = {
     code: "",
@@ -321,6 +322,16 @@
           studentTimerApi.update(display.timer);
         }
       }
+      const tm = display.timer;
+      if (tm && tm.kind === "countdown" && tm.done && !sliveTimerWasDone) {
+        sliveTimerWasDone = true;
+        const sh = window.EAP_LIVE_TIMER_SHARED;
+        if (sh && typeof sh.playTimerBell3s === "function") {
+          sh.playTimerBell3s();
+        }
+      } else if (tm && !tm.done) {
+        sliveTimerWasDone = false;
+      }
       return;
     }
 
@@ -472,11 +483,34 @@
     }
   }
 
+  function unlockTimerAudioOnce() {
+    const sh = window.EAP_LIVE_TIMER_SHARED;
+    if (sh && typeof sh.unlockTimerAudio === "function") {
+      void sh.unlockTimerAudio();
+    }
+  }
+
+  function bindTimerAudioUnlockOnFirstTap() {
+    const main = document.getElementById("slive-main");
+    if (!main || main.dataset.timerAudioUnlock === "1") return;
+    main.dataset.timerAudioUnlock = "1";
+    const onTap = () => {
+      unlockTimerAudioOnce();
+      main.removeEventListener("click", onTap, true);
+    };
+    main.addEventListener("click", onTap, true);
+  }
+
   function renderTeamPick() {
     const wrap = document.getElementById("slive-team-pick");
     const teams = document.getElementById("slive-teams");
     if (!wrap || !teams) return;
-    const colors = { A: "#0071E3", B: "#0A7EA4", C: "#FF9500", D: "#AF52DE" };
+    const teamStyle = {
+      A: { color: "#0071E3", bg: "rgba(0, 113, 227, 0.12)" },
+      B: { color: "#0A7EA4", bg: "rgba(10, 126, 164, 0.12)" },
+      C: { color: "#C93400", bg: "rgba(255, 149, 0, 0.14)" },
+      D: { color: "#8944AB", bg: "rgba(175, 82, 222, 0.12)" },
+    };
     const labels = {
       A: t("slive_team_a"),
       B: t("slive_team_b"),
@@ -486,9 +520,14 @@
     teams.innerHTML = ["A", "B", "C", "D"]
       .map((id) => {
         const active = state.teamId === id;
-        return `<button type="button" class="btn-secondary slive-team-btn${
+        const s = teamStyle[id];
+        const baseStyle = `color:${s.color};border:2px solid ${s.color};background:#fff;`;
+        const activeStyle = active
+          ? `color:${s.color};border:2px solid ${s.color};background:${s.bg};font-weight:600;box-shadow:0 0 0 2px ${s.bg};`
+          : baseStyle;
+        return `<button type="button" class="slive-team-btn${
           active ? " slive-team-btn--active" : ""
-        }" data-team="${id}" style="--team-color:${colors[id]}" aria-pressed="${active ? "true" : "false"}">${escapeHtml(labels[id])}</button>`;
+        }" data-team="${id}" style="${activeStyle}" aria-pressed="${active ? "true" : "false"}">${escapeHtml(labels[id])}</button>`;
       })
       .join("");
     wrap.classList.remove("hidden");
@@ -496,6 +535,7 @@
       btn.addEventListener("click", () => {
         state.teamId = btn.getAttribute("data-team");
         setTeamId(state.teamId);
+        unlockTimerAudioOnce();
         renderTeamPick();
       });
     });
@@ -723,7 +763,10 @@
       return;
     }
 
+    bindTimerAudioUnlockOnFirstTap();
+
     document.getElementById("slive-refresh")?.addEventListener("click", () => {
+      unlockTimerAudioOnce();
       void refreshOnce(true)
         .then(() => ensurePollRunning())
         .catch((err) => showLiveError(err));

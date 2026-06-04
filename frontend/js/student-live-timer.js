@@ -72,6 +72,16 @@
       }
       lastDone = !!currentTimer.done;
 
+      const hintSound = container.querySelector("[data-slive-timer-sound-hint]");
+      if (hintSound) {
+        const needUnlock = sh.isTimerAudioUnlocked && !sh.isTimerAudioUnlocked();
+        const showHint =
+          needUnlock &&
+          currentTimer.kind === "countdown" &&
+          (currentTimer.running || currentTimer.done);
+        hintSound.classList.toggle("hidden", !showHint);
+      }
+
       if (
         currentTimer.kind === "countdown" &&
         currentTimer.running &&
@@ -79,12 +89,12 @@
         sec <= 0
       ) {
         currentTimer = { ...currentTimer, done: true, running: false, remaining_sec: 0 };
-        lastDone = true;
         render();
       }
     }
 
     function updateTimer(next) {
+      if (next && !next.done) lastDone = false;
       currentTimer = next ? { ...next } : null;
       stopLocalTick();
       if (!currentTimer) {
@@ -101,7 +111,13 @@
       <p class="slive-timer__label" data-slive-timer-label></p>
       <div class="slive-timer-display" data-slive-timer-display aria-live="polite">00:00</div>
       <p class="slive-timer-status" data-slive-timer-status></p>
+      <p class="slive-timer-sound-hint hidden" data-slive-timer-sound-hint></p>
     `;
+
+    const hintEl = container.querySelector("[data-slive-timer-sound-hint]");
+    if (hintEl) {
+      hintEl.textContent = t("slive_timer_sound_hint");
+    }
 
     updateTimer(timer);
 

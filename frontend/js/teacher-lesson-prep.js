@@ -477,6 +477,17 @@
         setStatus(statusEl, t("tlp_date_required_publish"), true);
         return;
       }
+      let packSnapshot;
+      try {
+        packSnapshot = await prepApi.getPack(packId);
+      } catch (_) {
+        packSnapshot = null;
+      }
+      const linkedPageId = packSnapshot?.teaching_page_id || teachingPageId;
+      if (!linkedPageId && !packSnapshot?.has_html) {
+        setStatus(statusEl, t("tlp_publish_need_html"), true);
+        return;
+      }
       setStatus(statusEl, t("tlp_publishing"), false);
       try {
         const result = await prepApi.publishPack(packId, { lesson_date: lessonDate });
@@ -490,7 +501,11 @@
         );
         if (result.pack) updateLiveLink(result.pack);
       } catch (err) {
-        setStatus(statusEl, (err && err.message) || t("tlp_publish_failed"), true);
+        const msg = (err && err.message) || t("tlp_publish_failed");
+        const stale =
+          /teaching page not found/i.test(msg) || /stale_teaching_page/i.test(msg);
+        setStatus(statusEl, stale ? t("tlp_stale_teaching_page") : msg, true);
+        if (stale) teachingPageId = null;
       }
     });
   }
