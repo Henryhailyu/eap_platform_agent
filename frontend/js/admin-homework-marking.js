@@ -91,6 +91,13 @@
     showProfile(Number(sel.value));
   }
 
+  function resetSaveButton() {
+    const btn = document.getElementById("admin-hm-save-btn");
+    if (btn && typeof window.EAP_resetSaveButton === "function") {
+      window.EAP_resetSaveButton(btn);
+    }
+  }
+
   function showProfile(id) {
     selectedId = id;
     const p = profiles.find((x) => Number(x.id) === Number(id));
@@ -110,26 +117,37 @@
     if (!section) return;
 
     document.getElementById("admin-hm-profile-select")?.addEventListener("change", (ev) => {
+      resetSaveButton();
       showProfile(Number(ev.target.value));
+    });
+
+    ["admin-hm-prompt", "admin-hm-category", "admin-hm-title"].forEach((id) => {
+      document.getElementById(id)?.addEventListener("input", resetSaveButton);
     });
 
     document.getElementById("admin-hm-save-btn")?.addEventListener("click", () => {
       if (!selectedId) return;
+      const btn = document.getElementById("admin-hm-save-btn");
       const body = {
         title: document.getElementById("admin-hm-title")?.value || "",
         task_category: document.getElementById("admin-hm-category")?.value || "",
         system_prompt: document.getElementById("admin-hm-prompt")?.value || "",
       };
-      void apiFetch(`/api/admin/homework-marking/profiles/${selectedId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-        .then(() => {
+      const save = () =>
+        apiFetch(`/api/admin/homework-marking/profiles/${selectedId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(() => {
           setStatus(t("admin_hm_saved"), false);
           return loadProfiles();
-        })
-        .catch((err) => setStatus(err.message, true));
+        });
+      const run = typeof window.EAP_runSaveButton === "function" ? window.EAP_runSaveButton : null;
+      if (run && btn) {
+        void run(btn, save).catch((err) => setStatus(err.message, true));
+      } else {
+        void save().catch((err) => setStatus(err.message, true));
+      }
     });
 
     document.getElementById("admin-hm-upload-btn")?.addEventListener("click", () => {

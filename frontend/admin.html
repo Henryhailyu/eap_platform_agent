@@ -364,7 +364,14 @@
               <label for="admin-hm-prompt" data-i18n="admin_hm_prompt">AI system instruction</label>
               <textarea id="admin-hm-prompt" class="admin-ai-prompt" rows="10" spellcheck="false"></textarea>
             </div>
-            <button type="button" class="btn-primary" id="admin-hm-save-btn" data-i18n="admin_ai_save">
+            <button
+              type="button"
+              class="btn-primary"
+              id="admin-hm-save-btn"
+              data-i18n="admin_ai_save"
+              data-eap-saving-key="eap_btn_saving"
+              data-eap-saved-key="eap_btn_saved"
+            >
               Save instruction
             </button>
             <h3 class="admin-hm-descriptors__title" data-i18n="admin_hm_descriptors">Marking descriptors</h3>
@@ -421,6 +428,7 @@
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>
-    <script src="js/admin-homework-marking.js"></script>
+    <script src="js/eap-button-state.js"></script>
+    <script src="js/admin-homework-marking.js?v=20260604-hm1"></script>
   </body>
 </html>

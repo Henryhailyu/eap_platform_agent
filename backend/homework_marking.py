@@ -580,10 +580,19 @@ def register_homework_marking_routes(
         "format_ai_error": format_ai_error,
     }
 
+    def require_manager_console_role(conn):
+        """Manager console users are role admin; also allow explicit manager role."""
+        err = require_session_role_if_enabled(conn, "manager")
+        if not err:
+            return None
+        if not require_session_role_if_enabled(conn, "admin"):
+            return None
+        return err
+
     @app.route("/api/admin/homework-marking/profiles", methods=["GET"])
     def admin_hm_profiles_list():
         conn = get_db_connection()
-        err = require_session_role_if_enabled(conn, "manager")
+        err = require_manager_console_role(conn)
         if err:
             conn.close()
             return err
@@ -605,7 +614,7 @@ def register_homework_marking_routes(
     @app.route("/api/admin/homework-marking/profiles", methods=["POST"])
     def admin_hm_profiles_create():
         conn = get_db_connection()
-        err = require_session_role_if_enabled(conn, "manager")
+        err = require_manager_console_role(conn)
         if err:
             conn.close()
             return err
@@ -647,7 +656,7 @@ def register_homework_marking_routes(
     @app.route("/api/admin/homework-marking/profiles/<int:profile_id>", methods=["PUT"])
     def admin_hm_profiles_update(profile_id: int):
         conn = get_db_connection()
-        err = require_session_role_if_enabled(conn, "manager")
+        err = require_manager_console_role(conn)
         if err:
             conn.close()
             return err
@@ -692,7 +701,7 @@ def register_homework_marking_routes(
     @app.route("/api/admin/homework-marking/profiles/<int:profile_id>/descriptors", methods=["POST"])
     def admin_hm_descriptor_upload(profile_id: int):
         conn = get_db_connection()
-        err = require_session_role_if_enabled(conn, "manager")
+        err = require_manager_console_role(conn)
         if err:
             conn.close()
             return err
@@ -762,7 +771,7 @@ def register_homework_marking_routes(
     @app.route("/api/admin/homework-marking/descriptors/<int:descriptor_id>", methods=["DELETE"])
     def admin_hm_descriptor_delete(descriptor_id: int):
         conn = get_db_connection()
-        err = require_session_role_if_enabled(conn, "manager")
+        err = require_manager_console_role(conn)
         if err:
             conn.close()
             return err
