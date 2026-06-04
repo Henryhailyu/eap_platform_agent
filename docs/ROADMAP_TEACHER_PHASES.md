@@ -47,12 +47,28 @@
 
 ---
 
-## Planned (teacher-facing)
+## Recently shipped (LP-M3++)
 
-| ID | Task | Depends on |
-|----|------|------------|
-| **LP-M3++** | Deeper Excel→HTML rendering (server-side table embed) | LP-M3+ |
-| **HM-M4** | Full analytics dashboard, export | HM-M3 |
+| ID | Task | Doc |
+|----|------|-----|
+| **LP-M3++** | Server-side Excel → `eap-excel-table` embed | [`LP-M3plusplus_EXCEL_TABLES.md`](LP-M3plusplus_EXCEL_TABLES.md) |
+
+---
+
+## In progress (next — step by step)
+
+| ID | Task | Doc |
+|----|------|-----|
+| **HM-M4** | Manager marking dashboard: charts, CSV export, class filter | [`VISION_AI_HOMEWORK_MARKING.md`](VISION_AI_HOMEWORK_MARKING.md) |
+| **PILOT-HANDOUT** | 教师一页纸（Lighthouse URL、登录、Live/作业流程，可打印） | [`PILOT_HANDOUT.md`](PILOT_HANDOUT.md) |
+
+---
+
+## Deferred (after student-side refinement)
+
+| ID | Task | Notes |
+|----|------|-------|
+| **WEB-J** | Privacy page, monitoring, custom domain | Not before student UX polish |
 
 ---
 

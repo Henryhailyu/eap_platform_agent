@@ -15,6 +15,7 @@ from flask import jsonify, request
 from teaching_page_source_files import (
     allowed_source_extension,
     delete_stored_file,
+    excel_table_text_to_html,
     extract_text_from_bytes,
     merge_source_text,
     normalize_extracted_text,
@@ -70,6 +71,8 @@ WRITING_HTML_FROM_PLAN_EXTRA = (
     "- Source text may include Excel sheets marked [TABLE] with pipe-separated rows; "
     "render important tables as accessible HTML <table> with <thead> when the first row is a header.\n"
     "- Keep tables responsive (simple borders, readable on mobile); do not paste raw TSV only.\n"
+    "- When materials include ready-made <table class=\"eap-excel-table\"> blocks, place them in the "
+    "relevant segment (do not discard).\n"
 )
 
 
@@ -249,6 +252,14 @@ def collect_materials_text(conn, pack_id: int) -> str:
             continue
         name = (row["original_name"] or "material").strip()
         blocks.append(f"=== File: {name} ===\n{text}")
+        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        if ext in ("xlsx", "xls"):
+            table_html = excel_table_text_to_html(text)
+            if table_html:
+                blocks.append(
+                    f"=== Embed these HTML tables from {name} in the lesson (class eap-excel-table) ===\n"
+                    f"{table_html}"
+                )
     return merge_source_text("", blocks, MAX_MATERIALS_FOR_AI)
 
 

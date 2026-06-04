@@ -177,6 +177,56 @@ def _extract_text_from_xlsx(data: bytes, ext: str = "xlsx") -> str:
     return "\n".join(parts)
 
 
+def _escape_html_cell(text: str) -> str:
+    return (
+        str(text or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def excel_table_text_to_html(text: str) -> str:
+    """
+    LP-M3++ — Turn [TABLE] pipe rows from Excel extract into embeddable HTML tables.
+    """
+    raw = str(text or "")
+    if "[TABLE]" not in raw:
+        return ""
+    chunks: list[str] = []
+    for block in raw.split("[TABLE]")[1:]:
+        rows: list[list[str]] = []
+        for line in block.splitlines():
+            line = line.strip()
+            if not line or line.startswith("===") or line.startswith("…"):
+                continue
+            if line.startswith("|") and "|" in line[1:]:
+                inner = line.strip("|").strip()
+                cells = [c.strip() for c in inner.split("|")]
+                if any(cells):
+                    rows.append(cells)
+        if not rows:
+            continue
+        width = max(len(r) for r in rows)
+        parts = [
+            '<table class="eap-excel-table" role="table">',
+            "<style>.eap-excel-table{border-collapse:collapse;width:100%;max-width:100%;margin:1rem 0;font-size:0.95rem}"
+            ".eap-excel-table th,.eap-excel-table td{border:1px solid #c8c8cc;padding:0.45rem 0.6rem;text-align:left;vertical-align:top}"
+            ".eap-excel-table th{background:#f5f5f7}</style>",
+        ]
+        for i, row in enumerate(rows):
+            padded = row + [""] * (width - len(row))
+            tag = "th" if i == 0 else "td"
+            parts.append(
+                "<tr>"
+                + "".join(f"<{tag}>{_escape_html_cell(c)}</{tag}>" for c in padded)
+                + "</tr>"
+            )
+        parts.append("</table>")
+        chunks.append("\n".join(parts))
+    return "\n\n".join(chunks)
+
+
 def normalize_extracted_text(text: str) -> str:
     cleaned = re.sub(r"\r\n?", "\n", str(text or ""))
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
