@@ -91,4 +91,4 @@
 
 ---
 
-*EAP047-R + LP-M4 signed off. Latest batch: HM-M2, HM-M3, LP-M3+, ops runbook.*
+*Next: **HM-M4** → **PILOT-HANDOUT**. WEB-J deferred.*
