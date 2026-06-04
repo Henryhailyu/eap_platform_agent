@@ -3499,6 +3499,35 @@ body.tlive-modal-open {
   color: #6e6e73;
 }
 
+/* LP-M4 — lesson HTML sync toolbar (segment focus) */
+.tlive-lesson-sync {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(10, 77, 104, 0.1);
+}
+
+.tlive-lesson-sync__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.tlive-lesson-sync__select {
+  min-width: 10rem;
+  max-width: 100%;
+}
+
+.tlive-lesson-sync__status {
+  font-size: 0.8rem;
+  color: #0a7ea4;
+}
+
 /* Student live — synced timer */
 .slive-timer-card {
   text-align: center;

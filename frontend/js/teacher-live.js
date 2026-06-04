@@ -602,6 +602,7 @@
               sessionCode: window.__tliveLiveSession.code,
               pageId,
               apiBase: (getLiveApi() && getLiveApi().API_BASE) || window.location.origin,
+              role: "teacher",
             }
           : null;
       return window.EAP_injectLiveBridge(text, ctx);
@@ -615,12 +616,34 @@
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
     const activityCount =
       typeof window.EAP_countLessonActivities === "function" ? window.EAP_countLessonActivities(html) : 0;
+    const segments = Array.isArray(window.__tliveLessonPlanSegments) ? window.__tliveLessonPlanSegments : [];
+    const segmentOpts = segments.length
+      ? segments
+          .map((seg, i) => {
+            const label = (seg && (seg.title || seg.name)) || t("tlive_pq_segment_n", { n: i + 1 });
+            return `<option value="${i}">${escapeHtml(label)}</option>`;
+          })
+          .join("")
+      : "";
+    const segmentBar = segments.length
+      ? `<div class="tlive-lesson-sync" role="group" aria-label="${escapeHtml(t("tlive_lesson_sync_group"))}">
+          <label class="tlive-lesson-sync__label" for="tlive-lesson-segment">${escapeHtml(t("tlive_lesson_sync_segment"))}</label>
+          <select id="tlive-lesson-segment" class="tlive-lesson-sync__select">
+            <option value="">${escapeHtml(t("tlive_lesson_sync_all_segments"))}</option>
+            ${segmentOpts}
+          </select>
+          <button type="button" class="btn-secondary btn-small" id="tlive-lesson-segment-push">${escapeHtml(t("tlive_lesson_sync_push_segment"))}</button>
+          <span class="tlive-lesson-sync__status" id="tlive-lesson-sync-status" aria-live="polite"></span>
+        </div>`
+      : "";
+
     canvas.innerHTML = `
       <div class="tla-live-present tla-live-present--with-stats">
         <div class="tla-live-present__head">
           <p class="tla-live-present__title">${escapeHtml(title || t("tla_preview_title"))}</p>
           <button type="button" class="btn-secondary btn-small" id="tlive-push-html-again">${escapeHtml(t("tlive_push_again"))}</button>
         </div>
+        ${segmentBar}
         <div class="tla-live-present__stage">
           <iframe class="tla-live-present__frame" sandbox="allow-scripts allow-same-origin" title="${escapeHtml(title || "Lesson")}"></iframe>
           <aside id="tlive-activity-stats" class="tlive-activity-stats" aria-live="polite">${
@@ -637,6 +660,36 @@
     if (frame) frame.srcdoc = injectLessonBridge(html, pageId);
     document.getElementById("tlive-push-html-again")?.addEventListener("click", () => {
       void pushHtmlLessonToClass({ html, title, pageId });
+    });
+    document.getElementById("tlive-lesson-segment-push")?.addEventListener("click", () => {
+      const sel = document.getElementById("tlive-lesson-segment");
+      const statusEl = document.getElementById("tlive-lesson-sync-status");
+      const raw = sel ? sel.value : "";
+      const patch =
+        raw === "" ? { active_segment: null } : { active_segment: parseInt(raw, 10) };
+      const api = getLiveApi();
+      const code = window.__tliveLiveSession?.code;
+      const teacher = window.__tliveTeacherUser;
+      if (!api || !code || typeof api.pushLessonSync !== "function") {
+        if (statusEl) statusEl.textContent = t("tlive_lesson_sync_fail");
+        return;
+      }
+      if (statusEl) statusEl.textContent = t("tlive_lesson_sync_pushing");
+      void api
+        .pushLessonSync(code, patch, teacher?.username ? { teacher_username: teacher.username } : {})
+        .then(() => {
+          if (statusEl) statusEl.textContent = t("tlive_lesson_sync_ok");
+          try {
+            frame?.contentWindow?.EAP_applyLessonSyncState?.({
+              active_segment: patch.active_segment == null ? null : patch.active_segment,
+            });
+          } catch (_) {
+            /* preview iframe */
+          }
+        })
+        .catch(() => {
+          if (statusEl) statusEl.textContent = t("tlive_lesson_sync_fail");
+        });
     });
     if (pageId && activityCount) void startActivityStatsPoll(pageId);
   }

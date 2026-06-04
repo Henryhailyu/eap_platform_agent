@@ -207,6 +207,34 @@
     return parseJson(response);
   }
 
+  async function pushLessonSync(sessionCode, patch, options) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const opts = options && typeof options === "object" ? options : {};
+    const body = { patch: patch || {} };
+    if (opts.teacher_username) body.teacher_username = opts.teacher_username;
+    const response = await liveFetch(
+      `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(code)}/lesson-sync`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    return parseJson(response);
+  }
+
+  async function studentWaitLessonSync(sessionCode, sinceVersion, signal) {
+    const code = String(sessionCode || "").trim().toUpperCase();
+    const qs = waitQuery({
+      since_version: sinceVersion != null ? sinceVersion : 0,
+    });
+    const response = await liveFetch(
+      `${API_BASE}/api/student/live/join/${encodeURIComponent(code)}/wait-lesson-sync?${qs}`,
+      { signal },
+    );
+    return parseJson(response);
+  }
+
   global.EAP_LIVE_TEACHING_API = {
     API_BASE,
     WAIT_TIMEOUT_SEC,
@@ -221,6 +249,8 @@
     studentJoin,
     studentJoinWait,
     studentJoinWaitDisplay,
+    studentWaitLessonSync,
+    pushLessonSync,
     studentFetchLesson,
     studentDisplayFileUrl,
     studentRespond,

@@ -1,11 +1,32 @@
 /**
- * K6 — in-lesson activity bridge for live HTML pages (student iframe).
+ * K6 + LP-M4 — in-lesson activity bridge; teacher reveal/segment sync to students (long-poll).
  */
 (function (global) {
   const ctx = global.EAP_LIVE_CTX || {};
   const API_BASE = String(ctx.apiBase || global.location.origin || "").replace(/\/$/, "");
   const SESSION = String(ctx.sessionCode || "").trim().toUpperCase();
   const PAGE_ID = ctx.pageId;
+  const IS_TEACHER = String(ctx.role || "").toLowerCase() === "teacher";
+
+  let lessonSyncVersion = 0;
+  let lessonSyncPollAbort = null;
+  let lessonSyncPolling = false;
+
+  function t(key) {
+    if (typeof global.t === "function") return global.t(key);
+    return key;
+  }
+
+  function injectSyncStyles() {
+    if (document.getElementById("eap-lesson-sync-style")) return;
+    const style = document.createElement("style");
+    style.id = "eap-lesson-sync-style";
+    style.textContent = `
+      .eap-lesson-segment--dimmed { opacity: 0.38; pointer-events: none; filter: grayscale(0.15); }
+      .eap-reveal--synced { opacity: 0.85; }
+    `;
+    document.head.appendChild(style);
+  }
 
   function teamId() {
     try {
@@ -21,6 +42,77 @@
       return global.EAP_getAuthHeaders(extra);
     }
     return extra && typeof extra === "object" ? { ...extra } : {};
+  }
+
+  function applyRevealTarget(root, targetSel) {
+    if (!targetSel) return;
+    const target = targetSel.startsWith("#") || targetSel.startsWith(".")
+      ? root.querySelector(targetSel)
+      : root.querySelector(`#${targetSel}`) || root.querySelector(`[data-eap-target="${targetSel}"]`);
+    if (target) {
+      target.classList.add("eap-revealed");
+      target.hidden = false;
+      target.style.display = "";
+    }
+    root.querySelectorAll(`.eap-reveal[data-eap-target="${targetSel}"], .eap-reveal[data-eap-target='#${targetSel.replace(/^#/, "")}']`).forEach((btn) => {
+      btn.classList.add("eap-reveal--done", "eap-reveal--synced");
+      btn.disabled = true;
+    });
+  }
+
+  function applyActiveSegment(root, segmentIndex) {
+    const blocks = root.querySelectorAll("[data-eap-live-segment]");
+    if (!blocks.length) return;
+    if (segmentIndex == null || Number.isNaN(Number(segmentIndex))) {
+      blocks.forEach((el) => {
+        const row = el.closest("section") || el.closest(".eap-segment") || el;
+        row.classList.remove("eap-lesson-segment--dimmed");
+      });
+      return;
+    }
+    const n = Number(segmentIndex);
+    blocks.forEach((el) => {
+      const seg = parseInt(el.getAttribute("data-eap-live-segment"), 10);
+      const row = el.closest("section") || el.closest(".eap-segment") || el;
+      if (!Number.isNaN(seg) && seg === n) {
+        row.classList.remove("eap-lesson-segment--dimmed");
+      } else {
+        row.classList.add("eap-lesson-segment--dimmed");
+      }
+    });
+  }
+
+  function applyLessonSyncState(state) {
+    if (!state || typeof state !== "object") return;
+    const root = document;
+    (state.reveals || []).forEach((targetSel) => applyRevealTarget(root, targetSel));
+    if ("active_segment" in state) {
+      applyActiveSegment(root, state.active_segment);
+    }
+  }
+
+  async function pushLessonSyncPatch(patch) {
+    if (!SESSION || !IS_TEACHER) return null;
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/teacher/live/sessions/${encodeURIComponent(SESSION)}/lesson-sync`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: authHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ patch }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return null;
+      if (data.lesson_sync) {
+        lessonSyncVersion = Number(data.lesson_sync.version) || lessonSyncVersion;
+        applyLessonSyncState(data.lesson_sync.state);
+      }
+      return data;
+    } catch (_) {
+      return null;
+    }
   }
 
   async function submitActivity(activityId, answerText, answerIndex, startedAt) {
@@ -53,7 +145,7 @@
       if (btn.dataset.eapBound === "1") return;
       btn.dataset.eapBound = "1";
       btn.addEventListener("click", () => {
-        const targetSel = btn.getAttribute("data-eap-target");
+        const targetSel = btn.getAttribute("data-eap-target") || "";
         const target = targetSel ? root.querySelector(targetSel) : btn.nextElementSibling;
         if (target) {
           target.classList.add("eap-revealed");
@@ -62,6 +154,9 @@
         }
         btn.classList.add("eap-reveal--done");
         btn.disabled = true;
+        if (IS_TEACHER && targetSel) {
+          void pushLessonSyncPatch({ reveal: targetSel });
+        }
       });
     });
   }
@@ -138,7 +233,63 @@
     });
   }
 
+  function stopLessonSyncPoll() {
+    lessonSyncPolling = false;
+    if (lessonSyncPollAbort) {
+      lessonSyncPollAbort.abort();
+      lessonSyncPollAbort = null;
+    }
+  }
+
+  async function startLessonSyncPoll() {
+    if (!SESSION || IS_TEACHER || lessonSyncPolling) return;
+    stopLessonSyncPoll();
+    lessonSyncPolling = true;
+    const waitSec = 25;
+
+    while (lessonSyncPolling) {
+      const controller = new AbortController();
+      lessonSyncPollAbort = controller;
+      try {
+        const qs = new URLSearchParams({
+          since_version: String(lessonSyncVersion),
+          timeout: String(waitSec),
+        });
+        const response = await fetch(
+          `${API_BASE}/api/student/live/join/${encodeURIComponent(SESSION)}/wait-lesson-sync?${qs}`,
+          { credentials: "include", headers: authHeaders(), signal: controller.signal },
+        );
+        const data = await response.json().catch(() => ({}));
+        if (data.lesson_sync) {
+          const ver = Number(data.lesson_sync.version) || 0;
+          if (ver !== lessonSyncVersion) {
+            lessonSyncVersion = ver;
+            applyLessonSyncState(data.lesson_sync.state);
+          }
+        }
+      } catch (err) {
+        if (err && err.name === "AbortError") break;
+        await new Promise((r) => global.setTimeout(r, 4000));
+      } finally {
+        if (lessonSyncPollAbort === controller) lessonSyncPollAbort = null;
+      }
+    }
+  }
+
+  function onParentMessage(ev) {
+    const data = ev && ev.data;
+    if (!data || data.type !== "eap-lesson-sync") return;
+    const sync = data.lesson_sync;
+    if (!sync) return;
+    const ver = Number(sync.version) || 0;
+    if (ver >= lessonSyncVersion) {
+      lessonSyncVersion = ver;
+      applyLessonSyncState(sync.state);
+    }
+  }
+
   function boot() {
+    injectSyncStyles();
     wireRevealButtons(document);
     wireActivities(document);
     wireLiveLaunchToParent(document);
@@ -147,7 +298,14 @@
         el.hidden = true;
       }
     });
+    if (!IS_TEACHER) {
+      global.addEventListener("message", onParentMessage);
+      void startLessonSyncPoll();
+    }
   }
+
+  global.EAP_applyLessonSyncState = applyLessonSyncState;
+  global.EAP_pushLessonSyncPatch = pushLessonSyncPatch;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

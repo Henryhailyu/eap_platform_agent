@@ -6,6 +6,7 @@ Routes registered via register_live_teaching_routes(app) from app.py.
 
 L28: long-poll wait endpoints (Render-friendly; no WebSocket required).
 K6: classroom display push (slides / HTML / material) + HTML activity responses.
+LP-M4: lesson HTML sync (teacher reveal + segment focus → students via long-poll).
 """
 import json
 import os
@@ -42,6 +43,53 @@ def migrate_live_k6(conn):
         conn.execute(
             "ALTER TABLE live_sessions ADD COLUMN display_version INTEGER NOT NULL DEFAULT 0"
         )
+
+
+def migrate_live_lp4(conn):
+    """LP-M4 — real-time lesson HTML sync state per live session."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(live_sessions)").fetchall()}
+    if "lesson_sync_json" not in cols:
+        conn.execute("ALTER TABLE live_sessions ADD COLUMN lesson_sync_json TEXT")
+    if "lesson_sync_version" not in cols:
+        conn.execute(
+            "ALTER TABLE live_sessions ADD COLUMN lesson_sync_version INTEGER NOT NULL DEFAULT 0"
+        )
+
+
+def _default_lesson_sync_state() -> dict:
+    return {"reveals": [], "active_segment": None}
+
+
+def _parse_lesson_sync_json(raw) -> dict:
+    if not raw:
+        return _default_lesson_sync_state()
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            return _default_lesson_sync_state()
+    except (TypeError, json.JSONDecodeError):
+        return _default_lesson_sync_state()
+    reveals = data.get("reveals")
+    if not isinstance(reveals, list):
+        reveals = []
+    reveals = [str(x).strip()[:200] for x in reveals if str(x).strip()]
+    active = data.get("active_segment")
+    active_segment = None
+    if active is not None and str(active).strip() != "":
+        try:
+            active_segment = int(active)
+        except (TypeError, ValueError):
+            active_segment = None
+    return {"reveals": reveals, "active_segment": active_segment}
+
+
+def _lesson_sync_payload(sess) -> dict:
+    return {
+        "version": int(sess["lesson_sync_version"] if "lesson_sync_version" in sess.keys() else 0),
+        "state": _parse_lesson_sync_json(
+            sess["lesson_sync_json"] if "lesson_sync_json" in sess.keys() else None
+        ),
+    }
 
 
 def init_live_teaching_tables(conn):
@@ -97,6 +145,7 @@ def init_live_teaching_tables(conn):
         )
     """)
     migrate_live_k6(conn)
+    migrate_live_lp4(conn)
 
 
 _CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -114,14 +163,25 @@ def _new_session_code(conn):
     raise RuntimeError("Could not allocate live session code")
 
 
+_SESSION_SELECT = """
+        SELECT id, session_code, class_name, teacher_username, session_date,
+               created_at, active_launch_id, display_mode, display_json, display_version,
+               lesson_sync_json, lesson_sync_version
+        FROM live_sessions
+"""
+
+
 def _session_by_code(conn, code):
     return conn.execute(
-        """
-        SELECT id, session_code, class_name, teacher_username, session_date,
-               created_at, active_launch_id, display_mode, display_json, display_version
-        FROM live_sessions WHERE session_code = ?
-        """,
+        f"{_SESSION_SELECT} WHERE session_code = ?",
         (code.upper().strip(),),
+    ).fetchone()
+
+
+def _session_by_id(conn, session_id):
+    return conn.execute(
+        f"{_SESSION_SELECT} WHERE id = ?",
+        (session_id,),
     ).fetchone()
 
 
@@ -221,20 +281,28 @@ def extract_activity_answers(html: str) -> dict[str, str]:
     return answers
 
 
-def inject_live_bridge(html: str, session_code: str, page_id: int, api_base: str = "") -> str:
-    """Append live activity bridge config for student iframe."""
+def inject_live_bridge(
+    html: str,
+    session_code: str,
+    page_id: int,
+    api_base: str = "",
+    *,
+    role: str = "student",
+) -> str:
+    """Append live activity bridge config for lesson iframe (student or teacher preview)."""
     text = str(html or "")
     cfg = json.dumps(
         {
             "sessionCode": session_code,
             "pageId": page_id,
             "apiBase": api_base.rstrip("/"),
+            "role": str(role or "student").strip().lower(),
         },
         ensure_ascii=False,
     )
     snippet = (
         f'<script>window.EAP_LIVE_CTX={cfg};</script>'
-        '<script src="/ui/js/eap-live-bridge.js"></script>'
+        '<script src="/ui/js/eap-live-bridge.js?v=20260604-lp4"></script>'
     )
     lower = text.lower()
     if "</body>" in lower:
@@ -300,7 +368,8 @@ def _student_join_payload(conn, sess, student_username):
         question = _question_payload(launch)
         launched_at = launch["launched_at"] if launch else None
 
-    return {
+    display = _display_payload(sess)
+    out = {
         "session_code": sess["session_code"],
         "class_name": sess["class_name"],
         "student_username": student_username,
@@ -308,8 +377,11 @@ def _student_join_payload(conn, sess, student_username):
         "launch_id": lid,
         "launched_at": launched_at,
         "question": question,
-        "display": _display_payload(sess),
+        "display": display,
     }
+    if str(display.get("mode") or "").lower() == "html":
+        out["lesson_sync"] = _lesson_sync_payload(sess)
+    return out
 
 
 def _teacher_responses_payload(conn, sess, launch_id):
@@ -695,14 +767,7 @@ def register_live_teaching_routes(app):
                 return current != since_launch_id
 
             _wait_until(launch_changed, timeout_sec)
-            fresh = conn.execute(
-                """
-                SELECT id, session_code, class_name, teacher_username, session_date,
-                       created_at, active_launch_id, display_mode, display_json, display_version
-                FROM live_sessions WHERE id = ?
-                """,
-                (session_id,),
-            ).fetchone()
+            fresh = _session_by_id(conn, session_id)
             payload = _student_join_payload(conn, fresh, student_username)
             payload["waited"] = True
             return jsonify(payload)
@@ -739,17 +804,142 @@ def register_live_teaching_routes(app):
                 return current != since_version
 
             _wait_until(display_changed, timeout_sec)
-            fresh = conn.execute(
-                """
-                SELECT id, session_code, class_name, teacher_username, session_date,
-                       created_at, active_launch_id, display_mode, display_json, display_version
-                FROM live_sessions WHERE id = ?
-                """,
-                (session_id,),
-            ).fetchone()
+            fresh = _session_by_id(conn, session_id)
             payload = _student_join_payload(conn, fresh, student_username)
             payload["waited"] = True
             return jsonify(payload)
+        finally:
+            conn.close()
+
+    @app.route("/api/student/live/join/<session_code>/wait-lesson-sync", methods=["GET"])
+    def student_live_wait_lesson_sync(session_code):
+        from app import get_db_connection, resolve_student_with_optional_enforcement
+
+        since_version = request.args.get("since_version", default=0, type=int)
+        timeout_sec = _clamp_wait_timeout(request.args.get("timeout", type=float))
+
+        conn = get_db_connection()
+        try:
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            student_username, err = resolve_student_with_optional_enforcement(
+                conn, request.args.get("student_username"), sess["class_name"]
+            )
+            if err is not None:
+                return err
+
+            display = _display_payload(sess)
+            if str(display.get("mode") or "").lower() != "html":
+                return jsonify(
+                    {
+                        "lesson_sync": _lesson_sync_payload(sess),
+                        "display_mode": display.get("mode"),
+                        "waited": False,
+                    }
+                )
+
+            session_id = sess["id"]
+
+            def sync_changed():
+                row = conn.execute(
+                    "SELECT lesson_sync_version FROM live_sessions WHERE id = ?",
+                    (session_id,),
+                ).fetchone()
+                current = int(row["lesson_sync_version"] if row else 0)
+                return current != since_version
+
+            _wait_until(sync_changed, timeout_sec)
+            fresh = _session_by_id(conn, session_id)
+            return jsonify(
+                {
+                    "lesson_sync": _lesson_sync_payload(fresh),
+                    "display": _display_payload(fresh),
+                    "waited": True,
+                }
+            )
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/live/sessions/<session_code>/lesson-sync", methods=["POST"])
+    def teacher_live_lesson_sync(session_code):
+        from app import (
+            enforce_teacher_class_access_if_enabled,
+            get_db_connection,
+            get_effective_teacher_username,
+            require_session_role_if_enabled,
+            should_enforce_membership,
+            should_require_session_identity,
+        )
+
+        data = request.get_json(silent=True) or {}
+        patch = data.get("patch") if isinstance(data.get("patch"), dict) else data
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+
+            sess = _session_by_code(conn, session_code)
+            if not sess:
+                return jsonify({"error": "Session not found"}), 404
+
+            teacher_username = get_effective_teacher_username(conn, data.get("teacher_username"))
+            if should_require_session_identity() or should_enforce_membership():
+                if not teacher_username:
+                    return jsonify({"error": "teacher_username is required"}), 400
+                err = enforce_teacher_class_access_if_enabled(
+                    conn, teacher_username, sess["class_name"]
+                )
+                if err is not None:
+                    return err
+
+            display = _display_payload(sess)
+            if str(display.get("mode") or "").lower() != "html":
+                return jsonify({"error": "Push an HTML lesson to the class first"}), 409
+
+            state = _parse_lesson_sync_json(sess["lesson_sync_json"])
+
+            if patch.get("reset"):
+                state = _default_lesson_sync_state()
+            else:
+                if "active_segment" in patch:
+                    raw_seg = patch.get("active_segment")
+                    if raw_seg is None or str(raw_seg).strip() == "":
+                        state["active_segment"] = None
+                    else:
+                        try:
+                            state["active_segment"] = int(raw_seg)
+                        except (TypeError, ValueError):
+                            pass
+                new_reveals = patch.get("reveals")
+                if isinstance(new_reveals, list):
+                    merged = list(state.get("reveals") or [])
+                    for item in new_reveals:
+                        key = str(item).strip()[:200]
+                        if key and key not in merged:
+                            merged.append(key)
+                    state["reveals"] = merged
+                single = patch.get("reveal")
+                if single:
+                    key = str(single).strip()[:200]
+                    if key and key not in state["reveals"]:
+                        state["reveals"].append(key)
+
+            sync_version = int(sess["lesson_sync_version"] or 0) + 1
+            conn.execute(
+                """
+                UPDATE live_sessions
+                SET lesson_sync_json = ?, lesson_sync_version = ?
+                WHERE id = ?
+                """,
+                (json.dumps(state, ensure_ascii=False), sync_version, sess["id"]),
+            )
+            conn.commit()
+            fresh = _session_by_id(conn, sess["id"])
+            return jsonify({"lesson_sync": _lesson_sync_payload(fresh), "ok": True})
         finally:
             conn.close()
 
@@ -859,14 +1049,37 @@ def register_live_teaching_routes(app):
 
             version = int(sess["display_version"] or 0) + 1
             now = utc_now_iso()
-            conn.execute(
-                """
-                UPDATE live_sessions
-                SET display_mode = ?, display_json = ?, display_version = ?
-                WHERE id = ?
-                """,
-                (mode if mode != "upload" else "material", json.dumps(meta, ensure_ascii=False), version, sess["id"]),
-            )
+            reset_sync = json.dumps(_default_lesson_sync_state(), ensure_ascii=False)
+            if mode == "html":
+                conn.execute(
+                    """
+                    UPDATE live_sessions
+                    SET display_mode = ?, display_json = ?, display_version = ?,
+                        lesson_sync_json = ?, lesson_sync_version = 0
+                    WHERE id = ?
+                    """,
+                    (
+                        mode if mode != "upload" else "material",
+                        json.dumps(meta, ensure_ascii=False),
+                        version,
+                        reset_sync,
+                        sess["id"],
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE live_sessions
+                    SET display_mode = ?, display_json = ?, display_version = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        mode if mode != "upload" else "material",
+                        json.dumps(meta, ensure_ascii=False),
+                        version,
+                        sess["id"],
+                    ),
+                )
             conn.commit()
 
             fresh = _session_by_code(conn, session_code)
@@ -1146,10 +1359,11 @@ def register_live_teaching_routes(app):
                     return err
 
             display = _display_payload(sess)
+            pid = page_id or display.get("page_id")
             if not pid:
                 return jsonify({"page_id": None, "activities": [], "summary": {"responses": 0}})
 
-            payload = _teacher_activity_stats_payload(conn, sess, page_id)
+            payload = _teacher_activity_stats_payload(conn, sess, int(pid))
             return jsonify(payload)
         finally:
             conn.close()

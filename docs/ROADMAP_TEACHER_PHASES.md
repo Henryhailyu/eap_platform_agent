@@ -47,7 +47,7 @@
 | ID | Task | Depends on |
 |----|------|------------|
 | **LP-M3+** | Further LP-M3 polish (xls, richer Excel tables in HTML) | LP-M3 |
-| **LP-M4** | Real-time class sync (Phase B, ~35 students) | LP-M2+ |
+| ~~**LP-M4**~~ | ~~Real-time lesson HTML sync (reveal + segment focus, long-poll)~~ ✅ | [`LP-M4_LESSON_HTML_SYNC.md`](LP-M4_LESSON_HTML_SYNC.md) |
 | **HM-M2+** | Richer reports, regenerate, analytics | HM-M1b ✅ |
 
 ---
@@ -67,8 +67,8 @@
 2. ~~Manager端 — HM-M1a marking profiles~~ ✅  
 3. ~~HM-M1b on teacher submissions~~ ✅  
 
-**Next:** Complete **EAP047-R** checklist → then **LP-M4** (real-time sync) unless rehearsal logs blockers.
+**Next:** **EAP047 UAT** for LP-M4 on Lighthouse; then HM-M2+ or LP-M3+ polish.
 
 ---
 
-*Current sprint: **EAP047-R rehearsal** (active) → **LP-M4** when signed off.*
+*Current sprint: **LP-M4** shipped (2026-06-04) — UAT on EAP047 Live HTML lessons.*

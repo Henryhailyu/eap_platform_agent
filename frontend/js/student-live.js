@@ -362,6 +362,16 @@
           const payload = await api.studentFetchLesson(state.code);
           if (payload.html) {
             lessonFrame.srcdoc = payload.html;
+            const sync = data.lesson_sync;
+            if (sync) {
+              const deliver = () => postLessonSyncToFrame(sync);
+              try {
+                if (lessonFrame.contentDocument?.readyState === "complete") deliver();
+                else lessonFrame.addEventListener("load", deliver, { once: true });
+              } catch (_) {
+                lessonFrame.addEventListener("load", deliver, { once: true });
+              }
+            }
             const count =
               typeof window.EAP_countLessonActivities === "function"
                 ? window.EAP_countLessonActivities(payload.html)
@@ -608,6 +618,16 @@
     });
   }
 
+  function postLessonSyncToFrame(lessonSync) {
+    const frame = document.getElementById("slive-lesson-frame");
+    if (!frame || !lessonSync) return;
+    try {
+      frame.contentWindow?.postMessage({ type: "eap-lesson-sync", lesson_sync: lessonSync }, "*");
+    } catch (_) {
+      /* cross-origin guard */
+    }
+  }
+
   function applyJoinPayload(data) {
     const meta = document.getElementById("slive-meta");
     if (meta) {
@@ -629,6 +649,7 @@
       state.displayMode = data.display.mode || state.displayMode;
     }
     void renderLiveDisplay(data);
+    if (data.lesson_sync) postLessonSyncToFrame(data.lesson_sync);
     renderQuestion(data);
     updateSyncStatus(data);
   }

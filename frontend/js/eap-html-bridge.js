@@ -9,10 +9,12 @@
 
     let cfg = "";
     if (ctx && typeof ctx === "object") {
-      cfg = `<script>window.EAP_LIVE_CTX=${JSON.stringify(ctx)};</script>`;
+      const payload = { ...ctx };
+      if (!payload.role) payload.role = "student";
+      cfg = `<script>window.EAP_LIVE_CTX=${JSON.stringify(payload)};</script>`;
     }
 
-    const snippet = `${cfg}<script src="/ui/js/eap-live-bridge.js"></script>`;
+    const snippet = `${cfg}<script src="/ui/js/eap-live-bridge.js?v=20260604-lp4"></script>`;
     const lower = text.toLowerCase();
     if (lower.includes("</body>")) {
       const idx = lower.lastIndexOf("</body>");
