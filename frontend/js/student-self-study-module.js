@@ -504,6 +504,17 @@
       if (!VOCAB) return;
       initVocabulary(levelId);
     } else if (skill === "reading") {
+      const readingUi = window.EAP_READING_UI;
+      if (readingUi && typeof readingUi.init === "function") {
+        const ok = await readingUi.init();
+        if (ok) {
+          window.addEventListener("eap:langchange", () => {
+            void readingUi.init();
+            if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+          });
+          return;
+        }
+      }
       if (!window.EAP_MODULE_RW || !READ) return;
       window.EAP_MODULE_RW.initReading(levelId, renderTabs);
     } else if (skill === "writing") {

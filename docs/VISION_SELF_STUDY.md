@@ -2,7 +2,7 @@
 
 **Purpose:** IELTS-aligned EAP self-study (vocabulary, reading, listening, writing) — separate from class calendar homework.  
 **Pilot class examples:** `EAP047` (high, ~IELTS 6.5) · `EAP039` (foundation, ~IELTS 5.0)  
-**Status:** Requirements locked (2026-06) — **SS-0 done** · **SS-V1 vocabulary done** (Web-first)  
+**Status:** Requirements locked (2026-06) — **SS-0 done** · **SS-V1 vocabulary** · **SS-R1 reading** (Web-first)  
 **Related:** [`EAP_Student_AI_Self_Study_Centre_Design_Brief.txt`](../EAP_Student_AI_Self_Study_Centre_Design_Brief.txt) · Phase S2 placement mock · Phase S4 module mocks
 
 ---
@@ -169,3 +169,4 @@ Students without placement → reminder only until test complete
 | 2026-06 | Requirements consolidated (vocab, reading, listening, writing, speaking) |
 | 2026-06 | Web-first / App deferred; vocab Web review = 方案 A (manual) |
 | 2026-06-01 | **SS-V1** — vocabulary server + Web UI ([`SS-V1_SELF_STUDY_VOCABULARY.md`](SS-V1_SELF_STUDY_VOCABULARY.md)) |
+| 2026-06-01 | **SS-R1** — reading server + Web UI ([`SS-R1_SELF_STUDY_READING.md`](SS-R1_SELF_STUDY_READING.md)) |

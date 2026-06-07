@@ -290,6 +290,39 @@
             </div>
           </section>
 
+          <section class="content-section admin-panel" id="admin-reading-section" aria-labelledby="admin-reading-heading">
+            <h2 id="admin-reading-heading" class="section-heading" data-i18n="admin_reading_heading">Reading passages</h2>
+            <p class="admin-panel__hint" data-i18n="admin_reading_hint">
+              Channel A: push school passages in queue order (1/day). Channel B: AI passages from the library.
+            </p>
+            <p id="admin-reading-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="admin_reading_col_title">Title</th>
+                    <th scope="col" data-i18n="admin_reading_col_channel">Channel</th>
+                    <th scope="col" data-i18n="admin_reading_col_class">Class</th>
+                    <th scope="col" data-i18n="admin_reading_col_order">Order</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-reading-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-reading-empty" class="admin-empty hidden" data-i18n="admin_reading_empty">No passages yet.</p>
+            <div class="admin-inline-form admin-mat-form__row" style="margin-top: 1rem">
+              <div class="field">
+                <label for="admin-reading-push-class" data-i18n="admin_reading_push_class">Class for Channel A push</label>
+                <input id="admin-reading-push-class" type="text" value="EAP047" maxlength="40" />
+              </div>
+            </div>
+            <div class="admin-mat-form__actions">
+              <button type="button" class="btn-primary" id="admin-reading-push-on" data-i18n="admin_reading_push_on">Enable reading Channel A</button>
+              <button type="button" class="btn-secondary" id="admin-reading-push-off" data-i18n="admin_reading_push_off">Disable reading Channel A</button>
+              <button type="button" class="btn-secondary" id="admin-reading-export" data-i18n="admin_reading_export">Export passages CSV</button>
+            </div>
+          </section>
+
           <section class="content-section admin-panel" aria-labelledby="admin-ai-heading">
             <h2 id="admin-ai-heading" class="section-heading" data-i18n="admin_ai_heading">AI study coach instructions</h2>
             <p class="admin-panel__hint" data-i18n="admin_ai_hint">
@@ -506,6 +539,7 @@
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-materials.js"></script>
     <script src="js/admin-self-study-vocabulary.js"></script>
+    <script src="js/admin-self-study-reading.js"></script>
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>

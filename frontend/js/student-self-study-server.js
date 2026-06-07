@@ -88,6 +88,22 @@
     });
   }
 
+  async function getReadingOverview() {
+    return apiFetch("/api/student/self-study/reading/overview");
+  }
+
+  async function getReadingToday() {
+    return apiFetch("/api/student/self-study/reading/today");
+  }
+
+  async function completeReading(body) {
+    return apiFetch("/api/student/self-study/reading/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
   global.EAP_SELF_STUDY_SERVER = {
     getStatus,
     getPlacement,
@@ -101,5 +117,8 @@
     getVocabPackUnits,
     getVocabUnit,
     completeVocab,
+    getReadingOverview,
+    getReadingToday,
+    completeReading,
   };
 })();

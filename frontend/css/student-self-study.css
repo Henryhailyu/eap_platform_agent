@@ -1117,6 +1117,58 @@
   color: var(--eap-text-muted, #6e6e73);
 }
 
+.ssc-reading-passage-ref {
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.ssc-reading-passage-ref summary {
+  cursor: pointer;
+  color: var(--eap-teal, #0a7ea4);
+  font-weight: 600;
+}
+
+.ssc-question-type {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-reading-results {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.ssc-reading-result {
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 0.875rem;
+}
+
+.ssc-reading-result--ok {
+  background: rgba(10, 126, 164, 0.06);
+}
+
+.ssc-reading-result--bad {
+  background: rgba(180, 60, 40, 0.06);
+}
+
+.ssc-reading-result__status {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.ssc-reading-result__evidence {
+  margin: 0;
+  color: var(--eap-text-muted, #6e6e73);
+  line-height: 1.45;
+}
+
 @media (max-width: 520px) {
   .ssc-vocab-calendar__day {
     grid-template-columns: 1fr;
