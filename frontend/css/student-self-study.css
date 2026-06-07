@@ -968,6 +968,161 @@
   font-size: 0.9rem;
 }
 
+.ssc-vocab-channel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(10, 126, 164, 0.06);
+  border: 1px solid rgba(10, 126, 164, 0.12);
+  font-size: 0.875rem;
+}
+
+.ssc-vocab-channel__badge {
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(10, 126, 164, 0.14);
+  color: #0a4d68;
+}
+
+.ssc-vocab-channel__entry {
+  font-size: 0.8rem;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-affix-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+}
+
+.ssc-affix-part {
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(0, 113, 227, 0.1);
+  color: var(--eap-blue, #0071e3);
+  font-weight: 600;
+}
+
+.ssc-affix-plus {
+  color: var(--eap-text-muted, #6e6e73);
+  font-size: 0.75rem;
+}
+
+.ssc-word-card__mnemonic,
+.ssc-word-card__example {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--eap-text-muted, #6e6e73);
+  line-height: 1.45;
+}
+
+.ssc-vocab-hint,
+.ssc-vocab-error,
+.ssc-vocab-success {
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.ssc-vocab-error {
+  color: #b42318;
+}
+
+.ssc-vocab-success {
+  color: #0a7ea4;
+}
+
+.ssc-vocab-pack-list,
+.ssc-vocab-unit-list,
+.ssc-vocab-calendar {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ssc-vocab-pack-btn,
+.ssc-vocab-unit-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.ssc-vocab-pack-btn:hover,
+.ssc-vocab-unit-btn:hover {
+  border-color: rgba(10, 126, 164, 0.35);
+}
+
+.ssc-vocab-unit-btn--done {
+  background: rgba(10, 126, 164, 0.06);
+}
+
+.ssc-vocab-calendar__day {
+  display: grid;
+  grid-template-columns: 7rem 1fr 4rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 0.875rem;
+}
+
+.ssc-flash-header {
+  margin-bottom: 1rem;
+}
+
+.ssc-flash-card {
+  padding: 2rem 1.5rem;
+  border-radius: 14px;
+  border: 1px solid rgba(10, 126, 164, 0.2);
+  background: rgba(10, 126, 164, 0.04);
+  text-align: center;
+  min-height: 8rem;
+}
+
+.ssc-flash-card__term {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+.ssc-flash-card__def {
+  margin: 0;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-flash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.ssc-vocab-web-note {
+  font-size: 0.8rem;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+@media (max-width: 520px) {
+  .ssc-vocab-calendar__day {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ssc-module-card {
     transition: none;

@@ -244,6 +244,52 @@
             <p id="admin-mat-empty" class="admin-empty hidden" data-i18n="admin_mat_empty">No self-study materials yet.</p>
           </section>
 
+          <section class="content-section admin-panel" id="admin-vocab-section" aria-labelledby="admin-vocab-heading">
+            <h2 id="admin-vocab-heading" class="section-heading" data-i18n="admin_vocab_heading">Vocabulary course &amp; packs</h2>
+            <p class="admin-panel__hint" data-i18n="admin_vocab_hint">
+              Channel A: push school materials. Channel B: AI course export for manager review.
+            </p>
+            <p id="admin-vocab-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            <form id="admin-vocab-pack-form" class="admin-inline-form" novalidate>
+              <div class="field">
+                <label for="admin-vocab-pack-name" data-i18n="admin_vocab_pack_name">Pack display name</label>
+                <input id="admin-vocab-pack-name" type="text" required maxlength="200" />
+              </div>
+              <div class="field">
+                <label for="admin-vocab-pack-class" data-i18n="admin_vocab_pack_class">Class (optional)</label>
+                <input id="admin-vocab-pack-class" type="text" maxlength="40" placeholder="EAP047" />
+              </div>
+              <button type="submit" class="btn-primary" data-i18n="admin_vocab_add_pack">Add pack</button>
+            </form>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="admin_vocab_col_name">Pack name</th>
+                    <th scope="col" data-i18n="admin_vocab_col_class">Class</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-vocab-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-vocab-empty" class="admin-empty hidden" data-i18n="admin_vocab_no_packs">No packs yet.</p>
+            <div class="admin-inline-form admin-mat-form__row" style="margin-top: 1rem">
+              <div class="field">
+                <label for="admin-vocab-push-class" data-i18n="admin_vocab_push_class">Class for Channel A push</label>
+                <input id="admin-vocab-push-class" type="text" value="EAP047" maxlength="40" />
+              </div>
+              <div class="field">
+                <label for="admin-vocab-course-id" data-i18n="admin_vocab_export">Course ID for CSV</label>
+                <input id="admin-vocab-course-id" type="number" value="1" min="1" />
+              </div>
+            </div>
+            <div class="admin-mat-form__actions">
+              <button type="button" class="btn-primary" id="admin-vocab-push-on" data-i18n="admin_vocab_push_on">Enable vocabulary Channel A</button>
+              <button type="button" class="btn-secondary" id="admin-vocab-push-off" data-i18n="admin_vocab_push_off">Disable vocabulary Channel A</button>
+              <button type="button" class="btn-secondary" id="admin-vocab-export" data-i18n="admin_vocab_export">Export course CSV</button>
+            </div>
+          </section>
+
           <section class="content-section admin-panel" aria-labelledby="admin-ai-heading">
             <h2 id="admin-ai-heading" class="section-heading" data-i18n="admin_ai_heading">AI study coach instructions</h2>
             <p class="admin-panel__hint" data-i18n="admin_ai_hint">
@@ -459,6 +505,7 @@
     <script src="js/self-study-materials-api.js"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-materials.js"></script>
+    <script src="js/admin-self-study-vocabulary.js"></script>
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>

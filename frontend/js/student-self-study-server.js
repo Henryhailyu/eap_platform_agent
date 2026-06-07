@@ -56,11 +56,50 @@
     return apiFetch("/api/student/self-study/daily-overview");
   }
 
+  async function getVocabOverview() {
+    return apiFetch("/api/student/self-study/vocabulary/overview");
+  }
+
+  async function getVocabToday() {
+    return apiFetch("/api/student/self-study/vocabulary/today");
+  }
+
+  async function getVocabReviewYesterday() {
+    return apiFetch("/api/student/self-study/vocabulary/review-yesterday");
+  }
+
+  async function getVocabCalendar() {
+    return apiFetch("/api/student/self-study/vocabulary/calendar");
+  }
+
+  async function getVocabPackUnits(packId) {
+    return apiFetch(`/api/student/self-study/vocabulary/packs/${packId}/units`);
+  }
+
+  async function getVocabUnit(unitId) {
+    return apiFetch(`/api/student/self-study/vocabulary/units/${unitId}`);
+  }
+
+  async function completeVocab(body) {
+    return apiFetch("/api/student/self-study/vocabulary/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
   global.EAP_SELF_STUDY_SERVER = {
     getStatus,
     getPlacement,
     savePlacement,
     patchSettings,
     getDailyOverview,
+    getVocabOverview,
+    getVocabToday,
+    getVocabReviewYesterday,
+    getVocabCalendar,
+    getVocabPackUnits,
+    getVocabUnit,
+    completeVocab,
   };
 })();

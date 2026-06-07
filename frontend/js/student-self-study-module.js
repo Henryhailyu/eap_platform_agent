@@ -446,6 +446,19 @@
     renderGame(document.getElementById("ssc-panel-game"), pack, progress);
   }
 
+  async function resolvePlacement() {
+    const SERVER = window.EAP_SELF_STUDY_SERVER;
+    if (SERVER) {
+      try {
+        const data = await SERVER.getStatus();
+        if (data.placement) return data.placement;
+      } catch (_) {
+        /* fallback */
+      }
+    }
+    return MOCK ? MOCK.getPlacement() : null;
+  }
+
   async function boot() {
     if (document.body.getAttribute("data-page") !== PAGE) return;
     if (redirectIfDisabled()) return;
@@ -457,7 +470,7 @@
     const skill = getSkill();
     if (!MOCK) return;
 
-    const placement = MOCK.getPlacement();
+    const placement = await resolvePlacement();
     if (!placement) {
       window.location.replace("student-self-study-placement.html");
       return;
@@ -477,6 +490,17 @@
     }
 
     if (skill === "vocabulary") {
+      const vocabUi = window.EAP_VOCAB_UI;
+      if (vocabUi && typeof vocabUi.init === "function") {
+        const ok = await vocabUi.init();
+        if (ok) {
+          window.addEventListener("eap:langchange", () => {
+            void vocabUi.init();
+            if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+          });
+          return;
+        }
+      }
       if (!VOCAB) return;
       initVocabulary(levelId);
     } else if (skill === "reading") {
