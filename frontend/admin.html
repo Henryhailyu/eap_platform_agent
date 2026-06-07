@@ -323,6 +323,30 @@
             </div>
           </section>
 
+          <section class="content-section admin-panel" id="admin-listening-section" aria-labelledby="admin-listening-heading">
+            <h2 id="admin-listening-heading" class="section-heading" data-i18n="admin_listening_heading">Listening items (AI / Channel B)</h2>
+            <p class="admin-panel__hint" data-i18n="admin_listening_hint">
+              Part 3 and Part 4 alternate daily. Web uses text scripts; Tencent TTS audio comes in a later phase.
+            </p>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="admin_reading_col_title">Title</th>
+                    <th scope="col" data-i18n="admin_listening_col_part">Part</th>
+                    <th scope="col" data-i18n="admin_reading_col_class">Class</th>
+                    <th scope="col" data-i18n="admin_reading_col_order">Order</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-listening-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-listening-empty" class="admin-empty hidden" data-i18n="admin_listening_empty">No listening items yet.</p>
+            <div class="admin-mat-form__actions" style="margin-top: 1rem">
+              <button type="button" class="btn-secondary" id="admin-listening-export" data-i18n="admin_listening_export">Export items CSV</button>
+            </div>
+          </section>
+
           <section class="content-section admin-panel" aria-labelledby="admin-ai-heading">
             <h2 id="admin-ai-heading" class="section-heading" data-i18n="admin_ai_heading">AI study coach instructions</h2>
             <p class="admin-panel__hint" data-i18n="admin_ai_hint">
@@ -540,6 +564,7 @@
     <script src="js/admin-self-study-materials.js"></script>
     <script src="js/admin-self-study-vocabulary.js"></script>
     <script src="js/admin-self-study-reading.js"></script>
+    <script src="js/admin-self-study-listening.js"></script>
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>

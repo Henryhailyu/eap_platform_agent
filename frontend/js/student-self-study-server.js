@@ -104,6 +104,26 @@
     });
   }
 
+  async function getListeningOverview() {
+    return apiFetch("/api/student/self-study/listening/overview");
+  }
+
+  async function getListeningToday() {
+    return apiFetch("/api/student/self-study/listening/today");
+  }
+
+  async function getListeningCoach(itemId) {
+    return apiFetch(`/api/student/self-study/listening/coach?itemId=${encodeURIComponent(itemId)}`);
+  }
+
+  async function completeListening(body) {
+    return apiFetch("/api/student/self-study/listening/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
   global.EAP_SELF_STUDY_SERVER = {
     getStatus,
     getPlacement,
@@ -120,5 +140,9 @@
     getReadingOverview,
     getReadingToday,
     completeReading,
+    getListeningOverview,
+    getListeningToday,
+    getListeningCoach,
+    completeListening,
   };
 })();

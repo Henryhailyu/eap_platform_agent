@@ -1169,6 +1169,66 @@
   line-height: 1.45;
 }
 
+.ssc-listening-notes {
+  margin: 1rem 0;
+}
+
+.ssc-listening-notes__label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.ssc-listening-notes__input {
+  width: 100%;
+  min-height: 7rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.ssc-script-block--compact {
+  font-size: 0.8125rem;
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.ssc-listening-coach-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ssc-listening-coach-col h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.ssc-listening-tips-heading {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.ssc-listening-tips {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+@media (max-width: 640px) {
+  .ssc-listening-coach-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 520px) {
   .ssc-vocab-calendar__day {
     grid-template-columns: 1fr;
