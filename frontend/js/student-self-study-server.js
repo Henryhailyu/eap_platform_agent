@@ -156,6 +156,10 @@
     });
   }
 
+  async function getSpeakingHistory() {
+    return apiFetch("/api/student/self-study/speaking/history");
+  }
+
   global.EAP_SELF_STUDY_SERVER = {
     getStatus,
     getPlacement,
@@ -182,5 +186,6 @@
     getSpeakingOverview,
     getSpeakingSession,
     submitSpeakingResponse,
+    getSpeakingHistory,
   };
 })();

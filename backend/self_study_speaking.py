@@ -1,5 +1,5 @@
 """
-SS-Sp1 — Self-study speaking (Part 1 simulator; Web text + timer; TTS/STT/SOE deferred).
+SS-Sp1–Sp3 — Self-study speaking (P1/P2/P3 + full mock; Web text + timer; TTS/STT/SOE deferred).
 """
 from __future__ import annotations
 
@@ -15,6 +15,11 @@ from flask import Response, jsonify, request
 SPEAKING_SKILL = "speaking"
 PART1_TIME_LIMIT = 60
 PART1_MIN_WORDS = 30
+PART2_PREP_SEC = 60
+PART2_TIME_LIMIT = 120
+PART2_MIN_WORDS = 80
+PART3_TIME_LIMIT = 90
+PART3_MIN_WORDS = 40
 
 SEED_SESSION_A: dict[str, Any] = {
     "title": "Part 1 — Study and daily life",
@@ -90,6 +95,132 @@ SEED_SESSION_B: dict[str, Any] = {
     ],
 }
 
+SEED_SESSION_P2: dict[str, Any] = {
+    "title": "Part 2 — A place where you study",
+    "partType": "P2",
+    "lessonEn": "Use the 60s prep to plan each bullet. Speak for the full 2 minutes — intro, each bullet, brief conclusion.",
+    "lessonZh": "用 60 秒准备规划各要点。尽量说满 2 分钟 — 开场、各要点、简短收尾。",
+    "cueCard": {
+        "id": "p2-study-place",
+        "topicEn": "Describe a place where you like to study",
+        "topicZh": "描述一个你喜欢学习的地方",
+        "bulletsEn": [
+            "where it is",
+            "how often you go there",
+            "what you do there",
+            "and explain why you like studying there",
+        ],
+        "bulletsZh": [
+            "它在哪里",
+            "你多久去一次",
+            "你在那里做什么",
+            "并解释你为什么喜欢在那里学习",
+        ],
+        "prepTimeSec": PART2_PREP_SEC,
+        "timeLimitSec": PART2_TIME_LIMIT,
+        "minWords": PART2_MIN_WORDS,
+    },
+}
+
+SEED_SESSION_P3: dict[str, Any] = {
+    "title": "Part 3 — Studying and learning environments",
+    "partType": "P3",
+    "lessonEn": "Give developed answers with reasons and examples. Part 3 questions are more abstract than Part 1.",
+    "lessonZh": "用理由与例子充分展开。Part 3 问题比 Part 1 更抽象。",
+    "questions": [
+        {
+            "id": "p3q1",
+            "promptEn": "Why do some students prefer studying at home rather than at university?",
+            "promptZh": "为什么有些学生更喜欢在家而不是在大学学习？",
+            "timeLimitSec": PART3_TIME_LIMIT,
+            "minWords": PART3_MIN_WORDS,
+        },
+        {
+            "id": "p3q2",
+            "promptEn": "How has technology changed the way students prepare for exams?",
+            "promptZh": "科技如何改变了学生备考的方式？",
+            "timeLimitSec": PART3_TIME_LIMIT,
+            "minWords": PART3_MIN_WORDS,
+        },
+        {
+            "id": "p3q3",
+            "promptEn": "Do you think universities should provide more quiet study spaces? Why or why not?",
+            "promptZh": "你认为大学是否应该提供更多安静学习空间？为什么？",
+            "timeLimitSec": PART3_TIME_LIMIT,
+            "minWords": PART3_MIN_WORDS,
+        },
+        {
+            "id": "p3q4",
+            "promptEn": "In the future, will online learning replace traditional classrooms?",
+            "promptZh": "未来在线学习会取代传统课堂吗？",
+            "timeLimitSec": PART3_TIME_LIMIT,
+            "minWords": PART3_MIN_WORDS,
+        },
+    ],
+}
+
+SEED_SESSION_MOCK: dict[str, Any] = {
+    "title": "Full speaking mock — Study & technology",
+    "partType": "MOCK",
+    "lessonEn": "Complete Part 1 → Part 2 → Part 3 in one sitting (~11–14 min flow, shortened for Web MVP).",
+    "lessonZh": "连续完成 Part 1 → Part 2 → Part 3（完整模考流程，网页版为精简版）。",
+    "steps": [
+        {
+            "id": "mock-p1-1",
+            "partType": "P1",
+            "promptEn": "Do you enjoy studying?",
+            "promptZh": "你喜欢学习吗？",
+            "timeLimitSec": PART1_TIME_LIMIT,
+            "minWords": PART1_MIN_WORDS,
+        },
+        {
+            "id": "mock-p1-2",
+            "partType": "P1",
+            "promptEn": "What subject do you find most challenging?",
+            "promptZh": "你觉得哪门学科最有挑战性？",
+            "timeLimitSec": PART1_TIME_LIMIT,
+            "minWords": PART1_MIN_WORDS,
+        },
+        {
+            "id": "mock-p2",
+            "partType": "P2",
+            "topicEn": "Describe a piece of technology you use for studying",
+            "topicZh": "描述一件你用于学习的科技产品",
+            "bulletsEn": [
+                "what it is",
+                "how you use it",
+                "how long you have used it",
+                "and explain why it is useful for your studies",
+            ],
+            "bulletsZh": [
+                "它是什么",
+                "你如何使用它",
+                "你用了多久",
+                "并解释它为何对你的学习有用",
+            ],
+            "prepTimeSec": PART2_PREP_SEC,
+            "timeLimitSec": PART2_TIME_LIMIT,
+            "minWords": PART2_MIN_WORDS,
+        },
+        {
+            "id": "mock-p3-1",
+            "partType": "P3",
+            "promptEn": "How important is technology in modern education?",
+            "promptZh": "科技在现代教育中有多重要？",
+            "timeLimitSec": PART3_TIME_LIMIT,
+            "minWords": PART3_MIN_WORDS,
+        },
+        {
+            "id": "mock-p3-2",
+            "partType": "P3",
+            "promptEn": "Should schools limit students' screen time? Why?",
+            "promptZh": "学校是否应该限制学生的屏幕时间？为什么？",
+            "timeLimitSec": PART3_TIME_LIMIT,
+            "minWords": PART3_MIN_WORDS,
+        },
+    ],
+}
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -129,16 +260,46 @@ def migrate_self_study_speaking_tables(conn) -> None:
         """
     )
     seed_default_speaking_sessions(conn)
+    seed_extended_speaking_sessions(conn)
 
 
 def _session_payload(raw: dict[str, Any]) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "partType": raw.get("partType") or "P1",
         "title": raw.get("title") or "",
         "lessonEn": raw.get("lessonEn") or "",
         "lessonZh": raw.get("lessonZh") or "",
         "questions": raw.get("questions") or [],
     }
+    if raw.get("cueCard"):
+        payload["cueCard"] = raw["cueCard"]
+    if raw.get("steps"):
+        payload["steps"] = raw["steps"]
+    return payload
+
+
+def _session_items(content: dict[str, Any], part_type: str) -> list[dict[str, Any]]:
+    if part_type == "MOCK":
+        return list(content.get("steps") or [])
+    if part_type == "P2" and content.get("cueCard"):
+        card = dict(content["cueCard"])
+        card.setdefault("partType", "P2")
+        return [card]
+    items = list(content.get("questions") or [])
+    for item in items:
+        item.setdefault("partType", part_type)
+    return items
+
+
+def _item_count(content: dict[str, Any], part_type: str) -> int:
+    return len(_session_items(content, part_type))
+
+
+def _find_item(content: dict[str, Any], part_type: str, question_id: str) -> dict[str, Any] | None:
+    for item in _session_items(content, part_type):
+        if str(item.get("id") or "") == question_id:
+            return item
+    return None
 
 
 def seed_default_speaking_sessions(conn) -> None:
@@ -160,6 +321,38 @@ def seed_default_speaking_sessions(conn) -> None:
                 sess["partType"],
                 sess["title"],
                 i,
+                json.dumps(_session_payload(sess), ensure_ascii=False),
+                now,
+                now,
+            ),
+        )
+    conn.commit()
+
+
+def seed_extended_speaking_sessions(conn) -> None:
+    """Add P2, P3, and full mock seeds when missing (existing deployments)."""
+    now = _now_iso()
+    seeds = [SEED_SESSION_P2, SEED_SESSION_P3, SEED_SESSION_MOCK]
+    max_order = conn.execute("SELECT COALESCE(MAX(sort_order), 0) AS m FROM speaking_sessions").fetchone()
+    order = int(max_order["m"] if max_order else 0)
+    for sess in seeds:
+        exists = conn.execute(
+            "SELECT id FROM speaking_sessions WHERE class_name = ? AND title = ? LIMIT 1",
+            ("EAP047", sess["title"]),
+        ).fetchone()
+        if exists:
+            continue
+        order += 1
+        conn.execute(
+            """
+            INSERT INTO speaking_sessions (class_name, part_type, title, sort_order, content_json, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+            """,
+            (
+                "EAP047",
+                sess["partType"],
+                sess["title"],
+                order,
                 json.dumps(_session_payload(sess), ensure_ascii=False),
                 now,
                 now,
@@ -201,6 +394,7 @@ def _build_feedback(
     min_words: int,
     timed_out: bool,
     elapsed_sec: int | None,
+    part_type: str = "P1",
 ) -> dict[str, Any]:
     wc = _word_count(response)
     connectors = _has_connectors(response)
@@ -233,10 +427,22 @@ def _build_feedback(
     else:
         fc_improve.append("Add connectors: because, however, for example.")
 
+    time_hint = { "P1": "60 seconds", "P2": "2 minutes", "P3": "90 seconds", "MOCK": "the time limit" }.get(part_type, "the time limit")
+    full_window = { "P1": 45, "P2": 90, "P3": 60, "MOCK": 45 }.get(part_type, 45)
+
     if timed_out:
-        fc_improve.append("Timer ended — practise finishing within 60 seconds without rushing.")
-    elif elapsed_sec and elapsed_sec >= 45:
+        fc_improve.append(f"Timer ended — practise finishing within {time_hint} without rushing.")
+    elif elapsed_sec and elapsed_sec >= full_window:
         fc_strengths.append("Good use of the full response window.")
+
+    if part_type == "P2" and wc >= min_words:
+        fc_delta += 0.3
+        fc_strengths.append("Long-turn structure — you covered the cue card at length.")
+    if part_type == "P3":
+        abstract = sum(1 for t in ("because", "however", "society", "education", "important", "future", "should") if t in response.lower())
+        if abstract >= 2:
+            lr_delta += 0.3
+            lr_strengths.append("Abstract discussion vocabulary is developing.")
 
     if len(sentences) >= 3:
         gra_delta += 0.4
@@ -364,7 +570,7 @@ def register_self_study_speaking_routes(
                     "id": r["id"],
                     "title": r["title"],
                     "partType": r["part_type"],
-                    "questionCount": len(content.get("questions") or []),
+                    "questionCount": _item_count(content, r["part_type"]),
                 }
             )
 
@@ -375,6 +581,59 @@ def register_self_study_speaking_routes(
                 "noDailyPush": True,
                 "sessions": sessions_out,
                 "responsesCount": int(answered["n"] if answered else 0),
+            }
+        )
+
+    @app.route("/api/student/self-study/speaking/history", methods=["GET"])
+    def student_speaking_history():
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "student")
+        if err:
+            conn.close()
+            return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
+
+        rows = conn.execute(
+            """
+            SELECT r.question_id, r.word_count, r.timed_out, r.submitted_at,
+                   json_extract(r.feedback_json, '$.overallBandEstimate') AS band,
+                   s.title AS session_title, s.part_type
+            FROM student_speaking_responses r
+            JOIN speaking_sessions s ON s.id = r.session_id
+            WHERE r.student_username = ?
+            ORDER BY r.submitted_at DESC
+            LIMIT 50
+            """,
+            (username,),
+        ).fetchall()
+        conn.close()
+
+        entries = [
+            {
+                "questionId": r["question_id"],
+                "sessionTitle": r["session_title"],
+                "partType": r["part_type"],
+                "wordCount": r["word_count"],
+                "timedOut": bool(r["timed_out"]),
+                "submittedAt": r["submitted_at"],
+                "overallBandEstimate": r["band"],
+            }
+            for r in rows
+        ]
+        bands = [float(e["overallBandEstimate"]) for e in entries if e.get("overallBandEstimate") is not None]
+        recent = bands[:10]
+        trend_avg = _round_band_half(sum(recent) / len(recent)) if recent else None
+
+        return jsonify(
+            {
+                "entries": entries,
+                "bandTrend": {
+                    "recentAverage": trend_avg,
+                    "sampleSize": len(recent),
+                },
             }
         )
 
@@ -423,13 +682,16 @@ def register_self_study_speaking_routes(
                     "overallBandEstimate": r["band"],
                 }
 
+        part_type = row["part_type"]
         return jsonify(
             {
                 "session": {
                     "id": row["id"],
                     "title": row["title"],
-                    "partType": row["part_type"],
+                    "partType": part_type,
                     "content": content,
+                    "items": _session_items(content, part_type),
+                    "itemCount": _item_count(content, part_type),
                 },
                 "responses": list(latest_by_q.values()),
             }
@@ -463,7 +725,7 @@ def register_self_study_speaking_routes(
             return jsonify({"error": "Response too short"}), 400
 
         row = conn.execute(
-            "SELECT content_json FROM speaking_sessions WHERE id = ? AND is_active = 1",
+            "SELECT content_json, part_type FROM speaking_sessions WHERE id = ? AND is_active = 1",
             (session_id,),
         ).fetchone()
         if not row:
@@ -471,17 +733,26 @@ def register_self_study_speaking_routes(
             return jsonify({"error": "Session not found"}), 404
 
         content = json.loads(row["content_json"])
-        q_meta = next((q for q in content.get("questions") or [] if q.get("id") == question_id), None)
+        pt = str(row["part_type"] or "P1")
+        q_meta = _find_item(content, pt, question_id)
         if not q_meta:
             conn.close()
             return jsonify({"error": "Question not found"}), 404
 
-        min_words = int(q_meta.get("minWords") or PART1_MIN_WORDS)
+        item_part = str(q_meta.get("partType") or pt)
+        default_min = {
+            "P1": PART1_MIN_WORDS,
+            "P2": PART2_MIN_WORDS,
+            "P3": PART3_MIN_WORDS,
+            "MOCK": PART1_MIN_WORDS,
+        }.get(item_part, PART1_MIN_WORDS)
+        min_words = int(q_meta.get("minWords") or default_min)
         feedback = _build_feedback(
             response_text,
             min_words=min_words,
             timed_out=bool(timed_out),
             elapsed_sec=elapsed_sec,
+            part_type=item_part,
         )
         now = _now_iso()
         wc = _word_count(response_text)
@@ -552,15 +823,17 @@ def register_self_study_speaking_routes(
         writer.writerow(["session_id", "title", "part_type", "question_id", "prompt_en", "time_limit_sec"])
         for row in rows:
             content = json.loads(row["content_json"])
-            for q in content.get("questions") or []:
+            for item in _session_items(content, row["part_type"]):
+                prompt = item.get("promptEn") or item.get("topicEn") or ""
+                limit = item.get("timeLimitSec") or item.get("prepTimeSec")
                 writer.writerow(
                     [
                         row["id"],
                         row["title"],
-                        row["part_type"],
-                        q.get("id"),
-                        q.get("promptEn"),
-                        q.get("timeLimitSec"),
+                        item.get("partType") or row["part_type"],
+                        item.get("id"),
+                        prompt,
+                        limit,
                     ]
                 )
         return Response(

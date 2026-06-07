@@ -63,4 +63,4 @@ Rule-based practice bands for **FC / LR / GRA / PR** using word count, sentence 
 
 ## Next
 
-**SS-Sp2** Part 2 cue card · **SS-Sp3** Part 3 · **SS-Sp4** full mock · Tencent TTS/STT/SOE when keys available
+**SS-Sp2–Sp3** delivered — see [`SS-Sp2-Sp3_SELF_STUDY_SPEAKING.md`](SS-Sp2-Sp3_SELF_STUDY_SPEAKING.md). **SS-Sp4** SOE + TTS/STT when keys available.

@@ -1356,6 +1356,93 @@
   color: rgba(0, 0, 0, 0.55);
 }
 
+.ssc-speaking-pack-badge {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  background: rgba(10, 126, 164, 0.12);
+  color: rgba(10, 126, 164, 0.9);
+}
+
+.ssc-speaking-cue-card {
+  margin: 1rem 0;
+  padding: 1.1rem 1.2rem;
+  border-radius: 12px;
+  border: 2px solid rgba(10, 126, 164, 0.25);
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(10, 126, 164, 0.08);
+}
+
+.ssc-speaking-cue-card__label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(10, 126, 164, 0.8);
+}
+
+.ssc-speaking-cue-card h3 {
+  margin: 0.4rem 0 0.5rem;
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
+.ssc-speaking-cue-card__hint {
+  margin: 0 0 0.35rem;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.ssc-speaking-cue-card__bullets {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.ssc-speaking-timer--prep {
+  background: rgba(10, 126, 164, 0.08);
+  border-color: rgba(10, 126, 164, 0.2);
+}
+
+.ssc-speaking-timer--prep .ssc-speaking-timer__value {
+  color: #0a7ea4;
+}
+
+.ssc-speaking-prep-recap {
+  margin: 0.75rem 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 0.875rem;
+}
+
+.ssc-speaking-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ssc-speaking-history__item {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 520px) {
+  .ssc-speaking-history__item {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .ssc-tabs--inner {
   margin-top: 1.25rem;
 }

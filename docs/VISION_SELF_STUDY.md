@@ -173,3 +173,4 @@ Students without placement → reminder only until test complete
 | 2026-06-01 | **SS-L1** — listening server + Web UI ([`SS-L1_SELF_STUDY_LISTENING.md`](SS-L1_SELF_STUDY_LISTENING.md)); TTS deferred |
 | 2026-06-01 | **SS-W1** — writing server + Web UI ([`SS-W1_SELF_STUDY_WRITING.md`](SS-W1_SELF_STUDY_WRITING.md)) |
 | 2026-06-01 | **SS-Sp1** — speaking Part 1 simulator + Web UI ([`SS-Sp1_SELF_STUDY_SPEAKING.md`](SS-Sp1_SELF_STUDY_SPEAKING.md)); TTS/STT/SOE deferred |
+| 2026-06-01 | **SS-Sp2–Sp3** — P2 cue card, P3, full mock, history ([`SS-Sp2-Sp3_SELF_STUDY_SPEAKING.md`](SS-Sp2-Sp3_SELF_STUDY_SPEAKING.md)) |
