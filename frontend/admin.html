@@ -347,6 +347,30 @@
             </div>
           </section>
 
+          <section class="content-section admin-panel" id="admin-writing-section" aria-labelledby="admin-writing-heading">
+            <h2 id="admin-writing-heading" class="section-heading" data-i18n="admin_writing_heading">Writing tasks (AI / Channel B)</h2>
+            <p class="admin-panel__hint" data-i18n="admin_writing_hint">
+              Genre rotation Mon/Wed/Fri — no daily push. Students choose tasks autonomously on other days.
+            </p>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="admin_reading_col_title">Title</th>
+                    <th scope="col" data-i18n="admin_writing_col_genre">Genre</th>
+                    <th scope="col" data-i18n="admin_reading_col_class">Class</th>
+                    <th scope="col" data-i18n="admin_reading_col_order">Order</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-writing-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-writing-empty" class="admin-empty hidden" data-i18n="admin_writing_empty">No writing tasks yet.</p>
+            <div class="admin-mat-form__actions" style="margin-top: 1rem">
+              <button type="button" class="btn-secondary" id="admin-writing-export" data-i18n="admin_writing_export">Export tasks CSV</button>
+            </div>
+          </section>
+
           <section class="content-section admin-panel" aria-labelledby="admin-ai-heading">
             <h2 id="admin-ai-heading" class="section-heading" data-i18n="admin_ai_heading">AI study coach instructions</h2>
             <p class="admin-panel__hint" data-i18n="admin_ai_hint">
@@ -565,6 +589,7 @@
     <script src="js/admin-self-study-vocabulary.js"></script>
     <script src="js/admin-self-study-reading.js"></script>
     <script src="js/admin-self-study-listening.js"></script>
+    <script src="js/admin-self-study-writing.js"></script>
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>

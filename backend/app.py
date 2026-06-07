@@ -814,6 +814,7 @@ def init_database():
     from self_study_vocabulary import migrate_self_study_vocabulary_tables
     from self_study_reading import migrate_self_study_reading_tables
     from self_study_listening import migrate_self_study_listening_tables
+    from self_study_writing import migrate_self_study_writing_tables
 
     migrate_lesson_prep_tables(conn)
     migrate_homework_marking_tables(conn)
@@ -821,6 +822,7 @@ def init_database():
     migrate_self_study_vocabulary_tables(conn)
     migrate_self_study_reading_tables(conn)
     migrate_self_study_listening_tables(conn)
+    migrate_self_study_writing_tables(conn)
 
     seed_default_users(conn)
     ensure_e1_demo_users(conn)
@@ -8330,6 +8332,17 @@ register_self_study_reading_routes(
 from self_study_listening import register_self_study_listening_routes
 
 register_self_study_listening_routes(
+    app,
+    get_db_connection=get_db_connection,
+    require_session_role_if_enabled=require_session_role_if_enabled,
+    get_current_authenticated_user=get_current_authenticated_user,
+    get_effective_student_username=get_effective_student_username,
+    normalize_class_name=normalize_class_name,
+)
+
+from self_study_writing import register_self_study_writing_routes
+
+register_self_study_writing_routes(
     app,
     get_db_connection=get_db_connection,
     require_session_role_if_enabled=require_session_role_if_enabled,

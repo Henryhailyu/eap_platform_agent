@@ -1229,6 +1229,85 @@
   }
 }
 
+.ssc-writing-genre {
+  font-size: 0.8125rem;
+  color: var(--eap-teal, #0a7ea4);
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.ssc-writing-word-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-writing-coach-block {
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.ssc-writing-coach-block h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.ssc-writing-outline {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ssc-writing-draft {
+  width: 100%;
+  min-height: 14rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.ssc-writing-wordcount {
+  margin: 0.5rem 0 1rem;
+  font-size: 0.875rem;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-writing-criteria {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.ssc-writing-criterion {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 126, 164, 0.15);
+  background: rgba(10, 126, 164, 0.04);
+  font-size: 0.875rem;
+}
+
+.ssc-writing-criterion h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+.ssc-writing-criterion ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.ssc-tabs--inner {
+  margin-top: 1.25rem;
+}
+
 @media (max-width: 520px) {
   .ssc-vocab-calendar__day {
     grid-template-columns: 1fr;

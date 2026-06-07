@@ -518,6 +518,17 @@
       if (!window.EAP_MODULE_RW || !READ) return;
       window.EAP_MODULE_RW.initReading(levelId, renderTabs);
     } else if (skill === "writing") {
+      const writingUi = window.EAP_WRITING_UI;
+      if (writingUi && typeof writingUi.init === "function") {
+        const ok = await writingUi.init();
+        if (ok) {
+          window.addEventListener("eap:langchange", () => {
+            void writingUi.init();
+            if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+          });
+          return;
+        }
+      }
       if (!window.EAP_MODULE_RW || !WRITE) return;
       window.EAP_MODULE_RW.initWriting(levelId, renderTabs);
     } else if (skill === "listening") {

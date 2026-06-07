@@ -124,6 +124,22 @@
     });
   }
 
+  async function getWritingOverview() {
+    return apiFetch("/api/student/self-study/writing/overview");
+  }
+
+  async function getWritingTask(taskId) {
+    return apiFetch(`/api/student/self-study/writing/tasks/${taskId}`);
+  }
+
+  async function submitWriting(body) {
+    return apiFetch("/api/student/self-study/writing/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
   global.EAP_SELF_STUDY_SERVER = {
     getStatus,
     getPlacement,
@@ -144,5 +160,8 @@
     getListeningToday,
     getListeningCoach,
     completeListening,
+    getWritingOverview,
+    getWritingTask,
+    submitWriting,
   };
 })();
