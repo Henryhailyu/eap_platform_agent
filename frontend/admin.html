@@ -371,6 +371,30 @@
             </div>
           </section>
 
+          <section class="content-section admin-panel" id="admin-speaking-section" aria-labelledby="admin-speaking-heading">
+            <h2 id="admin-speaking-heading" class="section-heading" data-i18n="admin_speaking_heading">Speaking sessions (AI / Channel B)</h2>
+            <p class="admin-panel__hint" data-i18n="admin_speaking_hint">
+              Part 1 simulator — no daily push. Web uses text questions; Tencent TTS/STT/SOE in a later phase.
+            </p>
+            <div class="admin-table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th scope="col" data-i18n="admin_reading_col_title">Title</th>
+                    <th scope="col" data-i18n="admin_speaking_col_part">Part</th>
+                    <th scope="col" data-i18n="admin_reading_col_class">Class</th>
+                    <th scope="col" data-i18n="admin_reading_col_order">Order</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-speaking-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-speaking-empty" class="admin-empty hidden" data-i18n="admin_speaking_empty">No speaking sessions yet.</p>
+            <div class="admin-mat-form__actions" style="margin-top: 1rem">
+              <button type="button" class="btn-secondary" id="admin-speaking-export" data-i18n="admin_speaking_export">Export sessions CSV</button>
+            </div>
+          </section>
+
           <section class="content-section admin-panel" aria-labelledby="admin-ai-heading">
             <h2 id="admin-ai-heading" class="section-heading" data-i18n="admin_ai_heading">AI study coach instructions</h2>
             <p class="admin-panel__hint" data-i18n="admin_ai_hint">
@@ -590,6 +614,7 @@
     <script src="js/admin-self-study-reading.js"></script>
     <script src="js/admin-self-study-listening.js"></script>
     <script src="js/admin-self-study-writing.js"></script>
+    <script src="js/admin-self-study-speaking.js"></script>
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>

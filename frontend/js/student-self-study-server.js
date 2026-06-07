@@ -140,6 +140,22 @@
     });
   }
 
+  async function getSpeakingOverview() {
+    return apiFetch("/api/student/self-study/speaking/overview");
+  }
+
+  async function getSpeakingSession(sessionId) {
+    return apiFetch(`/api/student/self-study/speaking/sessions/${sessionId}`);
+  }
+
+  async function submitSpeakingResponse(body) {
+    return apiFetch("/api/student/self-study/speaking/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
   global.EAP_SELF_STUDY_SERVER = {
     getStatus,
     getPlacement,
@@ -163,5 +179,8 @@
     getWritingOverview,
     getWritingTask,
     submitWriting,
+    getSpeakingOverview,
+    getSpeakingSession,
+    submitSpeakingResponse,
   };
 })();

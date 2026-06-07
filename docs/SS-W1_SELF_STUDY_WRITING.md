@@ -65,4 +65,4 @@ Rule-based practice bands for **TR / CC / LR / GRA** using word count, paragraph
 
 ## Next
 
-**SS-Sp1** speaking simulator (Tencent ASR/SOE + TTS when keys available)
+**SS-Sp2–Sp4** Part 2/3 + full mock · Tencent ASR/SOE + TTS when keys available ([`SS-Sp1_SELF_STUDY_SPEAKING.md`](SS-Sp1_SELF_STUDY_SPEAKING.md) delivered)

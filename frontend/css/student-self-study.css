@@ -1304,6 +1304,58 @@
   padding-left: 1.1rem;
 }
 
+.ssc-speaking-question-card {
+  margin: 1rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(10, 126, 164, 0.18);
+  background: rgba(10, 126, 164, 0.04);
+}
+
+.ssc-speaking-question-card h3 {
+  margin: 0.35rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.ssc-speaking-examiner {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(10, 126, 164, 0.75);
+}
+
+.ssc-speaking-timer {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  background: rgba(180, 60, 40, 0.08);
+  border: 1px solid rgba(180, 60, 40, 0.2);
+}
+
+.ssc-speaking-timer__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ssc-speaking-timer__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #b43c28;
+}
+
+.ssc-speaking-progress {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+
 .ssc-tabs--inner {
   margin-top: 1.25rem;
 }
