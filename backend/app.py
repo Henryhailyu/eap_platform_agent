@@ -810,9 +810,11 @@ def init_database():
 
     from lesson_prep import migrate_lesson_prep_tables
     from homework_marking import migrate_homework_marking_tables
+    from self_study import migrate_self_study_tables
 
     migrate_lesson_prep_tables(conn)
     migrate_homework_marking_tables(conn)
+    migrate_self_study_tables(conn)
 
     seed_default_users(conn)
     ensure_e1_demo_users(conn)
@@ -8284,6 +8286,17 @@ register_homework_marking_routes(
     submissions_dir=SUBMISSIONS_DIR,
     ai_is_configured=ai_is_configured,
     format_ai_error=format_ai_error,
+)
+
+from self_study import register_self_study_routes
+
+register_self_study_routes(
+    app,
+    get_db_connection=get_db_connection,
+    require_session_role_if_enabled=require_session_role_if_enabled,
+    get_current_authenticated_user=get_current_authenticated_user,
+    get_effective_student_username=get_effective_student_username,
+    normalize_class_name=normalize_class_name,
 )
 
 # Start the Flask server

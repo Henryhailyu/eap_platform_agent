@@ -892,6 +892,82 @@
   word-break: break-word;
 }
 
+.ssc-channels {
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(10, 126, 164, 0.15);
+  background: rgba(10, 126, 164, 0.04);
+}
+
+.ssc-channels.hidden {
+  display: none;
+}
+
+.ssc-channels__heading {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ssc-channels__list {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ssc-channels__list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 0.9rem;
+}
+
+.ssc-channels__list li:last-child {
+  border-bottom: none;
+}
+
+.ssc-channels__skill {
+  font-weight: 600;
+  min-width: 5.5rem;
+}
+
+.ssc-channels__badge {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(10, 126, 164, 0.12);
+  color: #0a4d68;
+}
+
+.ssc-subscribe {
+  margin: 0 0 1.25rem;
+  font-size: 0.88rem;
+}
+
+.ssc-subscribe.hidden {
+  display: none;
+}
+
+.ssc-subscribe__label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.ssc-paused-banner {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: rgba(180, 120, 0, 0.08);
+  border: 1px solid rgba(180, 120, 0, 0.2);
+  font-size: 0.9rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ssc-module-card {
     transition: none;

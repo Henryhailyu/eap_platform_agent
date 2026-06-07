@@ -252,6 +252,92 @@
     });
   }
 
+  const SKILL_TITLE_KEYS = {
+    vocabulary: "self_study_mod_vocab",
+    reading: "self_study_mod_reading",
+    listening: "self_study_mod_listening",
+    writing: "self_study_mod_writing",
+    speaking: "self_study_mod_speaking",
+  };
+
+  async function resolvePlacement() {
+    const SERVER = window.EAP_SELF_STUDY_SERVER;
+    if (SERVER) {
+      try {
+        const data = await SERVER.getStatus();
+        if (data.placement) return data.placement;
+      } catch (_) {
+        /* fallback */
+      }
+    }
+    return MOCK ? MOCK.getPlacement() : null;
+  }
+
+  function renderChannels(overview) {
+    const section = document.getElementById("ssc-channels-section");
+    const list = document.getElementById("ssc-channels-list");
+    if (!section || !list || !overview || !overview.skills) {
+      if (section) section.classList.add("hidden");
+      return;
+    }
+    section.classList.remove("hidden");
+    const items = Object.keys(overview.skills)
+      .map((key) => {
+        const s = overview.skills[key];
+        const title = t(SKILL_TITLE_KEYS[key] || key);
+        const ch =
+          s.channel === "A" ? t("self_study_channel_a") : t("self_study_channel_b");
+        const hint = s.webReview ? t(s.webReview.labelKey) : "";
+        return `<li>
+          <span class="ssc-channels__skill">${title}</span>
+          <span class="ssc-channels__badge">${ch}</span>
+          ${hint ? `<span class="ssc-channels__hint">${hint}</span>` : ""}
+        </li>`;
+      })
+      .join("");
+    list.innerHTML = items;
+    if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+  }
+
+  function bindSubscribe(settings, placement) {
+    const wrap = document.getElementById("ssc-subscribe-wrap");
+    const box = document.getElementById("ssc-subscribe-checkbox");
+    const SERVER = window.EAP_SELF_STUDY_SERVER;
+    if (!wrap || !box || !placement) {
+      if (wrap) wrap.classList.add("hidden");
+      return;
+    }
+    wrap.classList.remove("hidden");
+    box.checked = settings ? settings.subscribed !== false : true;
+    box.onchange = () => {
+      if (!SERVER) return;
+      void SERVER.patchSettings({ subscribed: box.checked })
+        .then(() => window.location.reload())
+        .catch(() => {
+          box.checked = !box.checked;
+        });
+    };
+  }
+
+  function renderPausedBanner(settings, placement) {
+    const main = document.querySelector(".ssc-main");
+    if (!main || !placement || !settings || settings.subscribed !== false) return;
+    let el = document.getElementById("ssc-paused-banner");
+    if (!el) {
+      el = document.createElement("p");
+      el.id = "ssc-paused-banner";
+      el.className = "ssc-paused-banner";
+      el.setAttribute("role", "status");
+      const anchor = document.getElementById("ssc-placement-banner");
+      if (anchor && anchor.parentNode) {
+        anchor.parentNode.insertBefore(el, anchor.nextSibling);
+      } else {
+        main.insertBefore(el, main.firstChild);
+      }
+    }
+    el.textContent = t("self_study_subscribe_off_hint");
+  }
+
   async function boot() {
     if (document.body.getAttribute("data-page") !== PAGE) return;
     if (redirectIfDisabled()) return;
@@ -260,17 +346,42 @@
     const ready = await bootStudentSatellitePage(PAGE, () => {});
     if (!ready) return;
 
-    const placement = MOCK ? MOCK.getPlacement() : null;
+    const placement = await resolvePlacement();
+    let settings = { subscribed: true };
+    const SERVER = window.EAP_SELF_STUDY_SERVER;
+    if (SERVER) {
+      try {
+        const st = await SERVER.getStatus();
+        if (st.settings) settings = st.settings;
+        if (st.placement) {
+          /* use server placement */
+        }
+      } catch (_) {
+        /* offline */
+      }
+      if (placement) {
+        try {
+          const overview = await SERVER.getDailyOverview();
+          renderChannels(overview);
+        } catch (_) {
+          renderChannels(null);
+        }
+      }
+    }
+
     const bannerEl = document.getElementById("ssc-placement-banner");
     const levelEl = document.getElementById("ssc-level-badge");
     const modulesEl = document.getElementById("ssc-modules-grid");
     const retakeWrap = document.getElementById("ssc-retake-wrap");
+    const unlocked = placement && settings.subscribed !== false;
 
     if (bannerEl) renderPlacementBanner(bannerEl, placement);
+    renderPausedBanner(settings, placement);
     renderLevelBadge(levelEl, placement);
-    renderDailyPlan(placement);
-    renderModules(modulesEl, placement);
-    bindDailyRegenerate(placement);
+    renderDailyPlan(unlocked ? placement : null);
+    renderModules(modulesEl, unlocked ? placement : null);
+    bindDailyRegenerate(unlocked ? placement : null);
+    bindSubscribe(settings, placement);
 
     if (retakeWrap) {
       retakeWrap.hidden = !placement;
@@ -278,12 +389,13 @@
     bindRetake();
 
     window.addEventListener("eap:langchange", () => {
-      const p = MOCK ? MOCK.getPlacement() : null;
-      if (bannerEl) renderPlacementBanner(bannerEl, p);
-      renderLevelBadge(levelEl, p);
-      renderDailyPlan(p);
-      renderModules(modulesEl, p);
-      if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+      void resolvePlacement().then((p) => {
+        if (bannerEl) renderPlacementBanner(bannerEl, p);
+        renderLevelBadge(levelEl, p);
+        renderDailyPlan(p);
+        renderModules(modulesEl, p);
+        if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+      });
     });
   }
 

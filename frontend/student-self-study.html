@@ -65,6 +65,23 @@
             </ul>
           </section>
 
+          <section id="ssc-channels-section" class="ssc-channels hidden" aria-labelledby="ssc-channels-heading">
+            <h2 id="ssc-channels-heading" class="ssc-channels__heading" data-i18n="self_study_daily_channels_heading">
+              Today&apos;s channels
+            </h2>
+            <p class="ssc-disclaimer" data-i18n="self_study_daily_channels_hint">
+              Web Phase 1: open tasks manually. App push comes in a later phase.
+            </p>
+            <ul id="ssc-channels-list" class="ssc-channels__list"></ul>
+          </section>
+
+          <p id="ssc-subscribe-wrap" class="ssc-subscribe hidden">
+            <label class="ssc-subscribe__label">
+              <input type="checkbox" id="ssc-subscribe-checkbox" checked />
+              <span data-i18n="self_study_subscribe_label">Receive self-study updates when mobile app launches</span>
+            </label>
+          </p>
+
           <section aria-labelledby="ssc-modules-heading">
             <h2 id="ssc-modules-heading" style="font-size: 1rem; margin: 0 0 1rem; color: var(--eap-text-muted, #6e6e73)" data-i18n="self_study_modules_heading">
               Skill modules
@@ -84,6 +101,7 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="app.js"></script>
+    <script src="js/student-self-study-server.js?v=20260601-ss0"></script>
     <script src="js/student-self-study-mock.js"></script>
     <script src="js/student-self-study-vocabulary-mock.js"></script>
     <script src="js/student-self-study-reading-mock.js"></script>
@@ -91,6 +109,6 @@
     <script src="js/student-self-study-listening-mock.js"></script>
     <script src="js/student-self-study-speaking-mock.js"></script>
     <script src="js/student-self-study-daily-plan.js"></script>
-    <script src="js/student-self-study.js"></script>
+    <script src="js/student-self-study.js?v=20260601-ss0"></script>
   </body>
 </html>

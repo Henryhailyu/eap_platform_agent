@@ -121,7 +121,7 @@
     const part = currentPart();
     const q = currentQuestion();
     if (!part || !q) {
-      finishTest();
+      void finishTest();
       return;
     }
 
@@ -182,15 +182,23 @@
       state.partIndex += 1;
       state.questionIndex = 0;
     } else {
-      finishTest();
+      void finishTest();
       return;
     }
     render();
   }
 
-  function finishTest() {
+  async function finishTest() {
     const result = MOCK.computePlacement(state.answers);
     MOCK.savePlacement(result);
+    const SERVER = window.EAP_SELF_STUDY_SERVER;
+    if (SERVER) {
+      try {
+        await SERVER.savePlacement(result);
+      } catch (_) {
+        /* sessionStorage fallback remains */
+      }
+    }
     state.screen = "report";
     render();
   }
@@ -269,7 +277,19 @@
 
     bindRetakeFromQuery();
 
-    const existing = MOCK.getPlacement();
+    let existing = MOCK.getPlacement();
+    const SERVER = window.EAP_SELF_STUDY_SERVER;
+    if (SERVER) {
+      try {
+        const remote = await SERVER.getPlacement();
+        if (remote) {
+          existing = remote;
+          MOCK.savePlacement(remote);
+        }
+      } catch (_) {
+        /* use local */
+      }
+    }
     if (existing && !new URLSearchParams(window.location.search).has("retake")) {
       state.screen = "report";
     }

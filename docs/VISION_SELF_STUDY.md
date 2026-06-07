@@ -2,7 +2,7 @@
 
 **Purpose:** IELTS-aligned EAP self-study (vocabulary, reading, listening, writing) — separate from class calendar homework.  
 **Pilot class examples:** `EAP047` (high, ~IELTS 6.5) · `EAP039` (foundation, ~IELTS 5.0)  
-**Status:** Requirements locked (2026-06) — implementation pending  
+**Status:** Requirements locked (2026-06) — **SS-0 in progress** (Web-first)  
 **Related:** [`EAP_Student_AI_Self_Study_Centre_Design_Brief.txt`](../EAP_Student_AI_Self_Study_Centre_Design_Brief.txt) · Phase S2 placement mock · Phase S4 module mocks
 
 ---
@@ -91,12 +91,36 @@ daily_channel(skill) = manager_has_push(skill) ? 'A' : 'B'
 
 ### Platform matrix
 
-| Capability | Web | App / 微信小程序 |
-|------------|-----|------------------|
-| Module practice | ✅ | ✅ |
-| 19:00 (and 2h vocab) push | ❌ | ✅ |
-| Holiday review mode | ✅ entry | ✅ |
-| Streak | where defined | ✅ |
+| Capability | Web (Phase 1) | App / 微信小程序 (Phase 2) |
+|------------|-----------------|---------------------------|
+| Module practice | ✅ | ✅ later |
+| Today’s task API | ✅ | ✅ same API + push |
+| 19:00 (and 2h vocab) push | ❌ | ✅ SS-App |
+| Vocab 2h review | **Manual** “复习昨日” page (方案 A) | Scheduled push later |
+| Holiday review mode | ✅ entry | ✅ later |
+| Streak | ✅ server-backed | ✅ + notifications later |
+| Teacher message push | Web inbox later | SS-Teacher + SS-App |
+
+---
+
+## Delivery strategy — Web-first, App deferred
+
+**Decision (2026-06):** Complete the **full Web** student + manager self-study loop before **App / 微信小程序** or **teacher push** channels.
+
+| Phase | What ships |
+|-------|------------|
+| **Web Phase 1** | SS-0 → SS-V1 → SS-R1 → SS-L1 → SS-W1 → SS-Sp* on `/ui/` |
+| **Phase 2** | SS-App (19:00, 2h vocab, local timezone, device tokens) |
+| **Phase 2+** | Teacher notification push (may share notification service with SS-App) |
+
+**Why:** Lighthouse / browser pilot; one business-logic API for Web and mobile later.
+
+**Web Phase 1 rules:**
+
+- **All “what to study today” logic lives on the server** (`daily_channel`, task queues). Web calls the same endpoints App will use later.
+- **Push tables / `subscribed` / `timezone` may be created early**; schedulers and FCM/厂商通道 stay off until SS-App.
+- **词汇 2h 复习 — 方案 A:** Web shows **manual “复习昨日词”** (and weekend review entry); no browser timers pretending to be App push.
+- **写作 / 口语:** no push in any phase — unchanged.
 
 ---
 
@@ -112,15 +136,17 @@ Students without placement → reminder only until test complete
 
 ## Implementation phases (indicative)
 
-| Phase | Scope |
-|-------|--------|
-| **SS-V1** | Vocabulary Channel A/B, analytics, weekly calendar, placement gate (server) |
-| **SS-R1** | Reading dual channel, IELTS question schema, paraphrase pipeline, daily passage |
-| **SS-L1** | Listening Part 3/4, Tencent TTS, note-taking system, self-notes V1 |
-| **SS-L2** | Student notes vs AI exemplar comparison |
-| **SS-W1** | Writing genres, pre-writing coach, submit + IELTS rubric feedback, 1–2 revisions |
-| **SS-Sp1–Sp4** | Speaking simulator: TTS questions, record + timers, STT, IELTS 4-criteria feedback |
-| **SS-App** | Push scheduler, Streak, holiday mode, local timezone |
+| Phase | Scope | Platform |
+|-------|--------|----------|
+| **SS-0** | Placement server, student settings, manager push flags, daily-channel API, hub UI | Web |
+| **SS-V1** | Vocabulary Channel A/B, weekly calendar, manual review (方案 A) | Web |
+| **SS-R1** | Reading dual channel, IELTS schema, paraphrase, daily passage | Web |
+| **SS-L1** | Listening Part 3/4, Tencent TTS, note-taking, self-notes V1 | Web |
+| **SS-L2** | Student notes vs AI exemplar comparison | Web |
+| **SS-W1** | Writing genres, pre-writing coach, IELTS rubric, revisions | Web |
+| **SS-Sp1–Sp4** | Speaking simulator: TTS, record, timers, STT, rubric feedback | Web |
+| **SS-App** | Push scheduler, 2h vocab, Streak notifications, local timezone | App / 小程序 |
+| **SS-Teacher** | Teacher message push (optional shared notification layer) | Web inbox → App |
 
 **External dependency:** Tencent Cloud **TTS** (+ COS) for listening + speaking question playback; **ASR** (+ optional **SOE**) for speaking — purchase when SS-L1 / SS-Sp1 starts.
 
@@ -141,3 +167,4 @@ Students without placement → reminder only until test complete
 | Date | Note |
 |------|------|
 | 2026-06 | Requirements consolidated (vocab, reading, listening, writing, speaking) |
+| 2026-06 | Web-first / App deferred; vocab Web review = 方案 A (manual) |
