@@ -168,6 +168,20 @@ class EapConfig:
     SOE_ENGINE: str = (os.environ.get("EAP_SOE_ENGINE") or "16k_en").strip()
     SPEAKING_AUDIO_RETENTION_DAYS: int = int(os.environ.get("EAP_SPEAKING_AUDIO_RETENTION_DAYS", "90") or "90")
 
+    # Phase N — Tencent VOD (recorded lessons)
+    VOD_ENABLED: bool = _env_bool("EAP_VOD_ENABLED")
+    VOD_APP_ID: str = (
+        os.environ.get("EAP_VOD_APP_ID") or os.environ.get("EAP_TENCENT_APP_ID") or ""
+    ).strip()
+    VOD_SUB_APP_ID: str = (os.environ.get("EAP_VOD_SUB_APP_ID") or "").strip()
+    VOD_REGION: str = (os.environ.get("EAP_VOD_REGION") or TENCENT_REGION).strip()
+    VOD_PLAY_KEY: str = (os.environ.get("EAP_VOD_PLAY_KEY") or "").strip()
+    VOD_CALLBACK_KEY: str = (os.environ.get("EAP_VOD_CALLBACK_KEY") or "").strip()
+    VOD_PLAY_TTL_SECONDS: int = int(os.environ.get("EAP_VOD_PLAY_TTL_SECONDS", "7200") or "7200")
+    VOD_TRANSCODE_TEMPLATE_ID: int = int(
+        os.environ.get("EAP_VOD_TRANSCODE_TEMPLATE_ID", "10") or "10"
+    )
+
 
 config = EapConfig()
 
@@ -220,3 +234,7 @@ def validate_production_config() -> None:
         )
     if config.TTS_ENABLED and config.AUDIO_ENABLED and not config.COS_BUCKET:
         log.warning("EAP_TTS_ENABLED=1 but EAP_COS_BUCKET missing — TTS playback disabled.")
+    if config.VOD_ENABLED and not (config.TENCENT_SECRET_ID and config.TENCENT_SECRET_KEY):
+        log.warning("EAP_VOD_ENABLED=1 but Tencent credentials missing — VOD disabled.")
+    if config.VOD_ENABLED and not config.VOD_PLAY_KEY:
+        log.warning("EAP_VOD_ENABLED=1 but EAP_VOD_PLAY_KEY missing — student VOD play-auth will fail.")

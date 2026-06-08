@@ -157,19 +157,70 @@
     <script src="js/i18n-core.js"></script>
     <script src="api-config.js"></script>
     <script src="app.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://web.sdk.qcloud.com/player/tcplayer/release/v4.9.0/tcplayer.min.css"
+    />
     <script src="js/recorded-lessons-api.js"></script>
+    <script src="https://web.sdk.qcloud.com/player/tcplayer/release/v4.9.0/tcplayer.min.js"></script>
     <script>
     (function () {
       var AUDIO_EXTS = ["mp3", "m4a", "aac", "wav", "ogg"];
-      function isAudioUrl(url) {
-        var u = String(url || "").split("?")[0].toLowerCase();
-        return AUDIO_EXTS.some(function (e) { return u.endsWith("." + e); });
+      function t(key) {
+        return typeof window.t === "function" ? window.t(key) : key;
       }
       function showError(msg) {
         var el = document.getElementById("player-error");
         var ld = document.getElementById("player-loading");
         if (ld) ld.style.display = "none";
         if (el) { el.textContent = msg; el.style.display = "block"; }
+      }
+      function hideLoading() {
+        var ld = document.getElementById("player-loading");
+        if (ld) ld.style.display = "none";
+      }
+      function playLocal(streamUrl, titleParam, fileExt) {
+        hideLoading();
+        var ext = (fileExt || streamUrl.split("?")[0].split(".").pop() || "").toLowerCase();
+        if (AUDIO_EXTS.includes(ext)) {
+          var cover = document.getElementById("player-audio-cover");
+          var audioEl = document.getElementById("player-media-audio");
+          var audioName = document.getElementById("player-audio-name");
+          if (cover) cover.style.display = "flex";
+          if (audioName && titleParam) audioName.textContent = decodeURIComponent(titleParam);
+          if (audioEl) {
+            audioEl.src = streamUrl;
+            audioEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+          }
+          return;
+        }
+        var videoEl = document.getElementById("player-media-video");
+        if (videoEl) {
+          videoEl.style.display = "block";
+          videoEl.src = streamUrl;
+          videoEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+        }
+      }
+      function playVod(auth, titleParam) {
+        hideLoading();
+        if (typeof window.TCPlayer !== "function") {
+          showError(t("srec_vod_player_error"));
+          return;
+        }
+        var videoEl = document.getElementById("player-media-video");
+        if (!videoEl) return;
+        videoEl.style.display = "block";
+        window.TCPlayer("player-media-video", {
+          fileID: auth.fileId,
+          appID: auth.appId,
+          psign: auth.psign,
+          controls: true,
+          autoplay: false,
+        });
+        if (titleParam) {
+          var titleEl = document.getElementById("player-title");
+          if (titleEl) titleEl.textContent = decodeURIComponent(titleParam);
+        }
       }
       function boot() {
         var params = new URLSearchParams(location.search);
@@ -182,36 +233,43 @@
         }
         var api = window.EAP_RECORDED_LESSONS;
         if (!api) { showError("Player not ready — please reload."); return; }
-        var streamUrl = role === "teacher"
-          ? api.teacherStreamUrl(Number(id))
-          : api.studentStreamUrl(Number(id));
-        var titleEl = document.getElementById("player-title");
-        var loading = document.getElementById("player-loading");
-        if (loading) loading.style.display = "none";
-        if (titleEl && titleParam) {
-          titleEl.textContent = decodeURIComponent(titleParam);
+        if (titleParam) {
+          var titleEl = document.getElementById("player-title");
+          if (titleEl) titleEl.textContent = decodeURIComponent(titleParam);
           document.title = decodeURIComponent(titleParam) + " — EAP Platform";
         }
-        var ext = streamUrl.split("?")[0].split(".").pop().toLowerCase();
-        var audioExts = AUDIO_EXTS;
-        if (audioExts.includes(ext)) {
-          var cover = document.getElementById("player-audio-cover");
-          var audioEl = document.getElementById("player-media-audio");
-          var audioName = document.getElementById("player-audio-name");
-          if (cover) cover.style.display = "flex";
-          if (audioName && titleParam) audioName.textContent = decodeURIComponent(titleParam);
-          if (audioEl) {
-            audioEl.src = streamUrl;
-            audioEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-          }
-        } else {
-          var videoEl = document.getElementById("player-media-video");
-          if (videoEl) {
-            videoEl.style.display = "block";
-            videoEl.src = streamUrl;
-            videoEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
-          }
+        if (role === "teacher") {
+          playLocal(api.teacherStreamUrl(Number(id)), titleParam, "");
+          return;
         }
+        if (typeof api.studentPlayAuth !== "function") {
+          playLocal(api.studentStreamUrl(Number(id)), titleParam, "");
+          return;
+        }
+        api.studentPlayAuth(Number(id))
+          .then(function (auth) {
+            if (auth && auth.mode === "vod") {
+              playVod(auth, titleParam);
+              return;
+            }
+            if (auth && auth.mode === "processing") {
+              showError(auth.message || t("srec_vod_processing"));
+              return;
+            }
+            var url = auth && auth.streamUrl
+              ? (String(auth.streamUrl).indexOf("http") === 0
+                  ? auth.streamUrl
+                  : (window.location.origin + auth.streamUrl))
+              : api.studentStreamUrl(Number(id));
+            playLocal(url, titleParam, auth && auth.fileExt);
+          })
+          .catch(function (err) {
+            if (err && err.status === 202) {
+              showError(t("srec_vod_processing"));
+              return;
+            }
+            playLocal(api.studentStreamUrl(Number(id)), titleParam, "");
+          });
       }
       if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", boot);

@@ -120,5 +120,18 @@
       const q = encodeURIComponent(className || "");
       return apiFetch(`/api/student/recorded-lessons?class_name=${q}`);
     },
+    studentPlayAuth(lessonId) {
+      return apiFetch(`/api/student/recorded-lessons/${lessonId}/play-auth`);
+    },
+    vodStatus() {
+      return apiFetch("/api/teacher/recorded-lessons/vod/status");
+    },
+    vodUploadSign(body) {
+      return apiFetch("/api/teacher/recorded-lessons/vod/upload-sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+    },
   };
 })(typeof window !== "undefined" ? window : globalThis);

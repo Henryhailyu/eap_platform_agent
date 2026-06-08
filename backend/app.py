@@ -8271,6 +8271,15 @@ from recorded_lessons import register_recorded_lessons_routes
 from task_materials import register_task_materials_routes
 
 register_recorded_lessons_routes(app)
+
+from tencent_vod_routes import register_tencent_vod_routes
+
+register_tencent_vod_routes(
+    app,
+    get_db_connection=get_db_connection,
+    require_session_role_if_enabled=require_session_role_if_enabled,
+)
+
 register_task_materials_routes(app)
 
 from lesson_prep import register_lesson_prep_routes

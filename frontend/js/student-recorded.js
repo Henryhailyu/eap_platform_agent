@@ -135,7 +135,14 @@
 
     const meta = document.createElement("p");
     meta.className = "srec-lesson-card__meta";
-    meta.textContent = [lesson.file_name, formatBytes(lesson.file_size_bytes)]
+    const vodStatus = String(lesson.vod_status || "local").toLowerCase();
+    const vodNote =
+      vodStatus === "transcoding" || vodStatus === "pending"
+        ? t("srec_vod_processing")
+        : vodStatus === "ready" && lesson.vod_file_id
+          ? t("srec_vod_ready")
+          : "";
+    meta.textContent = [lesson.file_name, formatBytes(lesson.file_size_bytes), vodNote]
       .filter(Boolean).join(" · ");
 
     info.appendChild(titleEl);
@@ -144,10 +151,18 @@
     header.appendChild(info);
     card.appendChild(header);
 
-    // Inline player
+    // Inline player (local stream; fullscreen player.html uses VOD play-auth when ready)
     if (api() && lesson.id != null) {
       const playerWrap = document.createElement("div");
       playerWrap.className = "srec-lesson-card__player";
+      if (vodStatus === "transcoding" || vodStatus === "pending") {
+        const pending = document.createElement("p");
+        pending.className = "srec-lesson-card__pending";
+        pending.textContent = t("srec_vod_processing");
+        playerWrap.appendChild(pending);
+        card.appendChild(playerWrap);
+        return card;
+      }
       if (isAudio(lesson)) {
         const audio = document.createElement("audio");
         audio.controls = true;

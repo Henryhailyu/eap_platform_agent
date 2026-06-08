@@ -128,6 +128,8 @@ def lesson_row_to_dict(row) -> dict:
         "visibility": row["visibility"] or VISIBILITY_DRAFT,
         "calendar_task_id": row["calendar_task_id"],
         "vod_file_id": row["vod_file_id"] or "",
+        "vod_status": row["vod_status"] if "vod_status" in row.keys() else "local",
+        "vod_error": row["vod_error"] if "vod_error" in row.keys() else "",
         "created_at": row["created_at"] or "",
         "updated_at": row["updated_at"] or "",
     }
@@ -205,6 +207,8 @@ def enrich_task_dicts_with_recordings(conn, task_dicts, *, published_only: bool 
             "visibility": r["visibility"] or VISIBILITY_DRAFT,
             "file_ext": r["file_ext"] or "",
             "file_name": r["file_name"] or "",
+            "vod_file_id": r["vod_file_id"] or "",
+            "vod_status": r["vod_status"] if "vod_status" in r.keys() else "local",
         }
         by_task.setdefault(int(tid), []).append(entry)
     for t in task_dicts:
@@ -288,11 +292,25 @@ def init_recorded_lessons_tables(conn):
             visibility TEXT NOT NULL DEFAULT 'draft',
             calendar_task_id INTEGER,
             vod_file_id TEXT,
+            vod_status TEXT NOT NULL DEFAULT 'local',
+            vod_error TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
         """
     )
+    _migrate_recorded_lessons_vod_columns(conn)
+
+
+def _migrate_recorded_lessons_vod_columns(conn) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(recorded_lessons)")}
+    if "vod_status" not in cols:
+        conn.execute(
+            "ALTER TABLE recorded_lessons ADD COLUMN vod_status TEXT NOT NULL DEFAULT 'local'"
+        )
+    if "vod_error" not in cols:
+        conn.execute("ALTER TABLE recorded_lessons ADD COLUMN vod_error TEXT")
+    conn.commit()
 
 
 def register_recorded_lessons_routes(app):
@@ -301,7 +319,8 @@ def register_recorded_lessons_routes(app):
     _SELECT = """
         SELECT id, class_name, teacher_username, title, description,
                file_path, file_name, file_ext, file_size_bytes, visibility,
-               calendar_task_id, vod_file_id, created_at, updated_at
+               calendar_task_id, vod_file_id, vod_status, vod_error,
+               created_at, updated_at
         FROM recorded_lessons
     """
 
@@ -521,6 +540,7 @@ def register_recorded_lessons_routes(app):
             title = body.get("title")
             description = body.get("description")
             visibility = body.get("visibility")
+            vod_file_id_raw = body.get("vodFileId") if "vodFileId" in body else body.get("vod_file_id")
             if "calendar_task_id" in body:
                 from app import normalize_class_name
 
@@ -563,6 +583,22 @@ def register_recorded_lessons_routes(app):
                     return jsonify({"error": "visibility must be draft or published"}), 400
                 updates.append("visibility = ?")
                 params.append(v)
+            if vod_file_id_raw is not None:
+                from tencent_vod import VOD_STATUS_PENDING, VOD_STATUS_TRANSCODING
+
+                vod_id = str(vod_file_id_raw or "").strip()
+                if vod_id:
+                    updates.append("vod_file_id = ?")
+                    params.append(vod_id[:128])
+                    updates.append("vod_status = ?")
+                    params.append(VOD_STATUS_TRANSCODING)
+                    updates.append("vod_error = ?")
+                    params.append(None)
+                else:
+                    updates.append("vod_file_id = ?")
+                    params.append(None)
+                    updates.append("vod_status = ?")
+                    params.append(VOD_STATUS_PENDING)
             if not updates:
                 return jsonify({"lesson": lesson_row_to_dict(row)})
             updates.append("updated_at = ?")
