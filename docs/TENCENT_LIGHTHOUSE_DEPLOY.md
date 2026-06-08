@@ -311,6 +311,8 @@ curl -s http://127.0.0.1:5051/api/health | head -c 400
 
 | 现象 | 处理 |
 |------|------|
+| `git pull` 连不上 `ghfast.top` | 改回官方源：`git remote set-url origin https://github.com/Henryhailyu/eap_platform_agent.git` 再 `git pull`；私有库用 SSH 或 PAT |
+| `verify` 显示 `http None` / health `status=None` | 容器刚重启未就绪：等 10–30s 或 `curl http://127.0.0.1:5051/api/health`；服务器上优先 `EAP_VERIFY_BASE=http://127.0.0.1:5051 ./ops/lighthouse-verify.sh` |
 | 浏览器打不开 | 检查防火墙是否放行 **5051** |
 | `docker compose` 不存在 | 试 `docker compose version`；旧镜像用 `docker-compose` |
 | 构建失败 / 磁盘满 | `df -h`；轻量盘 60GB 一般够 |

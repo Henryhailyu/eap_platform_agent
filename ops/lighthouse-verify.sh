@@ -33,6 +33,29 @@ echo "EAP verify — base=$BASE class=$CLASS"
 echo "(uses EAP_PILOT_DEFAULT_PASSWORD from .env when set)"
 echo
 
+# After `docker compose up`, gunicorn may need a few seconds (entrypoint seeds DB first).
+wait_ready() {
+  local probe="${1:-http://127.0.0.1:5051}"
+  local i
+  for i in $(seq 1 30); do
+    if curl -sf --max-time 3 "${probe}/api/health" >/dev/null 2>&1; then
+      echo "Service ready (${probe}/api/health)."
+      echo
+      return 0
+    fi
+    if [[ "$i" -eq 1 ]]; then
+      echo "Waiting for EAP to start (up to ~60s)…"
+    fi
+    sleep 2
+  done
+  echo "warning: ${probe}/api/health not ready — continuing verify anyway" >&2
+  echo
+}
+
+if command -v curl >/dev/null 2>&1; then
+  wait_ready "http://127.0.0.1:5051"
+fi
+
 run_verify() {
   python3 "$SCRIPT" \
     --base "$BASE" \
