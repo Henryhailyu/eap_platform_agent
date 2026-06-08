@@ -311,13 +311,79 @@ curl -s http://127.0.0.1:5051/api/health | head -c 400
 
 | 现象 | 处理 |
 |------|------|
-| `git pull` 连不上 `ghfast.top` | 改回官方源：`git remote set-url origin https://github.com/Henryhailyu/eap_platform_agent.git` 再 `git pull`；私有库用 SSH 或 PAT |
+| `git pull` 连不上 `ghfast.top` | 改官方源：`git remote set-url origin https://github.com/Henryhailyu/eap_platform_agent.git` |
+| `GnuTLS recv error (-110)` 拉 GitHub HTTPS | 大陆 VPS 常见；见下方 **「Git 拉取失败」** — 优先 **Mac rsync** 或 **SSH** |
 | `verify` 显示 `http None` / health `status=None` | 容器刚重启未就绪：等 10–30s 或 `curl http://127.0.0.1:5051/api/health`；服务器上优先 `EAP_VERIFY_BASE=http://127.0.0.1:5051 ./ops/lighthouse-verify.sh` |
 | 浏览器打不开 | 检查防火墙是否放行 **5051** |
 | `docker compose` 不存在 | 试 `docker compose version`；旧镜像用 `docker-compose` |
 | 构建失败 / 磁盘满 | `df -h`；轻量盘 60GB 一般够 |
 | PPT 预览慢 | 正常，LibreOffice 首次转换 10–30 秒 |
 | 仍想用 Render | 可双轨；大陆师生用 Lighthouse IP/域名 |
+
+---
+
+## Git 拉取失败（大陆 Lighthouse 常见）
+
+**现象 A：** `ghfast.top` 连不上  
+**现象 B：** 已改 `github.com` 仍报 `GnuTLS recv error (-110): The TLS connection was non-properly terminated`
+
+说明：`git remote set-url` 通常已成功；失败的是 **服务器 → GitHub 的 HTTPS/TLS**，不是 Docker 命令错误。
+
+### 先确认远程地址
+
+```bash
+cd ~/eap_platform_agent
+git remote -v
+# 应显示 https://github.com/Henryhailyu/eap_platform_agent.git（不再是 ghfast）
+```
+
+### 方案 1 — 从 Mac 同步代码（推荐，与分工一致）
+
+Cursor 已在 Mac 上 `git push`；服务器拉不动时，用 **rsync** 覆盖代码（**不覆盖** 服务器 `.env` 与数据库）：
+
+在 **Mac 终端**执行（路径按你本机仓库调整）：
+
+```bash
+rsync -avz \
+  --exclude '.git' \
+  --exclude '.env' \
+  --exclude 'backend/venv' \
+  --exclude 'backend/eap_platform.db' \
+  --exclude 'backups' \
+  "/Users/henryhailyu/Documents/HL folder/Cursor coding file/eap_platform_agent/" \
+  ubuntu@124.222.124.42:~/eap_platform_agent/
+```
+
+然后在 **Lighthouse**：
+
+```bash
+cd ~/eap_platform_agent
+set -a && source .env && set +a
+sudo docker compose up -d --build
+EAP_VERIFY_BASE=http://127.0.0.1:5051 ./ops/lighthouse-verify.sh
+```
+
+### 方案 2 — SSH 拉取（需在 GitHub 添加服务器公钥）
+
+```bash
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -q
+cat ~/.ssh/id_ed25519.pub
+# 复制到 GitHub → Settings → SSH and GPG keys → New SSH key
+
+git remote set-url origin git@github.com:Henryhailyu/eap_platform_agent.git
+ssh -T git@github.com
+git pull
+```
+
+### 方案 3 — 重试 HTTPS（偶发超时）
+
+```bash
+git config --global http.version HTTP/1.1
+git config --global http.postBuffer 524288000
+git pull
+```
+
+若仍失败，用方案 1，不必卡在 `git pull`。
 
 ---
 
