@@ -190,7 +190,8 @@ def enrich_task_dicts_with_recordings(conn, task_dicts, *, published_only: bool 
         params.append(VISIBILITY_PUBLISHED)
     rows = conn.execute(
         f"""
-        SELECT id, calendar_task_id, title, visibility, file_ext, file_name
+        SELECT id, calendar_task_id, title, visibility, file_ext, file_name,
+               vod_file_id, vod_status
         FROM recorded_lessons
         WHERE calendar_task_id IN ({placeholders}){vis_sql}
         """,
@@ -201,14 +202,15 @@ def enrich_task_dicts_with_recordings(conn, task_dicts, *, published_only: bool 
         tid = r["calendar_task_id"]
         if tid is None:
             continue
+        keys = r.keys()
         entry = {
             "id": r["id"],
             "title": r["title"] or "",
             "visibility": r["visibility"] or VISIBILITY_DRAFT,
             "file_ext": r["file_ext"] or "",
             "file_name": r["file_name"] or "",
-            "vod_file_id": r["vod_file_id"] or "",
-            "vod_status": r["vod_status"] if "vod_status" in r.keys() else "local",
+            "vod_file_id": (r["vod_file_id"] or "") if "vod_file_id" in keys else "",
+            "vod_status": (r["vod_status"] or "local") if "vod_status" in keys else "local",
         }
         by_task.setdefault(int(tid), []).append(entry)
     for t in task_dicts:
