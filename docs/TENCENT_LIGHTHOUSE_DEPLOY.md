@@ -250,11 +250,11 @@ docker compose exec eap ls -la /data
 
 | 阶段 | 做法 |
 |------|------|
-| 现在 | `http://IP:5051` 小范围测试 |
-| 正式 | 域名 **ICP 备案** → Nginx 反代 80/443 → `EAP_PUBLIC_URL=https://你的域名` |
+| 现在 | `http://124.222.124.42:5051` 小范围测试 |
+| 备案通过后 | **[`HTTPS_AFTER_ICP.md`](HTTPS_AFTER_ICP.md)** — DNS → `ops/lighthouse-setup-https.sh` → `https://elc-eap-platform.top` |
 | 录课/直播 | 再按 `CHINA_LIVE_VOD_ROADMAP.md` 买 VOD/TRTC |
 
-Nginx 简要：对外 443 → 本机 `127.0.0.1:5051`，并设置 `EAP_TRUST_PROXY=1`。
+一键脚本：`sudo EAP_DOMAIN=elc-eap-platform.top ./ops/lighthouse-setup-https.sh`（需先 `git pull`）。
 
 ---
 
