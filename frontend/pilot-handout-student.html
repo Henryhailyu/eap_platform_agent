@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="EAP Platform teacher pilot quick reference — printable" />
-    <title>EAP Platform — Teacher quick start (EAP047)</title>
+    <meta name="description" content="EAP Platform student pilot quick reference — printable" />
+    <title>EAP Platform — Student quick start (EAP047)</title>
     <style>
       :root {
         --ink: #1a2a33;
         --muted: #5a6b75;
-        --accent: #0a7ea4;
+        --accent: #0071e3;
         --line: #d8e4ea;
         --paper: #fafbfc;
       }
@@ -44,9 +44,6 @@
         color: #fff;
         cursor: pointer;
       }
-      .no-print button:hover {
-        filter: brightness(1.05);
-      }
       header {
         border-bottom: 2px solid var(--accent);
         padding-bottom: 0.6rem;
@@ -56,7 +53,6 @@
         margin: 0;
         font-size: 1.35rem;
         font-weight: 600;
-        letter-spacing: -0.02em;
       }
       .subtitle {
         margin: 0.2rem 0 0;
@@ -86,7 +82,6 @@
       .box a {
         color: var(--accent);
         word-break: break-all;
-        font-size: 0.95rem;
       }
       .steps {
         margin: 0;
@@ -106,7 +101,6 @@
       .step-num {
         font-weight: 700;
         color: var(--accent);
-        font-size: 1rem;
       }
       .step-title {
         font-weight: 600;
@@ -124,11 +118,17 @@
       .step-link a {
         color: var(--accent);
       }
+      .modules {
+        margin: 0.35rem 0 0;
+        padding-left: 1.1rem;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
       .tips {
         margin-top: 0.65rem;
         padding: 0.5rem 0.6rem;
         border-left: 3px solid var(--accent);
-        background: rgba(10, 126, 164, 0.06);
+        background: rgba(0, 113, 227, 0.06);
         font-size: 0.9rem;
       }
       .tips ul {
@@ -149,14 +149,9 @@
           margin: 0;
           box-shadow: none;
           max-width: none;
-          padding: 10mm 12mm;
         }
         .no-print {
           display: none;
-        }
-        a {
-          color: var(--ink);
-          text-decoration: none;
         }
       }
       @media (max-width: 520px) {
@@ -173,8 +168,8 @@
       </p>
 
       <header>
-        <h1>EAP Platform — 教师快速上手（试点 EAP047）</h1>
-        <p class="subtitle">Teacher quick start · Lighthouse pilot · One page</p>
+        <h1>EAP Platform — 学生快速上手（试点 EAP047）</h1>
+        <p class="subtitle">Student quick start · Lighthouse pilot · One page</p>
       </header>
 
       <div class="grid-2">
@@ -184,19 +179,17 @@
         </div>
         <div class="box">
           <strong>登录 / Sign in</strong>
-          <span id="login-line">账号 <code>teacher1</code> · 密码由教务私下发放</span>
+          <span id="login-line">账号 <code>student1</code> · 密码由教务私下发放</span>
           <br />
-          <span class="step-en">Account <code>teacher1</code> · password from coordinator (not on public posters)</span>
+          <span class="step-en">Account from coordinator · password not on public posters</span>
         </div>
         <div class="box">
           <strong>班级 / Class</strong>
           <code>EAP047</code>
         </div>
         <div class="box">
-          <strong>学生入口 / Students</strong>
-          <span>同一网址，账号 <code>student1</code></span>
-          <br />
-          <span class="step-en">Same URL · student account from coordinator</span>
+          <strong>语言 / Language</strong>
+          页面右上角 <strong>中文</strong> / EN 切换
         </div>
       </div>
 
@@ -204,52 +197,44 @@
         <li>
           <span class="step-num">1</span>
           <div>
-            <p class="step-title">备课并发布到日历 · Lesson prep → calendar</p>
-            <p class="step-en">AI Lesson Builder → generate plan & HTML → Publish → check teacher calendar.</p>
-            <p class="step-link"><a id="link-lp" href="#">备课 / Lesson prep</a></p>
+            <p class="step-title">日历与作业 · Calendar & homework</p>
+            <p class="step-en">Open calendar → pick a day → read task → submit homework or revision.</p>
+            <p class="step-link"><a id="link-cal" href="#">学生日历</a></p>
           </div>
         </li>
         <li>
           <span class="step-num">2</span>
           <div>
-            <p class="step-title">课堂 Live · Live teaching</p>
-            <p class="step-en">
-              Open Live → share <strong>session code</strong> with class → push slides/HTML → optional timer
-              <strong>推送给学生</strong>.
-            </p>
-            <p class="step-link"><a id="link-live" href="#">Live 授课</a> · 学生页输入课堂码</p>
+            <p class="step-title">加入 Live 课堂 · Join live class</p>
+            <p class="step-en">Teacher gives a <strong>6-digit code</strong> → enter on live page → see slides & activities.</p>
+            <p class="step-link"><a id="link-live" href="#">加入课堂 / Join live</a></p>
           </div>
         </li>
         <li>
           <span class="step-num">3</span>
           <div>
-            <p class="step-title">布置作业 · Homework</p>
-            <p class="step-en">
-              Calendar → <strong>New task</strong> (Writing/Homework, EAP047) → enable <strong>AI marking</strong> if
-              needed → upload descriptor.
-            </p>
-            <p class="step-link"><a id="link-cal" href="#">教师日历</a></p>
+            <p class="step-title">AI 自学中心 · Self-Study Centre</p>
+            <p class="step-en">Daily practice across five modules (about 15–25 min each when assigned).</p>
+            <ul class="modules">
+              <li>词汇 Vocabulary · 阅读 Reading · 听力 Listening</li>
+              <li>写作 Writing · 口语 Speaking</li>
+            </ul>
+            <p class="step-link"><a id="link-ss" href="#">自学中心</a></p>
           </div>
         </li>
         <li>
           <span class="step-num">4</span>
           <div>
-            <p class="step-title">批改 · Marking</p>
-            <p class="step-en">
-              <strong>View submissions</strong> → Generate/refresh <strong>AI report</strong> → review →
-              <strong>Approve</strong> (writes feedback to student).
-            </p>
+            <p class="step-title">录课回放 · Recorded lessons（如有）</p>
+            <p class="step-en">When teacher publishes a recording → open month view → play in browser (no download).</p>
+            <p class="step-link"><a id="link-rec" href="#">录课回放</a></p>
           </div>
         </li>
         <li>
           <span class="step-num">5</span>
           <div>
-            <p class="step-title">录课 · Recorded lessons（可选）</p>
-            <p class="step-en">
-              Upload MP4 → link or create calendar task → <strong>Publish to students</strong>. VOD cloud when
-              enabled on server.
-            </p>
-            <p class="step-link"><a id="link-recorded" href="#">录课管理 / Recorded lessons</a></p>
+            <p class="step-title">查看反馈 · Feedback & archive</p>
+            <p class="step-en">Task detail → teacher feedback; Learning archive for past work.</p>
           </div>
         </li>
       </ol>
@@ -257,16 +242,16 @@
       <div class="tips">
         <strong>提示 / Tips</strong>
         <ul>
-          <li>系统更新后请 <strong>硬刷新</strong>（Ctrl+Shift+R 或清空缓存）。After updates: hard refresh.</li>
-          <li>Live 计时器推送到学生后，学生端需与教师同步显示；首次可点页面以允许提示音。</li>
-          <li>学生自学：<strong>AI Self-Study Centre</strong> — 可打印 <a id="link-student-handout" href="#">学生一页纸</a>。</li>
-          <li>遇问题请记录：设备、浏览器、操作步骤、截图。Report: device, browser, steps, screenshot.</li>
+          <li>更新后请 <strong>硬刷新</strong>（Ctrl+Shift+R）。Hard refresh after platform updates.</li>
+          <li>Live 计时器与教师同步；到 0 时可能有短提示音，首次需点击页面允许声音。</li>
+          <li>口语录音、听力 TTS 需浏览器允许麦克风/音频；部分功能备案 HTTPS 后更稳定。</li>
+          <li>遇问题：记录手机/电脑型号、浏览器、步骤、截图发给老师。</li>
         </ul>
       </div>
 
       <footer>
         <span id="footer-host"></span> ·
-        <a id="link-doc" href="#">Full checklist (EAP047 rehearsal)</a>
+        <a id="link-doc" href="#">Self-study UAT checklist</a>
         · v2026-06-09
       </footer>
     </div>
@@ -290,22 +275,20 @@
           if (id === "link-home") el.textContent = ui + "/index.html";
         }
         setHref("link-home", "/index.html");
-        setHref("link-lp", "/teacher-lesson-ai.html?class=EAP047");
-        setHref("link-live", "/teacher-live.html?class=EAP047");
-        setHref("link-cal", "/teacher.html");
-        setHref("link-recorded", "/teacher-recorded.html?class_name=EAP047");
-        setHref("link-student-handout", "/pilot-handout-student.html");
+        setHref("link-cal", "/student.html");
+        setHref("link-live", "/student-live.html");
+        setHref("link-ss", "/student-self-study-module.html");
+        setHref("link-rec", "/student-recorded.html?class_name=EAP047");
         var doc = document.getElementById("link-doc");
         if (doc) {
           doc.href =
-            "https://github.com/Henryhailyu/eap_platform_agent/blob/main/docs/CHECKLIST_EAP047_PILOT_REHEARSAL.md";
+            "https://github.com/Henryhailyu/eap_platform_agent/blob/main/docs/CHECKLIST_EAP047_SELF_STUDY.md";
           doc.target = "_blank";
           doc.rel = "noopener";
         }
-        var pw = params.get("show_demo_password");
-        if (pw === "1") {
+        if (params.get("show_demo_password") === "1") {
           document.getElementById("login-line").innerHTML =
-            '账号 <code>teacher1</code> · 演示密码 <code>123456</code>（公开课前必须更换）';
+            '账号 <code>student1</code> · 演示密码 <code>123456</code>（公开课前必须更换）';
         }
         var foot = document.getElementById("footer-host");
         if (foot) foot.textContent = base;

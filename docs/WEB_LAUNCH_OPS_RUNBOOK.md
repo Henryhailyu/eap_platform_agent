@@ -133,6 +133,8 @@ EAP_VERIFY_BASE=http://124.222.124.42:5051 ./ops/lighthouse-verify.sh
 
 密码须与 `.env` 中 `EAP_PILOT_DEFAULT_PASSWORD` 一致（轮换后勿再用 `123456`）。
 
+完整输出应包含 **Session (web UI)** 段（自学、录课、VOD）。若只有 v1 检查，请 `git pull` 后重跑；脚本使用宿主机 `backend/scripts/verify_pilot.py`（非容器内旧副本）。应用代码更新后另需 `sudo docker compose up -d --build`。
+
 ### 本机对远程
 
 ```bash

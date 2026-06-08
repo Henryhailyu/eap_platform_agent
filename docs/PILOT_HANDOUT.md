@@ -1,7 +1,9 @@
 # PILOT-HANDOUT — Teacher one-page quick start
 
 **Purpose:** Printable handout for Lighthouse / classroom pilot (**EAP047**).  
-**Printable page:** `/ui/pilot-handout-teacher.html`  
+**Printable pages:**  
+- Teacher — `/ui/pilot-handout-teacher.html`  
+- Student — `/ui/pilot-handout-student.html`  
 **Updated:** 2026-06-09
 
 ---
@@ -10,8 +12,8 @@
 
 | Host | Handout URL |
 |------|-------------|
-| **Lighthouse (recommended)** | `http://124.222.124.42:5051/ui/pilot-handout-teacher.html` |
-| Custom base | `.../ui/pilot-handout-teacher.html?base=http://YOUR_HOST:5051` |
+| **Lighthouse (recommended)** | Teacher: `.../pilot-handout-teacher.html` · Student: `.../pilot-handout-student.html` |
+| Custom base | `.../pilot-handout-teacher.html?base=http://YOUR_HOST:5051` (student sheet same query) |
 | Demo password on sheet (internal only) | Add `&show_demo_password=1` — **do not** distribute publicly |
 
 1. Open the URL in Chrome / Edge / Safari.  
