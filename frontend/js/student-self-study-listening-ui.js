@@ -1,5 +1,5 @@
 /**
- * SS-L1 — server-backed listening (Part 3/4 alternate, text scripts + notes + coach).
+ * SS-L1 / SS-L2 — server-backed listening (Part 3/4, notes coach + key-point compare).
  */
 (function (global) {
   const SERVER = () => global.EAP_SELF_STUDY_SERVER;
@@ -284,6 +284,41 @@
     });
   }
 
+  function renderComparisonHtml(coach) {
+    const cmp = coach && coach.comparison;
+    if (!cmp || !cmp.points || !cmp.points.length) return "";
+
+    const pct = cmp.coveragePct != null ? cmp.coveragePct : 0;
+    const matched = cmp.matchedCount != null ? cmp.matchedCount : 0;
+    const total = cmp.totalCount != null ? cmp.totalCount : cmp.points.length;
+    const barClass =
+      pct >= 75 ? "ssc-listening-coverage--good" : pct >= 40 ? "ssc-listening-coverage--mid" : "ssc-listening-coverage--low";
+
+    const rows = cmp.points
+      .map((pt) => {
+        const label = pickLang(pt, "labelEn", "labelZh") || pt.labelEn || pt.labelZh || "";
+        const cls = pt.matched ? "ssc-listening-kp--matched" : "ssc-listening-kp--missed";
+        const icon = pt.matched ? "✓" : "○";
+        const status = pt.matched
+          ? t("self_study_listening_kp_matched")
+          : t("self_study_listening_kp_missed");
+        return `<li class="ssc-listening-kp ${cls}"><span class="ssc-listening-kp__icon" aria-hidden="true">${icon}</span><span class="ssc-listening-kp__label">${escapeHtml(label)}</span><span class="ssc-listening-kp__status">${escapeHtml(status)}</span></li>`;
+      })
+      .join("");
+
+    return `
+      <section class="ssc-listening-compare-summary" aria-labelledby="ssc-listening-coverage-title">
+        <h3 id="ssc-listening-coverage-title">${t("self_study_listening_coverage_title")}</h3>
+        <p class="ssc-listening-coverage__meta">${t("self_study_listening_coverage_meta", { matched: String(matched), total: String(total), pct: String(pct) })}</p>
+        <div class="ssc-listening-coverage__track" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${t("self_study_listening_coverage_title")}">
+          <div class="ssc-listening-coverage__bar ${barClass}" style="width:${pct}%"></div>
+        </div>
+        <h4 class="ssc-listening-kp-heading">${t("self_study_listening_key_points")}</h4>
+        <ul class="ssc-listening-kp-list">${rows}</ul>
+      </section>
+    `;
+  }
+
   async function renderCoachPanel(root) {
     let data;
     try {
@@ -318,6 +353,7 @@
         <h2>${t("self_study_listening_coach_title")}</h2>
         <p>${t("self_study_listening_coach_hint")}</p>
       </div>
+      ${renderComparisonHtml(coach)}
       <div class="ssc-listening-coach-grid">
         <section class="ssc-listening-coach-col">
           <h3>${t("self_study_listening_your_notes")}</h3>

@@ -1229,6 +1229,107 @@
   }
 }
 
+.ssc-listening-compare-summary {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(10, 126, 164, 0.15);
+}
+
+.ssc-listening-compare-summary h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.ssc-listening-coverage__meta {
+  margin: 0 0 0.6rem;
+  font-size: 0.875rem;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-listening-coverage__track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin-bottom: 0.85rem;
+}
+
+.ssc-listening-coverage__bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.ssc-listening-coverage--good {
+  background: linear-gradient(90deg, #2d9f6f, #0a7ea4);
+}
+
+.ssc-listening-coverage--mid {
+  background: linear-gradient(90deg, #c9a227, #0a7ea4);
+}
+
+.ssc-listening-coverage--low {
+  background: linear-gradient(90deg, #c45c4a, #9a6b1f);
+}
+
+.ssc-listening-kp-heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.ssc-listening-kp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ssc-listening-kp {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr auto;
+  gap: 0.35rem 0.5rem;
+  align-items: start;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.ssc-listening-kp--matched {
+  background: rgba(45, 159, 111, 0.1);
+  border: 1px solid rgba(45, 159, 111, 0.22);
+}
+
+.ssc-listening-kp--missed {
+  background: rgba(196, 92, 74, 0.08);
+  border: 1px solid rgba(196, 92, 74, 0.18);
+}
+
+.ssc-listening-kp__icon {
+  font-weight: 700;
+  color: inherit;
+}
+
+.ssc-listening-kp__status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ssc-listening-kp--matched .ssc-listening-kp__status {
+  color: #2d9f6f;
+}
+
+.ssc-listening-kp--missed .ssc-listening-kp__status {
+  color: #b85a4a;
+}
+
 .ssc-writing-genre {
   font-size: 0.8125rem;
   color: var(--eap-teal, #0a7ea4);

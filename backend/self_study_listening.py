@@ -1,11 +1,13 @@
 """
-SS-L1 — Self-study listening (Channel B only; Part 3/4 alternate; Web text scripts first).
+SS-L1 / SS-L2 — Self-study listening (Channel B; Part 3/4 alternate; notes coach + compare).
 """
 from __future__ import annotations
 
 import csv
 import io
 import json
+import re
+import unicodedata
 from datetime import date, datetime, timezone
 from typing import Any, Callable
 
@@ -164,6 +166,16 @@ SEED_P3_A: dict[str, Any] = {
         "仅当符号比完整词更短时使用（如 → 表示导致）。",
         "不要用完整词和符号重复同一意思。",
     ],
+    "keyPointsEn": [
+        "Student A: transit-oriented development + mixed-use at station",
+        "Student B: green belts without expensive rail upgrades",
+        "Report criterion: feasibility vs long-term containment",
+    ],
+    "keyPointsZh": [
+        "学生 A：公交导向 + 车站混合用地",
+        "学生 B：绿带、不依赖昂贵铁路改造",
+        "报告标准：可行性 vs 长期管控",
+    ],
 }
 
 SEED_P4_A: dict[str, Any] = {
@@ -314,6 +326,18 @@ SEED_P4_A: dict[str, Any] = {
         "用箭头表示因果（步行友好 → 驾车减少）。",
         "在页边标出转折词（However）。",
     ],
+    "keyPointsEn": [
+        "Topic: Calthorpe / sustainable communities",
+        "Walkable + transit → car use down 15–20%",
+        "Density does not guarantee affordability; inclusive zoning",
+        "Close: two design principles",
+    ],
+    "keyPointsZh": [
+        "主题：Calthorpe / 可持续社区",
+        "步行+公交 → 驾车降低 15–20%",
+        "密度不等于可负担；包容性分区",
+        "结尾：两条设计原则",
+    ],
 }
 
 SEED_P3_B: dict[str, Any] = {
@@ -404,6 +428,16 @@ SEED_P3_B: dict[str, Any] = {
     "exemplarNotesZh": "分工：数据（Maya，周五）→ 设计（James，数据后）| 负责人 = 讲稿",
     "coachingTipsEn": ["Order of tasks matters — note dependencies (James after Maya)."],
     "coachingTipsZh": ["任务顺序很重要——记录依赖关系（James 在 Maya 之后）。"],
+    "keyPointsEn": [
+        "Maya: compile survey numbers by Friday",
+        "James: design after figures are ready",
+        "Project lead: draft presentation script",
+    ],
+    "keyPointsZh": [
+        "Maya：周五前整理调查数据",
+        "James：数据就绪后再做设计",
+        "项目负责人：撰写汇报讲稿",
+    ],
 }
 
 SEED_P4_B: dict[str, Any] = {
@@ -492,6 +526,23 @@ SEED_P4_B: dict[str, Any] = {
     "exemplarNotesZh": "1 定义诚信 | 2 案例：未标注转述 | 3 报告 → 院系门户",
     "coachingTipsEn": ["Signpost words (First/Next/Finally) map to lecture sections."],
     "coachingTipsZh": ["路标词（First/Next/Finally）对应讲座结构。"],
+    "keyPointsEn": [
+        "Define academic integrity",
+        "Example: uncited paraphrase case",
+        "Report concerns via faculty portal",
+    ],
+    "keyPointsZh": [
+        "定义学术诚信",
+        "案例：未标注出处的转述",
+        "通过院系门户报告问题",
+    ],
+}
+
+_SEED_BY_TITLE: dict[str, dict[str, Any]] = {
+    SEED_P3_A["title"]: SEED_P3_A,
+    SEED_P4_A["title"]: SEED_P4_A,
+    SEED_P3_B["title"]: SEED_P3_B,
+    SEED_P4_B["title"]: SEED_P4_B,
 }
 
 
@@ -550,7 +601,102 @@ def _item_payload(raw: dict[str, Any], *, include_answers: bool = True) -> dict[
         "exemplarNotesZh": raw.get("exemplarNotesZh") or "",
         "coachingTipsEn": tips_en,
         "coachingTipsZh": tips_zh,
+        "keyPointsEn": _key_points_list(raw.get("keyPointsEn")),
+        "keyPointsZh": _key_points_list(raw.get("keyPointsZh")),
         "audioUrl": raw.get("audioUrl"),
+    }
+
+
+def _key_points_list(raw: Any) -> list[str]:
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    if isinstance(raw, str) and raw.strip():
+        return [raw.strip()]
+    return []
+
+
+def _key_point_pairs(content: dict) -> list[tuple[str, str]]:
+    en = _key_points_list(content.get("keyPointsEn"))
+    zh = _key_points_list(content.get("keyPointsZh"))
+    if en or zh:
+        size = max(len(en), len(zh))
+        pairs: list[tuple[str, str]] = []
+        for i in range(size):
+            pairs.append((en[i] if i < len(en) else "", zh[i] if i < len(zh) else ""))
+        return pairs
+    lines_en = [ln.strip() for ln in (content.get("exemplarNotesEn") or "").splitlines() if ln.strip()]
+    lines_zh = [ln.strip() for ln in (content.get("exemplarNotesZh") or "").splitlines() if ln.strip()]
+    size = max(len(lines_en), len(lines_zh))
+    return [(lines_en[i] if i < len(lines_en) else "", lines_zh[i] if i < len(lines_zh) else "") for i in range(size)]
+
+
+def _normalize_notes_text(text: str) -> str:
+    text = unicodedata.normalize("NFKC", text or "")
+    text = text.lower().replace("–", "-").replace("—", "-")
+    text = re.sub(r"[^\w\s%\-]", " ", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _match_terms_from_label(label: str) -> list[str]:
+    norm = _normalize_notes_text(label)
+    if not norm:
+        return []
+    terms: list[str] = []
+    for token in re.split(r"[\s/|→:;+,]+", norm):
+        token = token.strip("-")
+        if len(token) >= 2 or re.search(r"\d", token):
+            terms.append(token)
+    for word in norm.split():
+        if len(word) >= 3 or re.search(r"\d", word):
+            terms.append(word)
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in terms:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+def _key_point_matched(notes_norm: str, label_en: str, label_zh: str) -> bool:
+    if not notes_norm:
+        return False
+    for label in (label_en, label_zh):
+        if not label:
+            continue
+        terms = _match_terms_from_label(label)
+        if not terms:
+            continue
+        hits = sum(1 for term in terms if term in notes_norm)
+        if hits >= max(1, round(len(terms) * 0.4)):
+            return True
+    return False
+
+
+def compare_listening_notes(self_notes: str, content: dict) -> dict[str, Any]:
+    pairs = _key_point_pairs(content)
+    notes_norm = _normalize_notes_text(self_notes)
+    points: list[dict[str, Any]] = []
+    matched_count = 0
+    for idx, (label_en, label_zh) in enumerate(pairs):
+        matched = _key_point_matched(notes_norm, label_en, label_zh)
+        if matched:
+            matched_count += 1
+        points.append(
+            {
+                "id": idx,
+                "labelEn": label_en,
+                "labelZh": label_zh,
+                "matched": matched,
+            }
+        )
+    total = len(points)
+    coverage = round((matched_count / total) * 100) if total else 0
+    return {
+        "coveragePct": coverage,
+        "matchedCount": matched_count,
+        "totalCount": total,
+        "points": points,
     }
 
 
@@ -615,6 +761,30 @@ def migrate_self_study_listening_tables(conn) -> None:
         """
     )
     seed_default_listening_course(conn)
+    _upgrade_listening_key_points(conn)
+
+
+def _upgrade_listening_key_points(conn) -> None:
+    """Patch EAP047 seed items created before SS-L2 keyPoints were added."""
+    now = _now_iso()
+    for title, seed in _SEED_BY_TITLE.items():
+        row = conn.execute(
+            "SELECT id, content_json FROM listening_items WHERE title = ? LIMIT 1",
+            (title,),
+        ).fetchone()
+        if not row:
+            continue
+        content = json.loads(row["content_json"])
+        if content.get("keyPointsEn") or content.get("keyPointsZh"):
+            continue
+        merged = dict(content)
+        merged["keyPointsEn"] = seed.get("keyPointsEn") or []
+        merged["keyPointsZh"] = seed.get("keyPointsZh") or []
+        conn.execute(
+            "UPDATE listening_items SET content_json = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(merged, ensure_ascii=False), now, row["id"]),
+        )
+    conn.commit()
 
 
 def seed_default_listening_course(conn) -> None:
@@ -748,13 +918,18 @@ def _strip_answers(content: dict) -> dict:
     return out
 
 
-def _coach_payload(content: dict) -> dict:
-    return {
+def _coach_payload(content: dict, self_notes: str = "") -> dict:
+    payload: dict[str, Any] = {
         "exemplarNotesEn": content.get("exemplarNotesEn") or "",
         "exemplarNotesZh": content.get("exemplarNotesZh") or "",
         "coachingTipsEn": content.get("coachingTipsEn") or [],
         "coachingTipsZh": content.get("coachingTipsZh") or [],
+        "keyPointsEn": _key_points_list(content.get("keyPointsEn")),
+        "keyPointsZh": _key_points_list(content.get("keyPointsZh")),
     }
+    if self_notes is not None:
+        payload["comparison"] = compare_listening_notes(self_notes, content)
+    return payload
 
 
 def _score_answers(content: dict, answers: dict[str, int]) -> dict[str, Any]:
@@ -920,7 +1095,7 @@ def register_self_study_listening_routes(
             return jsonify({"error": "itemId required"}), 400
 
         prog = conn.execute(
-            "SELECT practice_done FROM student_listening_progress WHERE student_username = ? AND item_id = ?",
+            "SELECT practice_done, self_notes FROM student_listening_progress WHERE student_username = ? AND item_id = ?",
             (username, item_id),
         ).fetchone()
         row = conn.execute("SELECT content_json FROM listening_items WHERE id = ?", (item_id,)).fetchone()
@@ -931,7 +1106,8 @@ def register_self_study_listening_routes(
             return jsonify({"error": "Complete practice first"}), 403
 
         content = json.loads(row["content_json"])
-        return jsonify({"coach": _coach_payload(content)})
+        self_notes = str(prog["self_notes"] or "") if prog else ""
+        return jsonify({"coach": _coach_payload(content, self_notes)})
 
     @app.route("/api/student/self-study/listening/complete", methods=["POST"])
     def student_listening_complete():
@@ -1009,11 +1185,18 @@ def register_self_study_listening_routes(
             ),
         )
         conn.commit()
+        notes_for_coach = notes_val if notes_val is not None else ""
+        if scoring and notes_for_coach == "":
+            prog_row = conn.execute(
+                "SELECT self_notes FROM student_listening_progress WHERE student_username = ? AND item_id = ?",
+                (username, item_id),
+            ).fetchone()
+            notes_for_coach = str(prog_row["self_notes"] or "") if prog_row else ""
         conn.close()
         out: dict[str, Any] = {"ok": True}
         if scoring:
             out["scoring"] = scoring
-            out["coach"] = _coach_payload(content)
+            out["coach"] = _coach_payload(content, notes_for_coach)
         return jsonify(out)
 
     @app.route("/api/admin/self-study/listening/items", methods=["GET"])

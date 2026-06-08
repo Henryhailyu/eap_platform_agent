@@ -59,6 +59,5 @@
 
 ## Next
 
-- **SS-L2** — side-by-side notes compare (V2 in requirements)
-- **SS-W1** writing module
-- TTS pipeline when Tencent keys available
+- **SS-L2** delivered — [`SS-L2_SELF_STUDY_LISTENING.md`](SS-L2_SELF_STUDY_LISTENING.md) (key-point coverage + side-by-side compare)
+- **SS-Sp4** TTS — [`SS-Sp4_SELF_STUDY_SPEAKING_AUDIO.md`](SS-Sp4_SELF_STUDY_SPEAKING_AUDIO.md)

@@ -142,7 +142,7 @@ Students without placement → reminder only until test complete
 | **SS-V1** | Vocabulary Channel A/B, weekly calendar, manual review (方案 A) | Web |
 | **SS-R1** | Reading dual channel, IELTS schema, paraphrase, daily passage | Web |
 | **SS-L1** | Listening Part 3/4, Tencent TTS, note-taking, self-notes V1 | Web |
-| **SS-L2** | Student notes vs AI exemplar comparison | Web |
+| **SS-L2** | Student notes vs AI exemplar comparison (key-point coverage) | Web ✅ |
 | **SS-W1** | Writing genres, pre-writing coach, IELTS rubric, revisions | Web |
 | **SS-Sp1–Sp4** | Speaking simulator: TTS, record, timers, STT, rubric feedback | Web |
 | **SS-App** | Push scheduler, 2h vocab, Streak notifications, local timezone | App / 小程序 |
