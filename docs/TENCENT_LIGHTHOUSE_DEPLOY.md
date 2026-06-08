@@ -225,6 +225,18 @@ http://你的公网IP:5051/api/health
 
 **不要长期使用 `123456`。**
 
+### API 冒烟（推荐，每次 `git pull` 后）
+
+```bash
+cd ~/eap_platform_agent
+set -a && source .env && set +a
+chmod +x ops/lighthouse-verify.sh
+./ops/lighthouse-verify.sh
+# 外网：EAP_VERIFY_BASE=http://你的公网IP:5051 ./ops/lighthouse-verify.sh
+```
+
+脚本调用 `verify_pilot.py`：健康检查、自学模块 API、音频状态、教师录课/VOD。详见 [`WEB_LAUNCH_OPS_RUNBOOK.md`](WEB_LAUNCH_OPS_RUNBOOK.md) §4。
+
 ---
 
 ## 第 8 步：常用运维命令
@@ -309,10 +321,11 @@ curl -s http://127.0.0.1:5051/api/health | head -c 400
 
 ## 与编程任务的衔接
 
-1. 本站跑通后，继续 **L32 教师端推送加固** → **学生端 display 修复**。  
-2. 需要我改代码部署时：在服务器 `git pull` + `docker compose up -d --build`。  
-3. **暂不必买** 云点播/TRTC，直到开始做录课 Phase N。
+1. 代码更新：服务器 `git pull` + `set -a && source .env && set +a` + `sudo docker compose up -d`（依赖变更时加 `--build`）。  
+2. 部署后跑 `./ops/lighthouse-verify.sh`，再按 [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md) / [`CHECKLIST_EAP047_SELF_STUDY.md`](CHECKLIST_EAP047_SELF_STUDY.md) 做浏览器 UAT。  
+3. **录课 Phase N** 代码已在 `main`；开通 VOD 见 [`TENCENT_VOD_SETUP.md`](TENCENT_VOD_SETUP.md)。**真直播 Phase O** 需备案 + TRTC 密钥。  
+4. 备案通过后 HTTPS：[`HTTPS_AFTER_ICP.md`](HTTPS_AFTER_ICP.md)。
 
 ---
 
-*Last updated: 2026-05-28*
+*Last updated: 2026-06-09*

@@ -11,8 +11,9 @@
 | # | Check | Pass |
 |---|--------|------|
 | 0.1 | Latest `main` deployed (`git pull` + `docker compose up -d`) | ☐ |
-| 0.2 | Optional audio: `.env` has `EAP_AUDIO_ENABLED=1` + Tencent keys | ☐ |
-| 0.3 | `GET /api/student/self-study/audio/status` → `tts` true (if keys on) | ☐ |
+| 0.2 | API smoke: `./ops/lighthouse-verify.sh` (password = `.env` `EAP_PILOT_DEFAULT_PASSWORD`) | ☐ |
+| 0.3 | Optional audio: `.env` has `EAP_AUDIO_ENABLED=1` + Tencent keys | ☐ |
+| 0.4 | `audio/status` → `tts` true when keys on (also checked by verify script) | ☐ |
 
 **Entry:** `/ui/student-self-study-module.html` or student hub → **AI Self-Study Centre**
 

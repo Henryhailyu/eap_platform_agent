@@ -110,9 +110,44 @@ curl -s http://124.222.124.42:5051/api/health
 
 ---
 
-## 4. 部署后检查清单
+## 4. 部署后 API 冒烟（推荐）
+
+`verify_pilot.py` 覆盖：健康检查、v1 登录、自学五模块 overview、`audio/status`、教师录课与 VOD 状态。
+
+### Lighthouse 一键（服务器上）
+
+```bash
+cd ~/eap_platform_agent
+git pull
+set -a && source .env && set +a
+sudo docker compose up -d
+chmod +x ops/lighthouse-verify.sh
+./ops/lighthouse-verify.sh
+```
+
+外网验收（把 `127.0.0.1` 换成公网 IP 或域名）：
+
+```bash
+EAP_VERIFY_BASE=http://124.222.124.42:5051 ./ops/lighthouse-verify.sh
+```
+
+密码须与 `.env` 中 `EAP_PILOT_DEFAULT_PASSWORD` 一致（轮换后勿再用 `123456`）。
+
+### 本机对远程
+
+```bash
+cd backend
+python3 scripts/verify_pilot.py --base http://124.222.124.42:5051 --password '你的强密码'
+```
+
+全部 `[OK]` 后再跑 [`CHECKLIST_EAP047_SELF_STUDY.md`](CHECKLIST_EAP047_SELF_STUDY.md) 与 [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md)。
+
+---
+
+## 5. 部署后检查清单
 
 - [ ] `git pull` + `sudo docker compose up -d --build --force-recreate`
+- [ ] `./ops/lighthouse-verify.sh` 全部通过（或等价 `verify_pilot.py`）
 - [ ] 强密码已轮换并口头通知教师
 - [ ] `/api/health` AI 已配置
 - [ ] 至少做一次 [`backup_lighthouse_data.sh`](../backend/scripts/backup_lighthouse_data.sh)
@@ -121,7 +156,7 @@ curl -s http://124.222.124.42:5051/api/health
 
 ---
 
-## 5. 相关文档
+## 6. 相关文档
 
 - [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) — 上线定义  
 - [`TENCENT_LIGHTHOUSE_DEPLOY.md`](TENCENT_LIGHTHOUSE_DEPLOY.md) — 轻量服务器部署  
