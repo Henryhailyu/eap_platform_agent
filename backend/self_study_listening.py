@@ -11,6 +11,8 @@ from typing import Any, Callable
 
 from flask import Response, jsonify, request
 
+from tencent_audio import audio_status, ensure_listening_audio
+
 LISTENING_SKILL = "listening"
 
 SEED_P3_A: dict[str, Any] = {
@@ -876,6 +878,8 @@ def register_self_study_listening_routes(
             "SELECT * FROM student_listening_progress WHERE student_username = ? AND item_id = ?",
             (username, item["id"]),
         ).fetchone()
+        script_en = content.get("scriptEn") or ""
+        audio = ensure_listening_audio(item["id"], script_en)
         conn.close()
 
         return jsonify(
@@ -886,6 +890,8 @@ def register_self_study_listening_routes(
                 "partType": item["scheduled_part"] or item["part_type"],
                 "title": item["title"],
                 "content": _strip_answers(content),
+                "audio": audio,
+                "audioStatus": audio_status(),
                 "progress": {
                     "listenDone": bool(prog and prog["listen_done"]),
                     "selfNotes": prog["self_notes"] if prog else "",

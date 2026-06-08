@@ -1369,6 +1369,29 @@
   color: rgba(10, 126, 164, 0.9);
 }
 
+.ssc-audio-player {
+  margin: 0.75rem 0 1rem;
+}
+
+.ssc-audio-player__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ssc-audio-player__el {
+  width: 100%;
+  max-width: 420px;
+}
+
+.ssc-speaking-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.75rem 0 1rem;
+}
+
 .ssc-speaking-cue-card {
   margin: 1rem 0;
   padding: 1.1rem 1.2rem;

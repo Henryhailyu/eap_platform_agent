@@ -12,3 +12,5 @@ pypdf>=5.0.0
 python-docx>=1.1.0
 openpyxl>=3.1.0
 xlrd>=2.0.1
+tencentcloud-sdk-python>=3.0.1200
+cos-python-sdk-v5>=1.9.30

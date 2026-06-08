@@ -8364,6 +8364,14 @@ register_self_study_speaking_routes(
     normalize_class_name=normalize_class_name,
 )
 
+from tencent_audio_routes import register_tencent_audio_routes
+
+register_tencent_audio_routes(
+    app,
+    require_session_role_if_enabled=require_session_role_if_enabled,
+    get_db_connection=get_db_connection,
+)
+
 # Start the Flask server
 if __name__ == "__main__":
     # Flask is installed in backend/venv, not system Python. Either:

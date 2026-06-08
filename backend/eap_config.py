@@ -148,6 +148,26 @@ class EapConfig:
     DEEPSEEK_BASE_URL: str = (os.environ.get("EAP_DEEPSEEK_BASE_URL") or "https://api.deepseek.com").strip().rstrip("/")
     DEEPSEEK_MODEL: str = (os.environ.get("EAP_DEEPSEEK_MODEL") or "deepseek-chat").strip()
 
+    # SS-Sp4 — Tencent TTS / COS / ASR / SOE
+    AUDIO_ENABLED: bool = _env_bool("EAP_AUDIO_ENABLED")
+    TENCENT_SECRET_ID: str = (os.environ.get("EAP_TENCENT_SECRET_ID") or "").strip()
+    TENCENT_SECRET_KEY: str = (os.environ.get("EAP_TENCENT_SECRET_KEY") or "").strip()
+    TENCENT_APP_ID: str = (os.environ.get("EAP_TENCENT_APP_ID") or "").strip()
+    TENCENT_REGION: str = (os.environ.get("EAP_TENCENT_REGION") or "ap-shanghai").strip()
+    COS_BUCKET: str = (os.environ.get("EAP_COS_BUCKET") or "").strip()
+    COS_REGION: str = (os.environ.get("EAP_COS_REGION") or TENCENT_REGION).strip()
+    COS_AUDIO_PREFIX: str = (os.environ.get("EAP_COS_AUDIO_PREFIX") or "self-study/").strip()
+    TTS_ENABLED: bool = _env_bool("EAP_TTS_ENABLED")
+    TTS_VOICE_ID: str = (os.environ.get("EAP_TTS_VOICE_ID") or "101051").strip()
+    TTS_SAMPLE_RATE: int = int(os.environ.get("EAP_TTS_SAMPLE_RATE", "16000") or "16000")
+    TTS_CODEC: str = (os.environ.get("EAP_TTS_CODEC") or "mp3").strip()
+    ASR_ENABLED: bool = _env_bool("EAP_ASR_ENABLED")
+    ASR_ENGINE: str = (os.environ.get("EAP_ASR_ENGINE") or "16k_en").strip()
+    SOE_ENABLED: bool = _env_bool("EAP_SOE_ENABLED")
+    SOE_APP_ID: str = (os.environ.get("EAP_SOE_APP_ID") or TENCENT_APP_ID).strip()
+    SOE_ENGINE: str = (os.environ.get("EAP_SOE_ENGINE") or "16k_en").strip()
+    SPEAKING_AUDIO_RETENTION_DAYS: int = int(os.environ.get("EAP_SPEAKING_AUDIO_RETENTION_DAYS", "90") or "90")
+
 
 config = EapConfig()
 
@@ -194,3 +214,9 @@ def validate_production_config() -> None:
             "EAP_AI_ENABLED=1 but no EAP_DEEPSEEK_API_KEY or EAP_OPENAI_API_KEY — "
             "AI lesson generator and coaches will return 503 until a key is set in the host dashboard."
         )
+    if config.AUDIO_ENABLED and not (config.TENCENT_SECRET_ID and config.TENCENT_SECRET_KEY):
+        log.warning(
+            "EAP_AUDIO_ENABLED=1 but EAP_TENCENT_SECRET_ID/KEY missing — audio falls back to text-only."
+        )
+    if config.TTS_ENABLED and config.AUDIO_ENABLED and not config.COS_BUCKET:
+        log.warning("EAP_TTS_ENABLED=1 but EAP_COS_BUCKET missing — TTS playback disabled.")

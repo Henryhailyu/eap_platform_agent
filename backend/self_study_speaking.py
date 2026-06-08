@@ -3,6 +3,7 @@ SS-Sp1–Sp3 — Self-study speaking (P1/P2/P3 + full mock; Web text + timer; TT
 """
 from __future__ import annotations
 
+import base64
 import csv
 import io
 import json
@@ -11,6 +12,16 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from flask import Response, jsonify, request
+
+from tencent_audio import (
+    asr_ready,
+    audio_status,
+    ensure_speaking_prompt_audio,
+    evaluate_oral_sentence,
+    merge_soe_into_feedback,
+    recognize_speech,
+    store_student_recording,
+)
 
 SPEAKING_SKILL = "speaking"
 PART1_TIME_LIMIT = 60
@@ -261,6 +272,31 @@ def migrate_self_study_speaking_tables(conn) -> None:
     )
     seed_default_speaking_sessions(conn)
     seed_extended_speaking_sessions(conn)
+    _migrate_speaking_audio_column(conn)
+
+
+def _migrate_speaking_audio_column(conn) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(student_speaking_responses)")}
+    if "audio_cos_key" not in cols:
+        conn.execute("ALTER TABLE student_speaking_responses ADD COLUMN audio_cos_key TEXT")
+        conn.commit()
+
+
+def _item_prompt_en(item: dict[str, Any]) -> str:
+    return str(item.get("promptEn") or item.get("topicEn") or "").strip()
+
+
+def _enrich_session_items(session_id: int, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for item in items:
+        copy = dict(item)
+        prompt = _item_prompt_en(item)
+        if prompt and item.get("id"):
+            audio = ensure_speaking_prompt_audio(session_id, str(item["id"]), prompt)
+            if audio:
+                copy["promptAudio"] = audio
+        out.append(copy)
+    return out
 
 
 def _session_payload(raw: dict[str, Any]) -> dict[str, Any]:
@@ -683,6 +719,7 @@ def register_self_study_speaking_routes(
                 }
 
         part_type = row["part_type"]
+        items = _enrich_session_items(row["id"], _session_items(content, part_type))
         return jsonify(
             {
                 "session": {
@@ -690,10 +727,11 @@ def register_self_study_speaking_routes(
                     "title": row["title"],
                     "partType": part_type,
                     "content": content,
-                    "items": _session_items(content, part_type),
+                    "items": items,
                     "itemCount": _item_count(content, part_type),
                 },
                 "responses": list(latest_by_q.values()),
+                "audioStatus": audio_status(),
             }
         )
 
@@ -716,13 +754,14 @@ def register_self_study_speaking_routes(
         timed_out = 1 if data.get("timedOut") else 0
         elapsed = data.get("elapsedSec")
         elapsed_sec = int(elapsed) if elapsed is not None else None
+        audio_b64 = str(data.get("audioBase64") or "").strip()
+        audio_format = str(data.get("audioFormat") or "webm").lower().lstrip(".")
+        audio_bytes: bytes | None = None
+        audio_cos_key: str | None = None
 
         if not session_id or not question_id:
             conn.close()
             return jsonify({"error": "sessionId and questionId required"}), 400
-        if len(response_text) < 5:
-            conn.close()
-            return jsonify({"error": "Response too short"}), 400
 
         row = conn.execute(
             "SELECT content_json, part_type FROM speaking_sessions WHERE id = ? AND is_active = 1",
@@ -747,6 +786,23 @@ def register_self_study_speaking_routes(
             "MOCK": PART1_MIN_WORDS,
         }.get(item_part, PART1_MIN_WORDS)
         min_words = int(q_meta.get("minWords") or default_min)
+
+        if audio_b64:
+            try:
+                audio_bytes = base64.b64decode(audio_b64)
+                audio_cos_key = store_student_recording(
+                    username, session_id, question_id, audio_bytes, audio_format
+                )
+                if asr_ready() and len(response_text) < 5:
+                    response_text = recognize_speech(audio_bytes, audio_format)
+            except Exception as exc:
+                conn.close()
+                return jsonify({"error": f"Audio processing failed: {exc}"}), 400
+
+        if len(response_text) < 5:
+            conn.close()
+            return jsonify({"error": "Response too short — type or record your answer"}), 400
+
         feedback = _build_feedback(
             response_text,
             min_words=min_words,
@@ -754,6 +810,14 @@ def register_self_study_speaking_routes(
             elapsed_sec=elapsed_sec,
             part_type=item_part,
         )
+        ref_text = _item_prompt_en(q_meta) or response_text
+        if audio_bytes:
+            soe = evaluate_oral_sentence(audio_bytes, ref_text, audio_format)
+            feedback = merge_soe_into_feedback(feedback, soe)
+            if audio_cos_key:
+                feedback["audioCosKey"] = audio_cos_key
+                feedback["transcriptSource"] = "asr" if asr_ready() else "typed"
+
         now = _now_iso()
         wc = _word_count(response_text)
 
@@ -761,8 +825,8 @@ def register_self_study_speaking_routes(
             """
             INSERT INTO student_speaking_responses
                 (student_username, session_id, question_id, response_text, word_count,
-                 elapsed_sec, timed_out, feedback_json, submitted_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 elapsed_sec, timed_out, feedback_json, submitted_at, audio_cos_key)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 username,
@@ -774,11 +838,12 @@ def register_self_study_speaking_routes(
                 timed_out,
                 json.dumps(feedback, ensure_ascii=False),
                 now,
+                audio_cos_key,
             ),
         )
         conn.commit()
         conn.close()
-        return jsonify({"ok": True, "feedback": feedback})
+        return jsonify({"ok": True, "feedback": feedback, "transcript": response_text})
 
     @app.route("/api/admin/self-study/speaking/sessions", methods=["GET"])
     def admin_speaking_sessions():

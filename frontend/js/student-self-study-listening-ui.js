@@ -87,11 +87,20 @@
     const lesson = pickLang(c, "lessonEn", "lessonZh");
     const savedNotes = prog.selfNotes || "";
 
+    const audio = data.audio;
+    const audioBlock = audio?.url
+      ? `<div class="ssc-audio-player">
+          <p class="ssc-audio-player__label">${t("self_study_listening_audio_play")}</p>
+          <audio controls preload="metadata" src="${escapeHtml(audio.url)}" class="ssc-audio-player__el"></audio>
+          ${audio.truncated ? `<p class="ssc-disclaimer">${t("self_study_listening_audio_truncated")}</p>` : ""}
+        </div>`
+      : `<p class="ssc-disclaimer">${t("self_study_listening_no_audio")}</p>`;
+
     root.innerHTML = `
       <div class="ssc-lesson-card">
         <h2>${escapeHtml(data.title || t("self_study_listening_learn_title"))}</h2>
         <p>${escapeHtml(lesson)}</p>
-        <p class="ssc-disclaimer">${t("self_study_listening_no_audio")}</p>
+        ${audioBlock}
       </div>
       <pre class="ssc-script-block">${escapeHtml(script)}</pre>
       <div class="ssc-listening-notes">

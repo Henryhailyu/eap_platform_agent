@@ -63,4 +63,4 @@ Rule-based practice bands for **FC / LR / GRA / PR** using word count, sentence 
 
 ## Next
 
-**SS-Sp2–Sp3** delivered — see [`SS-Sp2-Sp3_SELF_STUDY_SPEAKING.md`](SS-Sp2-Sp3_SELF_STUDY_SPEAKING.md). **SS-Sp4** SOE + TTS/STT when keys available.
+**SS-Sp2–Sp3** — [`SS-Sp2-Sp3_SELF_STUDY_SPEAKING.md`](SS-Sp2-Sp3_SELF_STUDY_SPEAKING.md). **SS-Sp4** audio — [`SS-Sp4_SELF_STUDY_SPEAKING_AUDIO.md`](SS-Sp4_SELF_STUDY_SPEAKING_AUDIO.md).

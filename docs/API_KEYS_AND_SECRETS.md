@@ -75,14 +75,20 @@ Document your answers in [`VISION_AI_MATERIALS.md`](VISION_AI_MATERIALS.md) (or 
 
 ---
 
-## TTS / STT (later)
+## TTS / ASR / SOE / COS (SS-Sp4)
 
-| Service | Typical env var | Used for |
-|---------|-----------------|----------|
-| Text-to-speech | `EAP_TTS_API_KEY` or vendor-specific | Listening module audio |
-| Speech-to-text | `EAP_STT_API_KEY` | Speaking recording |
+**Procurement checklist:** [`SS-Sp4_TENCENT_PROCUREMENT_CHECKLIST.md`](SS-Sp4_TENCENT_PROCUREMENT_CHECKLIST.md) — console steps, env vars, 30-user cost estimate.
 
-**Not started** until S5/S6 audio paths are approved and a host for audio files exists.
+| Service | Env vars | Used for |
+|---------|----------|----------|
+| Master switch | `EAP_AUDIO_ENABLED` | All student audio features |
+| Tencent CAM | `EAP_TENCENT_SECRET_ID`, `EAP_TENCENT_SECRET_KEY`, `EAP_TENCENT_APP_ID` | API auth |
+| COS | `EAP_COS_BUCKET`, `EAP_COS_REGION`, `EAP_COS_AUDIO_PREFIX` | TTS mp3 + student recordings |
+| TTS | `EAP_TTS_ENABLED`, `EAP_TTS_VOICE_ID` | Listening + speaking question playback |
+| ASR | `EAP_ASR_ENABLED`, `EAP_ASR_ENGINE` | Speaking recording → transcript |
+| SOE | `EAP_SOE_ENABLED`, `EAP_SOE_APP_ID`, `EAP_SOE_ENGINE` | Pronunciation (PR) scoring |
+
+Copy placeholders from repo root `.env.example`. Implementation: [`SS-Sp4_SELF_STUDY_SPEAKING_AUDIO.md`](SS-Sp4_SELF_STUDY_SPEAKING_AUDIO.md).
 
 ---
 

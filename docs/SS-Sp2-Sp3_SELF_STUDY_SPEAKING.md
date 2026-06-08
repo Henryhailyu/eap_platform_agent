@@ -46,4 +46,5 @@
 
 ## Next
 
-**SS-Sp4** — SOE + TTS/STT when Tencent keys available; extend mock to full 11–14 min flow
+**SS-Sp4** delivered — [`SS-Sp4_SELF_STUDY_SPEAKING_AUDIO.md`](SS-Sp4_SELF_STUDY_SPEAKING_AUDIO.md). Extend mock to full 11–14 min flow; CDN audio domain after ICP.  
+**Procurement:** [`SS-Sp4_TENCENT_PROCUREMENT_CHECKLIST.md`](SS-Sp4_TENCENT_PROCUREMENT_CHECKLIST.md)

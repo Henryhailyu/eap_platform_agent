@@ -160,6 +160,10 @@
     return apiFetch("/api/student/self-study/speaking/history");
   }
 
+  async function getAudioStatus() {
+    return apiFetch("/api/student/self-study/audio/status");
+  }
+
   global.EAP_SELF_STUDY_SERVER = {
     getStatus,
     getPlacement,
@@ -187,5 +191,6 @@
     getSpeakingSession,
     submitSpeakingResponse,
     getSpeakingHistory,
+    getAudioStatus,
   };
 })();

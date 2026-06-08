@@ -118,6 +118,23 @@
     return items.length ? Math.round((done / items.length) * 100) : 0;
   }
 
+  function promptAudioHtml(item) {
+    const a = item?.promptAudio;
+    if (!a?.url) {
+      return `<p class="ssc-disclaimer">${t("self_study_speaking_tts_pending")}</p>`;
+    }
+    return `<div class="ssc-audio-player"><p class="ssc-audio-player__label">${t("self_study_speaking_play_question")}</p><audio controls preload="metadata" src="${escapeHtml(a.url)}" class="ssc-audio-player__el"></audio></div>`;
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
   function renderCueCardHtml(item) {
     const bullets = isZh() ? item.bulletsZh || item.bulletsEn : item.bulletsEn || item.bulletsZh;
     const list = (bullets || []).map((b) => `<li>${escapeHtml(b)}</li>`).join("");
@@ -259,29 +276,57 @@
     const ta = root.querySelector("#ssc-speaking-response");
     const wcEl = root.querySelector("#ssc-sp-wc");
     const submitBtn = root.querySelector("#ssc-submit-response");
+    const recStatus = root.querySelector("#ssc-rec-status");
     let running = false;
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let recordChunks = [];
+    let recordedBlob = null;
 
     function refreshWc() {
       if (wcEl) wcEl.textContent = String(countWords(ta?.value || ""));
     }
     ta?.addEventListener("input", refreshWc);
 
+    function stopMedia() {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        try {
+          mediaRecorder.stop();
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((tr) => tr.stop());
+        mediaStream = null;
+      }
+    }
+
     async function finishResponse(timedOut) {
       clearTimer();
+      stopMedia();
       const text = ta?.value?.trim() || "";
       const elapsed = state.startedAt ? Math.min(limit, limit - state.secondsLeft) : 0;
-      if (text.length < 5) {
+      if (text.length < 5 && !recordedBlob) {
         alert(t("self_study_speaking_response_short"));
         return;
       }
       try {
-        const res = await SERVER().submitSpeakingResponse({
+        const body = {
           sessionId: state.sessionId,
           questionId: item.id,
           responseText: text,
           timedOut: !!timedOut,
           elapsedSec: elapsed,
-        });
+        };
+        if (recordedBlob) {
+          body.audioBase64 = await blobToBase64(recordedBlob);
+          body.audioFormat = recordedBlob.type.includes("webm") ? "webm" : "mp3";
+        }
+        const res = await SERVER().submitSpeakingResponse(body);
+        if (res.transcript && ta && !text) {
+          ta.value = res.transcript;
+        }
         state.lastFeedback = res.feedback;
         state.sessionDetail = null;
         resetPhase();
@@ -291,11 +336,47 @@
       }
     }
 
+    root.querySelector("#ssc-start-record")?.addEventListener("click", async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        alert(t("self_study_speaking_mic_unavailable"));
+        return;
+      }
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/webm";
+        recordChunks = [];
+        recordedBlob = null;
+        mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime });
+        mediaRecorder.ondataavailable = (ev) => {
+          if (ev.data?.size) recordChunks.push(ev.data);
+        };
+        mediaRecorder.onstop = () => {
+          if (recordChunks.length) {
+            recordedBlob = new Blob(recordChunks, { type: mime });
+            if (recStatus) recStatus.textContent = t("self_study_speaking_record_saved");
+          }
+        };
+        mediaRecorder.start();
+        if (recStatus) recStatus.textContent = t("self_study_speaking_recording");
+        if (submitBtn) submitBtn.disabled = false;
+      } catch (e) {
+        alert(e.message || t("self_study_speaking_mic_denied"));
+      }
+    });
+
+    root.querySelector("#ssc-stop-record")?.addEventListener("click", () => {
+      stopMedia();
+      if (recStatus && !recordedBlob) recStatus.textContent = t("self_study_speaking_record_stopped");
+    });
+
     root.querySelector("#ssc-start-timer")?.addEventListener("click", () => {
       if (running) return;
       running = true;
       if (submitBtn) submitBtn.disabled = false;
       ta?.focus();
+      void root.querySelector("#ssc-start-record")?.click();
       startCountdown(root, limit, () => void finishResponse(true), "self_study_speaking_time_left");
     });
 
@@ -360,7 +441,7 @@
       </div>
       ${renderCueCardHtml(item)}
       ${notesBlock}
-      <p class="ssc-disclaimer">${t("self_study_speaking_tts_pending")}</p>
+      ${promptAudioHtml(item)}
       <div class="ssc-speaking-timer" aria-live="polite">
         <span class="ssc-speaking-timer__label" id="ssc-timer-label">${t("self_study_speaking_time_left")}</span>
         <span class="ssc-speaking-timer__value" id="ssc-timer-val">${limit}</span>s
@@ -368,6 +449,11 @@
       <label for="ssc-speaking-response" class="ssc-listening-notes__label">${t("self_study_speaking_your_response")}</label>
       <textarea id="ssc-speaking-response" class="ssc-listening-notes__input" rows="6" maxlength="20000" placeholder="${t("self_study_speaking_response_placeholder")}"></textarea>
       <p class="ssc-writing-wordcount"><span id="ssc-sp-wc">0</span> / ${minW} ${t("self_study_writing_words")}</p>
+      <div class="ssc-speaking-record">
+        <button type="button" class="btn-secondary" id="ssc-start-record">${t("self_study_speaking_start_record")}</button>
+        <button type="button" class="btn-secondary" id="ssc-stop-record">${t("self_study_speaking_stop_record")}</button>
+        <span id="ssc-rec-status" class="ssc-vocab-hint"></span>
+      </div>
       <div class="ssc-placement-actions">
         <button type="button" class="btn-primary" id="ssc-start-timer">${t("self_study_speaking_start_long_turn")}</button>
         <button type="button" class="btn-secondary" id="ssc-submit-response" disabled>${t("self_study_speaking_submit")}</button>
@@ -399,7 +485,7 @@
       <div class="ssc-speaking-question-card">
         <p class="ssc-speaking-examiner">${t("self_study_speaking_examiner")}</p>
         <h3>${escapeHtml(pickLang(item, "promptEn", "promptZh"))}</h3>
-        <p class="ssc-disclaimer">${t("self_study_speaking_tts_pending")}</p>
+        ${promptAudioHtml(item)}
       </div>
       <div class="ssc-speaking-timer" aria-live="polite">
         <span class="ssc-speaking-timer__label" id="ssc-timer-label">${t("self_study_speaking_time_left")}</span>
@@ -408,6 +494,11 @@
       <label for="ssc-speaking-response" class="ssc-listening-notes__label">${t("self_study_speaking_your_response")}</label>
       <textarea id="ssc-speaking-response" class="ssc-listening-notes__input" rows="5" maxlength="20000" placeholder="${t("self_study_speaking_response_placeholder")}"></textarea>
       <p class="ssc-writing-wordcount"><span id="ssc-sp-wc">0</span> / ${minW} ${t("self_study_writing_words")}</p>
+      <div class="ssc-speaking-record">
+        <button type="button" class="btn-secondary" id="ssc-start-record">${t("self_study_speaking_start_record")}</button>
+        <button type="button" class="btn-secondary" id="ssc-stop-record">${t("self_study_speaking_stop_record")}</button>
+        <span id="ssc-rec-status" class="ssc-vocab-hint"></span>
+      </div>
       <div class="ssc-placement-actions">
         <button type="button" class="btn-primary" id="ssc-start-timer">${t(startKey, { sec: String(limit) })}</button>
         <button type="button" class="btn-secondary" id="ssc-submit-response" disabled>${t("self_study_speaking_submit")}</button>
