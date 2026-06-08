@@ -1,6 +1,6 @@
 # Teacher-side roadmap (execution order)
 
-**Updated:** 2026-06-04  
+**Updated:** 2026-06-09  
 **Pilot class:** `EAP047` · **Pilot skill:** Writing  
 
 ---
@@ -91,4 +91,4 @@
 
 ---
 
-*Next: batch UAT / real-class pilot; **WEB-J** deferred.*
+*Next: Lighthouse batch UAT — `verify_pilot.py` + [`CHECKLIST_EAP047_SELF_STUDY.md`](CHECKLIST_EAP047_SELF_STUDY.md); **WEB-J** deferred until after备案/HTTPS.*

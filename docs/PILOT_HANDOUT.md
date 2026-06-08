@@ -2,7 +2,7 @@
 
 **Purpose:** Printable handout for Lighthouse / classroom pilot (**EAP047**).  
 **Printable page:** `/ui/pilot-handout-teacher.html`  
-**Updated:** 2026-06-01
+**Updated:** 2026-06-09
 
 ---
 
@@ -27,6 +27,16 @@
 3. **Live teaching** — session code, push display, timer to students (`teacher-live.html`)  
 4. **Homework** — new task, optional AI marking  
 5. **Marking** — submissions → AI report → Approve  
+6. **Recorded lessons** — upload → publish (`teacher-recorded.html`)  
+7. **Students** — AI Self-Study Centre (`student-self-study-module.html`)  
+
+**Smoke test after deploy:**
+
+```bash
+cd backend && python3 scripts/verify_pilot.py --base http://YOUR_HOST:5051 --password 'YOUR_PASSWORD'
+```
+
+Includes self-study + audio status + recorded-lessons API checks.
 
 ---
 
@@ -47,6 +57,7 @@
 ## Related docs
 
 - [`CHECKLIST_EAP047_PILOT_REHEARSAL.md`](CHECKLIST_EAP047_PILOT_REHEARSAL.md) — full rehearsal steps  
+- [`CHECKLIST_EAP047_SELF_STUDY.md`](CHECKLIST_EAP047_SELF_STUDY.md) — self-study UAT addendum  
 - [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) — launch criteria  
 - [`I0_PHONE_PILOT.md`](I0_PHONE_PILOT.md) — phone spot-check  
 

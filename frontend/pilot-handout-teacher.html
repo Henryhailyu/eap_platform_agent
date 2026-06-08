@@ -241,6 +241,17 @@
             </p>
           </div>
         </li>
+        <li>
+          <span class="step-num">5</span>
+          <div>
+            <p class="step-title">录课 · Recorded lessons（可选）</p>
+            <p class="step-en">
+              Upload MP4 → link or create calendar task → <strong>Publish to students</strong>. VOD cloud when
+              enabled on server.
+            </p>
+            <p class="step-link"><a id="link-recorded" href="#">录课管理 / Recorded lessons</a></p>
+          </div>
+        </li>
       </ol>
 
       <div class="tips">
@@ -248,6 +259,7 @@
         <ul>
           <li>系统更新后请 <strong>硬刷新</strong>（Ctrl+Shift+R 或清空缓存）。After updates: hard refresh.</li>
           <li>Live 计时器推送到学生后，学生端需与教师同步显示；首次可点页面以允许提示音。</li>
+          <li>学生自学：<strong>AI Self-Study Centre</strong>（词汇/阅读/听力/写作/口语）— 同一学生账号登录。</li>
           <li>遇问题请记录：设备、浏览器、操作步骤、截图。Report: device, browser, steps, screenshot.</li>
         </ul>
       </div>
@@ -255,7 +267,7 @@
       <footer>
         <span id="footer-host"></span> ·
         <a id="link-doc" href="#">Full checklist (EAP047 rehearsal)</a>
-        · v2026-06-01
+        · v2026-06-09
       </footer>
     </div>
 
@@ -281,6 +293,7 @@
         setHref("link-lp", "/teacher-lesson-ai.html?class=EAP047");
         setHref("link-live", "/teacher-live.html?class=EAP047");
         setHref("link-cal", "/teacher.html");
+        setHref("link-recorded", "/teacher-recorded.html?class_name=EAP047");
         var doc = document.getElementById("link-doc");
         if (doc) {
           doc.href =

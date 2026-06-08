@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-I0: smoke-test a deployed (or local) EAP pilot — health, v1 auth, Bearer student APIs.
+I0: smoke-test a deployed (or local) EAP pilot — health, v1 auth, session self-study, VOD status.
 
   python scripts/verify_pilot.py --base http://127.0.0.1:5051 --password '123456'
   python scripts/verify_pilot.py --base https://eap-pilot.onrender.com --password 'secret'
@@ -8,10 +8,12 @@ I0: smoke-test a deployed (or local) EAP pilot — health, v1 auth, Bearer stude
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
 import json
 import ssl
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -26,6 +28,15 @@ def _ssl_context() -> ssl.SSLContext:
 
 DEFAULT_CLASS = "EAP047"
 STUDENT_USER = "student1"
+TEACHER_USER = "teacher1"
+
+
+def build_cookie_opener() -> urllib.request.OpenerDirector:
+    jar = http.cookiejar.CookieJar()
+    return urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(jar),
+        urllib.request.HTTPSHandler(context=_ssl_context()),
+    )
 
 
 def request_json(
@@ -35,6 +46,7 @@ def request_json(
     headers=None,
     retries: int = 0,
     retry_wait: int = 15,
+    opener: urllib.request.OpenerDirector | None = None,
 ):
     import time
 
@@ -45,9 +57,11 @@ def request_json(
         hdrs.setdefault("Content-Type", "application/json")
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
     last_code, last_payload = None, {}
+    open_fn = opener.open if opener is not None else urllib.request.urlopen
+    open_kwargs = {} if opener is not None else {"context": _ssl_context()}
     for attempt in range(retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=90, context=_ssl_context()) as resp:
+            with open_fn(req, timeout=90, **open_kwargs) as resp:
                 raw = resp.read().decode("utf-8")
                 return resp.status, json.loads(raw) if raw else {}
         except urllib.error.HTTPError as e:
@@ -220,6 +234,114 @@ def main() -> int:
         code == 401 and bad.get("code") == "AUTH_INVALID_CREDENTIALS",
         f"http {code}",
     )
+
+    print("\nSession (web UI) — self-study + recorded lessons…")
+    student_opener = build_cookie_opener()
+    s_code, web_login = request_json(
+        "POST",
+        f"{base}/api/login",
+        {"username": STUDENT_USER, "password": args.password},
+        opener=student_opener,
+    )
+    all_ok &= check(
+        "POST /api/login (student session)",
+        s_code == 200 and web_login.get("success") is True,
+        f"http {s_code}",
+    )
+
+    if s_code == 200:
+        code, ss = request_json(
+            "GET",
+            f"{base}/api/student/self-study/status",
+            opener=student_opener,
+        )
+        all_ok &= check(
+            "GET /api/student/self-study/status",
+            code == 200 and "placementComplete" in ss,
+            f"unlocked={ss.get('selfStudyUnlocked')}",
+        )
+
+        code, daily = request_json(
+            "GET",
+            f"{base}/api/student/self-study/daily-overview",
+            opener=student_opener,
+        )
+        all_ok &= check(
+            "GET /api/student/self-study/daily-overview",
+            code == 200,
+            f"http {code}",
+        )
+
+        code, listen = request_json(
+            "GET",
+            f"{base}/api/student/self-study/listening/overview",
+            opener=student_opener,
+        )
+        all_ok &= check(
+            "GET /api/student/self-study/listening/overview",
+            code == 200 and "schedule" in listen,
+            f"http {code}",
+        )
+
+        code, vocab = request_json(
+            "GET",
+            f"{base}/api/student/self-study/vocabulary/overview",
+            opener=student_opener,
+        )
+        all_ok &= check(
+            "GET /api/student/self-study/vocabulary/overview",
+            code == 200,
+            f"http {code}",
+        )
+
+        code, audio = request_json(
+            "GET",
+            f"{base}/api/student/self-study/audio/status",
+            opener=student_opener,
+        )
+        audio_ok = code == 200 and "tts" in audio
+        all_ok &= check(
+            "GET /api/student/self-study/audio/status",
+            audio_ok,
+            f"tts={audio.get('tts')} asr={audio.get('asr')}" if audio_ok else f"http {code}",
+        )
+
+    teacher_opener = build_cookie_opener()
+    t_code, t_login = request_json(
+        "POST",
+        f"{base}/api/login",
+        {"username": TEACHER_USER, "password": args.password},
+        opener=teacher_opener,
+    )
+    all_ok &= check(
+        "POST /api/login (teacher session)",
+        t_code == 200 and t_login.get("success") is True,
+        f"http {t_code}",
+    )
+
+    if t_code == 200:
+        q = urllib.parse.quote(class_name)
+        code, rec = request_json(
+            "GET",
+            f"{base}/api/teacher/recorded-lessons?class_name={q}",
+            opener=teacher_opener,
+        )
+        all_ok &= check(
+            "GET /api/teacher/recorded-lessons",
+            code == 200 and "lessons" in rec,
+            f"count={len(rec.get('lessons') or [])}",
+        )
+
+        code, vod = request_json(
+            "GET",
+            f"{base}/api/teacher/recorded-lessons/vod/status",
+            opener=teacher_opener,
+        )
+        all_ok &= check(
+            "GET /api/teacher/recorded-lessons/vod/status",
+            code == 200 and "vodEnabled" in vod,
+            f"vodEnabled={vod.get('vodEnabled')}",
+        )
 
     print()
     if all_ok:
