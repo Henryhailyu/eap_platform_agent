@@ -1,9 +1,11 @@
 /**
- * Phase N2 — Teacher recorded lessons (local upload).
+ * Phase N2 — Teacher recorded lessons (local upload + optional Tencent VOD).
  */
 (function (global) {
   const PAGE = "teacher-recorded";
   const api = () => global.EAP_RECORDED_LESSONS;
+  const VIDEO_EXTS = new Set(["mp4", "webm", "mov", "m4v"]);
+  const vodState = { enabled: false, appId: null };
 
   function t(key, params) {
     if (typeof global.t === "function") return global.t(key, params);
@@ -96,6 +98,84 @@
     selectEl.value = code;
   }
 
+  function fileExt(name) {
+    const n = String(name || "");
+    if (!n.includes(".")) return "";
+    return n.split(".").pop().toLowerCase();
+  }
+
+  function isVideoFile(file) {
+    const ext = fileExt(file && file.name);
+    if (ext && VIDEO_EXTS.has(ext)) return true;
+    return !!(file && file.type && String(file.type).startsWith("video/"));
+  }
+
+  function vodStatusLabel(status) {
+    const s = String(status || "local").toLowerCase();
+    if (s === "transcoding" || s === "pending") return t("trec_vod_status_processing");
+    if (s === "ready") return t("trec_vod_status_ready");
+    if (s === "failed") return t("trec_vod_status_failed");
+    if (s === "local") return "";
+    return s;
+  }
+
+  function tcVodConstructor() {
+    const lib = global.TcVod;
+    if (!lib) return null;
+    return lib.default || lib;
+  }
+
+  async function uploadViaVod(file, meta) {
+    const TcVodCtor = tcVodConstructor();
+    if (!TcVodCtor || !vodState.appId) {
+      throw new Error(t("trec_vod_sdk_missing"));
+    }
+    const signRes = await api().vodUploadSign({
+      mediaName: meta.title,
+      mediaExt: fileExt(file.name) || "mp4",
+    });
+    const appId = signRes.appId || vodState.appId;
+    const tcVod = new TcVodCtor({
+      appId: Number(appId),
+      getSignature: () => Promise.resolve(signRes.signature),
+    });
+    const uploader = tcVod.upload({ mediaFile: file });
+    if (uploader && typeof uploader.on === "function") {
+      uploader.on("media_progress", (info) => {
+        const pct = info && info.percent != null ? Math.round(info.percent * 100) : null;
+        if (pct != null) setUploadStatus(t("trec_vod_uploading", { pct: String(pct) }), false);
+      });
+    }
+    const done = await (uploader.done ? uploader.done() : uploader);
+    const fileId = (done && (done.fileId || done.FileId)) || "";
+    if (!fileId) throw new Error(t("trec_vod_no_file_id"));
+    await api().vodRegister({
+      class_name: meta.className,
+      title: meta.title,
+      vodFileId: fileId,
+      fileName: file.name,
+      fileExt: fileExt(file.name) || "mp4",
+      fileSizeBytes: file.size,
+      task_date: meta.taskDate || undefined,
+      create_calendar_task: meta.createTask ? "1" : undefined,
+      calendar_task_id: meta.linkId || undefined,
+      visibility: meta.publishOnCreate ? "published" : "draft",
+    });
+  }
+
+  async function loadVodStatus() {
+    if (!api() || typeof api().vodStatus !== "function") return;
+    try {
+      const s = await api().vodStatus();
+      vodState.enabled = !!(s && s.vodEnabled);
+      vodState.appId = s && s.appId != null ? Number(s.appId) : null;
+      const banner = document.getElementById("trec-vod-banner");
+      if (banner) banner.classList.toggle("hidden", !vodState.enabled);
+    } catch (_) {
+      vodState.enabled = false;
+    }
+  }
+
   function renderList(lessons) {
     const list = document.getElementById("trec-list");
     const empty = document.getElementById("trec-list-empty");
@@ -110,14 +190,23 @@
       const published = lesson.visibility === "published";
       const badgeClass = published ? "trec-badge trec-badge--published" : "trec-badge";
       const badgeText = published ? t("trec_status_published") : t("trec_status_draft");
+      const vodLabel = vodStatusLabel(lesson.vod_status);
+      const vodBadge = vodLabel
+        ? `<span class="trec-badge trec-badge--vod">${escapeHtml(vodLabel)}</span>`
+        : "";
+      const vodOnly = String(lesson.file_path || "").startsWith("vod:");
+      const previewBtn = vodOnly
+        ? ""
+        : `<button type="button" class="btn-secondary" data-action="preview" data-id="${lesson.id}">${escapeHtml(t("trec_preview_btn"))}</button>`;
       li.innerHTML = `
         <div class="trec-item__head">
           <h3 class="trec-item__title">${escapeHtml(lesson.title)}</h3>
           <span class="${badgeClass}">${escapeHtml(badgeText)}</span>
+          ${vodBadge}
         </div>
-        <p class="trec-item__meta">${escapeHtml(lesson.file_name || "")} · ${escapeHtml(formatBytes(lesson.file_size_bytes))}${lesson.calendar_task_date ? ` · ${escapeHtml(t("trec_linked_task", { date: lesson.calendar_task_date }))}` : ""} · ${escapeHtml(lesson.created_at || "")}</p>
+        <p class="trec-item__meta">${escapeHtml(lesson.file_name || "")} · ${escapeHtml(formatBytes(lesson.file_size_bytes))}${lesson.calendar_task_date ? ` · ${escapeHtml(t("trec_linked_task", { date: lesson.calendar_task_date }))}` : ""} · ${escapeHtml(lesson.created_at || "")}${lesson.vod_file_id ? ` · VOD ${escapeHtml(String(lesson.vod_file_id))}` : ""}</p>
         <div class="trec-item__actions">
-          <button type="button" class="btn-secondary" data-action="preview" data-id="${lesson.id}">${escapeHtml(t("trec_preview_btn"))}</button>
+          ${previewBtn}
           <button type="button" class="btn-secondary" data-action="toggle" data-id="${lesson.id}" data-published="${published ? "1" : "0"}">${escapeHtml(published ? t("trec_unpublish_btn") : t("trec_publish_btn"))}</button>
           <button type="button" class="btn-secondary" data-action="delete" data-id="${lesson.id}">${escapeHtml(t("trec_delete_btn"))}</button>
         </div>
@@ -204,20 +293,33 @@
         setUploadStatus(t("trec_task_date_required"), true);
         return;
       }
-      const fd = new FormData();
-      fd.append("class_name", className);
-      fd.append("title", (titleEl && titleEl.value) || fileEl.files[0].name);
-      fd.append("file", fileEl.files[0]);
-      if (taskDate) fd.append("task_date", taskDate);
-      if (createTask) {
-        fd.append("create_calendar_task", "1");
-      } else if (linkId) {
-        fd.append("calendar_task_id", linkId);
-      }
+      const title = (titleEl && titleEl.value) || fileEl.files[0].name;
+      const useVod = vodState.enabled && isVideoFile(fileEl.files[0]);
       if (submitBtn) submitBtn.disabled = true;
-      setUploadStatus(t("trec_uploading"), false);
+      setUploadStatus(useVod ? t("trec_vod_upload_start") : t("trec_uploading"), false);
       try {
-        await api().upload(fd);
+        if (useVod) {
+          await uploadViaVod(fileEl.files[0], {
+            className,
+            title,
+            taskDate,
+            createTask,
+            linkId,
+            publishOnCreate: false,
+          });
+        } else {
+          const fd = new FormData();
+          fd.append("class_name", className);
+          fd.append("title", title);
+          fd.append("file", fileEl.files[0]);
+          if (taskDate) fd.append("task_date", taskDate);
+          if (createTask) {
+            fd.append("create_calendar_task", "1");
+          } else if (linkId) {
+            fd.append("calendar_task_id", linkId);
+          }
+          await api().upload(fd);
+        }
         setUploadStatus(t("trec_upload_ok"), false);
         form.reset();
         if (classEl) classEl.value = className;
@@ -259,6 +361,7 @@
     };
     reloadTasks();
 
+    await loadVodStatus();
     bindUploadForm();
     document.getElementById("trec-list")?.addEventListener("click", handleListClick);
     classSelect?.addEventListener("change", () => {

@@ -69,14 +69,14 @@ sudo docker compose up -d --force-recreate
 
 ---
 
-## Teacher workflow (VOD path)
+## Teacher workflow (VOD path — N2 UI)
 
-1. `POST /api/teacher/recorded-lessons/vod/upload-sign` → browser uploads to VOD (SDK)
-2. `PATCH /api/teacher/recorded-lessons/<id>` with `{ "vodFileId": "328..." }`
+1. Open **Recorded lessons** (`teacher-recorded.html`) — banner shows when `EAP_VOD_ENABLED=1`
+2. Choose a **video** file → form uses **vod-js-sdk-v6** + `upload-sign` + `vod/register`
 3. Webhook sets `vod_status=ready` when transcode finishes
 4. Student opens `player.html` → `play-auth` → TCPlayer
 
-Until VOD UI is wired in teacher page, teachers can keep **local upload** (existing flow).
+**Audio** and **VOD off** → existing local multipart upload unchanged.
 
 ---
 

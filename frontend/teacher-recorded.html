@@ -40,6 +40,9 @@
               <p class="tlive-topbar__meta" data-i18n="trec_subtitle">
                 Upload class recordings for your students. Videos are stored on the server until Tencent VOD is connected.
               </p>
+              <p id="trec-vod-banner" class="trec-vod-banner hidden" role="status" data-i18n="trec_vod_enabled_hint">
+                Tencent VOD is on — video files upload to the cloud for HLS playback after transcode.
+              </p>
             </div>
           </div>
 
@@ -73,7 +76,7 @@
               </div>
               <div class="trec-field">
                 <label for="trec-file" data-i18n="trec_file_label">Video file</label>
-                <input id="trec-file" name="file" type="file" accept=".mp4,.webm,.mov,.m4v,video/*" required />
+                <input id="trec-file" name="file" type="file" accept=".mp4,.webm,.mov,.m4v,.mp3,.m4a,.aac,.wav,.ogg,video/*,audio/*" required />
                 <p class="trec-hint" data-i18n="trec_file_hint">MP4, WebM, MOV, or M4V — max 500 MB</p>
               </div>
               <button type="submit" class="btn-primary" id="trec-upload-btn" data-i18n="trec_upload_btn">Upload</button>
@@ -103,6 +106,7 @@
     <script src="api-config.js"></script>
     <script src="app.js"></script>
     <script src="js/recorded-lessons-api.js"></script>
-    <script src="js/teacher-recorded.js"></script>
+    <script src="https://web.sdk.qcloud.com/vod/js/vod-js-sdk-v6/latest/vod-js-sdk-v6.min.js" crossorigin="anonymous"></script>
+    <script src="js/teacher-recorded.js?v=20260609-n2"></script>
   </body>
 </html>

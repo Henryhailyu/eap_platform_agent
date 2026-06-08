@@ -133,5 +133,12 @@
         body: JSON.stringify(body || {}),
       });
     },
+    vodRegister(body) {
+      return apiFetch("/api/teacher/recorded-lessons/vod/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+    },
   };
 })(typeof window !== "undefined" ? window : globalThis);

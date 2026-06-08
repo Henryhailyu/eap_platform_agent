@@ -35,6 +35,25 @@
   font: inherit;
 }
 
+.trec-vod-banner {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: rgba(10, 126, 164, 0.1);
+  border: 1px solid rgba(10, 126, 164, 0.22);
+  color: #0a5f7a;
+}
+
+.trec-vod-banner.hidden {
+  display: none;
+}
+
+.trec-badge--vod {
+  background: rgba(10, 126, 164, 0.14);
+  color: #0a5f7a;
+}
+
 .trec-hint {
   font-size: 0.875rem;
   color: #6e6e73;

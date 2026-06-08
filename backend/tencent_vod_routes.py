@@ -6,6 +6,8 @@ from typing import Any, Callable
 
 from flask import Response, jsonify, request
 
+from eap_config import config
+
 from tencent_vod import (
     VOD_STATUS_FAILED,
     VOD_STATUS_PENDING,
@@ -13,6 +15,7 @@ from tencent_vod import (
     VOD_STATUS_TRANSCODING,
     apply_upload_signature,
     build_play_auth,
+    generate_client_upload_signature,
     parse_vod_callback_event,
     verify_callback_signature,
     vod_enabled,
@@ -108,15 +111,120 @@ def register_tencent_vod_routes(
                 return err
             if not vod_enabled():
                 return jsonify({"error": "VOD not configured"}), 503
+            from app import get_effective_teacher_username
+
+            teacher_username = get_effective_teacher_username(conn, None) or "eap-teacher"
             body = request.get_json(silent=True) or {}
             media_name = str(body.get("mediaName") or body.get("title") or "recording").strip()[:128]
             media_ext = str(body.get("mediaExt") or "mp4").strip().lstrip(".")[:16]
             try:
-                sig = apply_upload_signature(media_name, media_ext)
+                signature = generate_client_upload_signature(teacher_username)
             except Exception as exc:
-                log.exception("ApplyUpload failed")
+                log.exception("VOD upload signature failed")
                 return jsonify({"error": str(exc)}), 502
-            return jsonify({"upload": sig, "vod": vod_status_payload()})
+            payload: dict[str, Any] = {
+                "signature": signature,
+                "appId": int(config.VOD_APP_ID),
+                "vod": vod_status_payload(),
+            }
+            if body.get("includeApplyUpload"):
+                try:
+                    payload["upload"] = apply_upload_signature(media_name, media_ext)
+                except Exception as exc:
+                    payload["applyUploadError"] = str(exc)
+            return jsonify(payload)
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/recorded-lessons/vod/register", methods=["POST"])
+    def teacher_vod_register():
+        from app import (
+            enforce_teacher_class_access_if_enabled,
+            get_effective_teacher_username,
+            normalize_class_name,
+            should_enforce_membership,
+            should_require_session_identity,
+        )
+        from recorded_lessons import (
+            VISIBILITY_DRAFT,
+            VISIBILITY_PUBLISHED,
+            _create_calendar_task_for_recording,
+            create_vod_lesson_record,
+        )
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err:
+                return err
+            if not vod_enabled():
+                return jsonify({"error": "VOD not configured"}), 503
+
+            body = request.get_json(silent=True) or {}
+            class_name = str(body.get("class_name") or body.get("className") or "").strip()
+            title = str(body.get("title") or "").strip()[:200]
+            vod_file_id = str(body.get("vodFileId") or body.get("vod_file_id") or "").strip()
+            file_name = str(body.get("fileName") or body.get("file_name") or title or "recording.mp4")[:512]
+            file_ext = str(body.get("fileExt") or body.get("file_ext") or "mp4").lower().lstrip(".")[:16]
+            file_size = int(body.get("fileSizeBytes") or body.get("file_size_bytes") or 0)
+            description = str(body.get("description") or "").strip()[:2000]
+            task_date = str(body.get("task_date") or body.get("taskDate") or "").strip()[:10]
+            create_task = str(body.get("create_calendar_task") or body.get("createCalendarTask") or "").lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            calendar_task_id = None
+            raw_tid = body.get("calendar_task_id") or body.get("calendarTaskId")
+            if raw_tid and str(raw_tid).strip().isdigit():
+                calendar_task_id = int(raw_tid)
+            vis_raw = str(body.get("visibility") or "").strip().lower()
+            visibility = VISIBILITY_PUBLISHED if vis_raw == VISIBILITY_PUBLISHED else VISIBILITY_DRAFT
+
+            if not class_name:
+                return jsonify({"error": "class_name is required"}), 400
+            if not title:
+                return jsonify({"error": "title is required"}), 400
+            if not vod_file_id:
+                return jsonify({"error": "vodFileId is required"}), 400
+
+            teacher_username = get_effective_teacher_username(conn, body.get("teacher_username"))
+            if should_require_session_identity() or should_enforce_membership():
+                if not teacher_username:
+                    return jsonify({"error": "Not authenticated as teacher"}), 401
+                err = enforce_teacher_class_access_if_enabled(conn, teacher_username, class_name)
+                if err is not None:
+                    return err
+
+            class_norm = normalize_class_name(class_name)
+            if create_task:
+                if not task_date:
+                    return jsonify({"error": "task_date is required to create a calendar task"}), 400
+                calendar_task_id = _create_calendar_task_for_recording(conn, class_norm, task_date, title)
+            elif calendar_task_id is not None:
+                task_row = conn.execute(
+                    "SELECT id, class_name FROM calendar_tasks WHERE id = ?",
+                    (calendar_task_id,),
+                ).fetchone()
+                if not task_row:
+                    return jsonify({"error": "Calendar task not found"}), 404
+                if normalize_class_name(task_row["class_name"]) != class_norm:
+                    return jsonify({"error": "Task class does not match recording class"}), 400
+
+            lesson = create_vod_lesson_record(
+                conn,
+                class_name=class_norm,
+                teacher_username=teacher_username or "",
+                title=title,
+                description=description,
+                vod_file_id=vod_file_id,
+                file_name=file_name,
+                file_ext=file_ext,
+                file_size_bytes=file_size,
+                calendar_task_id=calendar_task_id,
+                visibility=visibility,
+            )
+            return jsonify({"lesson": lesson, "calendar_task_id": calendar_task_id}), 201
         finally:
             conn.close()
 

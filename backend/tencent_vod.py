@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import json
 import logging
+import random
 import time
 from typing import Any
 
@@ -142,6 +143,34 @@ def build_play_auth(file_id: str, username: str) -> dict[str, Any]:
         "username": username,
         "expiresIn": int(config.VOD_PLAY_TTL_SECONDS or 7200),
     }
+
+
+def generate_client_upload_signature(user_id: str = "eap-teacher") -> str:
+    """
+    Signature string for Tencent vod-js-sdk-v6 browser upload.
+    See https://cloud.tencent.com/document/product/266/9221
+    """
+    if not vod_enabled():
+        raise ValueError("VOD is not configured")
+    current = int(time.time())
+    expire = current + 3600
+    arg_list: dict[str, Any] = {
+        "secretId": config.TENCENT_SECRET_ID,
+        "currentTimeStamp": current,
+        "expireTime": expire,
+        "random": random.randint(0, 2**32 - 1),
+    }
+    if config.VOD_SUB_APP_ID:
+        arg_list["vodSubAppId"] = int(config.VOD_SUB_APP_ID)
+    if user_id:
+        arg_list["sourceContext"] = str(user_id)[:128]
+    original = json.dumps(arg_list, separators=(",", ":"))
+    digest = hmac.new(
+        config.TENCENT_SECRET_KEY.encode("utf-8"),
+        original.encode("utf-8"),
+        hashlib.sha1,
+    ).digest()
+    return base64.b64encode(digest + original.encode("utf-8")).decode("utf-8")
 
 
 def apply_upload_signature(media_name: str, media_ext: str = "mp4") -> dict[str, Any]:

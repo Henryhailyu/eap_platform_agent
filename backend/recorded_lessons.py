@@ -259,6 +259,68 @@ def _attach_task_meta_to_lesson(conn, lesson: dict) -> dict:
     return lesson
 
 
+def create_vod_lesson_record(
+    conn,
+    *,
+    class_name: str,
+    teacher_username: str,
+    title: str,
+    description: str,
+    vod_file_id: str,
+    file_name: str,
+    file_ext: str,
+    file_size_bytes: int,
+    calendar_task_id: int | None,
+    visibility: str,
+) -> dict:
+    """N2 — metadata row after browser upload to Tencent VOD (no local file)."""
+    from tencent_vod import VOD_STATUS_TRANSCODING
+
+    from app import normalize_class_name
+
+    class_norm = normalize_class_name(class_name)
+    now = _now_iso()
+    stored = f"vod:{vod_file_id}"
+    cur = conn.execute(
+        """
+        INSERT INTO recorded_lessons
+            (class_name, teacher_username, title, description,
+             file_path, file_name, file_ext, file_size_bytes, visibility,
+             calendar_task_id, vod_file_id, vod_status, vod_error, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+        """,
+        (
+            class_norm,
+            teacher_username or "",
+            title[:200],
+            description[:2000] if description else None,
+            stored,
+            file_name[:512],
+            file_ext.lower().lstrip(".")[:16],
+            int(file_size_bytes or 0),
+            visibility,
+            calendar_task_id,
+            vod_file_id[:128],
+            VOD_STATUS_TRANSCODING,
+            now,
+            now,
+        ),
+    )
+    conn.commit()
+    row = conn.execute(
+        """
+        SELECT id, class_name, teacher_username, title, description,
+               file_path, file_name, file_ext, file_size_bytes, visibility,
+               calendar_task_id, vod_file_id, vod_status, vod_error,
+               created_at, updated_at
+        FROM recorded_lessons WHERE id = ?
+        """,
+        (cur.lastrowid,),
+    ).fetchone()
+    lesson = _attach_task_meta_to_lesson(conn, lesson_row_to_dict(row))
+    return lesson
+
+
 def _create_calendar_task_for_recording(
     conn, class_name: str, task_date: str, title: str
 ) -> int:
