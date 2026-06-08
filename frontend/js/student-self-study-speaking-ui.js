@@ -1,5 +1,5 @@
 /**
- * SS-Sp1–Sp3 — speaking: P1/P2/P3, full mock, history (typed + timer; TTS/STT/SOE deferred).
+ * SS-Sp1–Sp4 — speaking: P1/P2/P3, mock, TTS/record/ASR/SOE when server keys on.
  */
 (function (global) {
   const SERVER = () => global.EAP_SELF_STUDY_SERVER;
@@ -121,7 +121,11 @@
   function promptAudioHtml(item) {
     const a = item?.promptAudio;
     if (!a?.url) {
-      return `<p class="ssc-disclaimer">${t("self_study_speaking_tts_pending")}</p>`;
+      const st = state.sessionDetail?.audioStatus || {};
+      const msg = st.tts
+        ? t("self_study_speaking_tts_generating")
+        : t("self_study_speaking_tts_off");
+      return `<p class="ssc-disclaimer">${escapeHtml(msg)}</p>`;
     }
     return `<div class="ssc-audio-player"><p class="ssc-audio-player__label">${t("self_study_speaking_play_question")}</p><audio controls preload="metadata" src="${escapeHtml(a.url)}" class="ssc-audio-player__el"></audio></div>`;
   }

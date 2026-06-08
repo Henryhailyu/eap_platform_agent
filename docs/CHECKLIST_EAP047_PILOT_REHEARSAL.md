@@ -3,7 +3,7 @@
 **Purpose:** One full teacher → student run before real-class pilot or starting **LP-M4**.  
 **Class:** `EAP047` · **Skill:** Writing  
 **Accounts (pilot default):** `teacher1` / `student1` / `manager1` — password `123456` (rotate before public pilot)  
-**Updated:** 2026-06-04 (§6–§7 sign-off recorded)  
+**Updated:** 2026-06-09 (§8 Self-Study addendum)  
 
 **Related:** [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) · [`CHECKLIST_AI_HOMEWORK_REPORT.md`](CHECKLIST_AI_HOMEWORK_REPORT.md) · [`I0_PHONE_PILOT.md`](I0_PHONE_PILOT.md)
 
@@ -13,7 +13,7 @@
 
 | # | Check | Pass |
 |---|--------|------|
-| 0.1 | Server has latest `main` (includes Live timer push `cc576b7` or newer): `git pull` + Docker rebuild on Lighthouse | ☐ |
+| 0.1 | Server has latest `main` (Self-Study SS-L2 + Sp4 audio + Phase N VOD): `git pull` + `docker compose up -d` on Lighthouse | ☐ |
 | 0.2 | Hard refresh teacher/student pages after deploy (`Ctrl+Shift+R` / 清空缓存) | ☐ |
 | 0.3 | `.env`: `EAP_AI_ENABLED=1` and AI keys set if testing lesson prep + AI homework | ☐ |
 | 0.4 | Optional API smoke: `python backend/scripts/verify_pilot.py --base http://YOUR_HOST:5051 --password '123456'` | ☐ |
@@ -28,6 +28,8 @@
 | Live teaching | `/ui/teacher-live.html?class=EAP047` |
 | Student calendar | `/ui/student.html` |
 | Student live | `/ui/student-live.html?code=XXXXXX` (code from teacher Live banner) |
+| Self-Study Centre | `/ui/student-self-study-module.html` |
+| Recorded lessons (teacher) | `/ui/teacher-recorded.html?class_name=EAP047` |
 
 ---
 
@@ -101,16 +103,33 @@
 
 ---
 
-## 7 — Sign-off
+## 7 — AI Self-Study Centre（推荐 · Web Phase 1）
+
+**Detail:** [`CHECKLIST_EAP047_SELF_STUDY.md`](CHECKLIST_EAP047_SELF_STUDY.md)
+
+| Step | Who | Action | Pass |
+|------|-----|--------|------|
+| 7.1 | Student | Hub → **Self-Study** → Vocabulary + Reading complete one flow each | ☐ |
+| 7.2 | Student | **Listening** → notes → practice → **Notes coach** (coverage checklist) | ☐ |
+| 7.3 | Student | **Writing** → draft + rubric feedback | ☐ |
+| 7.4 | Student | **Speaking** → timer + response; optional record if `EAP_ASR_ENABLED=1` | ☐ |
+| 7.5 | Teacher | Optional: **Recorded lessons** upload + publish → student plays | ☐ |
+
+Skip §7 if pilot scope excludes self-study; mark N/A in sign-off.
+
+---
+
+## 8 — Sign-off
 
 | Criterion | Done |
 |-----------|------|
-| All §1–§5 critical steps ☐ (§3.4–3.7 timer required if Live is in scope) | ✅ |
-| §6 phone spot-check | ✅ |
-| No blocker logged in § Failures | ✅ |
-| Ready for **1–2 real classes** (2–4 weeks) per [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) | ✅ |
+| All §1–§5 critical steps ☐ (§3.4–3.7 timer required if Live is in scope) | ☐ |
+| §6 phone spot-check | ☐ |
+| §7 self-study (if in scope) or N/A | ☐ |
+| No blocker logged in § Failures | ☐ |
+| Ready for **1–2 real classes** (2–4 weeks) per [`WEB_LAUNCH_CHECKLIST.md`](WEB_LAUNCH_CHECKLIST.md) | ☐ |
 
-**After sign-off → engineering:** **LP-M4** ✅ · next **HM-M2** ([`ROADMAP_TEACHER_PHASES.md`](ROADMAP_TEACHER_PHASES.md)).
+**Prior sign-off (2026-06-04):** §1–§6 completed for Live + homework path. Re-run §0 + §7 after Self-Study / audio deploy.
 
 ---
 
@@ -131,7 +150,10 @@
 | AI report NOT FOUND | Deploy `homework_marking` fixes; see [`CHECKLIST_AI_HOMEWORK_REPORT.md`](CHECKLIST_AI_HOMEWORK_REPORT.md) |
 | No lesson link on student task | Republish from lesson prep; check task date/class **EAP047** |
 | No bell at 0 | Student page in focus; unmute device; one tap on page (browser audio policy) |
+| Listening no TTS player | Check `EAP_TTS_ENABLED=1` + COS; `/api/student/self-study/audio/status` |
+| Speaking mic blocked | Use HTTPS (`HTTPS_AFTER_ICP.md`); browser permission |
+| Notes coach 403 | Complete listening **practice** first |
 
 ---
 
-*Mark Pass ☐ as you go. When §7 is done, update `ROADMAP_TEACHER_PHASES.md` sprint note and `EAP_PROJECT_TRACKER.md` changelog.*
+*Mark Pass ☐ as you go. When §8 is done, update `EAP_PROJECT_TRACKER.md` changelog.*

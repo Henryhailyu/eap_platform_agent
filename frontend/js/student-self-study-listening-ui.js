@@ -88,13 +88,17 @@
     const savedNotes = prog.selfNotes || "";
 
     const audio = data.audio;
+    const audioSt = data.audioStatus || {};
+    const noAudioMsg = audioSt.tts
+      ? t("self_study_listening_audio_generating")
+      : t("self_study_listening_no_audio");
     const audioBlock = audio?.url
       ? `<div class="ssc-audio-player">
           <p class="ssc-audio-player__label">${t("self_study_listening_audio_play")}</p>
           <audio controls preload="metadata" src="${escapeHtml(audio.url)}" class="ssc-audio-player__el"></audio>
           ${audio.truncated ? `<p class="ssc-disclaimer">${t("self_study_listening_audio_truncated")}</p>` : ""}
         </div>`
-      : `<p class="ssc-disclaimer">${t("self_study_listening_no_audio")}</p>`;
+      : `<p class="ssc-disclaimer">${escapeHtml(noAudioMsg)}</p>`;
 
     root.innerHTML = `
       <div class="ssc-lesson-card">

@@ -193,7 +193,7 @@
         <div class="ssc-lesson-card">
           <h2 data-i18n="self_study_listening_learn_title">Listening & note-taking</h2>
           <p>${LISTEN.lesson(pack)}</p>
-          <p class="ssc-disclaimer" data-i18n="self_study_listening_no_audio">Text script only — audio (TTS) coming in a later phase.</p>
+          <p class="ssc-disclaimer" data-i18n="self_study_listening_no_audio">No audio playback — read the script below. (Enable EAP_TTS on the server for TTS.)</p>
         </div>
         <pre class="ssc-script-block">${escapeHtml(scriptText)}</pre>
         ${

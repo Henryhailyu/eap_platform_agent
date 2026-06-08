@@ -51,7 +51,9 @@ Run on **HTTPS pilot** (not only localhost):
 - [ ] Teacher: **AI Lesson Builder** → generate HTML → preview (no AI preamble) → push to classroom  
 - [ ] Student: login `student1` → calendar → submit homework  
 - [ ] Student: **Join live class** → see display (HTML/PDF/PPT) + answer activities  
-- [ ] Student: **AI Self-Study Centre** → module + Ask AI (after keys configured)  
+- [ ] Student: **AI Self-Study Centre** — Vocab / Reading / Listening (notes coach) / Writing / Speaking ([`CHECKLIST_EAP047_SELF_STUDY.md`](CHECKLIST_EAP047_SELF_STUDY.md))
+- [ ] Student: optional TTS + speaking record when `EAP_AUDIO_*` configured on host
+- [ ] Teacher: **Recorded lessons** local upload; VOD when `EAP_VOD_ENABLED=1`  
 - [ ] Phone browser: student calendar + live join (`docs/I0_PHONE_PILOT.md`)  
 
 ### Known limitations (accept or fix)
