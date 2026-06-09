@@ -679,6 +679,7 @@ window.EAP_STRINGS_EN = {
   "self_study_reading_correct": "Correct",
   "self_study_reading_incorrect": "Incorrect",
   "self_study_reading_evidence": "Passage evidence",
+  "self_study_reading_meta": "{words} words · {questions} questions",
   "self_study_reading_passage_label": "Reading passage",
   "self_study_reading_questions_label": "Questions",
   "self_study_reading_questions_heading": "Questions ({n})",

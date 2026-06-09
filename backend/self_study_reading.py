@@ -606,6 +606,56 @@ def _next_schedule_day(conn, schedule_id: int) -> int:
     return int(row["mx"] or 0) + 1
 
 
+def _update_passage_content(conn, passage_id: int, data: dict) -> None:
+    now = _now_iso()
+    payload = _passage_payload(data, include_answers=True)
+    conn.execute(
+        """
+        UPDATE reading_passages
+        SET content_json = ?, title = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            json.dumps(payload, ensure_ascii=False),
+            payload["title"],
+            now,
+            passage_id,
+        ),
+    )
+
+
+def _maybe_upgrade_passage(
+    conn,
+    passage: Any,
+    *,
+    day_number: int,
+    channel: str,
+    class_name: str,
+) -> Any:
+    """Replace legacy short seed passages (SS-R1) with full IELTS-length AI sets."""
+    try:
+        from self_study_reading_ai import (
+            generate_daily_passage,
+            passage_needs_upgrade,
+            reading_ai_available,
+        )
+    except Exception:
+        return passage
+    if not reading_ai_available():
+        return passage
+    content = json.loads(passage["content_json"])
+    if not passage_needs_upgrade(content):
+        return passage
+    try:
+        level = str(content.get("passageLevel") or _passage_level_for_day(day_number)).upper()
+        new_content = generate_daily_passage(level, day_number, class_name)
+        _update_passage_content(conn, int(passage["id"]), new_content)
+        conn.commit()
+        return conn.execute("SELECT * FROM reading_passages WHERE id = ?", (passage["id"],)).fetchone()
+    except Exception:
+        return passage
+
+
 def _ensure_passage_for_day(
     conn,
     *,
@@ -616,7 +666,13 @@ def _ensure_passage_for_day(
 ) -> Any:
     passage = _passage_for_day(conn, schedule["id"], day_number)
     if passage:
-        return passage
+        return _maybe_upgrade_passage(
+            conn,
+            passage,
+            day_number=day_number,
+            channel=channel,
+            class_name=class_name,
+        )
     if channel != "B":
         return None
     try:

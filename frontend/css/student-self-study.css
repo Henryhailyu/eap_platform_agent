@@ -382,7 +382,12 @@
 
 .ssc-option--selected {
   border-color: var(--eap-teal, #0a7ea4);
-  background: rgba(10, 126, 164, 0.08);
+  background: rgba(10, 126, 164, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(10, 126, 164, 0.25);
+}
+
+.ssc-reading-q .ssc-option--selected {
+  font-weight: 600;
 }
 
 .ssc-placement-actions {

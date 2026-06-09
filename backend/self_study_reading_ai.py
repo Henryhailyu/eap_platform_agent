@@ -10,10 +10,14 @@ from typing import Any
 READING_PASSAGE_LEVELS = ("P1", "P2", "P3")
 
 _LEVEL_HINTS = {
-    "P1": "IELTS Academic Passage 1 style — general interest, 600–900 words, easier vocabulary.",
-    "P2": "IELTS Academic Passage 2 style — work/study topic, 750–900 words, medium difficulty.",
-    "P3": "IELTS Academic Passage 3 style — abstract academic argument, 800–1000 words, harder vocabulary.",
+    "P1": "IELTS Academic Passage 1 style — general interest, 700–900 words, easier vocabulary.",
+    "P2": "IELTS Academic Passage 2 style — work/study topic, 750–1000 words, medium difficulty.",
+    "P3": "IELTS Academic Passage 3 style — abstract academic argument, 800–1100 words, harder vocabulary.",
 }
+
+_MIN_PASSAGE_WORDS = 650
+_MIN_QUESTION_COUNT = 10
+_TARGET_QUESTION_COUNT = "10-15"
 
 
 def reading_ai_available() -> bool:
@@ -120,7 +124,7 @@ Return ONLY valid JSON with this shape:
   "passageLevel": "P1"|"P2"|"P3",
   "lessonEn": string (1-2 sentence reading tip),
   "lessonZh": string,
-  "paragraphsEn": string[] (5-8 paragraphs, full passage split),
+  "paragraphsEn": string[] (7-10 paragraphs; combined length MUST be 700-1000 words, P3 may reach 1100),
   "paragraphsZh": string[] (optional Chinese gloss paragraphs, same count),
   "questions": [
     {
@@ -141,12 +145,33 @@ Return ONLY valid JSON with this shape:
   ]
 }
 Rules:
-- Exactly 12-14 questions mixing MC, TFNG or YNNG, GAP, and MH.
+- Exactly 10-15 questions. Required mix: at least 3 MC, 2 TFNG, 2 YNNG, 2 GAP, 2 MH (no single-type sets).
+- Combined paragraphsEn word count: 700-1000 words (P3 up to 1100). Count words before returning.
 - Answers must be verifiable from the passage text (verbatim for GAP).
 - TFNG uses TRUE/FALSE/NOT GIVEN; YNNG uses YES/NO/NOT GIVEN.
 - MH: options are paragraph headings; prompt references a paragraph letter.
 - Academic register, no contractions in answers.
 - EAP047 standard difficulty for all students."""
+
+
+def passage_word_count(content: dict[str, Any]) -> int:
+    text = str(content.get("passageEn") or "").strip()
+    if not text:
+        text = " ".join(str(p) for p in (content.get("paragraphsEn") or []))
+    return len(re.sub(r"\s+", " ", text).split())
+
+
+def passage_needs_upgrade(content: dict[str, Any]) -> bool:
+    return passage_word_count(content) < _MIN_PASSAGE_WORDS or len(content.get("questions") or []) < _MIN_QUESTION_COUNT
+
+
+def _validate_passage_content(content: dict[str, Any]) -> None:
+    wc = passage_word_count(content)
+    qn = len(content.get("questions") or [])
+    if wc < _MIN_PASSAGE_WORDS:
+        raise RuntimeError(f"Passage too short ({wc} words; need {_MIN_PASSAGE_WORDS}+)")
+    if qn < _MIN_QUESTION_COUNT:
+        raise RuntimeError(f"Too few questions ({qn}; need {_MIN_QUESTION_COUNT}+)")
 
 
 def generate_daily_passage(
@@ -159,20 +184,28 @@ def generate_daily_passage(
     user = (
         f"Generate one original IELTS Academic reading set for class {class_name}, day {day_number}. "
         f"Passage level: {level}. {hint} "
+        f"Write {_TARGET_QUESTION_COUNT} questions with mixed types (MC, TFNG, YNNG, GAP, MH). "
+        "Passage body must be 700-1000 words (P3 up to 1100). "
         "Topic: rotate across environment, education, technology, health, urban studies. "
         "Do not copy real IELTS papers."
     )
-    payload = _ai_json(_GENERATION_SYSTEM, user, max_tokens=4500)
-    content = normalize_passage_content(payload)
-    if len(content.get("questions") or []) < 8:
-        raise RuntimeError("AI generated too few questions")
-    return content
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            payload = _ai_json(_GENERATION_SYSTEM, user, max_tokens=7000)
+            content = normalize_passage_content(payload)
+            _validate_passage_content(content)
+            return content
+        except Exception as exc:
+            last_err = exc
+            user += " Previous attempt failed validation — increase word count and question count."
+    raise RuntimeError(str(last_err) if last_err else "AI generation failed")
 
 
 _STRUCTURE_SYSTEM = """You are an EAP reading editor. Convert manager source text into IELTS-style reading JSON.
 Use the same JSON schema as daily generation (title, passageLevel, lessonEn, lessonZh, paragraphsEn, paragraphsZh, questions).
-Infer paragraph breaks from the source. Create 10-14 questions covering the source content.
-Mix MC, TFNG, GAP, and MH. Keep answers evidence-based in the text."""
+Infer paragraph breaks from the source. If source is short, expand into a 700-1000 word academic passage while keeping the topic.
+Create 10-15 questions covering the content. Mix MC, TFNG, YNNG, GAP, and MH. Keep answers evidence-based in the text."""
 
 
 def structure_passage_from_text(

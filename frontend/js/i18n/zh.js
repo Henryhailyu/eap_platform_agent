@@ -681,6 +681,7 @@ window.EAP_STRINGS_ZH = {
   "self_study_reading_correct": "正确",
   "self_study_reading_incorrect": "错误",
   "self_study_reading_evidence": "原文依据",
+  "self_study_reading_meta": "{words} 词 · {questions} 题",
   "self_study_reading_passage_label": "阅读文章",
   "self_study_reading_questions_label": "题目",
   "self_study_reading_questions_heading": "题目（{n}）",

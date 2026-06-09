@@ -120,7 +120,14 @@
   function bindQuestionInputs(root, answers) {
     root.querySelectorAll(".ssc-option").forEach((btn) => {
       btn.addEventListener("click", () => {
-        answers[btn.getAttribute("data-q")] = parseInt(btn.getAttribute("data-i"), 10);
+        const qid = btn.getAttribute("data-q");
+        answers[qid] = parseInt(btn.getAttribute("data-i"), 10);
+        const block = btn.closest(".ssc-reading-q");
+        if (block) {
+          block.querySelectorAll(".ssc-option").forEach((opt) => {
+            opt.classList.toggle("ssc-option--selected", opt === btn);
+          });
+        }
       });
     });
     root.querySelectorAll(".ssc-reading-gap").forEach((inp) => {
@@ -212,11 +219,15 @@
     const answers = {};
     const lesson = pickLang(c, "lessonEn", "lessonZh");
 
+    const paraText = (c.paragraphsEn || []).join(" ") || c.passageEn || "";
+    const wordCount = paraText.trim().split(/\s+/).filter(Boolean).length;
+
     root.innerHTML = `
       <article class="ssc-reading-exam">
         <header class="ssc-reading-exam__head">
           <h2>${escapeHtml(data.title || c.title || t("self_study_mod_reading"))}</h2>
           ${lesson ? `<p class="ssc-reading-exam__tip">${escapeHtml(lesson)}</p>` : ""}
+          <p class="ssc-reading-exam__meta">${t("self_study_reading_meta", { words: String(wordCount), questions: String(questions.length) })}</p>
         </header>
         <section class="ssc-reading-passage" aria-label="${t("self_study_reading_passage_label")}">
           ${renderParagraphs(c)}
