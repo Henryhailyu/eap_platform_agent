@@ -103,6 +103,46 @@ def cos_presigned_get_url(key: str, expires: int = 3600) -> str:
     )
 
 
+def chunk_text_for_tts(text: str, max_chars: int = 500) -> list[str]:
+    """Split long passages into sentence-bounded chunks for Tencent TTS limits."""
+    raw = re.sub(r"\s+", " ", (text or "").strip())
+    if not raw:
+        return []
+    if len(raw) <= max_chars:
+        return [raw]
+    chunks: list[str] = []
+    rest = raw
+    while rest:
+        if len(rest) <= max_chars:
+            chunks.append(rest.strip())
+            break
+        cut = rest[:max_chars]
+        last = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+        if last > max_chars // 3:
+            piece = rest[: last + 1].strip()
+            rest = rest[last + 1 :].strip()
+        else:
+            piece = cut.strip()
+            rest = rest[max_chars:].strip()
+        if piece:
+            chunks.append(piece)
+    return chunks
+
+
+def expand_playback_segments(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ensure each segment fits TTS length; preserve speaker/gender metadata."""
+    out: list[dict[str, Any]] = []
+    for seg in segments or []:
+        text = str(seg.get("text") or "").strip()
+        if not text:
+            continue
+        speaker = str(seg.get("speaker") or "Speaker").strip()
+        gender = str(seg.get("gender") or "female").lower()
+        for chunk in chunk_text_for_tts(text):
+            out.append({"speaker": speaker, "gender": gender, "text": chunk})
+    return out
+
+
 def _truncate_tts_text(text: str, max_chars: int = _TTS_MAX_CHARS) -> tuple[str, bool]:
     raw = re.sub(r"\s+", " ", (text or "").strip())
     if len(raw) <= max_chars:
@@ -176,38 +216,45 @@ def ensure_listening_audio(
     item_id: int,
     script_en: str,
     *,
-    turns: list[dict[str, Any]] | None = None,
+    segments: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     if not tts_ready():
         return None
     try:
-        part_turns = [t for t in (turns or []) if str(t.get("text") or "").strip()]
-        if len(part_turns) > 1:
-            segments: list[dict[str, Any]] = []
-            for i, turn in enumerate(part_turns):
-                text = str(turn.get("text") or "").strip()
-                voice = _voice_id_for_gender(turn.get("gender"))
-                speaker = str(turn.get("speaker") or f"Speaker {i + 1}")
+        part_segs = expand_playback_segments(segments or [])
+        if len(part_segs) > 1:
+            audio_segments: list[dict[str, Any]] = []
+            for i, seg in enumerate(part_segs):
+                text = str(seg.get("text") or "").strip()
+                voice = _voice_id_for_gender(seg.get("gender"))
+                speaker = str(seg.get("speaker") or f"Part {i + 1}")
                 meta = ensure_tts_audio(
                     f"listening/item-{item_id}-seg-{i}.mp3",
                     text,
                     voice_type=voice,
                 )
-                segments.append(
+                audio_segments.append(
                     {
                         "url": meta["url"],
                         "speaker": speaker,
-                        "gender": turn.get("gender") or "female",
+                        "gender": seg.get("gender") or "female",
                         "truncated": meta.get("truncated"),
                     }
                 )
-            if segments:
+            if audio_segments:
                 return {
                     "playlist": True,
-                    "segments": segments,
-                    "truncated": any(s.get("truncated") for s in segments),
+                    "segments": audio_segments,
+                    "truncated": any(s.get("truncated") for s in audio_segments),
                     "available": True,
                 }
+        if len(part_segs) == 1:
+            seg = part_segs[0]
+            return ensure_tts_audio(
+                f"listening/item-{item_id}.mp3",
+                str(seg.get("text") or script_en),
+                voice_type=_voice_id_for_gender(seg.get("gender")),
+            )
         return ensure_tts_audio(f"listening/item-{item_id}.mp3", script_en)
     except Exception as exc:
         log.warning("Listening TTS failed for item %s: %s", item_id, exc)

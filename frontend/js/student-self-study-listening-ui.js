@@ -83,10 +83,126 @@
     `;
   }
 
-  function renderAudioPlayer(audio) {
-    if (!audio || !audio.available) {
-      return `<p class="ssc-disclaimer" role="status">${t("self_study_listening_no_audio")}</p>`;
+  const speechCtl = { idx: 0, playing: false, segments: [], voice: null };
+
+  function speechSupported() {
+    return !!(global.speechSynthesis && global.SpeechSynthesisUtterance);
+  }
+
+  function pickSpeechVoice(gender) {
+    const voices = global.speechSynthesis.getVoices();
+    const g = String(gender || "female").toLowerCase();
+    const preferMale = g === "male";
+    const enGb = voices.filter((v) => /en-gb/i.test(v.lang || ""));
+    const enAny = voices.filter((v) => /^en/i.test(v.lang || ""));
+    const pool = enGb.length ? enGb : enAny.length ? enAny : voices;
+    const named = pool.find((v) => {
+      const n = (v.name || "").toLowerCase();
+      return preferMale ? /male|daniel|james|arthur|guy/.test(n) : /female|zira|sonia|hazel|samantha/.test(n);
+    });
+    return named || pool[0] || null;
+  }
+
+  function stopBrowserSpeech() {
+    speechCtl.playing = false;
+    global.speechSynthesis.cancel();
+  }
+
+  function speakSegmentAt(root, index) {
+    const seg = speechCtl.segments[index];
+    if (!seg || !seg.text) return;
+    const utter = new global.SpeechSynthesisUtterance(seg.text);
+    utter.lang = "en-GB";
+    utter.rate = 0.92;
+    if (speechCtl.voice) utter.voice = speechCtl.voice;
+    utter.onend = () => {
+      if (!speechCtl.playing) return;
+      if (index + 1 < speechCtl.segments.length) {
+        speechCtl.idx = index + 1;
+        speakSegmentAt(root, index + 1);
+        root.querySelectorAll(".ssc-audio-seg-btn").forEach((btn) => {
+          btn.classList.toggle("ssc-audio-seg-btn--active", parseInt(btn.getAttribute("data-seg"), 10) === speechCtl.idx);
+        });
+      } else {
+        speechCtl.playing = false;
+        speechCtl.idx = 0;
+        const playBtn = root.querySelector("#ssc-speech-play");
+        const pauseBtn = root.querySelector("#ssc-speech-pause");
+        const stopBtn = root.querySelector("#ssc-speech-stop");
+        if (playBtn) playBtn.disabled = false;
+        if (pauseBtn) pauseBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = true;
+      }
+    };
+    global.speechSynthesis.speak(utter);
+  }
+
+  function bindBrowserSpeech(root, segments) {
+    if (!speechSupported() || !segments || !segments.length) return;
+    speechCtl.segments = segments;
+    speechCtl.idx = 0;
+    speechCtl.playing = false;
+
+    const refreshVoice = () => {
+      speechCtl.voice = pickSpeechVoice(speechCtl.segments[speechCtl.idx]?.gender);
+    };
+    refreshVoice();
+    if (global.speechSynthesis.onvoiceschanged !== undefined) {
+      global.speechSynthesis.onvoiceschanged = refreshVoice;
     }
+    global.speechSynthesis.getVoices();
+
+    const playBtn = root.querySelector("#ssc-speech-play");
+    const pauseBtn = root.querySelector("#ssc-speech-pause");
+    const stopBtn = root.querySelector("#ssc-speech-stop");
+
+    playBtn?.addEventListener("click", () => {
+      if (speechCtl.playing && global.speechSynthesis.paused) {
+        global.speechSynthesis.resume();
+        return;
+      }
+      stopBrowserSpeech();
+      speechCtl.playing = true;
+      speechCtl.voice = pickSpeechVoice(speechCtl.segments[speechCtl.idx]?.gender);
+      if (playBtn) playBtn.disabled = false;
+      if (pauseBtn) pauseBtn.disabled = false;
+      if (stopBtn) stopBtn.disabled = false;
+      speakSegmentAt(root, speechCtl.idx);
+    });
+
+    pauseBtn?.addEventListener("click", () => {
+      if (global.speechSynthesis.speaking && !global.speechSynthesis.paused) {
+        global.speechSynthesis.pause();
+      }
+    });
+
+    stopBtn?.addEventListener("click", () => {
+      stopBrowserSpeech();
+      speechCtl.idx = 0;
+      if (playBtn) playBtn.disabled = false;
+      if (pauseBtn) pauseBtn.disabled = true;
+      if (stopBtn) stopBtn.disabled = true;
+      root.querySelectorAll(".ssc-audio-seg-btn").forEach((btn) => btn.classList.remove("ssc-audio-seg-btn--active"));
+    });
+
+    root.querySelectorAll(".ssc-audio-seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.getAttribute("data-seg"), 10);
+        stopBrowserSpeech();
+        speechCtl.idx = i;
+        speechCtl.playing = true;
+        speechCtl.voice = pickSpeechVoice(speechCtl.segments[i]?.gender);
+        if (pauseBtn) pauseBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = false;
+        root.querySelectorAll(".ssc-audio-seg-btn").forEach((b) => {
+          b.classList.toggle("ssc-audio-seg-btn--active", b === btn);
+        });
+        speakSegmentAt(root, i);
+      });
+    });
+  }
+
+  function renderServerAudioPlayer(audio) {
     if (audio.playlist && audio.segments && audio.segments.length) {
       const list = audio.segments
         .map(
@@ -112,7 +228,47 @@
         </div>
       `;
     }
-    return `<p class="ssc-disclaimer">${t("self_study_listening_audio_generating")}</p>`;
+    return "";
+  }
+
+  function renderBrowserAudioPlayer(segments) {
+    const list = segments
+      .map((seg, i) => {
+        const label = seg.speaker ? `${seg.speaker}` : `Part ${i + 1}`;
+        return `<li><button type="button" class="ssc-audio-seg-btn" data-seg="${i}">${escapeHtml(label)}</button></li>`;
+      })
+      .join("");
+    return `
+      <div class="ssc-audio-player" id="ssc-listening-speech-wrap">
+        <p class="ssc-audio-player__label">${t("self_study_listening_browser_play")}</p>
+        <div class="ssc-listening-speech-controls">
+          <button type="button" class="btn-primary" id="ssc-speech-play">${t("self_study_listening_play")}</button>
+          <button type="button" class="btn-secondary" id="ssc-speech-pause" disabled>${t("self_study_listening_pause")}</button>
+          <button type="button" class="btn-secondary" id="ssc-speech-stop" disabled>${t("self_study_listening_stop")}</button>
+        </div>
+        <p class="ssc-disclaimer ssc-listening-speech-hint">${t("self_study_listening_browser_hint")}</p>
+        <ol class="ssc-audio-playlist">${list}</ol>
+      </div>
+    `;
+  }
+
+  function renderAudioSection(audio, playbackSegments) {
+    if (audio && audio.available) {
+      const html = renderServerAudioPlayer(audio);
+      if (html) return html;
+    }
+    if (playbackSegments && playbackSegments.length && speechSupported()) {
+      return renderBrowserAudioPlayer(playbackSegments);
+    }
+    if (audioStatusSaysTts(audio)) {
+      return `<p class="ssc-disclaimer">${t("self_study_listening_audio_generating")}</p>`;
+    }
+    return `<p class="ssc-disclaimer" role="status">${t("self_study_listening_no_audio")}</p>`;
+  }
+
+  function audioStatusSaysTts(data) {
+    const st = data && data.audioStatus;
+    return !!(st && st.tts);
   }
 
   function bindPlaylistAudio(root, audio) {
@@ -130,10 +286,14 @@
     el.addEventListener("ended", () => {
       if (idx + 1 < audio.segments.length) playSeg(idx + 1);
     });
-    root.querySelectorAll(".ssc-audio-seg-btn").forEach((btn) => {
+    root.querySelectorAll("#ssc-listening-audio-wrap .ssc-audio-seg-btn").forEach((btn) => {
       btn.addEventListener("click", () => playSeg(parseInt(btn.getAttribute("data-seg"), 10)));
     });
-    playSeg(0);
+  }
+
+  function bindAudioSection(root, data) {
+    bindPlaylistAudio(root, data.audio);
+    bindBrowserSpeech(root, data.playbackSegments);
   }
 
   function renderQuestionItem(q, answers) {
@@ -377,7 +537,7 @@
           ${lesson ? `<p class="ssc-reading-exam__tip">${escapeHtml(lesson)}</p>` : ""}
           <p class="ssc-disclaimer">${t("self_study_listening_script_hidden")}</p>
         </header>
-        ${renderAudioPlayer(data.audio)}
+        ${renderAudioSection(data.audio, data.playbackSegments)}
         <label for="ssc-self-notes" class="ssc-listening-notes__label">${t("self_study_listening_notes_label")}</label>
         <textarea id="ssc-self-notes" class="ssc-listening-notes__input" rows="6" maxlength="8000" placeholder="${t("self_study_listening_notes_placeholder")}">${escapeHtml(savedNotes)}</textarea>
         <div class="ssc-placement-actions">
@@ -387,7 +547,7 @@
       </article>
     `;
 
-    bindPlaylistAudio(root, data.audio);
+    bindAudioSection(root, data);
 
     document.getElementById("ssc-save-notes")?.addEventListener("click", async () => {
       const notes = document.getElementById("ssc-self-notes")?.value || "";

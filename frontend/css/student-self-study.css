@@ -2322,6 +2322,22 @@
   background: #f3f4f6;
 }
 
+.ssc-audio-seg-btn--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.ssc-listening-speech-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ssc-listening-speech-hint {
+  margin-top: 0.35rem;
+}
+
 .ssc-listening-lm-row {
   display: flex;
   flex-wrap: wrap;

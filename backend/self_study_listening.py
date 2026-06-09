@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 from flask import Response, jsonify, request
 
-from tencent_audio import audio_status, ensure_listening_audio
+from tencent_audio import audio_status, ensure_listening_audio, expand_playback_segments
 
 LISTENING_SKILL = "listening"
 
@@ -1020,6 +1020,34 @@ def _ensure_item_for_day(
         return None
 
 
+def _playback_segments(content: dict[str, Any]) -> list[dict[str, Any]]:
+    """Audio-only segments (text not shown in listen UI; script stays hidden)."""
+    raw: list[dict[str, Any]] = []
+    for t in content.get("turns") or []:
+        text = str(t.get("text") or "").strip()
+        if not text:
+            continue
+        raw.append(
+            {
+                "speaker": str(t.get("speaker") or "Speaker").strip(),
+                "gender": str(t.get("gender") or "female").lower(),
+                "text": text,
+            }
+        )
+    if raw:
+        return expand_playback_segments(raw)
+    for p in content.get("paragraphs") or []:
+        text = str(p).strip()
+        if text:
+            raw.append({"speaker": "Lecturer", "gender": "female", "text": text})
+    if raw:
+        return expand_playback_segments(raw)
+    script = str(content.get("scriptEn") or "").strip()
+    if script:
+        return expand_playback_segments([{"speaker": "Lecturer", "gender": "female", "text": script}])
+    return []
+
+
 def _strip_answers(content: dict) -> dict:
     out = dict(content)
     qs = []
@@ -1255,8 +1283,8 @@ def register_self_study_listening_routes(
             (username, item["id"]),
         ).fetchone()
         script_en = content.get("scriptEn") or ""
-        turns = content.get("turns") or []
-        audio = ensure_listening_audio(item["id"], script_en, turns=turns)
+        playback_segments = _playback_segments(content)
+        audio = ensure_listening_audio(item["id"], script_en, segments=playback_segments)
         conn.close()
 
         return jsonify(
@@ -1268,6 +1296,7 @@ def register_self_study_listening_routes(
                 "title": item["title"],
                 "content": _strip_answers(content),
                 "audio": audio,
+                "playbackSegments": playback_segments,
                 "audioStatus": audio_status(),
                 "progress": {
                     "listenDone": bool(prog and prog["listen_done"]),
