@@ -64,32 +64,53 @@ def generate_vocab_batch(
 ) -> list[dict]:
     system = (
         "You generate academic English vocabulary for EAP047 (IELTS ~6.5). "
-        "Return compact JSON only: {\"words\": [{\"word\", \"phonetic\", \"coreMeaning\", "
-        "\"methodPrimary\": \"affix|mnemonic|mixed\", \"affix\": {\"prefix\",\"root\",\"suffix\",\"gloss\"}, "
-        "\"mnemonic\", \"examples\": [\"one short sentence\"]}]}. "
-        f"Exactly {count} unique words. Keep fields concise. No markdown."
+        "Return ONLY compact JSON: {\"words\": [{\"word\", \"coreMeaning\", \"methodPrimary\", "
+        "\"prefix\", \"root\", \"suffix\", \"mnemonic\"}]}. "
+        "methodPrimary is affix, mnemonic, or mixed. Use empty string for unused affix fields. "
+        "One short coreMeaning per word (under 12 words). No phonetic, no example sentences. "
+        f"Exactly {count} unique words."
     )
-    avoid = ", ".join(used_words[-80:]) if used_words else "(none)"
+    avoid = ", ".join(used_words[-60:]) if used_words else "(none)"
     user = f"Day {day_number}, batch {batch_no}. Generate {count} new words. Do not repeat: {avoid}"
-    payload = _ai_json(system, user, max_tokens=6000)
+    payload = _ai_json(system, user, max_tokens=3500)
     words = payload.get("words") or []
     if len(words) < count:
         print(f"    warning: batch returned {len(words)} words (wanted {count})", file=sys.stderr)
     return words
 
 
+def _normalize_word(raw: dict) -> dict:
+    """Map flat AI fields to SS-V1 word card shape."""
+    return {
+        "word": raw.get("word") or "",
+        "phonetic": raw.get("phonetic") or "",
+        "coreMeaning": raw.get("coreMeaning") or raw.get("core") or "",
+        "methodPrimary": raw.get("methodPrimary") or raw.get("method") or "affix",
+        "affix": {
+            "prefix": raw.get("prefix") or (raw.get("affix") or {}).get("prefix") or "",
+            "root": raw.get("root") or (raw.get("affix") or {}).get("root") or "",
+            "suffix": raw.get("suffix") or (raw.get("affix") or {}).get("suffix") or "",
+            "gloss": raw.get("coreMeaning") or "",
+        },
+        "mnemonic": raw.get("mnemonic"),
+        "examples": raw.get("examples")
+        or ([raw["example"]] if raw.get("example") else [f"Scholars study how {raw.get('word', 'this term')} affects outcomes."]),
+    }
+
+
 def generate_vocab_day(day_number: int, used_words: list[str]) -> list[dict]:
-    """30 words/day in two API calls (15+15) to avoid JSON truncation."""
+    """30 words/day in three API calls (10+10+10) to avoid JSON truncation."""
     words: list[dict] = []
-    for batch_no, n in ((1, 15), (2, 15)):
+    for batch_no, n in ((1, 10), (2, 10), (3, 10)):
         print(f"    batch {batch_no}/2 ({n} words)…")
         batch = generate_vocab_batch(day_number, batch_no, count=n, used_words=used_words + words)
         for w in batch:
-            token = str(w.get("word") or "").strip().lower()
+            entry = _normalize_word(w)
+            token = str(entry.get("word") or "").strip().lower()
             if token and token not in {x.lower() for x in used_words} and token not in {
                 str(x.get("word") or "").lower() for x in words
             }:
-                words.append(w)
+                words.append(entry)
         if len(words) >= 30:
             break
     return words[:30]

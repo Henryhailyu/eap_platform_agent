@@ -11,10 +11,19 @@ OUT_CONTAINER="/data/seeds/eap047_draft.json"
 OUT_HOST="$ROOT/data/seeds/eap047_draft.json"
 
 mkdir -p "$ROOT/data/seeds"
+
+echo "Rebuilding container so /app has latest scripts (git pull alone is not enough)…"
+sudo docker compose up -d --build
+
+if ! sudo docker compose exec -T eap grep -q "three API calls (10+10+10)" /app/backend/scripts/generate_eap047_self_study_seeds.py 2>/dev/null; then
+  echo "error: container still has old generate script — run: sudo docker compose up -d --build" >&2
+  exit 1
+fi
+
 sudo docker compose exec -T eap mkdir -p /data/seeds
 
 echo "Generating vocab ${DAYS} days + ${READING} reading passages (AI)…"
-echo "(30 words/day = 2 API batches; checkpoints saved after each day — may take 30–90 min)"
+echo "(30 words/day = 3×10 word batches; checkpoints after each day — may take 30–90 min)"
 RESUME=""
 if [[ -f "$OUT_HOST" ]]; then
   RESUME="--resume"
