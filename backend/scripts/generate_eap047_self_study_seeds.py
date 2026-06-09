@@ -102,8 +102,10 @@ def generate_vocab_day(day_number: int, used_words: list[str]) -> list[dict]:
     """30 words/day in three API calls (10+10+10) to avoid JSON truncation."""
     words: list[dict] = []
     for batch_no, n in ((1, 10), (2, 10), (3, 10)):
-        print(f"    batch {batch_no}/2 ({n} words)…")
-        batch = generate_vocab_batch(day_number, batch_no, count=n, used_words=used_words + words)
+        print(f"    batch {batch_no}/3 ({n} words)…")
+        avoid = used_words + [str(w.get("word") or "") for w in words]
+        avoid = [w for w in avoid if w]
+        batch = generate_vocab_batch(day_number, batch_no, count=n, used_words=avoid)
         for w in batch:
             entry = _normalize_word(w)
             token = str(entry.get("word") or "").strip().lower()
