@@ -170,10 +170,30 @@
     today: null,
     selectedDay: null,
     activeTab: "learn",
+    practiceRetake: false,
     packId: null,
     unitId: null,
     unitWords: null,
   };
+
+  function estimateExamTotal(exam) {
+    let total = 0;
+    (exam?.sections || []).forEach((section) => {
+      const st = section.type;
+      if (st === "mcq" || st === "fill") {
+        total += (section.items || []).length;
+      } else if (st === "match") {
+        (section.items || []).forEach((item) => {
+          total += (item.pairs || []).length;
+        });
+      } else if (st === "order") {
+        total += (section.items || []).length;
+      } else if (st === "writing") {
+        total += 2;
+      }
+    });
+    return Math.max(total, 1);
+  }
 
   function progressPct(progress) {
     if (!progress) return 0;
@@ -362,6 +382,7 @@
     document.getElementById("ssc-clear-day")?.addEventListener("click", () => {
       state.selectedDay = null;
       state.today = null;
+      state.practiceRetake = false;
       void renderLearnPanel(root);
     });
 
@@ -556,7 +577,9 @@
           learnDone: prog.learnDone,
           practiceDone: true,
           practiceScore: result.score || 0,
+          practiceScoreTotal: result.total || estimateExamTotal(exam),
         });
+        state.practiceRetake = false;
         state.today = null;
         root.innerHTML = `
           <div class="ssc-report">
@@ -589,13 +612,20 @@
       document.getElementById("ssc-exam-submit")?.addEventListener("click", () => void submitExam());
     }
 
-    if (prog.practiceDone) {
+    const examTotal = prog.practiceScoreTotal || estimateExamTotal(exam);
+
+    if (prog.practiceDone && !state.practiceRetake) {
       root.innerHTML = `
         <div class="ssc-report">
           <h2>${t("self_study_vocab_practice_done")}</h2>
-          <p>${t("self_study_vocab_practice_score", { correct: String(prog.practiceScore || 0), total: "—" })}</p>
+          <p>${t("self_study_vocab_practice_score", { correct: String(prog.practiceScore ?? 0), total: String(examTotal) })}</p>
+          <button type="button" class="btn-secondary" id="ssc-practice-redo">${t("self_study_vocab_redo")}</button>
         </div>
       `;
+      document.getElementById("ssc-practice-redo")?.addEventListener("click", () => {
+        state.practiceRetake = true;
+        renderExam();
+      });
       return;
     }
     renderExam();
@@ -737,6 +767,7 @@
       li.addEventListener("click", () => {
         state.selectedDay = parseInt(li.getAttribute("data-day"), 10);
         state.today = null;
+        state.practiceRetake = false;
         showTab("learn");
         void renderLearnPanel(document.getElementById("ssc-panel-learn"));
       });

@@ -334,6 +334,7 @@ def _vocab_day_payload(
             "learnDone": bool(prog and prog["learn_done"]),
             "practiceDone": bool(prog and prog["practice_done"]),
             "practiceScore": prog["practice_score"] if prog else None,
+            "practiceScoreTotal": prog["practice_score_total"] if prog else None,
         },
     }
 
@@ -433,7 +434,30 @@ def migrate_self_study_vocabulary_tables(conn) -> None:
         )
         """
     )
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(student_vocab_day_progress)").fetchall()}
+    if "practice_score_total" not in cols:
+        conn.execute(
+            "ALTER TABLE student_vocab_day_progress ADD COLUMN practice_score_total INTEGER"
+        )
+
     seed_default_vocab_course(conn)
+
+
+def _exam_max_total(exam: dict) -> int:
+    """Maximum scorable items for a practice exam (writing section counts as 2)."""
+    total = 0
+    for section in exam.get("sections") or []:
+        st = section.get("type")
+        if st in ("mcq", "fill"):
+            total += len(section.get("items") or [])
+        elif st == "match":
+            for item in section.get("items") or []:
+                total += len(item.get("pairs") or [])
+        elif st == "order":
+            total += len(section.get("items") or [])
+        elif st == "writing":
+            total += 2
+    return max(total, 1)
 
 
 def seed_default_vocab_course(conn) -> None:
@@ -996,6 +1020,7 @@ def register_self_study_vocabulary_routes(
         learn_done = 1 if data.get("learnDone", True) else 0
         practice_done = 1 if data.get("practiceDone") else 0
         practice_score = data.get("practiceScore")
+        practice_score_total = data.get("practiceScoreTotal")
         if not course_id or not day_number:
             conn.close()
             return jsonify({"error": "courseId and dayNumber required"}), 400
@@ -1012,12 +1037,16 @@ def register_self_study_vocabulary_routes(
         conn.execute(
             """
             INSERT INTO student_vocab_day_progress
-                (student_username, course_id, day_number, learn_done, practice_done, practice_score, completed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (student_username, course_id, day_number, learn_done, practice_done,
+                 practice_score, practice_score_total, completed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(student_username, course_id, day_number) DO UPDATE SET
                 learn_done = CASE WHEN excluded.learn_done = 1 OR student_vocab_day_progress.learn_done = 1 THEN 1 ELSE 0 END,
                 practice_done = CASE WHEN excluded.practice_done = 1 OR student_vocab_day_progress.practice_done = 1 THEN 1 ELSE 0 END,
                 practice_score = COALESCE(excluded.practice_score, student_vocab_day_progress.practice_score),
+                practice_score_total = COALESCE(
+                    excluded.practice_score_total, student_vocab_day_progress.practice_score_total
+                ),
                 completed_at = COALESCE(excluded.completed_at, student_vocab_day_progress.completed_at)
             """,
             (
@@ -1027,6 +1056,7 @@ def register_self_study_vocabulary_routes(
                 learn_done,
                 practice_done,
                 practice_score,
+                practice_score_total,
                 completed_at,
             ),
         )
