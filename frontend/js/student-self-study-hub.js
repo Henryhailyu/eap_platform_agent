@@ -176,7 +176,7 @@
     const mod = SKILL_MODULES.find((s) => s.id === skillId);
     if (!mod) return "#";
     let href = mod.href;
-    if ((skillId === "vocabulary" || skillId === "reading") && dayNumber) {
+    if ((skillId === "vocabulary" || skillId === "reading" || skillId === "listening") && dayNumber) {
       href += `&day=${dayNumber}`;
     }
     return href;

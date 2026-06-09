@@ -1,5 +1,5 @@
 /**
- * SS-L1 / SS-L2 — server-backed listening (Part 3/4, notes coach + key-point compare).
+ * SS-L3 — server-backed listening: listen (script hidden) → single-page exam → coach.
  */
 (function (global) {
   const SERVER = () => global.EAP_SELF_STUDY_SERVER;
@@ -26,7 +26,15 @@
     return isZh() ? obj[zhKey] || obj[enKey] || "" : obj[enKey] || obj[zhKey] || "";
   }
 
-  const state = { today: null, coach: null, lastScoring: null, activeTab: "listen" };
+  const state = {
+    today: null,
+    selectedDay: null,
+    lastScoring: null,
+    coach: null,
+    revealedScript: null,
+    practiceRetake: false,
+    phase: "listen",
+  };
 
   function updateHeader(pct, statusText) {
     const fill = document.getElementById("ssc-module-progress-fill");
@@ -37,26 +45,12 @@
     if (statusEl) statusEl.textContent = statusText;
   }
 
-  function progressPct(prog) {
-    if (!prog) return 0;
-    let n = 0;
-    if (prog.listenDone) n += 35;
-    if (prog.selfNotes && String(prog.selfNotes).trim()) n += 15;
-    if (prog.practiceDone) n += 50;
-    return Math.min(100, n);
-  }
-
-  function showTab(tabId) {
-    state.activeTab = tabId;
-    document.querySelectorAll(".ssc-tab").forEach((btn) => {
-      const tab = btn.getAttribute("data-tab");
-      const selected = tab === tabId;
-      btn.classList.toggle("ssc-tab--active", selected);
-      btn.setAttribute("aria-selected", selected ? "true" : "false");
-    });
-    document.querySelectorAll(".ssc-tab-panel").forEach((panel) => {
-      panel.hidden = panel.getAttribute("data-panel") !== tabId;
-    });
+  function progressPct(prog, phase) {
+    if (!prog) return phase === "exam" ? 40 : 0;
+    if (prog.practiceDone) return 100;
+    if (phase === "exam") return 65;
+    if (prog.listenDone) return 40;
+    return 15;
   }
 
   function partLabel(partType) {
@@ -65,227 +59,202 @@
     return partType || "";
   }
 
+  function parseDayFromUrl() {
+    const n = parseInt(new URLSearchParams(global.location.search).get("day") || "", 10);
+    return n > 0 ? n : null;
+  }
+
   async function loadToday() {
     if (!state.today) {
-      state.today = await SERVER().getListeningToday();
+      const day = state.selectedDay || parseDayFromUrl();
+      state.today = await SERVER().getListeningToday(day);
     }
     return state.today;
   }
 
-  async function renderListenPanel(root) {
-    let data;
-    try {
-      data = await loadToday();
-    } catch (e) {
-      root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
-      return;
+  function channelBanner(data) {
+    const day = data.dayNumber ? t("self_study_listening_day_label", { day: String(data.dayNumber) }) : "";
+    return `
+      <div class="ssc-vocab-channel" role="status">
+        <span class="ssc-vocab-channel__badge">${t("self_study_channel_b")}</span>
+        <span class="ssc-vocab-channel__sched">${escapeHtml(partLabel(data.partType))}</span>
+        ${day ? `<span class="ssc-vocab-channel__sched">${escapeHtml(day)}</span>` : ""}
+      </div>
+    `;
+  }
+
+  function renderAudioPlayer(audio) {
+    if (!audio || !audio.available) {
+      return `<p class="ssc-disclaimer" role="status">${t("self_study_listening_no_audio")}</p>`;
     }
-
-    const c = data.content || {};
-    const prog = data.progress || {};
-    const script = pickLang(c, "scriptEn", "scriptZh");
-    const lesson = pickLang(c, "lessonEn", "lessonZh");
-    const savedNotes = prog.selfNotes || "";
-
-    const audio = data.audio;
-    const audioSt = data.audioStatus || {};
-    const noAudioMsg = audioSt.tts
-      ? t("self_study_listening_audio_generating")
-      : t("self_study_listening_no_audio");
-    const audioBlock = audio?.url
-      ? `<div class="ssc-audio-player">
+    if (audio.playlist && audio.segments && audio.segments.length) {
+      const list = audio.segments
+        .map(
+          (seg, i) =>
+            `<li><button type="button" class="ssc-audio-seg-btn" data-seg="${i}">${escapeHtml(seg.speaker || `Part ${i + 1}`)}</button></li>`,
+        )
+        .join("");
+      return `
+        <div class="ssc-audio-player" id="ssc-listening-audio-wrap">
+          <p class="ssc-audio-player__label">${t("self_study_listening_audio_play")}</p>
+          <audio id="ssc-listening-audio" controls preload="metadata" class="ssc-audio-player__el"></audio>
+          <ol class="ssc-audio-playlist">${list}</ol>
+          ${audio.truncated ? `<p class="ssc-disclaimer">${t("self_study_listening_audio_truncated")}</p>` : ""}
+        </div>
+      `;
+    }
+    if (audio.url) {
+      return `
+        <div class="ssc-audio-player">
           <p class="ssc-audio-player__label">${t("self_study_listening_audio_play")}</p>
           <audio controls preload="metadata" src="${escapeHtml(audio.url)}" class="ssc-audio-player__el"></audio>
           ${audio.truncated ? `<p class="ssc-disclaimer">${t("self_study_listening_audio_truncated")}</p>` : ""}
-        </div>`
-      : `<p class="ssc-disclaimer">${escapeHtml(noAudioMsg)}</p>`;
+        </div>
+      `;
+    }
+    return `<p class="ssc-disclaimer">${t("self_study_listening_audio_generating")}</p>`;
+  }
 
-    root.innerHTML = `
-      <div class="ssc-lesson-card">
-        <h2>${escapeHtml(data.title || t("self_study_listening_learn_title"))}</h2>
-        <p>${escapeHtml(lesson)}</p>
-        ${audioBlock}
-      </div>
-      <pre class="ssc-script-block">${escapeHtml(script)}</pre>
-      <div class="ssc-listening-notes">
-        <label for="ssc-self-notes" class="ssc-listening-notes__label">${t("self_study_listening_notes_label")}</label>
-        <textarea id="ssc-self-notes" class="ssc-listening-notes__input" rows="6" maxlength="8000" placeholder="${t("self_study_listening_notes_placeholder")}">${escapeHtml(savedNotes)}</textarea>
-      </div>
-      <div class="ssc-placement-actions">
-        <button type="button" class="btn-secondary" id="ssc-save-notes">${t("self_study_listening_save_notes")}</button>
-        <button type="button" class="btn-primary" id="ssc-listen-done">${prog.listenDone ? t("self_study_listening_marked") : t("self_study_listening_mark_listened")}</button>
-        <button type="button" class="btn-secondary" id="ssc-go-practice">${t("self_study_listening_start_questions")}</button>
-      </div>
-    `;
+  function bindPlaylistAudio(root, audio) {
+    if (!audio || !audio.playlist || !audio.segments || !audio.segments.length) return;
+    const el = root.querySelector("#ssc-listening-audio");
+    if (!el) return;
+    let idx = 0;
+    const playSeg = (i) => {
+      idx = i;
+      const seg = audio.segments[i];
+      if (!seg || !seg.url) return;
+      el.src = seg.url;
+      void el.play();
+    };
+    el.addEventListener("ended", () => {
+      if (idx + 1 < audio.segments.length) playSeg(idx + 1);
+    });
+    root.querySelectorAll(".ssc-audio-seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => playSeg(parseInt(btn.getAttribute("data-seg"), 10)));
+    });
+    playSeg(0);
+  }
 
-    updateHeader(
-      progressPct({ ...prog, selfNotes: savedNotes }),
-      prog.practiceDone
-        ? t("self_study_listening_complete_short")
-        : t("self_study_module_in_progress", { pct: String(progressPct({ ...prog, selfNotes: savedNotes })) }),
-    );
+  function renderQuestionItem(q, answers) {
+    const typeId = (q.typeId || "LMC").toUpperCase();
+    const instruction = pickLang(q, "instructionEn", "instructionZh");
+    const prompt = pickLang(q, "promptEn", "promptZh");
+    const opts = isZh() ? q.optionsZh || q.optionsEn : q.optionsEn || q.optionsZh;
+    const chosen = answers[q.id];
 
-    async function persist(listenDone, notes) {
-      await SERVER().completeListening({
-        itemId: data.itemId,
-        listenDone: !!listenDone,
-        selfNotes: notes,
-      });
-      state.today = null;
+    if (typeId === "LM" && q.pairs && q.pairs.length) {
+      const chosenMap = chosen && typeof chosen === "object" ? chosen : {};
+      const rows = q.pairs
+        .map((p) => {
+          const left = p.left || "";
+          const sel = chosenMap[left] || "";
+          const options = (opts || [])
+            .map(
+              (opt) =>
+                `<option value="${escapeHtml(opt)}"${sel === opt ? " selected" : ""}>${escapeHtml(opt)}</option>`,
+            )
+            .join("");
+          return `
+            <div class="ssc-listening-lm-row">
+              <span class="ssc-listening-lm-left">${escapeHtml(left)}</span>
+              <select class="ssc-exam-select ssc-listening-lm-select" data-q="${escapeHtml(q.id)}" data-left="${escapeHtml(left)}">
+                <option value="">${t("self_study_exam_choose")}</option>
+                ${options}
+              </select>
+            </div>
+          `;
+        })
+        .join("");
+      return `
+        <div class="ssc-reading-q" data-qid="${escapeHtml(q.id)}">
+          <p class="ssc-reading-q__type">${escapeHtml(typeId)}</p>
+          ${instruction ? `<p class="ssc-reading-q__instr">${escapeHtml(instruction)}</p>` : ""}
+          <p class="ssc-reading-q__prompt">${escapeHtml(prompt)}</p>
+          <div class="ssc-listening-lm">${rows}</div>
+        </div>
+      `;
     }
 
-    document.getElementById("ssc-save-notes")?.addEventListener("click", async () => {
-      const notes = document.getElementById("ssc-self-notes")?.value || "";
-      try {
-        await persist(prog.listenDone, notes);
-        root.insertAdjacentHTML("beforeend", `<p class="ssc-vocab-success" role="status">${t("self_study_listening_notes_saved")}</p>`);
-      } catch (e) {
-        alert(e.message);
-      }
-    });
+    if (["LSeC", "LNC", "LSAQ", "LSC", "LFC"].includes(typeId)) {
+      const val = chosen != null ? String(chosen) : "";
+      return `
+        <div class="ssc-reading-q" data-qid="${escapeHtml(q.id)}">
+          <p class="ssc-reading-q__type">${escapeHtml(typeId)}${q.wordLimit ? ` · ${t("self_study_reading_word_limit", { n: String(q.wordLimit) })}` : ""}</p>
+          ${instruction ? `<p class="ssc-reading-q__instr">${escapeHtml(instruction)}</p>` : ""}
+          <p class="ssc-reading-q__prompt">${escapeHtml(prompt)}</p>
+          <input type="text" class="ssc-exam-input ssc-reading-gap" data-gap="${escapeHtml(q.id)}" value="${escapeHtml(val)}" placeholder="${t("self_study_exam_type_answer")}" />
+        </div>
+      `;
+    }
 
-    document.getElementById("ssc-listen-done")?.addEventListener("click", async () => {
-      const notes = document.getElementById("ssc-self-notes")?.value || "";
-      try {
-        await persist(true, notes);
-        await renderListenPanel(root);
-      } catch (e) {
-        alert(e.message);
-      }
-    });
+    return `
+      <div class="ssc-reading-q" data-qid="${escapeHtml(q.id)}">
+        <p class="ssc-reading-q__type">${escapeHtml(typeId)}</p>
+        ${instruction ? `<p class="ssc-reading-q__instr">${escapeHtml(instruction)}</p>` : ""}
+        <p class="ssc-reading-q__prompt">${escapeHtml(prompt)}</p>
+        <ul class="ssc-options">
+          ${(opts || [])
+            .map(
+              (opt, i) =>
+                `<li><button type="button" class="ssc-option${chosen === i ? " ssc-option--selected" : ""}" data-q="${escapeHtml(q.id)}" data-i="${i}">${escapeHtml(opt)}</button></li>`,
+            )
+            .join("")}
+        </ul>
+      </div>
+    `;
+  }
 
-    document.getElementById("ssc-go-practice")?.addEventListener("click", () => {
-      showTab("practice");
-      void renderPracticePanel(document.getElementById("ssc-panel-practice"));
+  function bindQuestionInputs(root, answers) {
+    root.querySelectorAll(".ssc-option").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const qid = btn.getAttribute("data-q");
+        answers[qid] = parseInt(btn.getAttribute("data-i"), 10);
+        const block = btn.closest(".ssc-reading-q");
+        if (block) {
+          block.querySelectorAll(".ssc-option").forEach((opt) => {
+            opt.classList.toggle("ssc-option--selected", opt === btn);
+          });
+        }
+      });
+    });
+    root.querySelectorAll(".ssc-reading-gap").forEach((inp) => {
+      inp.addEventListener("input", () => {
+        answers[inp.getAttribute("data-gap")] = inp.value;
+      });
+    });
+    root.querySelectorAll(".ssc-listening-lm-select").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        const qid = sel.getAttribute("data-q");
+        const left = sel.getAttribute("data-left");
+        if (!answers[qid] || typeof answers[qid] !== "object") answers[qid] = {};
+        answers[qid][left] = sel.value;
+      });
     });
   }
 
-  async function renderPracticePanel(root) {
-    let data;
-    try {
-      data = await loadToday();
-    } catch (e) {
-      root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
-      return;
-    }
-
-    const prog = data.progress || {};
-    if (prog.practiceDone && state.lastScoring) {
-      renderResults(root, data, state.lastScoring);
-      return;
-    }
-    if (prog.practiceDone) {
-      root.innerHTML = `
-        <div class="ssc-report">
-          <h2>${t("self_study_vocab_practice_done")}</h2>
-          <p>${t("self_study_vocab_practice_score", { correct: String(prog.scoreCorrect || 0), total: String(prog.scoreTotal || 0) })}</p>
-          <button type="button" class="btn-primary" id="ssc-go-coach">${t("self_study_listening_view_coach")}</button>
-        </div>
-      `;
-      document.getElementById("ssc-go-coach")?.addEventListener("click", () => {
-        showTab("coach");
-        void renderCoachPanel(document.getElementById("ssc-panel-coach"));
-      });
-      return;
-    }
-
-    const questions = (data.content && data.content.questions) || [];
-    const c = data.content || {};
-    const script = pickLang(c, "scriptEn", "scriptZh");
-    let index = 0;
-    const answers = {};
-
-    function renderQuestion() {
-      const q = questions[index];
-      if (!q) return submit();
-
-      const opts = isZh() ? q.optionsZh || q.optionsEn : q.optionsEn || q.optionsZh;
-      const chosen = answers[q.id];
-
-      root.innerHTML = `
-        <details class="ssc-reading-passage-ref">
-          <summary>${t("self_study_listening_show_script")}</summary>
-          <pre class="ssc-script-block ssc-script-block--compact">${escapeHtml(script)}</pre>
-        </details>
-        <p class="ssc-placement-progress__label">${t("self_study_vocab_practice_progress", { current: String(index + 1), total: String(questions.length) })}</p>
-        <div class="ssc-question-card">
-          <p class="ssc-question-type">${escapeHtml(q.typeId || "LMC")}</p>
-          <h3>${escapeHtml(pickLang(q, "promptEn", "promptZh"))}</h3>
-          <ul class="ssc-options">
-            ${(opts || [])
-              .map(
-                (opt, i) =>
-                  `<li><button type="button" class="ssc-option${chosen === i ? " ssc-option--selected" : ""}" data-i="${i}">${escapeHtml(opt)}</button></li>`,
-              )
-              .join("")}
-          </ul>
-        </div>
-        <div class="ssc-placement-actions">
-          <button type="button" class="btn-primary" id="ssc-practice-next" ${chosen == null ? "disabled" : ""}>${index < questions.length - 1 ? t("self_study_next") : t("self_study_listening_submit")}</button>
-        </div>
-      `;
-
-      root.querySelectorAll(".ssc-option").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          answers[q.id] = parseInt(btn.getAttribute("data-i"), 10);
-          renderQuestion();
-        });
-      });
-      document.getElementById("ssc-practice-next")?.addEventListener("click", () => {
-        if (answers[q.id] == null) return;
-        index += 1;
-        renderQuestion();
-      });
-    }
-
-    async function submit() {
-      const notes = document.getElementById("ssc-self-notes")?.value || prog.selfNotes || "";
-      try {
-        const res = await SERVER().completeListening({
-          itemId: data.itemId,
-          answers,
-          selfNotes: notes,
-        });
-        state.today = null;
-        state.lastScoring = res.scoring;
-        state.coach = res.coach || null;
-        renderResults(root, data, res.scoring);
-        updateHeader(100, t("self_study_listening_complete_short"));
-      } catch (e) {
-        root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
-      }
-    }
-
-    renderQuestion();
+  function collectAnswers(root, answers) {
+    root.querySelectorAll(".ssc-reading-gap").forEach((inp) => {
+      answers[inp.getAttribute("data-gap")] = inp.value;
+    });
+    root.querySelectorAll(".ssc-listening-lm-select").forEach((sel) => {
+      const qid = sel.getAttribute("data-q");
+      const left = sel.getAttribute("data-left");
+      if (!answers[qid] || typeof answers[qid] !== "object") answers[qid] = {};
+      answers[qid][left] = sel.value;
+    });
   }
 
-  function renderResults(root, data, scoring) {
-    if (!scoring) return;
-    const items = (scoring.results || [])
-      .map((r) => {
-        const status = r.correct ? t("self_study_reading_correct") : t("self_study_reading_incorrect");
-        const evidence = isZh() ? r.evidenceZh || r.evidenceEn : r.evidenceEn || r.evidenceZh;
-        return `
-          <li class="ssc-reading-result${r.correct ? " ssc-reading-result--ok" : " ssc-reading-result--bad"}">
-            <p class="ssc-reading-result__status">${status} · ${escapeHtml(r.id)}</p>
-            ${evidence ? `<p class="ssc-reading-result__evidence">${t("self_study_reading_evidence")}: ${escapeHtml(evidence)}</p>` : ""}
-          </li>
-        `;
-      })
-      .join("");
-
-    root.innerHTML = `
-      <div class="ssc-report">
-        <h2>${t("self_study_reading_results_title")}</h2>
-        <p>${t("self_study_vocab_practice_score", { correct: String(scoring.correct), total: String(scoring.total) })}</p>
-        <button type="button" class="btn-primary" id="ssc-go-coach">${t("self_study_listening_view_coach")}</button>
-      </div>
-      <ul class="ssc-reading-results">${items}</ul>
-    `;
-    document.getElementById("ssc-go-coach")?.addEventListener("click", () => {
-      showTab("coach");
-      void renderCoachPanel(document.getElementById("ssc-panel-coach"));
-    });
+  function errorTypeLabel(code) {
+    const map = {
+      wrong_option: t("self_study_reading_err_wrong"),
+      not_in_recording: t("self_study_listening_err_not_in_recording"),
+      spelling: t("self_study_reading_err_spelling"),
+      word_limit: t("self_study_reading_err_word_limit"),
+      order_error: t("self_study_listening_err_order"),
+      not_given_confusion: t("self_study_reading_err_ng"),
+    };
+    return map[code] || code || "";
   }
 
   function renderComparisonHtml(coach) {
@@ -303,9 +272,7 @@
         const label = pickLang(pt, "labelEn", "labelZh") || pt.labelEn || pt.labelZh || "";
         const cls = pt.matched ? "ssc-listening-kp--matched" : "ssc-listening-kp--missed";
         const icon = pt.matched ? "✓" : "○";
-        const status = pt.matched
-          ? t("self_study_listening_kp_matched")
-          : t("self_study_listening_kp_missed");
+        const status = pt.matched ? t("self_study_listening_kp_matched") : t("self_study_listening_kp_missed");
         return `<li class="ssc-listening-kp ${cls}"><span class="ssc-listening-kp__icon" aria-hidden="true">${icon}</span><span class="ssc-listening-kp__label">${escapeHtml(label)}</span><span class="ssc-listening-kp__status">${escapeHtml(status)}</span></li>`;
       })
       .join("");
@@ -323,53 +290,235 @@
     `;
   }
 
-  async function renderCoachPanel(root) {
+  function renderCoachSection(coach, selfNotes) {
+    if (!coach) return "";
+    const exemplar = pickLang(coach, "exemplarNotesEn", "exemplarNotesZh");
+    const tips = isZh() ? coach.coachingTipsZh || coach.coachingTipsEn : coach.coachingTipsEn || coach.coachingTipsZh;
+    const tipsHtml = (tips || []).map((tip) => `<li>${escapeHtml(tip)}</li>`).join("");
+
+    return `
+      <section class="ssc-listening-coach-block" aria-labelledby="ssc-listening-coach-heading">
+        <h2 id="ssc-listening-coach-heading">${t("self_study_listening_coach_title")}</h2>
+        <p>${t("self_study_listening_coach_hint")}</p>
+        ${renderComparisonHtml(coach)}
+        <div class="ssc-listening-coach-grid">
+          <section class="ssc-listening-coach-col">
+            <h3>${t("self_study_listening_your_notes")}</h3>
+            <pre class="ssc-script-block ssc-script-block--compact">${escapeHtml(selfNotes || t("self_study_listening_no_notes"))}</pre>
+          </section>
+          <section class="ssc-listening-coach-col">
+            <h3>${t("self_study_listening_exemplar_notes")}</h3>
+            <pre class="ssc-script-block ssc-script-block--compact">${escapeHtml(exemplar)}</pre>
+          </section>
+        </div>
+        ${tipsHtml ? `<h3 class="ssc-listening-tips-heading">${t("self_study_listening_coaching_tips")}</h3><ul class="ssc-listening-tips">${tipsHtml}</ul>` : ""}
+      </section>
+    `;
+  }
+
+  function renderScriptBlock(scriptText) {
+    if (!scriptText) return "";
+    return `
+      <details class="ssc-reading-passage-ref ssc-listening-script-reveal">
+        <summary>${t("self_study_listening_show_script")}</summary>
+        <pre class="ssc-script-block">${escapeHtml(scriptText)}</pre>
+      </details>
+    `;
+  }
+
+  function renderResults(root, data, scoring, coach) {
+    if (!scoring) return;
+    const scriptText = state.revealedScript || "";
+    const selfNotes = (data.progress && data.progress.selfNotes) || "";
+    const items = (scoring.results || [])
+      .map((r) => {
+        const status = r.correct ? t("self_study_reading_correct") : t("self_study_reading_incorrect");
+        const evidence = isZh() ? r.evidenceZh || r.evidenceEn : r.evidenceEn || r.evidenceZh;
+        const feedback = isZh() ? r.feedbackZh || r.feedbackEn : r.feedbackEn || r.feedbackZh;
+        const err = r.errorType ? errorTypeLabel(r.errorType) : "";
+        return `
+          <li class="ssc-reading-result${r.correct ? " ssc-reading-result--ok" : " ssc-reading-result--bad"}">
+            <p class="ssc-reading-result__status">${status} · ${escapeHtml(r.id)}${err ? ` · ${escapeHtml(err)}` : ""}</p>
+            ${feedback ? `<p class="ssc-reading-result__feedback">${escapeHtml(feedback)}</p>` : ""}
+            ${evidence ? `<p class="ssc-reading-result__evidence">${t("self_study_reading_evidence")}: ${escapeHtml(evidence)}</p>` : ""}
+          </li>
+        `;
+      })
+      .join("");
+
+    root.innerHTML = `
+      <div class="ssc-report">
+        <h2>${t("self_study_reading_results_title")}</h2>
+        <p>${t("self_study_vocab_practice_score", { correct: String(scoring.correct), total: String(scoring.total) })}</p>
+        <button type="button" class="btn-secondary" id="ssc-listening-redo">${t("self_study_vocab_redo")}</button>
+      </div>
+      ${renderScriptBlock(scriptText)}
+      <ul class="ssc-reading-results">${items}</ul>
+      ${renderCoachSection(coach, selfNotes)}
+    `;
+    document.getElementById("ssc-listening-redo")?.addEventListener("click", () => {
+      state.practiceRetake = true;
+      state.lastScoring = null;
+      state.coach = null;
+      state.phase = "exam";
+      void renderMainPanel(root);
+    });
+  }
+
+  async function renderListenPhase(root, data) {
+    const prog = data.progress || {};
+    const lesson = pickLang(data.content || {}, "lessonEn", "lessonZh");
+    const savedNotes = prog.selfNotes || "";
+
+    root.innerHTML = `
+      <article class="ssc-listening-listen">
+        <header class="ssc-reading-exam__head">
+          <h2>${escapeHtml(data.title || t("self_study_listening_learn_title"))}</h2>
+          ${lesson ? `<p class="ssc-reading-exam__tip">${escapeHtml(lesson)}</p>` : ""}
+          <p class="ssc-disclaimer">${t("self_study_listening_script_hidden")}</p>
+        </header>
+        ${renderAudioPlayer(data.audio)}
+        <label for="ssc-self-notes" class="ssc-listening-notes__label">${t("self_study_listening_notes_label")}</label>
+        <textarea id="ssc-self-notes" class="ssc-listening-notes__input" rows="6" maxlength="8000" placeholder="${t("self_study_listening_notes_placeholder")}">${escapeHtml(savedNotes)}</textarea>
+        <div class="ssc-placement-actions">
+          <button type="button" class="btn-secondary" id="ssc-save-notes">${t("self_study_listening_save_notes")}</button>
+          <button type="button" class="btn-primary" id="ssc-start-exam">${t("self_study_listening_start_questions")}</button>
+        </div>
+      </article>
+    `;
+
+    bindPlaylistAudio(root, data.audio);
+
+    document.getElementById("ssc-save-notes")?.addEventListener("click", async () => {
+      const notes = document.getElementById("ssc-self-notes")?.value || "";
+      try {
+        await SERVER().completeListening({ itemId: data.itemId, listenDone: true, selfNotes: notes });
+        state.today = null;
+        root.insertAdjacentHTML("beforeend", `<p class="ssc-vocab-success" role="status">${t("self_study_listening_notes_saved")}</p>`);
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+
+    document.getElementById("ssc-start-exam")?.addEventListener("click", async () => {
+      const notes = document.getElementById("ssc-self-notes")?.value || "";
+      try {
+        await SERVER().completeListening({ itemId: data.itemId, listenDone: true, selfNotes: notes });
+        state.today = null;
+        state.phase = "exam";
+        await renderMainPanel(root);
+      } catch (e) {
+        alert(e.message);
+      }
+    });
+
+    updateHeader(progressPct(prog, "listen"), t("self_study_module_in_progress", { pct: String(progressPct(prog, "listen")) }));
+  }
+
+  async function renderExamPhase(root, data) {
+    const prog = data.progress || {};
+    const c = data.content || {};
+    const questions = c.questions || [];
+    const answers = {};
+    const lesson = pickLang(c, "lessonEn", "lessonZh");
+    const scriptText = state.revealedScript || "";
+
+    root.innerHTML = `
+      <article class="ssc-reading-exam">
+        <header class="ssc-reading-exam__head">
+          <h2>${escapeHtml(data.title || t("self_study_mod_listening"))}</h2>
+          ${lesson ? `<p class="ssc-reading-exam__tip">${escapeHtml(lesson)}</p>` : ""}
+          <p class="ssc-reading-exam__meta">${t("self_study_listening_meta", { questions: String(questions.length) })}</p>
+        </header>
+        ${renderScriptBlock(scriptText)}
+        <section class="ssc-reading-questions" aria-label="${t("self_study_listening_questions_label")}">
+          <h3 class="ssc-reading-questions__title">${t("self_study_listening_questions_heading", { n: String(questions.length) })}</h3>
+          ${questions.map((q) => renderQuestionItem(q, answers)).join("")}
+        </section>
+        <div class="ssc-placement-actions">
+          <button type="button" class="btn-primary ssc-reading-submit-btn" id="ssc-listening-submit">
+            <span class="ssc-reading-submit__spinner" id="ssc-listening-submit-spinner" hidden aria-hidden="true"></span>
+            <span class="ssc-reading-submit__label">${t("self_study_listening_submit")}</span>
+          </button>
+        </div>
+      </article>
+    `;
+
+    bindQuestionInputs(root, answers);
+    updateHeader(progressPct(prog, "exam"), t("self_study_module_in_progress", { pct: String(progressPct(prog, "exam")) }));
+
+    document.getElementById("ssc-listening-submit")?.addEventListener("click", async () => {
+      collectAnswers(root, answers);
+      const btn = document.getElementById("ssc-listening-submit");
+      const spinner = document.getElementById("ssc-listening-submit-spinner");
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add("ssc-reading-submit-btn--loading");
+        btn.setAttribute("aria-busy", "true");
+      }
+      if (spinner) spinner.hidden = false;
+      const notes = document.getElementById("ssc-self-notes")?.value;
+      try {
+        const body = { itemId: data.itemId, answers };
+        if (notes != null) body.selfNotes = notes;
+        const res = await SERVER().completeListening(body);
+        state.today = null;
+        state.practiceRetake = false;
+        state.lastScoring = res.scoring;
+        state.coach = res.coach || null;
+        state.revealedScript = isZh() ? res.scriptZh || res.scriptEn : res.scriptEn || res.scriptZh;
+        state.phase = "results";
+        renderResults(root, data, res.scoring, res.coach);
+        updateHeader(100, t("self_study_listening_complete_short"));
+      } catch (e) {
+        alert(e.message);
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove("ssc-reading-submit-btn--loading");
+          btn.removeAttribute("aria-busy");
+        }
+        if (spinner) spinner.hidden = true;
+      }
+    });
+  }
+
+  async function renderMainPanel(root) {
     let data;
     try {
+      state.today = null;
       data = await loadToday();
     } catch (e) {
       root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
       return;
     }
 
-    let coach = state.coach;
-    if (!coach) {
-      try {
-        const res = await SERVER().getListeningCoach(data.itemId);
-        coach = res.coach;
-        state.coach = coach;
-      } catch (e) {
-        root.innerHTML = `<p class="ssc-vocab-hint">${escapeHtml(e.message)}</p>`;
+    const prog = data.progress || {};
+    if (prog.practiceDone && !state.practiceRetake) {
+      if (!state.coach) {
+        try {
+          const coachRes = await SERVER().getListeningCoach(data.itemId);
+          state.coach = coachRes.coach || null;
+        } catch (_) {
+          /* coach optional on revisit */
+        }
+      }
+      const scoring =
+        state.lastScoring ||
+        (prog.scoreTotal != null
+          ? { correct: prog.scoreCorrect || 0, total: prog.scoreTotal, results: [] }
+          : null);
+      if (scoring) {
+        renderResults(root, data, scoring, state.coach);
+        updateHeader(100, t("self_study_listening_complete_short"));
         return;
       }
     }
 
-    const exemplar = pickLang(coach, "exemplarNotesEn", "exemplarNotesZh");
-    const tips = isZh() ? coach.coachingTipsZh || coach.coachingTipsEn : coach.coachingTipsEn || coach.coachingTipsZh;
-    const tipsHtml = (tips || [])
-      .map((tip) => `<li>${escapeHtml(tip)}</li>`)
-      .join("");
-
-    const selfNotes = (data.progress && data.progress.selfNotes) || "";
-
-    root.innerHTML = `
-      <div class="ssc-lesson-card">
-        <h2>${t("self_study_listening_coach_title")}</h2>
-        <p>${t("self_study_listening_coach_hint")}</p>
-      </div>
-      ${renderComparisonHtml(coach)}
-      <div class="ssc-listening-coach-grid">
-        <section class="ssc-listening-coach-col">
-          <h3>${t("self_study_listening_your_notes")}</h3>
-          <pre class="ssc-script-block ssc-script-block--compact">${escapeHtml(selfNotes || t("self_study_listening_no_notes"))}</pre>
-        </section>
-        <section class="ssc-listening-coach-col">
-          <h3>${t("self_study_listening_exemplar_notes")}</h3>
-          <pre class="ssc-script-block ssc-script-block--compact">${escapeHtml(exemplar)}</pre>
-        </section>
-      </div>
-      ${tipsHtml ? `<h3 class="ssc-listening-tips-heading">${t("self_study_listening_coaching_tips")}</h3><ul class="ssc-listening-tips">${tipsHtml}</ul>` : ""}
-    `;
+    if (state.phase === "listen" && !prog.listenDone && !state.practiceRetake) {
+      await renderListenPhase(root, data);
+      return;
+    }
+    await renderExamPhase(root, data);
   }
 
   async function init() {
@@ -381,6 +530,14 @@
     if (titleEl) titleEl.textContent = t("self_study_mod_listening");
     if (levelEl) levelEl.hidden = true;
 
+    state.selectedDay = parseDayFromUrl();
+    state.today = null;
+    state.lastScoring = null;
+    state.coach = null;
+    state.revealedScript = null;
+    state.practiceRetake = false;
+    state.phase = "listen";
+
     let overview;
     try {
       overview = await SERVER().getListeningOverview();
@@ -388,40 +545,16 @@
       return false;
     }
 
-    state.today = null;
-    state.coach = null;
-    state.lastScoring = null;
-    state.activeTab = "listen";
-
-    const pt = overview.schedule && overview.schedule.partType;
-    const day = overview.schedule && overview.schedule.dayNumber;
-
+    const dayNum = state.selectedDay || (overview.schedule && overview.schedule.dayNumber);
     shell.innerHTML = `
-      <div class="ssc-vocab-channel" role="status">
-        <span class="ssc-vocab-channel__badge">${t("self_study_channel_b")}</span>
-        <span class="ssc-vocab-channel__sched">${escapeHtml(partLabel(pt))}${day ? ` · ${t("self_study_reading_day_label", { day: String(day) })}` : ""}</span>
-      </div>
-      <nav class="ssc-tabs" role="tablist">
-        <button type="button" class="ssc-tab ssc-tab--active" role="tab" data-tab="listen" aria-selected="true">${t("self_study_listening_tab_listen")}</button>
-        <button type="button" class="ssc-tab" role="tab" data-tab="practice" aria-selected="false">${t("self_study_tab_practice")}</button>
-        <button type="button" class="ssc-tab" role="tab" data-tab="coach" aria-selected="false">${t("self_study_listening_tab_coach")}</button>
-      </nav>
-      <div id="ssc-panel-listen" class="ssc-tab-panel" data-panel="listen" role="tabpanel"></div>
-      <div id="ssc-panel-practice" class="ssc-tab-panel" data-panel="practice" role="tabpanel" hidden></div>
-      <div id="ssc-panel-coach" class="ssc-tab-panel" data-panel="coach" role="tabpanel" hidden></div>
+      ${channelBanner({
+        partType: overview.schedule && overview.schedule.partType,
+        dayNumber: dayNum,
+      })}
+      <div id="ssc-listening-panel" class="ssc-listening-panel"></div>
     `;
 
-    shell.querySelectorAll(".ssc-tab").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const tab = btn.getAttribute("data-tab");
-        showTab(tab);
-        if (tab === "listen") void renderListenPanel(document.getElementById("ssc-panel-listen"));
-        if (tab === "practice") void renderPracticePanel(document.getElementById("ssc-panel-practice"));
-        if (tab === "coach") void renderCoachPanel(document.getElementById("ssc-panel-coach"));
-      });
-    });
-
-    await renderListenPanel(document.getElementById("ssc-panel-listen"));
+    await renderMainPanel(document.getElementById("ssc-listening-panel"));
     return true;
   }
 

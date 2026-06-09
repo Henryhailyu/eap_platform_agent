@@ -568,18 +568,34 @@ def _part_type_for_day(day_number: int) -> str:
 
 
 def _item_payload(raw: dict[str, Any], *, include_answers: bool = True) -> dict[str, Any]:
+    try:
+        from self_study_listening_ai import normalize_listening_content
+
+        raw = normalize_listening_content(raw)
+    except Exception:
+        pass
     questions = []
     for q in raw.get("questions") or []:
+        type_id = str(q.get("typeId") or "LMC").upper()
         item: dict[str, Any] = {
             "id": q["id"],
-            "typeId": q.get("typeId") or "LMC",
+            "typeId": type_id,
+            "instructionEn": q.get("instructionEn") or "",
+            "instructionZh": q.get("instructionZh") or "",
             "promptEn": q.get("promptEn") or "",
             "promptZh": q.get("promptZh") or "",
             "optionsEn": q.get("optionsEn") or [],
             "optionsZh": q.get("optionsZh") or [],
         }
+        if type_id == "LM" and q.get("pairs"):
+            item["pairs"] = q.get("pairs") or []
+        elif type_id in ("LSeC", "LNC", "LSAQ", "LSC", "LFC"):
+            item["wordLimit"] = int(q.get("wordLimit") or 3)
+            if include_answers:
+                item["correctAnswer"] = q.get("correctAnswer") or ""
         if include_answers:
-            item["correctIndex"] = q.get("correctIndex", 0)
+            if "correctIndex" in q or type_id in ("LMC", "LTC", "LM") and not q.get("pairs"):
+                item["correctIndex"] = int(q.get("correctIndex") or 0)
             item["evidenceEn"] = q.get("evidenceEn") or ""
             item["evidenceZh"] = q.get("evidenceZh") or ""
         questions.append(item)
@@ -594,6 +610,8 @@ def _item_payload(raw: dict[str, Any], *, include_answers: bool = True) -> dict[
         "title": raw.get("title") or "",
         "lessonEn": raw.get("lessonEn") or "",
         "lessonZh": raw.get("lessonZh") or "",
+        "turns": raw.get("turns") or [],
+        "paragraphs": raw.get("paragraphs") or [],
         "scriptEn": raw.get("scriptEn") or "",
         "scriptZh": raw.get("scriptZh") or "",
         "questions": questions,
@@ -871,7 +889,7 @@ def _day_number(schedule: Any, on_date: date | None = None) -> int:
 
 
 def _item_for_day(conn, schedule_id: int, day_number: int) -> Any:
-    row = conn.execute(
+    return conn.execute(
         """
         SELECT i.*, d.part_type AS scheduled_part
         FROM listening_schedule_days d
@@ -881,40 +899,158 @@ def _item_for_day(conn, schedule_id: int, day_number: int) -> Any:
         """,
         (schedule_id, day_number),
     ).fetchone()
-    if row:
-        return row
-    pt = _part_type_for_day(day_number)
-    return conn.execute(
+
+
+def _attach_item_to_schedule(conn, schedule_id: int, day_number: int, item_id: int, part_type: str) -> None:
+    conn.execute(
         """
-        SELECT i.*, i.part_type AS scheduled_part
-        FROM listening_items i
-        WHERE i.class_name = ? AND i.part_type = ? AND i.is_active = 1
-        ORDER BY sort_order ASC, id ASC
-        LIMIT 1
+        INSERT INTO listening_schedule_days (schedule_id, day_number, item_id, part_type)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(schedule_id, day_number) DO UPDATE SET
+            item_id = excluded.item_id,
+            part_type = excluded.part_type
         """,
-        ("EAP047", pt),
-    ).fetchone()
+        (schedule_id, day_number, item_id, part_type),
+    )
+
+
+def _insert_listening_item(conn, data: dict, class_name: str, sort_order: int) -> int:
+    now = _now_iso()
+    payload = _item_payload(data, include_answers=True)
+    conn.execute(
+        """
+        INSERT INTO listening_items (class_name, part_type, title, sort_order, content_json, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+        """,
+        (
+            class_name,
+            payload["partType"],
+            payload["title"],
+            sort_order,
+            json.dumps(payload, ensure_ascii=False),
+            now,
+            now,
+        ),
+    )
+    return int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+
+
+def _update_item_content(conn, item_id: int, data: dict) -> None:
+    now = _now_iso()
+    payload = _item_payload(data, include_answers=True)
+    conn.execute(
+        """
+        UPDATE listening_items
+        SET content_json = ?, title = ?, part_type = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            json.dumps(payload, ensure_ascii=False),
+            payload["title"],
+            payload["partType"],
+            now,
+            item_id,
+        ),
+    )
+
+
+def _maybe_upgrade_item(
+    conn,
+    item: Any,
+    *,
+    schedule_id: int,
+    day_number: int,
+    class_name: str,
+) -> Any:
+    try:
+        from self_study_listening_ai import (
+            generate_daily_listening,
+            item_needs_upgrade,
+            listening_ai_available,
+        )
+    except Exception:
+        return item
+    if not listening_ai_available():
+        return item
+    content = json.loads(item["content_json"])
+    if not item_needs_upgrade(content):
+        return item
+    try:
+        pt = str(item["scheduled_part"] or item["part_type"] or _part_type_for_day(day_number)).upper()
+        new_content = generate_daily_listening(pt, day_number, class_name)
+        _update_item_content(conn, int(item["id"]), new_content)
+        conn.commit()
+        return _item_for_day(conn, schedule_id, day_number)
+    except Exception:
+        return item
+
+
+def _ensure_item_for_day(
+    conn,
+    *,
+    schedule: Any,
+    day_number: int,
+    class_name: str,
+) -> Any:
+    item = _item_for_day(conn, schedule["id"], day_number)
+    if item:
+        return _maybe_upgrade_item(
+            conn,
+            item,
+            schedule_id=int(schedule["id"]),
+            day_number=day_number,
+            class_name=class_name,
+        )
+    try:
+        from self_study_listening_ai import generate_daily_listening, listening_ai_available
+
+        if not listening_ai_available():
+            return None
+        pt = _part_type_for_day(day_number)
+        content = generate_daily_listening(pt, day_number, class_name)
+        sort_row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), 0) AS mx FROM listening_items WHERE class_name = ?",
+            (class_name,),
+        ).fetchone()
+        item_id = _insert_listening_item(conn, content, class_name, int(sort_row["mx"] or 0) + 1)
+        _attach_item_to_schedule(conn, schedule["id"], day_number, item_id, pt)
+        conn.commit()
+        return _item_for_day(conn, schedule["id"], day_number)
+    except Exception:
+        return None
 
 
 def _strip_answers(content: dict) -> dict:
     out = dict(content)
     qs = []
     for q in content.get("questions") or []:
-        qs.append(
-            {
-                "id": q["id"],
-                "typeId": q.get("typeId") or "LMC",
-                "promptEn": q.get("promptEn") or "",
-                "promptZh": q.get("promptZh") or "",
-                "optionsEn": q.get("optionsEn") or [],
-                "optionsZh": q.get("optionsZh") or [],
-            }
-        )
+        type_id = str(q.get("typeId") or "LMC").upper()
+        item: dict[str, Any] = {
+            "id": q["id"],
+            "typeId": type_id,
+            "instructionEn": q.get("instructionEn") or "",
+            "instructionZh": q.get("instructionZh") or "",
+            "promptEn": q.get("promptEn") or "",
+            "promptZh": q.get("promptZh") or "",
+            "optionsEn": q.get("optionsEn") or [],
+            "optionsZh": q.get("optionsZh") or [],
+        }
+        if type_id in ("LSeC", "LNC", "LSAQ", "LSC", "LFC"):
+            item["wordLimit"] = int(q.get("wordLimit") or 3)
+        if type_id == "LM" and q.get("pairs"):
+            item["pairs"] = [{"left": p.get("left") or ""} for p in q.get("pairs") or []]
+        qs.append(item)
     out["questions"] = qs
+    out.pop("scriptEn", None)
+    out.pop("scriptZh", None)
+    out.pop("turns", None)
+    out.pop("paragraphs", None)
     out.pop("exemplarNotesEn", None)
     out.pop("exemplarNotesZh", None)
     out.pop("coachingTipsEn", None)
     out.pop("coachingTipsZh", None)
+    out.pop("keyPointsEn", None)
+    out.pop("keyPointsZh", None)
     return out
 
 
@@ -932,30 +1068,78 @@ def _coach_payload(content: dict, self_notes: str = "") -> dict:
     return payload
 
 
-def _score_answers(content: dict, answers: dict[str, int]) -> dict[str, Any]:
+def _norm_gap(text: Any) -> str:
+    return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def _answer_for_question(q: dict, answers: dict) -> Any:
+    qid = q["id"]
+    if qid in answers:
+        return answers[qid]
+    return answers.get(str(qid))
+
+
+def _score_lm_pairs(q: dict, given: Any) -> tuple[bool, dict[str, Any]]:
+    pairs = q.get("pairs") or []
+    if not pairs:
+        return False, {}
+    given_map = given if isinstance(given, dict) else {}
+    all_ok = True
+    pair_results: list[dict[str, Any]] = []
+    for p in pairs:
+        left = str(p.get("left") or "")
+        expect = str(p.get("right") or "").strip()
+        got = str(given_map.get(left) or given_map.get(left.lower()) or "").strip()
+        ok = bool(got) and _norm_gap(got) == _norm_gap(expect)
+        if not ok:
+            all_ok = False
+        pair_results.append({"left": left, "chosen": got, "correct": expect, "ok": ok})
+    return all_ok, {"pairs": pair_results}
+
+
+def _score_answers(content: dict, answers: dict[str, Any]) -> dict[str, Any]:
     results = []
     correct = 0
     total = 0
     for q in content.get("questions") or []:
         qid = q["id"]
+        type_id = str(q.get("typeId") or "LMC").upper()
         total += 1
-        chosen = answers.get(qid)
-        if chosen is None:
-            chosen = answers.get(str(qid))
-        ci = int(q.get("correctIndex") or 0)
-        ok = chosen is not None and int(chosen) == ci
+        given = _answer_for_question(q, answers)
+        ok = False
+        result_row: dict[str, Any] = {
+            "id": qid,
+            "typeId": type_id,
+            "evidenceEn": q.get("evidenceEn") or "",
+            "evidenceZh": q.get("evidenceZh") or "",
+        }
+        if type_id == "LM" and q.get("pairs"):
+            ok, extra = _score_lm_pairs(q, given)
+            result_row.update(extra)
+            result_row["errorType"] = None if ok else "wrong_option"
+        elif type_id in ("LSeC", "LNC", "LSAQ", "LSC", "LFC"):
+            expect = _norm_gap(q.get("correctAnswer"))
+            got = _norm_gap(given)
+            ok = bool(got) and got == expect
+            result_row["chosenAnswer"] = given
+            result_row["correctAnswer"] = q.get("correctAnswer") or ""
+            result_row["errorType"] = None if ok else ("word_limit" if not got else "spelling")
+        else:
+            ci = int(q.get("correctIndex") or 0)
+            chosen = None
+            if given is not None:
+                try:
+                    chosen = int(given)
+                except (TypeError, ValueError):
+                    chosen = None
+            ok = chosen is not None and chosen == ci
+            result_row["chosenIndex"] = chosen
+            result_row["correctIndex"] = ci
+            result_row["errorType"] = None if ok else "wrong_option"
+        result_row["correct"] = ok
         if ok:
             correct += 1
-        results.append(
-            {
-                "id": qid,
-                "correct": ok,
-                "chosenIndex": chosen,
-                "correctIndex": ci,
-                "evidenceEn": q.get("evidenceEn") or "",
-                "evidenceZh": q.get("evidenceZh") or "",
-            }
-        )
+        results.append(result_row)
     return {"correct": correct, "total": total, "results": results}
 
 
@@ -991,7 +1175,11 @@ def register_self_study_listening_routes(
         class_name = _student_class_name(conn, username)
         schedule = _active_schedule(conn, class_name)
         day_num = _day_number(schedule) if schedule else None
-        item = _item_for_day(conn, schedule["id"], day_num) if schedule and day_num else None
+        item = (
+            _ensure_item_for_day(conn, schedule=schedule, day_number=day_num, class_name=class_name)
+            if schedule and day_num
+            else None
+        )
         prog = None
         if item:
             prog = conn.execute(
@@ -1042,11 +1230,24 @@ def register_self_study_listening_routes(
             conn.close()
             return jsonify({"error": "No active listening schedule"}), 404
 
-        day_num = _day_number(schedule)
-        item = _item_for_day(conn, schedule["id"], day_num)
+        day_arg = request.args.get("day")
+        if day_arg:
+            try:
+                day_num = max(1, int(day_arg))
+            except (TypeError, ValueError):
+                day_num = _day_number(schedule)
+        else:
+            day_num = _day_number(schedule)
+
+        item = _ensure_item_for_day(
+            conn,
+            schedule=schedule,
+            day_number=day_num,
+            class_name=class_name,
+        )
         if not item:
             conn.close()
-            return jsonify({"error": "No listening item for today"}), 404
+            return jsonify({"error": "No listening item for this day", "dayNumber": day_num}), 404
 
         content = json.loads(item["content_json"])
         prog = conn.execute(
@@ -1054,7 +1255,8 @@ def register_self_study_listening_routes(
             (username, item["id"]),
         ).fetchone()
         script_en = content.get("scriptEn") or ""
-        audio = ensure_listening_audio(item["id"], script_en)
+        turns = content.get("turns") or []
+        audio = ensure_listening_audio(item["id"], script_en, turns=turns)
         conn.close()
 
         return jsonify(
@@ -1146,6 +1348,12 @@ def register_self_study_listening_routes(
         if submit_answers is not None:
             answers = submit_answers if isinstance(submit_answers, dict) else {}
             scoring = _score_answers(content, answers)
+            try:
+                from self_study_listening_ai import enrich_scoring_with_ai_feedback
+
+                scoring = enrich_scoring_with_ai_feedback(content, answers, scoring)
+            except Exception:
+                pass
             practice_done = 1
             score_correct = scoring["correct"]
             score_total = scoring["total"]
@@ -1197,6 +1405,8 @@ def register_self_study_listening_routes(
         if scoring:
             out["scoring"] = scoring
             out["coach"] = _coach_payload(content, notes_for_coach)
+            out["scriptEn"] = content.get("scriptEn") or ""
+            out["scriptZh"] = content.get("scriptZh") or ""
         return jsonify(out)
 
     @app.route("/api/admin/self-study/listening/items", methods=["GET"])

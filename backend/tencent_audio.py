@@ -114,7 +114,16 @@ def _truncate_tts_text(text: str, max_chars: int = _TTS_MAX_CHARS) -> tuple[str,
     return cut.strip(), True
 
 
-def synthesize_tts_mp3(text: str) -> bytes:
+def _voice_id_for_gender(gender: str | None) -> int:
+    g = str(gender or "female").lower()
+    raw = config.TTS_VOICE_MALE if g == "male" else config.TTS_VOICE_FEMALE
+    try:
+        return int(raw or config.TTS_VOICE_ID or "101051")
+    except (TypeError, ValueError):
+        return int(config.TTS_VOICE_ID or "101051")
+
+
+def synthesize_tts_mp3(text: str, *, voice_type: int | None = None) -> bytes:
     from tencentcloud.common import credential
     from tencentcloud.common.profile.client_profile import ClientProfile
     from tencentcloud.common.profile.http_profile import HttpProfile
@@ -135,7 +144,7 @@ def synthesize_tts_mp3(text: str) -> bytes:
     req.Text = snippet
     req.SessionId = str(uuid.uuid4())
     req.ModelType = 1
-    req.VoiceType = int(config.TTS_VOICE_ID or "101051")
+    req.VoiceType = int(voice_type or config.TTS_VOICE_ID or "101051")
     req.Codec = config.TTS_CODEC
     req.SampleRate = config.TTS_SAMPLE_RATE
     req.PrimaryLanguage = 2  # English
@@ -146,12 +155,13 @@ def synthesize_tts_mp3(text: str) -> bytes:
     return base64.b64decode(resp.Audio)
 
 
-def ensure_tts_audio(cos_subpath: str, text: str) -> dict[str, Any]:
+def ensure_tts_audio(cos_subpath: str, text: str, *, voice_type: int | None = None) -> dict[str, Any]:
     """Synthesize if missing; return presigned URL metadata."""
-    key = cos_key("tts", cos_subpath)
+    voice_tag = f"-v{voice_type}" if voice_type is not None else ""
+    key = cos_key("tts", f"{cos_subpath}{voice_tag}")
     truncated_text, was_truncated = _truncate_tts_text(text)
     if not cos_object_exists(key):
-        audio = synthesize_tts_mp3(truncated_text)
+        audio = synthesize_tts_mp3(truncated_text, voice_type=voice_type)
         cos_put_bytes(key, audio, "audio/mpeg")
         log.info("TTS uploaded to COS: %s (%d bytes)", key, len(audio))
     return {
@@ -162,10 +172,42 @@ def ensure_tts_audio(cos_subpath: str, text: str) -> dict[str, Any]:
     }
 
 
-def ensure_listening_audio(item_id: int, script_en: str) -> dict[str, Any] | None:
+def ensure_listening_audio(
+    item_id: int,
+    script_en: str,
+    *,
+    turns: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     if not tts_ready():
         return None
     try:
+        part_turns = [t for t in (turns or []) if str(t.get("text") or "").strip()]
+        if len(part_turns) > 1:
+            segments: list[dict[str, Any]] = []
+            for i, turn in enumerate(part_turns):
+                text = str(turn.get("text") or "").strip()
+                voice = _voice_id_for_gender(turn.get("gender"))
+                speaker = str(turn.get("speaker") or f"Speaker {i + 1}")
+                meta = ensure_tts_audio(
+                    f"listening/item-{item_id}-seg-{i}.mp3",
+                    text,
+                    voice_type=voice,
+                )
+                segments.append(
+                    {
+                        "url": meta["url"],
+                        "speaker": speaker,
+                        "gender": turn.get("gender") or "female",
+                        "truncated": meta.get("truncated"),
+                    }
+                )
+            if segments:
+                return {
+                    "playlist": True,
+                    "segments": segments,
+                    "truncated": any(s.get("truncated") for s in segments),
+                    "available": True,
+                }
         return ensure_tts_audio(f"listening/item-{item_id}.mp3", script_en)
     except Exception as exc:
         log.warning("Listening TTS failed for item %s: %s", item_id, exc)

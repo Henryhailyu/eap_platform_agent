@@ -159,6 +159,8 @@ class EapConfig:
     COS_AUDIO_PREFIX: str = (os.environ.get("EAP_COS_AUDIO_PREFIX") or "self-study/").strip()
     TTS_ENABLED: bool = _env_bool("EAP_TTS_ENABLED")
     TTS_VOICE_ID: str = (os.environ.get("EAP_TTS_VOICE_ID") or "101051").strip()
+    TTS_VOICE_MALE: str = (os.environ.get("EAP_TTS_VOICE_MALE") or os.environ.get("EAP_TTS_VOICE_ID") or "101051").strip()
+    TTS_VOICE_FEMALE: str = (os.environ.get("EAP_TTS_VOICE_FEMALE") or "101050").strip()
     TTS_SAMPLE_RATE: int = int(os.environ.get("EAP_TTS_SAMPLE_RATE", "16000") or "16000")
     TTS_CODEC: str = (os.environ.get("EAP_TTS_CODEC") or "mp3").strip()
     ASR_ENABLED: bool = _env_bool("EAP_ASR_ENABLED")

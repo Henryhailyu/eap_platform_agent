@@ -129,8 +129,9 @@
     return apiFetch("/api/student/self-study/listening/overview");
   }
 
-  async function getListeningToday() {
-    return apiFetch("/api/student/self-study/listening/today");
+  async function getListeningToday(dayNumber) {
+    const q = dayNumber ? `?day=${encodeURIComponent(String(dayNumber))}` : "";
+    return apiFetch(`/api/student/self-study/listening/today${q}`);
   }
 
   async function getListeningCoach(itemId) {
