@@ -160,9 +160,45 @@
   function promptPlayerHtml(item, audioId) {
     const a = item?.promptAudio;
     if (a?.url) {
-      return `<audio id="${audioId}" preload="metadata" src="${escapeHtml(a.url)}" class="ssc-audio-player__el ssc-speaking-prompt-audio"></audio>`;
+      return `<audio id="${audioId}" preload="auto" src="${escapeHtml(a.url)}" hidden></audio>`;
     }
-    return `<button type="button" class="btn-secondary" id="${audioId}-btn">${t("self_study_speaking_play_question")}</button>`;
+    return "";
+  }
+
+  function micAccessError() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return t("self_study_speaking_mic_unavailable");
+    }
+    if (!global.isSecureContext) {
+      return t("self_study_speaking_https_required");
+    }
+    return null;
+  }
+
+  async function warmUpMicrophone() {
+    const blocked = micAccessError();
+    if (blocked) {
+      state.micWarmError = blocked;
+      return false;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((tr) => tr.stop());
+      state.micWarmError = null;
+      return true;
+    } catch (e) {
+      state.micWarmError = e.message || t("self_study_speaking_mic_denied");
+      return false;
+    }
+  }
+
+  function pickRecorderMime() {
+    if (typeof MediaRecorder === "undefined") return "";
+    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+    for (const mime of candidates) {
+      if (MediaRecorder.isTypeSupported(mime)) return mime;
+    }
+    return "";
   }
 
   function speakPromptText(text) {
@@ -212,25 +248,88 @@
   }
 
   async function startRecording() {
+    stopMedia();
     state.recordChunks = [];
     state.recordedBlob = null;
-    if (!navigator.mediaDevices?.getUserMedia) {
+    const blocked = micAccessError();
+    if (blocked) {
+      throw new Error(blocked);
+    }
+    if (typeof MediaRecorder === "undefined") {
       throw new Error(t("self_study_speaking_mic_unavailable"));
     }
-    state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : "audio/webm";
-    state.mediaRecorder = new MediaRecorder(state.mediaStream, { mimeType: mime });
+    state.mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+    const mime = pickRecorderMime();
+    try {
+      state.mediaRecorder = mime
+        ? new MediaRecorder(state.mediaStream, { mimeType: mime })
+        : new MediaRecorder(state.mediaStream);
+    } catch (_) {
+      state.mediaRecorder = new MediaRecorder(state.mediaStream);
+    }
+    const blobType = state.mediaRecorder.mimeType || mime || "audio/webm";
     state.mediaRecorder.ondataavailable = (ev) => {
       if (ev.data?.size) state.recordChunks.push(ev.data);
     };
     state.mediaRecorder.onstop = () => {
       if (state.recordChunks.length) {
-        state.recordedBlob = new Blob(state.recordChunks, { type: mime });
+        state.recordedBlob = new Blob(state.recordChunks, { type: blobType });
       }
     };
-    state.mediaRecorder.start();
+    state.mediaRecorder.start(250);
+  }
+
+  function showMicError(root, message) {
+    let box = root.querySelector("#ssc-mic-error");
+    if (!box) {
+      root.insertAdjacentHTML(
+        "beforeend",
+        `<div id="ssc-mic-error" class="ssc-vocab-error" role="alert"></div>`,
+      );
+      box = root.querySelector("#ssc-mic-error");
+    }
+    if (box) {
+      box.hidden = false;
+      box.innerHTML = `
+        <p>${escapeHtml(message)}</p>
+        <button type="button" class="btn-secondary" id="ssc-mic-retry">${t("self_study_speaking_mic_retry")}</button>
+      `;
+    }
+  }
+
+  async function beginAnswerWindow(root, limit, onExpire) {
+    const block = root.querySelector("#ssc-rec-block");
+    const statusEl = root.querySelector("#ssc-rec-status");
+    const playBtn = root.querySelector("#ssc-play-question");
+    const errBox = root.querySelector("#ssc-mic-error");
+    if (errBox) errBox.hidden = true;
+    if (playBtn) playBtn.disabled = true;
+    if (statusEl) statusEl.textContent = t("self_study_speaking_mic_requesting");
+    if (block) block.hidden = false;
+
+    playBeep();
+
+    try {
+      await startRecording();
+    } catch (e) {
+      if (block) block.hidden = true;
+      if (playBtn) playBtn.disabled = false;
+      showMicError(root, e.message || t("self_study_speaking_mic_denied"));
+      root.querySelector("#ssc-mic-retry")?.addEventListener("click", async () => {
+        const warmed = await warmUpMicrophone();
+        if (!warmed && state.micWarmError) {
+          showMicError(root, state.micWarmError);
+          return;
+        }
+        await beginAnswerWindow(root, limit, onExpire);
+      });
+      return;
+    }
+
+    if (statusEl) statusEl.textContent = t("self_study_speaking_recording");
+    startCountdown(root, limit, "self_study_speaking_time_left", onExpire);
   }
 
   async function stopRecording() {
@@ -328,8 +427,12 @@
     const lesson = pickLang(detail.session.content, "lessonEn", "lessonZh");
     const audioId = "ssc-prompt-audio";
 
+    const micWarn = state.micWarmError
+      ? `<p class="ssc-vocab-error" role="alert">${escapeHtml(state.micWarmError)}</p>`
+      : "";
     root.innerHTML = `
       <button type="button" class="btn-secondary ssc-vocab-back" id="ssc-back-parts">← ${t("self_study_speaking_back_hub")}</button>
+      ${micWarn}
       <div class="ssc-lesson-card">
         <h2>${escapeHtml(detail.session.title)}</h2>
         <p>${escapeHtml(lesson)}</p>
@@ -342,6 +445,7 @@
         <p class="ssc-speaking-examiner">${t("self_study_speaking_examiner")}</p>
         <h3>${escapeHtml(pickLang(item, "promptEn", "promptZh"))}</h3>
         <p class="ssc-disclaimer">${t("self_study_speaking_listen_then_answer", { sec: String(limit) })}</p>
+        ${!global.isSecureContext ? `<p class="ssc-vocab-error" role="alert">${t("self_study_speaking_https_required")}</p>` : ""}
         ${promptPlayerHtml(item, audioId)}
         <button type="button" class="btn-primary" id="ssc-play-question">${t("self_study_speaking_play_question")}</button>
       </div>
@@ -353,19 +457,16 @@
     `;
 
     document.getElementById("ssc-back-parts")?.addEventListener("click", backToHub);
+    updateHeader(
+      Math.round((idx / items.length) * 100),
+      t("self_study_module_in_progress", { pct: String(Math.round((idx / items.length) * 100)) }),
+    );
 
-    const beginRecord = async () => {
-      const block = document.getElementById("ssc-rec-block");
-      if (block) block.hidden = false;
-      document.getElementById("ssc-play-question")?.setAttribute("disabled", "true");
-      playBeep();
-      try {
-        await startRecording();
-      } catch (e) {
-        alert(e.message);
-        return;
-      }
-      startCountdown(root, limit, "self_study_speaking_time_left", async () => {
+    document.getElementById("ssc-play-question")?.addEventListener("click", async () => {
+      await playPrompt(item, audioId);
+      await beginAnswerWindow(root, limit, async () => {
+        const statusEl = root.querySelector("#ssc-rec-status");
+        if (statusEl) statusEl.textContent = t("self_study_speaking_submitting");
         try {
           await submitResponse(item, true, limit);
           state.questionIndex += 1;
@@ -376,14 +477,10 @@
           }
         } catch (err) {
           alert(err.message);
+          const playBtn = root.querySelector("#ssc-play-question");
+          if (playBtn) playBtn.disabled = false;
         }
       });
-    };
-
-    document.getElementById("ssc-play-question")?.addEventListener("click", async () => {
-      await playPrompt(item, audioId);
-      playBeep();
-      await beginRecord();
     });
   }
 
@@ -434,20 +531,14 @@
     if (state.phase === "p2-record") {
       root.innerHTML = `
         ${renderCueCardHtml(item)}
-        <div class="ssc-speaking-timer" aria-live="polite">
+        ${!global.isSecureContext ? `<p class="ssc-vocab-error" role="alert">${t("self_study_speaking_https_required")}</p>` : ""}
+        <div class="ssc-speaking-timer" id="ssc-rec-block" aria-live="polite">
           <span class="ssc-speaking-timer__label" id="ssc-timer-label">${t("self_study_speaking_time_left")}</span>
           <span class="ssc-speaking-timer__value" id="ssc-timer-val">${speak}</span>s
+          <p class="ssc-vocab-hint" id="ssc-rec-status">${t("self_study_speaking_mic_requesting")}</p>
         </div>
-        <p class="ssc-vocab-hint" id="ssc-rec-status">${t("self_study_speaking_recording")}</p>
       `;
-      playBeep();
-      try {
-        await startRecording();
-      } catch (e) {
-        alert(e.message);
-        return;
-      }
-      startCountdown(root, speak, "self_study_speaking_time_left", async () => {
+      await beginAnswerWindow(root, speak, async () => {
         try {
           await submitResponse(item, true, speak);
           await finishBatch(root);
@@ -480,7 +571,10 @@
     const root = document.getElementById("ssc-speaking-practice");
     renderLoading(root, "self_study_speaking_loading_title");
     try {
-      const res = await SERVER().startSpeakingSession({ partType });
+      const [res] = await Promise.all([
+        SERVER().startSpeakingSession({ partType }),
+        warmUpMicrophone(),
+      ]);
       state.sessionId = res.sessionId;
       state.sessionDetail = res;
       state.phase = partType === "P2" ? "p2-card" : "exam";
