@@ -337,7 +337,9 @@ def module_coach_reply(
     if mod == "vocabulary":
         user_prompt = (
             f"Explain the word '{cleaned}' for a {lvl}-level EAP student. "
-            f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}."
+            f"Primary UI language: {'Chinese' if ui_lang == 'zh' else 'English'}. "
+            "Required: phonetic_ipa_uk must be accurate British English (RP) IPA in slashes "
+            f"(e.g. /ˌænθrəpəˈdʒenɪk/ for '{cleaned}'). Never leave phonetic_ipa_uk empty."
         )
         meta = {"term": cleaned, "level": lvl, "module": mod}
     elif mod == "reading":
@@ -379,6 +381,31 @@ def module_coach_reply(
     return _coach_json_reply(prompt, user_prompt, keys, provider=provider, extra_meta=meta)
 
 
+def vocabulary_phonetic_uk(
+    term: str,
+    provider: str | None = None,
+) -> str:
+    """Lightweight British IPA lookup when the full vocabulary explain omits phonetic_ipa_uk."""
+    cleaned = " ".join(str(term or "").split()).strip()
+    if not cleaned:
+        return ""
+    prompt = (
+        "You are a British English pronunciation lexicographer (Received Pronunciation). "
+        "Return ONLY valid JSON with exactly one key: phonetic_ipa_uk. "
+        "The value must be RP IPA wrapped in forward slashes, e.g. /ˌænθrəpəˈdʒenɪk/. "
+        "Never leave phonetic_ipa_uk empty."
+    )
+    user_prompt = f"British English (RP) IPA for: {cleaned}"
+    result = _coach_json_reply(
+        prompt,
+        user_prompt,
+        ("phonetic_ipa_uk",),
+        provider=provider,
+        max_tokens=120,
+    )
+    return str(result.get("phonetic_ipa_uk") or "").strip()
+
+
 def vocabulary_explain(
     term: str,
     level: str = "beginner",
@@ -388,21 +415,36 @@ def vocabulary_explain(
     json_keys: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     """Generate a structured vocabulary explanation for self-study (Phase K2)."""
-    from self_study_ai_prompts import VOCABULARY_JSON_KEYS
+    from self_study_ai_prompts import VOCABULARY_JSON_KEYS, default_prompt
 
     cleaned = " ".join(str(term or "").split()).strip()
     if not cleaned or len(cleaned) > 80:
         raise ValueError("term must be 1–80 characters")
 
-    return module_coach_reply(
+    effective_prompt = (system_prompt or default_prompt("vocabulary")).strip()
+    if "phonetic_ipa_uk" not in effective_prompt:
+        effective_prompt += (
+            "\n\nRequired JSON field phonetic_ipa_uk: British English (RP) IPA in slashes; never empty."
+        )
+
+    result = module_coach_reply(
         "vocabulary",
         cleaned,
         level=level,
         lang=lang,
-        system_prompt=system_prompt,
+        system_prompt=effective_prompt,
         json_keys=json_keys or VOCABULARY_JSON_KEYS,
         provider=provider,
     )
+    ipa = str(result.get("phonetic_ipa_uk") or "").strip()
+    if not ipa:
+        try:
+            ipa = vocabulary_phonetic_uk(cleaned, provider=provider)
+            if ipa:
+                result["phonetic_ipa_uk"] = ipa
+        except Exception:
+            pass
+    return result
 
 
 _MAX_TEACHING_SOURCE = 6000

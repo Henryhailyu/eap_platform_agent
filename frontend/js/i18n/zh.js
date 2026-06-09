@@ -464,6 +464,8 @@ window.EAP_STRINGS_ZH = {
   "self_study_cal_review": "复习",
   "self_study_cal_new_review": "新词+复习",
   "self_study_vocab_tap_detail": "点击查看完整词条 →",
+  "self_study_vocab_ipa_loading": "正在加载英式音标…",
+  "self_study_vocab_ipa_unavailable": "暂无音标",
   "self_study_close": "关闭",
   "self_study_vocab_detail_meaning": "释义",
   "self_study_vocab_detail_synonyms": "同义词",

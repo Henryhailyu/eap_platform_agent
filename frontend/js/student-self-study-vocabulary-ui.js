@@ -64,6 +64,27 @@
     document.body.classList.remove("ssc-word-detail-open");
   }
 
+  function formatUkIpa(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    if (s.startsWith("/") && s.endsWith("/")) return s;
+    if (s.startsWith("[") && s.endsWith("]")) return `/${s.slice(1, -1)}/`;
+    return `/${s.replace(/^\/+|\/+$/g, "")}/`;
+  }
+
+  function pickUkIpa(ex, word) {
+    if (!ex || typeof ex !== "object") return formatUkIpa(word && word.phonetic);
+    const raw =
+      ex.phonetic_ipa_uk ||
+      ex.phonetic_uk ||
+      ex.phonetic_ipa ||
+      ex.phonetic ||
+      ex.ipa ||
+      ex.pronunciation ||
+      (word && word.phonetic);
+    return formatUkIpa(raw);
+  }
+
   async function openWordDetail(word, levelId) {
     closeWordDetail();
     const overlay = document.createElement("div");
@@ -75,7 +96,7 @@
         <button type="button" class="ssc-word-detail__close" data-close="1" aria-label="${t("self_study_close")}">×</button>
         <header class="ssc-word-detail__head">
           <h2 id="ssc-word-detail-title" class="ssc-word-detail__term">${escapeHtml(word.word)}</h2>
-          <p class="ssc-word-detail__phonetic" id="ssc-word-detail-ipa">${word.phonetic ? escapeHtml(word.phonetic) : "…"}</p>
+          <p class="ssc-word-detail__phonetic" id="ssc-word-detail-ipa" aria-live="polite">${word.phonetic ? escapeHtml(formatUkIpa(word.phonetic)) : t("self_study_vocab_ipa_loading")}</p>
           <p class="ssc-word-detail__core">${escapeHtml(word.coreMeaning || "")}</p>
         </header>
         <div class="ssc-word-detail__body" id="ssc-word-detail-body">
@@ -97,11 +118,9 @@
       try {
         const ex = await AI.explainVocabulary(word.word, levelId || "intermediate", isZh() ? "zh" : "en");
         if (ex) {
-          const ipa = ex.phonetic_ipa_uk || ex.phonetic_ipa || ex.ipa || word.phonetic;
-          if (ipa) {
-            const ipaEl = document.getElementById("ssc-word-detail-ipa");
-            if (ipaEl) ipaEl.textContent = ipa;
-          }
+          const ipa = pickUkIpa(ex, word);
+          const ipaEl = document.getElementById("ssc-word-detail-ipa");
+          if (ipaEl) ipaEl.textContent = ipa || t("self_study_vocab_ipa_unavailable");
           aiBlock = `
             <section class="ssc-word-detail__section">
               <h3>${t("self_study_vocab_detail_meaning")}</h3>
@@ -120,6 +139,9 @@
         }
       } catch (e) {
         aiBlock = `<p class="ssc-vocab-error">${escapeHtml(e.message)}</p>`;
+        const ipaEl = document.getElementById("ssc-word-detail-ipa");
+        const fallback = formatUkIpa(word.phonetic);
+        if (ipaEl) ipaEl.textContent = fallback || t("self_study_vocab_ipa_unavailable");
       }
     }
 

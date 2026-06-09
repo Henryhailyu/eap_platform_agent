@@ -838,10 +838,11 @@ def init_database():
     seed_default_class_memberships(conn)
     seed_task_templates(conn)
     backfill_calendar_tasks_title_zh(conn)
-    from self_study_ai_prompts import seed_default_prompts
+    from self_study_ai_prompts import seed_default_prompts, upgrade_default_self_study_prompts
     from teaching_page_templates import seed_default_templates
 
     seed_default_prompts(conn)
+    upgrade_default_self_study_prompts(conn)
     seed_default_templates(conn)
 
     conn.commit()

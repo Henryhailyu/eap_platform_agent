@@ -462,6 +462,8 @@ window.EAP_STRINGS_EN = {
   "self_study_cal_review": "Review",
   "self_study_cal_new_review": "New + review",
   "self_study_vocab_tap_detail": "Tap for full entry →",
+  "self_study_vocab_ipa_loading": "Loading British IPA…",
+  "self_study_vocab_ipa_unavailable": "IPA unavailable",
   "self_study_close": "Close",
   "self_study_vocab_detail_meaning": "Definitions",
   "self_study_vocab_detail_synonyms": "Synonyms",

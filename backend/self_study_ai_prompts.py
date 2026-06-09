@@ -259,3 +259,25 @@ def seed_default_prompts(conn) -> None:
             """,
             (mod, default_prompt(mod), now),
         )
+
+
+def upgrade_default_self_study_prompts(conn) -> None:
+    """Refresh built-in prompts when DEFAULT_*_SYSTEM_PROMPT gains new JSON keys (e.g. phonetic_ipa_uk)."""
+    now = _now_iso()
+    for mod in SELF_STUDY_AI_MODULES:
+        row = conn.execute(
+            "SELECT module, system_prompt, is_default FROM self_study_ai_prompts WHERE module = ?",
+            (mod,),
+        ).fetchone()
+        if not row or not row["is_default"]:
+            continue
+        latest = default_prompt(mod)
+        if latest != row["system_prompt"]:
+            conn.execute(
+                """
+                UPDATE self_study_ai_prompts
+                SET system_prompt = ?, updated_at = ?, updated_by = 'system'
+                WHERE module = ?
+                """,
+                (latest, now, mod),
+            )
