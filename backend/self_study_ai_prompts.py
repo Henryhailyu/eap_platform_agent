@@ -8,8 +8,13 @@ from datetime import datetime, timezone
 SELF_STUDY_AI_MODULES = frozenset({"vocabulary", "reading", "listening", "speaking", "writing"})
 
 VOCABULARY_JSON_KEYS = (
+    "phonetic_ipa_uk",
     "definition_en",
     "definition_zh",
+    "synonyms_en",
+    "antonyms_en",
+    "eap_usage_en",
+    "eap_usage_zh",
     "word_root",
     "collocation",
     "derived_words",
@@ -81,7 +86,11 @@ DEFAULT_VOCABULARY_SYSTEM_PROMPT = (
     + ", ".join(VOCABULARY_JSON_KEYS)
     + ". "
     "Field rules: "
+    "phonetic_ipa_uk — British English IPA in slashes, e.g. /ˈmɪtɪɡeɪt/; "
     "definition_en/zh — concise academic definition (1–2 sentences); "
+    "synonyms_en — comma-separated near-synonyms for academic writing; "
+    "antonyms_en — comma-separated antonyms, or empty string if none; "
+    "eap_usage_en/zh — one sentence on how the word is used in EAP/academic texts; "
     "word_root — explain root, prefix, or suffix when useful, else a brief etymology note (empty string if N/A); "
     "collocation — one natural academic phrase using the word; "
     "derived_words — comma-separated related forms (e.g. analysis, analytical); "

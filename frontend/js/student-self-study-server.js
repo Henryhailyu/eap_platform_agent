@@ -92,6 +92,22 @@
     });
   }
 
+  async function getVocabPracticeExam(body) {
+    return apiFetch("/api/student/self-study/vocabulary/practice-exam", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
+  async function gradeVocabPracticeExam(body) {
+    return apiFetch("/api/student/self-study/vocabulary/practice-exam/grade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
   async function getReadingOverview() {
     return apiFetch("/api/student/self-study/reading/overview");
   }
@@ -190,6 +206,8 @@
     getVocabPackUnits,
     getVocabUnit,
     completeVocab,
+    getVocabPracticeExam,
+    gradeVocabPracticeExam,
     getReadingOverview,
     getReadingToday,
     completeReading,

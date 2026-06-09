@@ -142,6 +142,142 @@ def _practice_for_words(words: list[dict]) -> list[dict]:
     return out
 
 
+def _build_practice_exam(words: list[dict], day_number: int) -> dict[str, Any]:
+    """Structured mini-exam: MCQ, gap-fill, matching, sentence order, academic writing."""
+    import random
+
+    pool = list(words)
+    random.shuffle(pool)
+    word_list = [w["word"] for w in words]
+    mcq_items: list[dict] = []
+    fill_items: list[dict] = []
+    for i, wd in enumerate(pool[:8]):
+        w = wd["word"]
+        meaning = wd.get("coreMeaning") or w
+        others = [x for x in word_list if x != w]
+        opts, ci = _shuffle_options(w, others)
+        if i < 5:
+            mcq_items.append(
+                {
+                    "id": f"mcq{i + 1}",
+                    "promptEn": f"Which word means: {meaning}?",
+                    "promptZh": f"哪个词表示：{meaning}？",
+                    "options": opts,
+                    "correctIndex": ci,
+                    "answer": w,
+                }
+            )
+        else:
+            fill_items.append(
+                {
+                    "id": f"fill{i - 4}",
+                    "promptEn": f"Gap fill — meaning «{meaning}»: Researchers must _____ the data carefully.",
+                    "answer": w,
+                }
+            )
+    match_pairs = [
+        {"left": wd["word"], "right": wd.get("coreMeaning") or wd["word"]}
+        for wd in pool[:6]
+    ]
+    order_parts = [
+        "In conclusion, the evidence supports a cautious policy response.",
+        "For example, peer-reviewed studies document similar trends across regions.",
+        "Therefore, universities should embed explicit vocabulary instruction in EAP courses.",
+        "This paragraph argues that academic vocabulary underpins clear scholarly communication.",
+    ]
+    writing_prompt = (
+        "Write a 150-word academic English paragraph using at least five words from today's list. "
+        "Include: (1) a clear topic sentence, (2) one supporting reason, (3) a concrete example, "
+        "and (4) a brief summary sentence. Use formal EAP register."
+    )
+    return {
+        "titleEn": f"Day {day_number} vocabulary practice exam",
+        "titleZh": f"第 {day_number} 天词汇小测",
+        "sections": [
+            {"type": "mcq", "titleEn": "Section A — Multiple choice", "items": mcq_items},
+            {"type": "fill", "titleEn": "Section B — Gap fill", "items": fill_items},
+            {
+                "type": "match",
+                "titleEn": "Section C — Match word to meaning",
+                "items": [{"id": "match1", "pairs": match_pairs}],
+            },
+            {
+                "type": "order",
+                "titleEn": "Section D — Put sentences in logical order",
+                "items": [
+                    {
+                        "id": "order1",
+                        "promptEn": "Drag to order: topic → support → example → conclusion.",
+                        "parts": order_parts,
+                        "correctOrder": [3, 2, 1, 0],
+                    }
+                ],
+            },
+            {
+                "type": "writing",
+                "titleEn": "Section E — Academic paragraph (150 words)",
+                "items": [{"id": "writing1", "promptEn": writing_prompt}],
+            },
+        ],
+    }
+
+
+def _grade_practice_exam(exam: dict, answers: dict) -> dict[str, Any]:
+    score = 0
+    total = 0
+    for section in exam.get("sections") or []:
+        st = section.get("type")
+        if st in ("mcq", "fill"):
+            for item in section.get("items") or []:
+                total += 1
+                iid = item.get("id")
+                if st == "mcq":
+                    if answers.get(iid) == item.get("correctIndex"):
+                        score += 1
+                else:
+                    given = str(answers.get(iid) or "").strip().lower()
+                    expect = str(item.get("answer") or "").strip().lower()
+                    if given and given == expect:
+                        score += 1
+        elif st == "match":
+            for item in section.get("items") or []:
+                for pair in item.get("pairs") or []:
+                    total += 1
+                    key = f"{item.get('id')}:{pair.get('left')}"
+                    if answers.get(key) == pair.get("right"):
+                        score += 1
+        elif st == "order":
+            for item in section.get("items") or []:
+                total += 1
+                iid = item.get("id")
+                given = answers.get(iid)
+                expect = item.get("correctOrder")
+                if isinstance(given, list) and isinstance(expect, list) and given == expect:
+                    score += 1
+                elif not expect and given:
+                    score += 1
+        elif st == "writing":
+            pass
+    writing_text = str(answers.get("writing") or "").strip()
+    writing_feedback = ""
+    if writing_text:
+        wc = len(writing_text.split())
+        writing_feedback = (
+            f"Submitted {wc} words. "
+            "Check: topic sentence, supporting reason, example, and summary. "
+            "AI rubric feedback will refine this in the next release."
+        )
+        if 120 <= wc <= 180:
+            score += 2
+            total += 2
+        elif wc >= 80:
+            score += 1
+            total += 2
+        else:
+            total += 2
+    return {"score": score, "total": max(total, 1), "writingFeedback": writing_feedback}
+
+
 def _game_rounds_for_words(words: list[dict]) -> dict[str, Any]:
     """Payload for Star Battle + Speed Race front-end games."""
     import random
@@ -897,6 +1033,55 @@ def register_self_study_vocabulary_routes(
         conn.commit()
         conn.close()
         return jsonify({"ok": True})
+
+    @app.route("/api/student/self-study/vocabulary/practice-exam", methods=["POST"])
+    def student_vocab_practice_exam():
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "student")
+        if err:
+            conn.close()
+            return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
+
+        data = request.get_json(silent=True) or {}
+        course_id = int(data.get("courseId") or 0)
+        day_number = int(data.get("dayNumber") or 0)
+        if not course_id or not day_number:
+            conn.close()
+            return jsonify({"error": "courseId and dayNumber required"}), 400
+
+        day_row = conn.execute(
+            "SELECT words_json FROM vocab_course_days WHERE course_id = ? AND day_number = ?",
+            (course_id, day_number),
+        ).fetchone()
+        conn.close()
+        if not day_row:
+            return jsonify({"error": "No lesson for this day"}), 404
+        words = json.loads(day_row["words_json"])
+        return jsonify(_build_practice_exam(words, day_number))
+
+    @app.route("/api/student/self-study/vocabulary/practice-exam/grade", methods=["POST"])
+    def student_vocab_practice_exam_grade():
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "student")
+        if err:
+            conn.close()
+            return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
+        conn.close()
+
+        data = request.get_json(silent=True) or {}
+        exam = data.get("exam") or {}
+        answers = data.get("answers") or {}
+        if not exam:
+            return jsonify({"error": "exam required"}), 400
+        return jsonify(_grade_practice_exam(exam, answers))
 
     @app.route("/api/admin/self-study/vocabulary/packs", methods=["GET", "POST"])
     def admin_vocab_packs():

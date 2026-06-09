@@ -535,12 +535,44 @@
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(10, 126, 164, 0.15);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.ssc-word-card--btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.ssc-word-card--btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(10, 126, 164, 0.15);
+  border-color: rgba(10, 126, 164, 0.35);
+}
+
+.ssc-word-card--btn:active {
+  transform: scale(0.98);
 }
 
 .ssc-word-card__term {
   margin: 0 0 0.35rem;
-  font-size: 1rem;
+  font-size: clamp(0.85rem, 2.5vw, 1rem);
   color: var(--eap-teal, #0a7ea4);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.25;
+}
+
+.ssc-word-card__tap {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--eap-teal, #0a7ea4);
+  opacity: 0.75;
 }
 
 .ssc-word-card__def {
@@ -1733,6 +1765,430 @@
   }
 }
 
+/* —— SS-V3 calendar hub —— */
+.ssc-main--hub .ssc-hero--compact {
+  margin-bottom: 1rem;
+}
+
+.ssc-cal-shell {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 14px;
+  padding: 1rem 1.25rem 1.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.ssc-cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.ssc-cal-month {
+  flex: 1;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.ssc-cal-nav {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  cursor: pointer;
+  font-size: 1.25rem;
+}
+
+.ssc-cal-today {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.ssc-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  font-size: 0.7rem;
+  color: var(--eap-text-muted, #6e6e73);
+  text-align: center;
+  margin-bottom: 0.35rem;
+}
+
+.ssc-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.ssc-cal-cell {
+  min-height: 4.5rem;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 0.35rem;
+  text-align: left;
+  cursor: default;
+  position: relative;
+}
+
+.ssc-cal-cell--pad {
+  background: transparent;
+}
+
+.ssc-cal-cell--day {
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.ssc-cal-cell--day:hover {
+  background: rgba(0, 113, 227, 0.06);
+}
+
+.ssc-cal-cell--today .ssc-cal-cell__num {
+  background: #e74c3c;
+  color: #fff;
+  border-radius: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ssc-cal-cell--selected {
+  outline: 2px solid var(--eap-teal, #0a7ea4);
+  background: rgba(10, 126, 164, 0.08);
+}
+
+.ssc-cal-cell__num {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ssc-cal-cell__tag {
+  display: block;
+  font-size: 0.6rem;
+  color: var(--eap-text-muted, #6e6e73);
+  margin-top: 0.15rem;
+  line-height: 1.2;
+}
+
+.ssc-cal-cell__dot {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--eap-teal, #0a7ea4);
+}
+
+.ssc-cal-cell__dot--done {
+  background: #2ecc71;
+}
+
+.ssc-hub-day-panel {
+  margin-top: 1.25rem;
+}
+
+.ssc-hub-day {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 14px;
+  padding: 1.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ssc-hub-channels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.ssc-hub-channel {
+  padding: 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ssc-hub-channel--active {
+  border-color: var(--eap-teal, #0a7ea4);
+  box-shadow: 0 0 0 1px var(--eap-teal, #0a7ea4);
+}
+
+.ssc-hub-channel__title {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.ssc-hub-channel__sub {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--eap-text-muted, #6e6e73);
+  margin-top: 0.2rem;
+}
+
+.ssc-hub-skills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ssc-hub-skill {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ssc-hub-skill__btn {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  white-space: nowrap;
+}
+
+.ssc-retake--hub {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.ssc-retake__link {
+  background: none;
+  border: none;
+  color: var(--eap-teal, #0a7ea4);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* Word detail drawer */
+.ssc-word-detail {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.ssc-word-detail__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.ssc-word-detail__panel {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 1.25rem 1.5rem 2rem;
+  animation: ssc-slide-up 0.28s ease;
+}
+
+@keyframes ssc-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.ssc-word-detail__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.ssc-word-detail__term {
+  margin: 0;
+  font-size: 1.75rem;
+  color: var(--eap-teal, #0a7ea4);
+  overflow-wrap: anywhere;
+}
+
+.ssc-word-detail__phonetic {
+  font-family: "Source Serif 4", Georgia, serif;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-word-detail__section {
+  margin-top: 1rem;
+}
+
+.ssc-word-detail__section h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-word-detail__zh {
+  color: #555;
+  font-size: 0.9rem;
+}
+
+/* Practice exam */
+.ssc-exam {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 1.25rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ssc-exam-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ssc-exam-input {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  font: inherit;
+}
+
+.ssc-exam-textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  resize: vertical;
+}
+
+.ssc-exam-match li {
+  margin: 0.35rem 0;
+}
+
+.ssc-exam-order {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ssc-exam-order li {
+  padding: 0.65rem 0.75rem;
+  margin: 0.35rem 0;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fafafa;
+  cursor: grab;
+}
+
+.ssc-exam-order__drag {
+  opacity: 0.55;
+}
+
+/* Star Battle space theme */
+.ssc-game-arena--space {
+  position: relative;
+  min-height: 220px;
+  padding-top: 2.5rem;
+  overflow: hidden;
+}
+
+.ssc-game-starfield {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(1px 1px at 20% 30%, #fff, transparent),
+    radial-gradient(1px 1px at 60% 70%, #fff, transparent),
+    radial-gradient(1px 1px at 80% 20%, #fff, transparent),
+    linear-gradient(180deg, #0a1628 0%, #1a2a44 100%);
+  opacity: 0.9;
+}
+
+.ssc-game-enemy {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 2rem;
+  z-index: 2;
+  transition: transform 0.2s ease;
+}
+
+.ssc-game-enemy--hit {
+  animation: ssc-enemy-hit 0.4s ease;
+}
+
+.ssc-game-enemy--dodge {
+  animation: ssc-enemy-dodge 0.4s ease;
+}
+
+@keyframes ssc-enemy-hit {
+  50% {
+    transform: translateX(-50%) scale(1.3);
+    filter: brightness(2);
+  }
+}
+
+@keyframes ssc-enemy-dodge {
+  50% {
+    transform: translateX(-30%) rotate(-15deg);
+  }
+}
+
+.ssc-game-player {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.5rem;
+  z-index: 2;
+}
+
+.ssc-game-laser {
+  position: absolute;
+  width: 3px;
+  height: 60px;
+  background: linear-gradient(180deg, #7df9ff, transparent);
+  z-index: 1;
+  animation: ssc-laser 0.35s ease forwards;
+}
+
+@keyframes ssc-laser {
+  to {
+    transform: translateY(-80px);
+    opacity: 0;
+  }
+}
+
+.ssc-game-opt--space {
+  position: relative;
+  z-index: 3;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.ssc-game-track-wrap {
+  margin: 0.5rem 0 1rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ssc-module-card {
     transition: none;
@@ -1741,6 +2197,12 @@
     transition: none;
   }
   .ssc-game--pulse .ssc-game-hud__timer {
+    animation: none;
+  }
+  .ssc-word-card--btn:hover {
+    transform: none;
+  }
+  .ssc-word-detail__panel {
     animation: none;
   }
 }

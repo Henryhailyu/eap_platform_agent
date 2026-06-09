@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="css/student-self-study.css" />
   </head>
-  <body class="page-app eap-shell-active" data-page="student-self-study">
+  <body class="page-app eap-shell-active" data-page="student-self-study" data-ss-hub="20260609-v3">
     <div id="page-shell" class="page-shell">
       <div class="page-overlay">
         <a class="skip-link" href="#main">Skip to content</a>
@@ -31,66 +31,28 @@
             </div>
           </div>
         </header>
-        <main id="main" class="app-main ssc-main">
+        <main id="main" class="app-main ssc-main ssc-main--hub">
           <div class="ssc-back-row">
             <a class="ssc-back-link" href="student.html" data-i18n="self_study_back_calendar">← Calendar Learning Centre</a>
             <span id="ssc-level-badge" class="ssc-level-badge" hidden aria-live="polite"></span>
           </div>
 
-          <div class="ssc-hero">
+          <div class="ssc-hero ssc-hero--compact">
             <h1 data-i18n="self_study_hub_title">AI Self-Study Centre</h1>
-            <p class="ssc-hero__lead" data-i18n="self_study_hub_lead">
-              IELTS-aligned EAP self-study — vocabulary, reading, listening, speaking, and writing. Separate from your class calendar homework.
+            <p class="ssc-hero__lead" data-i18n="self_study_hub_cal_lead">
+              Tap a date to open Channel A or B tasks for that day.
             </p>
           </div>
 
-          <div id="ssc-placement-banner"></div>
-
-          <section class="ssc-daily-plan" id="ssc-daily-plan-section" aria-labelledby="ssc-daily-heading">
-            <div class="ssc-daily-plan__header">
-              <div>
-                <h2 id="ssc-daily-heading" data-i18n="self_study_daily_plan">Today&apos;s AI study plan</h2>
-                <p id="ssc-daily-plan-summary" class="ssc-daily-plan__summary" hidden></p>
-                <p id="ssc-daily-plan-stats" class="ssc-daily-plan__stats" hidden aria-live="polite"></p>
-              </div>
-              <button type="button" id="ssc-daily-regenerate" class="btn-secondary hidden" data-i18n="self_study_daily_regenerate">
-                Refresh plan
-              </button>
-            </div>
-            <p class="ssc-disclaimer" id="ssc-daily-disclaimer" data-i18n="self_study_daily_mock_note" hidden>
-              Rule-based demo plan — not powered by a live AI API.
-            </p>
-            <ul id="ssc-daily-plan-list" class="ssc-daily-plan__list">
-              <li data-i18n="self_study_daily_placeholder">Complete placement to see personalised tasks.</li>
-            </ul>
+          <section class="ssc-hub-calendar" aria-labelledby="ssc-cal-heading">
+            <h2 id="ssc-cal-heading" class="visually-hidden" data-i18n="self_study_vocab_tab_calendar">Calendar</h2>
+            <div id="ssc-cal-root" class="ssc-cal-shell"></div>
           </section>
 
-          <section id="ssc-channels-section" class="ssc-channels hidden" aria-labelledby="ssc-channels-heading">
-            <h2 id="ssc-channels-heading" class="ssc-channels__heading" data-i18n="self_study_daily_channels_heading">
-              Today&apos;s channels
-            </h2>
-            <p class="ssc-disclaimer" data-i18n="self_study_daily_channels_hint">
-              Web Phase 1: open tasks manually. App push comes in a later phase.
-            </p>
-            <ul id="ssc-channels-list" class="ssc-channels__list"></ul>
-          </section>
+          <section id="ssc-day-panel" class="ssc-hub-day-panel" hidden aria-live="polite"></section>
 
-          <p id="ssc-subscribe-wrap" class="ssc-subscribe hidden">
-            <label class="ssc-subscribe__label">
-              <input type="checkbox" id="ssc-subscribe-checkbox" checked />
-              <span data-i18n="self_study_subscribe_label">Receive self-study updates when mobile app launches</span>
-            </label>
-          </p>
-
-          <section aria-labelledby="ssc-modules-heading">
-            <h2 id="ssc-modules-heading" style="font-size: 1rem; margin: 0 0 1rem; color: var(--eap-text-muted, #6e6e73)" data-i18n="self_study_modules_heading">
-              Skill modules
-            </h2>
-            <div id="ssc-modules-grid" class="ssc-modules" role="list"></div>
-          </section>
-
-          <p id="ssc-retake-wrap" class="ssc-retake" hidden>
-            <button type="button" id="ssc-retake-btn" data-i18n="self_study_retake">Retake placement test</button>
+          <p id="ssc-retake-wrap" class="ssc-retake ssc-retake--hub">
+            <button type="button" id="ssc-retake-btn" class="ssc-retake__link" data-i18n="self_study_retake">Retake placement test</button>
           </p>
         </main>
       </div>
@@ -101,14 +63,9 @@
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
     <script src="app.js"></script>
-    <script src="js/student-self-study-server.js?v=20260601-ss0"></script>
+    <script src="js/student-self-study-server.js?v=20260610-v3"></script>
     <script src="js/student-self-study-mock.js"></script>
-    <script src="js/student-self-study-vocabulary-mock.js"></script>
-    <script src="js/student-self-study-reading-mock.js"></script>
-    <script src="js/student-self-study-writing-mock.js"></script>
-    <script src="js/student-self-study-listening-mock.js"></script>
-    <script src="js/student-self-study-speaking-mock.js"></script>
-    <script src="js/student-self-study-daily-plan.js"></script>
-    <script src="js/student-self-study.js?v=20260601-ss0"></script>
+    <script src="js/student-self-study-hub.js?v=20260609-v3"></script>
+    <script src="js/student-self-study.js?v=20260609-v3"></script>
   </body>
 </html>
