@@ -237,7 +237,10 @@
           ${questions.map((q) => renderQuestionItem(q, answers)).join("")}
         </section>
         <div class="ssc-placement-actions">
-          <button type="button" class="btn-primary" id="ssc-reading-submit">${t("self_study_reading_submit")}</button>
+          <button type="button" class="btn-primary ssc-reading-submit-btn" id="ssc-reading-submit">
+            <span class="ssc-reading-submit__spinner" id="ssc-reading-submit-spinner" hidden aria-hidden="true"></span>
+            <span class="ssc-reading-submit__label">${t("self_study_reading_submit")}</span>
+          </button>
         </div>
       </article>
     `;
@@ -254,7 +257,13 @@
         answers[inp.getAttribute("data-gap")] = inp.value;
       });
       const btn = document.getElementById("ssc-reading-submit");
-      if (btn) btn.disabled = true;
+      const spinner = document.getElementById("ssc-reading-submit-spinner");
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add("ssc-reading-submit-btn--loading");
+        btn.setAttribute("aria-busy", "true");
+      }
+      if (spinner) spinner.hidden = false;
       try {
         const res = await SERVER().completeReading({
           passageId: data.passageId,
@@ -267,7 +276,12 @@
         updateHeader(100, t("self_study_reading_complete_short"));
       } catch (e) {
         alert(e.message);
-        if (btn) btn.disabled = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove("ssc-reading-submit-btn--loading");
+          btn.removeAttribute("aria-busy");
+        }
+        if (spinner) spinner.hidden = true;
       }
     });
   }
