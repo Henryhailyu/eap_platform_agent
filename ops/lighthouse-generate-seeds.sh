@@ -26,17 +26,23 @@ echo "Generating vocab ${DAYS} days + ${READING} reading passages (AI)…"
 echo "(30 words/day with top-up batches; checkpoints after each day — may take 45–120 min)"
 RESUME=""
 REGEN_VOCAB=""
+FILL_GAPS=""
 if [[ -f "$OUT_HOST" ]]; then
   RESUME="--resume"
-  if [[ "${EAP_REGEN_VOCAB:-0}" == "1" ]]; then
+  if [[ "${EAP_FILL_VOCAB_GAPS:-0}" == "1" ]]; then
+    FILL_GAPS="--fill-vocab-gaps"
+    echo "Found existing draft — filling vocabulary gaps only (fast; keeps reading)"
+  elif [[ "${EAP_REGEN_VOCAB:-0}" == "1" ]]; then
     REGEN_VOCAB="--regen-vocab"
     echo "Found existing draft — regenerating vocabulary only (keeping reading passages)"
   else
-    echo "Found existing draft — resuming with --resume (set EAP_REGEN_VOCAB=1 to redo vocab)"
+    echo "Found existing draft — resuming with --resume"
+    echo "  EAP_FILL_VOCAB_GAPS=1  → top up short days only"
+    echo "  EAP_REGEN_VOCAB=1      → redo all vocab days"
   fi
 fi
 sudo docker compose exec -T eap python /app/backend/scripts/generate_eap047_self_study_seeds.py \
-  $RESUME $REGEN_VOCAB --days "$DAYS" --reading "$READING" --out "$OUT_CONTAINER"
+  $RESUME $REGEN_VOCAB $FILL_GAPS --days "$DAYS" --reading "$READING" --out "$OUT_CONTAINER"
 
 sudo docker compose cp "eap:$OUT_CONTAINER" "$OUT_HOST"
 echo "Saved: $OUT_HOST"
