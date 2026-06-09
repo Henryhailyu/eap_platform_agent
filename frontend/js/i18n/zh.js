@@ -818,6 +818,7 @@ window.EAP_STRINGS_ZH = {
   "self_study_listening_mark_listened": "标记为已听读",
   "self_study_listening_marked": "已听读 ✓",
   "self_study_listening_start_questions": "开始答题",
+  "self_study_listening_listen_again": "重新听录音",
   "self_study_listening_show_script": "显示文字稿",
   "self_study_listening_submit": "提交答案",
   "self_study_listening_view_coach": "查看笔记教练",

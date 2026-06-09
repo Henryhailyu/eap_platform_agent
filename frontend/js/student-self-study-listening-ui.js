@@ -534,13 +534,23 @@
       <div class="ssc-report">
         <h2>${t("self_study_reading_results_title")}</h2>
         <p>${t("self_study_vocab_practice_score", { correct: String(scoring.correct), total: String(scoring.total) })}</p>
-        <button type="button" class="btn-secondary" id="ssc-listening-redo">${t("self_study_vocab_redo")}</button>
+        <div class="ssc-placement-actions ssc-listening-results-actions">
+          <button type="button" class="btn-secondary" id="ssc-listening-relisten">${t("self_study_listening_listen_again")}</button>
+          <button type="button" class="btn-secondary" id="ssc-listening-redo">${t("self_study_vocab_redo")}</button>
+        </div>
       </div>
       ${renderScriptBlock(scriptText)}
       <ul class="ssc-reading-results">${items}</ul>
       ${renderCoachSection(coach, selfNotes)}
     `;
+    document.getElementById("ssc-listening-relisten")?.addEventListener("click", () => {
+      stopBrowserSpeech();
+      state.phase = "listen";
+      state.today = null;
+      void renderMainPanel(root);
+    });
     document.getElementById("ssc-listening-redo")?.addEventListener("click", () => {
+      stopBrowserSpeech();
       state.practiceRetake = true;
       state.lastScoring = null;
       state.coach = null;
@@ -678,7 +688,7 @@
     }
 
     const prog = data.progress || {};
-    if (prog.practiceDone && !state.practiceRetake) {
+    if (prog.practiceDone && !state.practiceRetake && state.phase !== "listen") {
       if (!state.coach) {
         try {
           const coachRes = await SERVER().getListeningCoach(data.itemId);
@@ -699,7 +709,7 @@
       }
     }
 
-    if (state.phase === "listen" && !prog.listenDone && !state.practiceRetake) {
+    if (state.phase === "listen") {
       await renderListenPhase(root, data);
       return;
     }

@@ -816,6 +816,7 @@ window.EAP_STRINGS_EN = {
   "self_study_listening_mark_listened": "Mark as listened",
   "self_study_listening_marked": "Listened ✓",
   "self_study_listening_start_questions": "Answer questions",
+  "self_study_listening_listen_again": "Listen again",
   "self_study_listening_show_script": "Show script",
   "self_study_listening_submit": "Submit answers",
   "self_study_listening_view_coach": "View note-taking coach",

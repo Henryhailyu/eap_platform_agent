@@ -2436,6 +2436,10 @@
   border-top: 1px solid #e5e7eb;
 }
 
+.ssc-listening-results-actions {
+  margin-top: 0.75rem;
+}
+
 .admin-code-preview {
   margin-top: 0.75rem;
   padding: 0.75rem;
