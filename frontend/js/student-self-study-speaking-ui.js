@@ -274,7 +274,9 @@
     }, 1000);
   }
 
-  function bindResponseForm(root, item, detail, idx, items) {
+  function bindResponseForm(root, item, detail, idx, items, options) {
+    const opts = options || {};
+    const recordOnly = !!opts.recordOnly;
     const limit = item.timeLimitSec || 60;
     const minW = item.minWords || 30;
     const ta = root.querySelector("#ssc-speaking-response");
@@ -311,7 +313,11 @@
       stopMedia();
       const text = ta?.value?.trim() || "";
       const elapsed = state.startedAt ? Math.min(limit, limit - state.secondsLeft) : 0;
-      if (text.length < 5 && !recordedBlob) {
+      if (recordOnly && !recordedBlob) {
+        alert(t("self_study_speaking_record_required"));
+        return;
+      }
+      if (!recordOnly && text.length < 5 && !recordedBlob) {
         alert(t("self_study_speaking_response_short"));
         return;
       }
@@ -328,8 +334,10 @@
           body.audioFormat = recordedBlob.type.includes("webm") ? "webm" : "mp3";
         }
         const res = await SERVER().submitSpeakingResponse(body);
-        if (res.transcript && ta && !text) {
-          ta.value = res.transcript;
+        if (res.transcript) {
+          const tr = root.querySelector("#ssc-speaking-transcript");
+          if (tr) tr.textContent = res.transcript;
+          else if (ta && !text) ta.value = res.transcript;
         }
         state.lastFeedback = res.feedback;
         state.sessionDetail = null;
@@ -472,9 +480,9 @@
   function renderQuestionTurn(root, item, detail, idx, items) {
     const pt = itemPartType(item, detail.session.partType);
     const limit = item.timeLimitSec || (pt === "P3" ? 90 : 60);
-    const minW = item.minWords || (pt === "P3" ? 40 : 30);
     const lesson = pickLang(detail.session.content, "lessonEn", "lessonZh");
     const startKey = pt === "P3" ? "self_study_speaking_start_p3_timer" : "self_study_speaking_start_timer";
+    const recordOnly = pt === "P1";
 
     root.innerHTML = `
       <button type="button" class="btn-secondary ssc-vocab-back" id="ssc-back-sessions">← ${t("self_study_speaking_all_sessions")}</button>
@@ -495,14 +503,24 @@
         <span class="ssc-speaking-timer__label" id="ssc-timer-label">${t("self_study_speaking_time_left")}</span>
         <span class="ssc-speaking-timer__value" id="ssc-timer-val">${limit}</span>s
       </div>
-      <label for="ssc-speaking-response" class="ssc-listening-notes__label">${t("self_study_speaking_your_response")}</label>
+      ${
+        recordOnly
+          ? `<p class="ssc-speaking-record-only">${t("self_study_speaking_record_only_hint")}</p>
+      <div class="ssc-speaking-record ssc-speaking-record--primary">
+        <button type="button" class="btn-primary" id="ssc-start-record">${t("self_study_speaking_start_record")}</button>
+        <button type="button" class="btn-secondary" id="ssc-stop-record">${t("self_study_speaking_stop_record")}</button>
+        <span id="ssc-rec-status" class="ssc-vocab-hint"></span>
+      </div>
+      <p class="ssc-listening-notes__label">${t("self_study_speaking_transcript_label")}</p>
+      <p id="ssc-speaking-transcript" class="ssc-speaking-transcript" aria-live="polite">${t("self_study_speaking_transcript_pending")}</p>`
+          : `<label for="ssc-speaking-response" class="ssc-listening-notes__label">${t("self_study_speaking_your_response")}</label>
       <textarea id="ssc-speaking-response" class="ssc-listening-notes__input" rows="5" maxlength="20000" placeholder="${t("self_study_speaking_response_placeholder")}"></textarea>
-      <p class="ssc-writing-wordcount"><span id="ssc-sp-wc">0</span> / ${minW} ${t("self_study_writing_words")}</p>
       <div class="ssc-speaking-record">
         <button type="button" class="btn-secondary" id="ssc-start-record">${t("self_study_speaking_start_record")}</button>
         <button type="button" class="btn-secondary" id="ssc-stop-record">${t("self_study_speaking_stop_record")}</button>
         <span id="ssc-rec-status" class="ssc-vocab-hint"></span>
-      </div>
+      </div>`
+      }
       <div class="ssc-placement-actions">
         <button type="button" class="btn-primary" id="ssc-start-timer">${t(startKey, { sec: String(limit) })}</button>
         <button type="button" class="btn-secondary" id="ssc-submit-response" disabled>${t("self_study_speaking_submit")}</button>
@@ -511,7 +529,7 @@
 
     updateHeader(sessionProgress(detail), t("self_study_module_in_progress", { pct: String(sessionProgress(detail)) }));
     bindBackToHub(root);
-    bindResponseForm(root, item, detail, idx, items);
+    bindResponseForm(root, item, detail, idx, items, { recordOnly });
   }
 
   async function renderPractice(root) {

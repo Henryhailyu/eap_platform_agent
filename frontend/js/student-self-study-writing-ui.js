@@ -166,8 +166,13 @@
       </div>
       <textarea id="ssc-writing-draft" class="ssc-writing-draft" rows="14" maxlength="50000" placeholder="${t("self_study_writing_draft_placeholder")}"></textarea>
       <p class="ssc-writing-wordcount" aria-live="polite"><span id="ssc-wc">0</span> / ${minW} ${t("self_study_writing_words")}</p>
+      <div class="ssc-writing-upload">
+        <label class="ssc-writing-upload__label" for="ssc-writing-file">${t("self_study_writing_upload_label")}</label>
+        <input type="file" id="ssc-writing-file" accept=".doc,.docx,.pdf,.txt,image/*" />
+        <p class="ssc-vocab-hint">${t("self_study_writing_upload_hint")}</p>
+      </div>
       <div class="ssc-placement-actions">
-        <button type="button" class="btn-primary" id="ssc-submit-draft" ${revLeft <= 0 ? "disabled" : ""}>${t("self_study_writing_submit")}</button>
+        <button type="button" class="btn-primary" id="ssc-submit-draft" ${revLeft <= 0 ? "disabled" : ""}>${t("self_study_writing_ai_score")}</button>
       </div>
     `;
 
@@ -179,14 +184,25 @@
     ta?.addEventListener("input", refreshWc);
     refreshWc();
 
+    const fileInput = document.getElementById("ssc-writing-file");
+
     document.getElementById("ssc-submit-draft")?.addEventListener("click", async () => {
       const draft = ta?.value?.trim() || "";
-      if (draft.length < 20) {
+      const file = fileInput?.files?.[0] || null;
+      if (draft.length < 20 && !file) {
         alert(t("self_study_writing_draft_short"));
         return;
       }
+      const btn = document.getElementById("ssc-submit-draft");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = t("self_study_writing_ai_scoring");
+      }
       try {
-        const res = await SERVER().submitWriting({ taskId: state.taskId, draftText: draft });
+        const res = await SERVER().submitWriting(
+          { taskId: state.taskId, draftText: draft, useAi: true },
+          file,
+        );
         state.lastFeedback = res.feedback;
         state.taskDetail = null;
         await loadTask(state.taskId);
@@ -195,6 +211,11 @@
         updateHeader(100, t("self_study_writing_submitted"));
       } catch (e) {
         alert(e.message);
+      } finally {
+        if (btn) {
+          btn.disabled = revLeft <= 0;
+          btn.textContent = t("self_study_writing_ai_score");
+        }
       }
     });
   }

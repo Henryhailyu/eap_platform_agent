@@ -80,25 +80,126 @@ def _word_entry(raw: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
+def _shuffle_options(correct: str, pool: list[str]) -> tuple[list[str], int]:
+    import random
+
+    distractors = [x for x in pool if x != correct]
+    random.shuffle(distractors)
+    options = [correct] + distractors[:3]
+    random.shuffle(options)
+    return options, options.index(correct)
+
+
 def _practice_for_words(words: list[dict]) -> list[dict]:
+    """Classic practice — up to 15 items covering the word list (games handle speed rounds)."""
     out: list[dict] = []
-    for i, wd in enumerate(words[:8]):
+    word_list = [wd["word"] for wd in words]
+    for i, wd in enumerate(words[:15]):
         w = wd["word"]
-        others = [x["word"] for x in words if x["word"] != w][:3]
-        while len(others) < 3:
-            others.append("unknown")
-        options = [w] + others[:3]
-        out.append(
+        meaning = wd.get("coreMeaning") or ""
+        aff = wd.get("affix") or {}
+        parts = [aff.get("prefix"), aff.get("root"), aff.get("suffix")]
+        affix_hint = "+".join(p for p in parts if p) or w[:4]
+        if i % 3 == 0:
+            options, correct_idx = _shuffle_options(w, word_list)
+            out.append(
+                {
+                    "id": f"vp{i + 1}",
+                    "type": "meaning_mcq",
+                    "promptEn": f"Which word means: {meaning}?",
+                    "promptZh": f"哪个词表示：{meaning}？",
+                    "options": options,
+                    "correctIndex": correct_idx,
+                }
+            )
+        elif i % 3 == 1:
+            collocation = f"conduct a detailed _____ of the data"
+            options, correct_idx = _shuffle_options(w, word_list)
+            out.append(
+                {
+                    "id": f"vp{i + 1}",
+                    "type": "collocation_mcq",
+                    "promptEn": f"Best fit: {collocation.replace('_____', '______')}",
+                    "promptZh": f"最佳搭配：{collocation.replace('_____', '______')}",
+                    "options": options,
+                    "correctIndex": correct_idx,
+                    "hintEn": meaning,
+                    "hintZh": meaning,
+                }
+            )
+        else:
+            options, correct_idx = _shuffle_options(w, word_list)
+            out.append(
+                {
+                    "id": f"vp{i + 1}",
+                    "type": "affix_drill",
+                    "promptEn": f"Affix pattern «{affix_hint}» → which word?",
+                    "promptZh": f"词缀 «{affix_hint}» → 哪个词？",
+                    "options": options,
+                    "correctIndex": correct_idx,
+                }
+            )
+    return out
+
+
+def _game_rounds_for_words(words: list[dict]) -> dict[str, Any]:
+    """Payload for Star Battle + Speed Race front-end games."""
+    import random
+
+    rounds = []
+    pool = list(words)
+    random.shuffle(pool)
+    for i, wd in enumerate(pool[:20]):
+        w = wd["word"]
+        meaning = wd.get("coreMeaning") or w
+        others = [x["word"] for x in words if x["word"] != w]
+        random.shuffle(others)
+        options, correct_idx = _shuffle_options(w, others)
+        rounds.append(
             {
-                "id": f"vp{i + 1}",
-                "type": "gap_fill" if i % 2 else "affix_drill",
-                "promptEn": f"Which word means: {wd.get('coreMeaning', '')}?",
-                "promptZh": f"哪个词表示：{wd.get('coreMeaning', '')}？",
+                "id": f"vg{i + 1}",
+                "word": w,
+                "promptEn": meaning,
+                "promptZh": meaning,
                 "options": options,
-                "correctIndex": 0,
+                "correctIndex": correct_idx,
+                "mode": "collocation" if i % 4 == 1 else "meaning",
             }
         )
-    return out
+    return {
+        "rounds": rounds,
+        "timeLimitSec": 45,
+        "lives": 3,
+    }
+
+
+def _vocab_day_payload(
+    *,
+    course,
+    day_row,
+    words: list[dict],
+    practice: list[dict],
+    prog,
+    sched: dict,
+) -> dict[str, Any]:
+    if not practice:
+        practice = _practice_for_words(words)
+    return {
+        "channel": "B",
+        "courseId": course["id"],
+        "dayNumber": int(day_row["day_number"]),
+        "schedule": sched,
+        "newWords": bool(sched.get("newWords", True)),
+        "words": words,
+        "wordCount": len(words),
+        "practice": practice,
+        "games": _game_rounds_for_words(words),
+        "progress": {
+            "learnDone": bool(prog and prog["learn_done"]),
+            "practiceDone": bool(prog and prog["practice_done"]),
+            "practiceScore": prog["practice_score"] if prog else None,
+        },
+    }
 
 
 def migrate_self_study_vocabulary_tables(conn) -> None:
@@ -392,17 +493,19 @@ def register_self_study_vocabulary_routes(
             """,
             (class_name,),
         ).fetchall()
+        channel_a_on = _has_manager_push(conn, class_name, VOCAB_SKILL)
         conn.close()
 
         today = _today_utc()
         day_num = _course_day_number(course, today) if course else None
         offset = (_today_utc() - _parse_start(course["start_date"] if course else None)).days if course else 0
         sched = _schedule_label(max(0, offset))
-
         return jsonify(
             {
                 "className": class_name,
                 "channel": channel,
+                "channelAEnabled": channel_a_on,
+                "channelBActive": channel == "B",
                 "vocabEntryLevel": bool(placement and placement["vocab_entry_level"]),
                 "course": {
                     "id": course["id"] if course else None,
@@ -471,6 +574,8 @@ def register_self_study_vocabulary_routes(
 
         words = json.loads(day_row["words_json"])
         practice = json.loads(day_row["practice_json"] or "[]")
+        if not practice:
+            practice = _practice_for_words(words)
         prog = conn.execute(
             """
             SELECT * FROM student_vocab_day_progress
@@ -481,19 +586,66 @@ def register_self_study_vocabulary_routes(
         conn.close()
 
         return jsonify(
-            {
-                "channel": "B",
-                "courseId": course["id"],
-                "dayNumber": day_num,
-                "schedule": sched,
-                "words": words,
-                "practice": practice,
-                "progress": {
-                    "learnDone": bool(prog and prog["learn_done"]),
-                    "practiceDone": bool(prog and prog["practice_done"]),
-                    "practiceScore": prog["practice_score"] if prog else None,
-                },
-            }
+            _vocab_day_payload(
+                course=course,
+                day_row=day_row,
+                words=words,
+                practice=practice,
+                prog=prog,
+                sched=sched,
+            )
+        )
+
+    @app.route("/api/student/self-study/vocabulary/day/<int:day_number>", methods=["GET"])
+    def student_vocab_day(day_number: int):
+        """Channel B — open a calendar day to view that day's 30 words."""
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "student")
+        if err:
+            conn.close()
+            return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
+
+        class_name = _student_class_name(conn, username)
+        course = _active_course(conn, class_name)
+        if not course:
+            conn.close()
+            return jsonify({"error": "No active vocabulary course"}), 404
+
+        day_num = max(1, int(day_number))
+        day_row = conn.execute(
+            "SELECT * FROM vocab_course_days WHERE course_id = ? AND day_number = ?",
+            (course["id"], day_num),
+        ).fetchone()
+        if not day_row:
+            conn.close()
+            return jsonify({"error": "No lesson for this day", "dayNumber": day_num}), 404
+
+        words = json.loads(day_row["words_json"])
+        practice = json.loads(day_row["practice_json"] or "[]")
+        if not practice:
+            practice = _practice_for_words(words)
+        prog = conn.execute(
+            """
+            SELECT * FROM student_vocab_day_progress
+            WHERE student_username = ? AND course_id = ? AND day_number = ?
+            """,
+            (username, course["id"], day_num),
+        ).fetchone()
+        sched = _schedule_label(max(0, day_num - 1))
+        conn.close()
+        return jsonify(
+            _vocab_day_payload(
+                course=course,
+                day_row=day_row,
+                words=words,
+                practice=practice,
+                prog=prog,
+                sched=sched,
+            )
         )
 
     @app.route("/api/student/self-study/vocabulary/review-yesterday", methods=["GET"])
@@ -549,20 +701,54 @@ def register_self_study_vocabulary_routes(
             return jsonify({"days": []})
 
         start = _parse_start(course["start_date"])
+        day_rows = {
+            int(r["day_number"]): r
+            for r in conn.execute(
+                "SELECT day_number, words_json FROM vocab_course_days WHERE course_id = ?",
+                (course["id"],),
+            ).fetchall()
+        }
+        prog_rows = {
+            int(r["day_number"]): r
+            for r in conn.execute(
+                """
+                SELECT day_number, learn_done, practice_done
+                FROM student_vocab_day_progress
+                WHERE student_username = ? AND course_id = ?
+                """,
+                (username, course["id"]),
+            ).fetchall()
+        }
         days_out = []
-        for i in range(14):
+        for i in range(30):
             d = start + timedelta(days=i)
             sched = _schedule_label(i)
+            day_num = i + 1 if sched.get("newWords") else None
+            if day_num is None and sched.get("label") == "review_weekend":
+                day_num = i + 1
+            row = day_rows.get(day_num) if day_num else None
+            wc = len(json.loads(row["words_json"])) if row else 0
+            pr = prog_rows.get(day_num) if day_num else None
             days_out.append(
                 {
                     "date": d.isoformat(),
                     "offset": i,
                     "schedule": sched,
-                    "dayNumber": _course_day_number(course, d) if sched["newWords"] else None,
+                    "dayNumber": day_num,
+                    "wordCount": wc,
+                    "hasLesson": bool(row),
+                    "learnDone": bool(pr and pr["learn_done"]),
+                    "practiceDone": bool(pr and pr["practice_done"]),
                 }
             )
         conn.close()
-        return jsonify({"startDate": course["start_date"], "days": days_out})
+        return jsonify(
+            {
+                "startDate": course["start_date"],
+                "totalDays": int(course["total_days"]),
+                "days": days_out,
+            }
+        )
 
     @app.route("/api/student/self-study/vocabulary/packs/<int:pack_id>/units", methods=["GET"])
     def student_vocab_pack_units(pack_id: int):

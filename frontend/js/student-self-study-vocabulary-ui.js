@@ -61,6 +61,7 @@
   const state = {
     overview: null,
     today: null,
+    selectedDay: null,
     activeTab: "learn",
     packId: null,
     unitId: null,
@@ -85,13 +86,22 @@
   }
 
   function renderChannelBanner(overview) {
-    const ch = overview.channel === "A" ? t("self_study_channel_a") : t("self_study_channel_b");
+    const active = overview.channel === "A" ? "A" : "B";
+    const aOn = overview.channelAEnabled ? t("self_study_vocab_channel_on") : t("self_study_vocab_channel_off");
+    const bOn = overview.channelBActive ? t("self_study_vocab_channel_on") : t("self_study_vocab_channel_standby");
     const sched = overview.todaySchedule ? scheduleLabel(overview.todaySchedule) : "";
     return `
-      <div class="ssc-vocab-channel" role="status">
-        <span class="ssc-vocab-channel__badge">${ch}</span>
-        ${sched ? `<span class="ssc-vocab-channel__sched">${escapeHtml(sched)}</span>` : ""}
-        ${overview.vocabEntryLevel ? `<span class="ssc-vocab-channel__entry">${t("self_study_vocab_entry_level")}</span>` : ""}
+      <div class="ssc-vocab-channel-hub" role="status">
+        <div class="ssc-vocab-channel-card${active === "A" ? " ssc-vocab-channel-card--active" : ""}">
+          <span class="ssc-vocab-channel-card__label">${t("self_study_channel_a")}</span>
+          <span class="ssc-vocab-channel-card__state">${aOn}</span>
+        </div>
+        <div class="ssc-vocab-channel-card${active === "B" ? " ssc-vocab-channel-card--active" : ""}">
+          <span class="ssc-vocab-channel-card__label">${t("self_study_channel_b")}</span>
+          <span class="ssc-vocab-channel-card__state">${bOn}</span>
+        </div>
+        ${sched ? `<p class="ssc-vocab-channel__sched">${escapeHtml(sched)}</p>` : ""}
+        ${overview.vocabEntryLevel ? `<p class="ssc-vocab-channel__entry">${t("self_study_vocab_entry_level")}</p>` : ""}
       </div>
     `;
   }
@@ -106,6 +116,8 @@
     return [
       { id: "learn", labelKey: "self_study_tab_learn" },
       { id: "practice", labelKey: "self_study_tab_practice" },
+      { id: "game_star", labelKey: "self_study_vocab_tab_game_star" },
+      { id: "game_race", labelKey: "self_study_vocab_tab_game_race" },
       { id: "review", labelKey: "self_study_vocab_tab_review" },
       { id: "calendar", labelKey: "self_study_vocab_tab_calendar" },
     ];
@@ -176,7 +188,15 @@
       return;
     }
 
-    if (!state.today) {
+    if (state.selectedDay) {
+      root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
+      try {
+        state.today = await SERVER().getVocabDay(state.selectedDay);
+      } catch (e) {
+        root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
+        return;
+      }
+    } else if (!state.today) {
       try {
         state.today = await SERVER().getVocabToday();
       } catch (e) {
@@ -208,7 +228,11 @@
 
     const words = data.words || [];
     const prog = data.progress || {};
+    const dayBack = state.selectedDay
+      ? `<button type="button" class="btn-secondary ssc-vocab-back" id="ssc-clear-day">← ${t("self_study_vocab_calendar_today")}</button>`
+      : "";
     root.innerHTML = `
+      ${dayBack}
       <div class="ssc-lesson-card">
         <h2 data-i18n="self_study_vocab_learn_title">${t("self_study_vocab_learn_title")}</h2>
         <p>${t("self_study_vocab_day_label", { day: String(data.dayNumber || ""), count: String(words.length) })}</p>
@@ -227,6 +251,12 @@
         ? t("self_study_vocab_complete_short")
         : t("self_study_vocab_in_progress", { pct: String(progressPct(prog)) }),
     );
+
+    document.getElementById("ssc-clear-day")?.addEventListener("click", () => {
+      state.selectedDay = null;
+      state.today = null;
+      void renderLearnPanel(root);
+    });
 
     document.getElementById("ssc-learn-done-btn")?.addEventListener("click", async () => {
       try {
@@ -399,6 +429,39 @@
     renderCard();
   }
 
+  async function ensureGamesData() {
+    if (!state.today || !state.today.games) {
+      try {
+        state.today = state.selectedDay
+          ? await SERVER().getVocabDay(state.selectedDay)
+          : await SERVER().getVocabToday();
+      } catch (_) {
+        return null;
+      }
+    }
+    return state.today.games;
+  }
+
+  async function renderGamePanel(root, mode) {
+    const games = await ensureGamesData();
+    if (!games || !global.EAP_VOCAB_GAMES) {
+      root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_no_practice_today")}</p>`;
+      return;
+    }
+    root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_game_intro")}</p><div id="ssc-game-mount"></div>`;
+    const mount = document.getElementById("ssc-game-mount");
+    const onComplete = (res) => {
+      mount.innerHTML = `
+        <div class="ssc-report">
+          <h2>${t("self_study_vocab_game_done")}</h2>
+          <p>${t("self_study_vocab_practice_score", { correct: String(res.score), total: String(res.total) })}</p>
+        </div>
+      `;
+    };
+    if (mode === "star") global.EAP_VOCAB_GAMES.mountStarBattle(mount, games, onComplete);
+    else global.EAP_VOCAB_GAMES.mountSpeedRace(mount, games, onComplete);
+  }
+
   async function renderCalendarPanel(root) {
     root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
     let data;
@@ -419,15 +482,27 @@
           .map((d) => {
             const sched = scheduleLabel(d.schedule);
             const dayNum = d.dayNumber ? t("self_study_vocab_day_short", { day: String(d.dayNumber) }) : "—";
-            return `<li class="ssc-vocab-calendar__day">
+            const wc = d.wordCount ? `${d.wordCount} ${t("self_study_vocab_words_short")}` : "";
+            const done = d.learnDone && d.practiceDone ? " ✓" : "";
+            const clickable = d.dayNumber && d.hasLesson;
+            return `<li class="ssc-vocab-calendar__day${clickable ? " ssc-vocab-calendar__day--click" : ""}"${clickable ? ` data-day="${d.dayNumber}"` : ""}>
               <span class="ssc-vocab-calendar__date">${escapeHtml(d.date)}</span>
               <span class="ssc-vocab-calendar__sched">${escapeHtml(sched)}</span>
-              <span class="ssc-vocab-calendar__num">${dayNum}</span>
+              <span class="ssc-vocab-calendar__num">${dayNum}${done}</span>
+              <span class="ssc-vocab-calendar__wc">${escapeHtml(wc)}</span>
             </li>`;
           })
           .join("")}
       </ul>
     `;
+    root.querySelectorAll("[data-day]").forEach((li) => {
+      li.addEventListener("click", () => {
+        state.selectedDay = parseInt(li.getAttribute("data-day"), 10);
+        state.today = null;
+        showTab("learn");
+        void renderLearnPanel(document.getElementById("ssc-panel-learn"));
+      });
+    });
   }
 
   async function renderPacksPanel(root) {
@@ -514,6 +589,8 @@
     else if (tabId === "review") await renderReviewPanel(panel);
     else if (tabId === "calendar") await renderCalendarPanel(panel);
     else if (tabId === "packs") await renderPacksPanel(panel);
+    else if (tabId === "game_star") await renderGamePanel(panel, "star");
+    else if (tabId === "game_race") await renderGamePanel(panel, "race");
   }
 
   async function init() {

@@ -424,7 +424,85 @@ def _build_feedback(draft: str, task_content: dict, revision: int) -> dict[str, 
         "priorities": priorities,
         "actionableRevisions": revisions,
         "revisionNumber": revision,
+        "source": "rules",
     }
+
+
+def _build_feedback_ai(draft: str, task_content: dict, revision: int) -> dict[str, Any]:
+    """IELTS rubric via configured OpenAI/Hunyuan client (same stack as homework AI)."""
+    from eap_ai import ai_is_configured, create_chat_completion, format_ai_error, get_openai_client, parse_ai_json_object
+
+    if not ai_is_configured():
+        fb = _build_feedback(draft, task_content, revision)
+        fb["aiUnavailable"] = True
+        return fb
+
+    wc = _word_count(draft)
+    min_w = int(task_content.get("wordLimitMin") or 250)
+    title = task_content.get("titleEn") or task_content.get("title") or "Writing task"
+    prompt_body = task_content.get("promptEn") or task_content.get("prompt") or ""
+    genre = task_content.get("genreId") or ""
+
+    system = (
+        "You are an IELTS Academic writing examiner. Score practice drafts using public band descriptors. "
+        "Return ONLY valid JSON with keys: overallBandEstimate (number), criteria (array of "
+        "{id: TR|CC|LR|GRA, labelEn, labelZh, estimatedBand, comments[]}), strengths[], priorities[], "
+        "actionableRevisions[]. Be constructive; cite specific issues from the draft."
+    )
+    user = (
+        f"Genre: {genre}\nTitle: {title}\nPrompt: {prompt_body}\n"
+        f"Word minimum: {min_w}\nWord count: {wc}\nRevision: {revision}\n\nDraft:\n{draft[:12000]}"
+    )
+
+    client, profile = get_openai_client(None)
+    resp = create_chat_completion(
+        client,
+        profile,
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        temperature=0.3,
+        max_tokens=2000,
+    )
+    raw = (resp.choices[0].message.content or "").strip()
+    data = parse_ai_json_object(raw)
+    criteria = data.get("criteria") or []
+    bands = [float(c.get("estimatedBand") or 5.5) for c in criteria if c.get("estimatedBand") is not None]
+    overall = float(data.get("overallBandEstimate") or (sum(bands) / len(bands) if bands else 5.5))
+
+    return {
+        "wordCount": wc,
+        "wordLimitMin": min_w,
+        "overallBandEstimate": round(overall, 1),
+        "disclaimerEn": "AI practice estimate — not an official IELTS score.",
+        "disclaimerZh": "AI 练习估分 — 非官方雅思成绩。",
+        "criteria": criteria,
+        "strengths": data.get("strengths") or [],
+        "priorities": data.get("priorities") or [],
+        "actionableRevisions": data.get("actionableRevisions") or [],
+        "revisionNumber": revision,
+        "source": "ai",
+    }
+
+
+def _extract_upload_draft() -> tuple[str, str | None]:
+    """Return (draft text, optional filename) from JSON or multipart upload."""
+    if request.content_type and "multipart/form-data" in request.content_type:
+        draft = (request.form.get("draftText") or request.form.get("draft") or "").strip()
+        f = request.files.get("file")
+        if f and f.filename:
+            from teaching_page_source_files import allowed_source_extension, extract_text_from_bytes
+
+            ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
+            if ext in {"doc", "docx", "pdf", "txt"}:
+                data = f.read()
+                if ext == "txt":
+                    text = data.decode("utf-8", errors="replace")
+                else:
+                    text = extract_text_from_bytes(data, ext if ext != "doc" else "docx")
+                if text.strip():
+                    return text.strip(), f.filename
+        return draft, f.filename if f else None
+    data = request.get_json(silent=True) or {}
+    return str(data.get("draftText") or data.get("draft") or "").strip(), None
 
 
 def _task_row_to_public(row: Any, include_content: bool = False) -> dict[str, Any]:
@@ -573,8 +651,11 @@ def register_self_study_writing_routes(
             return jsonify({"error": "Student session required"}), 401
 
         data = request.get_json(silent=True) or {}
-        task_id = int(data.get("taskId") or 0)
-        draft = str(data.get("draftText") or data.get("draft") or "").strip()
+        if request.content_type and "multipart/form-data" in request.content_type:
+            task_id = int(request.form.get("taskId") or 0)
+        else:
+            task_id = int(data.get("taskId") or 0)
+        draft, upload_name = _extract_upload_draft()
         if not task_id:
             conn.close()
             return jsonify({"error": "taskId required"}), 400
@@ -597,7 +678,21 @@ def register_self_study_writing_routes(
             return jsonify({"error": f"Maximum {MAX_REVISIONS} submissions reached"}), 400
 
         content = json.loads(row["content_json"])
-        feedback = _build_feedback(draft, content, rev)
+        use_ai = True
+        if request.content_type and "multipart/form-data" in request.content_type:
+            use_ai = request.form.get("useAi", "1") != "0"
+        else:
+            use_ai = data.get("useAi", True) is not False
+        try:
+            feedback = _build_feedback_ai(draft, content, rev) if use_ai else _build_feedback(draft, content, rev)
+        except Exception as exc:
+            from eap_ai import format_ai_error
+
+            fb = _build_feedback(draft, content, rev)
+            fb["aiError"] = format_ai_error(exc)
+            feedback = fb
+        if upload_name:
+            feedback["uploadFileName"] = upload_name
         now = _now_iso()
         wc = _word_count(draft)
 

@@ -1577,11 +1577,170 @@
   }
 }
 
+/* SS-V2 — Channel hub + competitive vocab games */
+.ssc-vocab-channel-hub {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+
+.ssc-vocab-channel-card {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 126, 164, 0.25);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.ssc-vocab-channel-card--active {
+  border-color: #0071e3;
+  box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.15);
+}
+
+.ssc-vocab-channel-card__label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.ssc-vocab-channel-card__state {
+  font-size: 0.8rem;
+  color: #5a6b75;
+}
+
+.ssc-vocab-calendar__day--click {
+  cursor: pointer;
+}
+
+.ssc-vocab-calendar__day--click:hover {
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.ssc-game {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #0a1628 0%, #1a2a44 100%);
+  color: #e8f0ff;
+}
+
+.ssc-game--pulse .ssc-game-hud__timer {
+  color: #ff6b6b;
+  animation: ssc-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes ssc-pulse {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.ssc-game-hud {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.ssc-game-prompt {
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-align: center;
+  margin: 0.75rem 0 1rem;
+}
+
+.ssc-game-options {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.ssc-game-opt {
+  font: inherit;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+}
+
+.ssc-game-opt--ok {
+  background: rgba(46, 204, 113, 0.35);
+}
+
+.ssc-game-opt--bad {
+  background: rgba(231, 76, 60, 0.35);
+}
+
+.ssc-game-track {
+  position: relative;
+  height: 48px;
+  margin: 0.5rem 0 1rem;
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    #2c3e50 0,
+    #2c3e50 24px,
+    #34495e 24px,
+    #34495e 48px
+  );
+  overflow: hidden;
+}
+
+.ssc-game-car {
+  position: absolute;
+  top: 8px;
+  width: 36px;
+  height: 28px;
+  border-radius: 6px 10px 4px 4px;
+  background: #e74c3c;
+  transition: left 0.25s ease-out;
+}
+
+.ssc-game-track__finish {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: #f1c40f;
+}
+
+.ssc-speaking-record--primary {
+  margin: 1rem 0;
+}
+
+.ssc-speaking-record-only {
+  font-weight: 600;
+  color: #0a7ea4;
+}
+
+.ssc-speaking-transcript {
+  min-height: 3rem;
+  padding: 0.65rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 0.92rem;
+}
+
+.ssc-writing-upload {
+  margin: 0.75rem 0;
+}
+
+@media (max-width: 520px) {
+  .ssc-vocab-channel-hub {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ssc-module-card {
     transition: none;
   }
   .ssc-match-item {
     transition: none;
+  }
+  .ssc-game--pulse .ssc-game-hud__timer {
+    animation: none;
   }
 }

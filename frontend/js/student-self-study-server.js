@@ -72,6 +72,10 @@
     return apiFetch("/api/student/self-study/vocabulary/calendar");
   }
 
+  async function getVocabDay(dayNumber) {
+    return apiFetch(`/api/student/self-study/vocabulary/day/${dayNumber}`);
+  }
+
   async function getVocabPackUnits(packId) {
     return apiFetch(`/api/student/self-study/vocabulary/packs/${packId}/units`);
   }
@@ -132,7 +136,15 @@
     return apiFetch(`/api/student/self-study/writing/tasks/${taskId}`);
   }
 
-  async function submitWriting(body) {
+  async function submitWriting(body, file) {
+    if (file) {
+      const fd = new FormData();
+      fd.append("taskId", String(body.taskId || ""));
+      fd.append("draftText", body.draftText || "");
+      fd.append("useAi", body.useAi === false ? "0" : "1");
+      fd.append("file", file);
+      return apiFetch("/api/student/self-study/writing/submit", { method: "POST", body: fd });
+    }
     return apiFetch("/api/student/self-study/writing/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -174,6 +186,7 @@
     getVocabToday,
     getVocabReviewYesterday,
     getVocabCalendar,
+    getVocabDay,
     getVocabPackUnits,
     getVocabUnit,
     completeVocab,
