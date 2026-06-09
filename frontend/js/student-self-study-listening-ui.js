@@ -59,6 +59,28 @@
     return partType || "";
   }
 
+  function segmentPartLabel(index) {
+    return t("self_study_listening_segment_part", { n: String(index + 1) });
+  }
+
+  function renderLoadingPanel(root) {
+    if (!root) return;
+    root.innerHTML = `
+      <div class="ssc-listening-loading" role="status" aria-live="polite" aria-busy="true">
+        <div class="ssc-listening-loading__spinner" aria-hidden="true"></div>
+        <h2 class="ssc-listening-loading__title">${t("self_study_listening_loading_title")}</h2>
+        <p class="ssc-listening-loading__body">${t("self_study_listening_loading_body")}</p>
+        <p class="ssc-listening-loading__eta">${t("self_study_listening_loading_eta")}</p>
+        <ul class="ssc-listening-loading__steps">
+          <li>${t("self_study_listening_loading_step_passage")}</li>
+          <li>${t("self_study_listening_loading_step_audio")}</li>
+        </ul>
+        <p class="ssc-listening-loading__patience">${t("self_study_listening_loading_patience")}</p>
+      </div>
+    `;
+    updateHeader(0, t("self_study_listening_loading_short"));
+  }
+
   function parseDayFromUrl() {
     const n = parseInt(new URLSearchParams(global.location.search).get("day") || "", 10);
     return n > 0 ? n : null;
@@ -206,14 +228,15 @@
     if (audio.playlist && audio.segments && audio.segments.length) {
       const list = audio.segments
         .map(
-          (seg, i) =>
-            `<li><button type="button" class="ssc-audio-seg-btn" data-seg="${i}">${escapeHtml(seg.speaker || `Part ${i + 1}`)}</button></li>`,
+          (_, i) =>
+            `<li><button type="button" class="ssc-audio-seg-btn" data-seg="${i}" aria-label="${escapeHtml(segmentPartLabel(i))}">${escapeHtml(segmentPartLabel(i))}</button></li>`,
         )
         .join("");
       return `
         <div class="ssc-audio-player" id="ssc-listening-audio-wrap">
           <p class="ssc-audio-player__label">${t("self_study_listening_audio_play")}</p>
           <audio id="ssc-listening-audio" controls preload="metadata" class="ssc-audio-player__el"></audio>
+          <p class="ssc-audio-playlist__heading">${t("self_study_listening_segments_heading")}</p>
           <ol class="ssc-audio-playlist">${list}</ol>
           ${audio.truncated ? `<p class="ssc-disclaimer">${t("self_study_listening_audio_truncated")}</p>` : ""}
         </div>
@@ -233,10 +256,10 @@
 
   function renderBrowserAudioPlayer(segments) {
     const list = segments
-      .map((seg, i) => {
-        const label = seg.speaker ? `${seg.speaker}` : `Part ${i + 1}`;
-        return `<li><button type="button" class="ssc-audio-seg-btn" data-seg="${i}">${escapeHtml(label)}</button></li>`;
-      })
+      .map(
+        (_, i) =>
+          `<li><button type="button" class="ssc-audio-seg-btn" data-seg="${i}" aria-label="${escapeHtml(segmentPartLabel(i))}">${escapeHtml(segmentPartLabel(i))}</button></li>`,
+      )
       .join("");
     return `
       <div class="ssc-audio-player" id="ssc-listening-speech-wrap">
@@ -247,6 +270,7 @@
           <button type="button" class="btn-secondary" id="ssc-speech-stop" disabled>${t("self_study_listening_stop")}</button>
         </div>
         <p class="ssc-disclaimer ssc-listening-speech-hint">${t("self_study_listening_browser_hint")}</p>
+        <p class="ssc-audio-playlist__heading">${t("self_study_listening_segments_heading")}</p>
         <ol class="ssc-audio-playlist">${list}</ol>
       </div>
     `;
@@ -643,6 +667,7 @@
   }
 
   async function renderMainPanel(root) {
+    renderLoadingPanel(root);
     let data;
     try {
       state.today = null;
@@ -698,6 +723,14 @@
     state.practiceRetake = false;
     state.phase = "listen";
 
+    const dayNum = state.selectedDay;
+    shell.innerHTML = `
+      <div id="ssc-listening-channel" class="ssc-listening-channel-slot"></div>
+      <div id="ssc-listening-panel" class="ssc-listening-panel"></div>
+    `;
+    renderLoadingPanel(document.getElementById("ssc-listening-panel"));
+    updateHeader(0, t("self_study_listening_loading_short"));
+
     let overview;
     try {
       overview = await SERVER().getListeningOverview();
@@ -705,14 +738,14 @@
       return false;
     }
 
-    const dayNum = state.selectedDay || (overview.schedule && overview.schedule.dayNumber);
-    shell.innerHTML = `
-      ${channelBanner({
+    const resolvedDay = dayNum || (overview.schedule && overview.schedule.dayNumber);
+    const channelEl = document.getElementById("ssc-listening-channel");
+    if (channelEl) {
+      channelEl.innerHTML = channelBanner({
         partType: overview.schedule && overview.schedule.partType,
-        dayNumber: dayNum,
-      })}
-      <div id="ssc-listening-panel" class="ssc-listening-panel"></div>
-    `;
+        dayNumber: resolvedDay,
+      });
+    }
 
     await renderMainPanel(document.getElementById("ssc-listening-panel"));
     return true;
