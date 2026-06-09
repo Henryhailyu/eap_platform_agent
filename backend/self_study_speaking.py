@@ -24,13 +24,14 @@ from tencent_audio import (
 )
 
 SPEAKING_SKILL = "speaking"
-PART1_TIME_LIMIT = 60
-PART1_MIN_WORDS = 30
+PART1_TIME_LIMIT = 50
+PART1_MIN_WORDS = 25
+PART2_PREP_DELAY_SEC = 15
 PART2_PREP_SEC = 60
 PART2_TIME_LIMIT = 120
 PART2_MIN_WORDS = 80
-PART3_TIME_LIMIT = 90
-PART3_MIN_WORDS = 40
+PART3_TIME_LIMIT = 80
+PART3_MIN_WORDS = 35
 
 SEED_SESSION_A: dict[str, Any] = {
     "title": "Part 1 — Study and daily life",
@@ -270,6 +271,17 @@ def migrate_self_study_speaking_tables(conn) -> None:
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS student_speaking_p2_context (
+            student_username TEXT PRIMARY KEY,
+            session_id INTEGER NOT NULL,
+            cue_json TEXT NOT NULL,
+            completed_at TEXT NOT NULL,
+            consumed_for_p3 INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
     seed_default_speaking_sessions(conn)
     seed_extended_speaking_sessions(conn)
     _migrate_speaking_audio_column(conn)
@@ -463,8 +475,10 @@ def _build_feedback(
     else:
         fc_improve.append("Add connectors: because, however, for example.")
 
-    time_hint = { "P1": "60 seconds", "P2": "2 minutes", "P3": "90 seconds", "MOCK": "the time limit" }.get(part_type, "the time limit")
-    full_window = { "P1": 45, "P2": 90, "P3": 60, "MOCK": 45 }.get(part_type, 45)
+    time_hint = { "P1": "50 seconds", "P2": "2 minutes", "P3": "80 seconds", "MOCK": "the time limit" }.get(
+        part_type, "the time limit"
+    )
+    full_window = { "P1": 40, "P2": 90, "P3": 55, "MOCK": 40 }.get(part_type, 40)
 
     if timed_out:
         fc_improve.append(f"Timer ended — practise finishing within {time_hint} without rushing.")
@@ -552,6 +566,109 @@ def _build_feedback(
     }
 
 
+def _insert_ai_session(conn, content: dict[str, Any], class_name: str) -> int:
+    now = _now_iso()
+    part_type = str(content.get("partType") or "P1").upper()
+    payload = _session_payload(content)
+    payload["batchFeedback"] = True
+    payload["aiGenerated"] = True
+    sort_row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order), 0) AS mx FROM speaking_sessions WHERE class_name = ?",
+        (class_name,),
+    ).fetchone()
+    conn.execute(
+        """
+        INSERT INTO speaking_sessions (class_name, part_type, title, sort_order, content_json, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+        """,
+        (
+            class_name,
+            part_type,
+            payload["title"],
+            int(sort_row["mx"] or 0) + 1,
+            json.dumps(payload, ensure_ascii=False),
+            now,
+            now,
+        ),
+    )
+    return int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+
+
+def _get_p2_context(conn, username: str) -> Any:
+    return conn.execute(
+        """
+        SELECT * FROM student_speaking_p2_context
+        WHERE student_username = ? AND consumed_for_p3 = 0
+        LIMIT 1
+        """,
+        (username,),
+    ).fetchone()
+
+
+def _save_p2_context(conn, username: str, session_id: int, cue: dict[str, Any]) -> None:
+    now = _now_iso()
+    conn.execute(
+        """
+        INSERT INTO student_speaking_p2_context (student_username, session_id, cue_json, completed_at, consumed_for_p3)
+        VALUES (?, ?, ?, ?, 0)
+        ON CONFLICT(student_username) DO UPDATE SET
+            session_id = excluded.session_id,
+            cue_json = excluded.cue_json,
+            completed_at = excluded.completed_at,
+            consumed_for_p3 = 0
+        """,
+        (username, session_id, json.dumps(cue, ensure_ascii=False), now),
+    )
+
+
+def _consume_p2_context(conn, username: str) -> None:
+    conn.execute(
+        "UPDATE student_speaking_p2_context SET consumed_for_p3 = 1 WHERE student_username = ?",
+        (username,),
+    )
+
+
+def _session_detail_response(conn, row: Any, username: str) -> dict[str, Any]:
+    content = json.loads(row["content_json"])
+    responses = conn.execute(
+        """
+        SELECT question_id, word_count, timed_out, submitted_at, response_text,
+               json_extract(feedback_json, '$.overallBandEstimate') AS band
+        FROM student_speaking_responses
+        WHERE student_username = ? AND session_id = ?
+        ORDER BY submitted_at DESC
+        """,
+        (username, row["id"]),
+    ).fetchall()
+    latest_by_q: dict[str, dict] = {}
+    for r in responses:
+        qid = r["question_id"]
+        if qid not in latest_by_q:
+            latest_by_q[qid] = {
+                "questionId": qid,
+                "wordCount": r["word_count"],
+                "timedOut": bool(r["timed_out"]),
+                "submittedAt": r["submitted_at"],
+                "overallBandEstimate": r["band"],
+                "transcript": r["response_text"],
+            }
+    part_type = row["part_type"]
+    items = _enrich_session_items(row["id"], _session_items(content, part_type))
+    return {
+        "session": {
+            "id": row["id"],
+            "title": row["title"],
+            "partType": part_type,
+            "content": content,
+            "items": items,
+            "itemCount": _item_count(content, part_type),
+            "batchFeedback": bool(content.get("batchFeedback")),
+        },
+        "responses": list(latest_by_q.values()),
+        "audioStatus": audio_status(),
+    }
+
+
 def register_self_study_speaking_routes(
     app,
     *,
@@ -596,6 +713,7 @@ def register_self_study_speaking_routes(
             "SELECT COUNT(*) AS n FROM student_speaking_responses WHERE student_username = ?",
             (username,),
         ).fetchone()
+        p2_ctx = _get_p2_context(conn, username)
         conn.close()
 
         sessions_out = []
@@ -617,6 +735,17 @@ def register_self_study_speaking_routes(
                 "noDailyPush": True,
                 "sessions": sessions_out,
                 "responsesCount": int(answered["n"] if answered else 0),
+                "parts": {
+                    "P1": {"available": True, "questionCount": 4, "timeLimitSec": PART1_TIME_LIMIT},
+                    "P2": {"available": True, "prepDelaySec": PART2_PREP_DELAY_SEC, "prepTimeSec": PART2_PREP_SEC, "timeLimitSec": PART2_TIME_LIMIT},
+                    "P3": {
+                        "available": bool(p2_ctx),
+                        "questionCount": 4,
+                        "timeLimitSec": PART3_TIME_LIMIT,
+                        "requiresPart2": True,
+                        "p2CompletedAt": p2_ctx["completed_at"] if p2_ctx else None,
+                    },
+                },
             }
         )
 
@@ -673,6 +802,154 @@ def register_self_study_speaking_routes(
             }
         )
 
+    @app.route("/api/student/self-study/speaking/start", methods=["POST"])
+    def student_speaking_start():
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "student")
+        if err:
+            conn.close()
+            return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
+
+        data = request.get_json(silent=True) or {}
+        part_type = str(data.get("partType") or "P1").upper()
+        if part_type not in ("P1", "P2", "P3"):
+            conn.close()
+            return jsonify({"error": "partType must be P1, P2, or P3"}), 400
+
+        class_name = _student_class_name(conn, username)
+        try:
+            from self_study_speaking_ai import generate_part1, generate_part2, generate_part3
+
+            if part_type == "P1":
+                content = generate_part1(class_name)
+            elif part_type == "P2":
+                content = generate_part2(class_name)
+            else:
+                p2_ctx = _get_p2_context(conn, username)
+                if not p2_ctx:
+                    conn.close()
+                    return jsonify({"error": "Complete Part 2 first", "code": "P2_REQUIRED"}), 403
+                cue = json.loads(p2_ctx["cue_json"])
+                content = generate_part3(cue, class_name)
+        except Exception as exc:
+            conn.close()
+            return jsonify({"error": str(exc)}), 500
+
+        session_id = _insert_ai_session(conn, content, class_name)
+        if part_type == "P3":
+            _consume_p2_context(conn, username)
+        conn.commit()
+        row = conn.execute("SELECT * FROM speaking_sessions WHERE id = ?", (session_id,)).fetchone()
+        out = _session_detail_response(conn, row, username)
+        conn.close()
+        return jsonify({"sessionId": session_id, **out})
+
+    @app.route("/api/student/self-study/speaking/complete", methods=["POST"])
+    def student_speaking_complete():
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "student")
+        if err:
+            conn.close()
+            return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
+
+        data = request.get_json(silent=True) or {}
+        session_id = int(data.get("sessionId") or 0)
+        if not session_id:
+            conn.close()
+            return jsonify({"error": "sessionId required"}), 400
+
+        row = conn.execute(
+            "SELECT * FROM speaking_sessions WHERE id = ? AND is_active = 1",
+            (session_id,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "Session not found"}), 404
+
+        content = json.loads(row["content_json"])
+        part_type = str(row["part_type"] or "P1").upper()
+        items = _session_items(content, part_type)
+        item_map = {str(it.get("id")): it for it in items}
+
+        resp_rows = conn.execute(
+            """
+            SELECT question_id, response_text, timed_out, elapsed_sec, feedback_json
+            FROM student_speaking_responses
+            WHERE student_username = ? AND session_id = ?
+            ORDER BY submitted_at ASC
+            """,
+            (username, session_id),
+        ).fetchall()
+
+        if not resp_rows:
+            conn.close()
+            return jsonify({"error": "No responses to analyse"}), 400
+
+        feedback_inputs: list[dict[str, Any]] = []
+        for r in resp_rows:
+            meta = item_map.get(str(r["question_id"])) or {}
+            feedback_inputs.append(
+                {
+                    "id": r["question_id"],
+                    "promptEn": meta.get("promptEn") or meta.get("topicEn") or "",
+                    "promptZh": meta.get("promptZh") or meta.get("topicZh") or "",
+                    "transcript": r["response_text"],
+                    "timedOut": bool(r["timed_out"]),
+                    "elapsedSec": r["elapsed_sec"],
+                }
+            )
+
+        try:
+            from self_study_speaking_ai import build_batch_ai_feedback
+
+            feedback_rows = build_batch_ai_feedback(part_type, feedback_inputs)
+        except Exception:
+            feedback_rows = []
+
+        fb_by_id = {str(f.get("id")): f for f in feedback_rows}
+        results: list[dict[str, Any]] = []
+        for r in resp_rows:
+            qid = str(r["question_id"])
+            meta = item_map.get(qid) or {}
+            fb = fb_by_id.get(qid) or {}
+            if not fb:
+                fb = _build_feedback(
+                    r["response_text"],
+                    min_words=int(meta.get("minWords") or PART1_MIN_WORDS),
+                    timed_out=bool(r["timed_out"]),
+                    elapsed_sec=r["elapsed_sec"],
+                    part_type=part_type,
+                )
+            conn.execute(
+                "UPDATE student_speaking_responses SET feedback_json = ? WHERE student_username = ? AND session_id = ? AND question_id = ?",
+                (json.dumps(fb, ensure_ascii=False), username, session_id, qid),
+            )
+            results.append(
+                {
+                    "questionId": qid,
+                    "promptEn": meta.get("promptEn") or meta.get("topicEn") or "",
+                    "promptZh": meta.get("promptZh") or meta.get("topicZh") or "",
+                    "transcript": r["response_text"],
+                    "timedOut": bool(r["timed_out"]),
+                    "feedback": fb,
+                }
+            )
+
+        if part_type == "P2" and content.get("cueCard"):
+            _save_p2_context(conn, username, session_id, content["cueCard"])
+
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "partType": part_type, "results": results})
+
     @app.route("/api/student/self-study/speaking/sessions/<int:session_id>", methods=["GET"])
     def student_speaking_session(session_id: int):
         conn = get_db_connection()
@@ -693,47 +970,9 @@ def register_self_study_speaking_routes(
             conn.close()
             return jsonify({"error": "Session not found"}), 404
 
-        content = json.loads(row["content_json"])
-        responses = conn.execute(
-            """
-            SELECT question_id, word_count, timed_out, submitted_at,
-                   json_extract(feedback_json, '$.overallBandEstimate') AS band
-            FROM student_speaking_responses
-            WHERE student_username = ? AND session_id = ?
-            ORDER BY submitted_at DESC
-            """,
-            (username, session_id),
-        ).fetchall()
+        out = _session_detail_response(conn, row, username)
         conn.close()
-
-        latest_by_q: dict[str, dict] = {}
-        for r in responses:
-            qid = r["question_id"]
-            if qid not in latest_by_q:
-                latest_by_q[qid] = {
-                    "questionId": qid,
-                    "wordCount": r["word_count"],
-                    "timedOut": bool(r["timed_out"]),
-                    "submittedAt": r["submitted_at"],
-                    "overallBandEstimate": r["band"],
-                }
-
-        part_type = row["part_type"]
-        items = _enrich_session_items(row["id"], _session_items(content, part_type))
-        return jsonify(
-            {
-                "session": {
-                    "id": row["id"],
-                    "title": row["title"],
-                    "partType": part_type,
-                    "content": content,
-                    "items": items,
-                    "itemCount": _item_count(content, part_type),
-                },
-                "responses": list(latest_by_q.values()),
-                "audioStatus": audio_status(),
-            }
-        )
+        return jsonify(out)
 
     @app.route("/api/student/self-study/speaking/respond", methods=["POST"])
     def student_speaking_respond():
@@ -799,24 +1038,29 @@ def register_self_study_speaking_routes(
                 conn.close()
                 return jsonify({"error": f"Audio processing failed: {exc}"}), 400
 
-        if len(response_text) < 5:
+        batch_mode = bool(content.get("batchFeedback"))
+        if not batch_mode and len(response_text) < 5:
             conn.close()
             return jsonify({"error": "Response too short — type or record your answer"}), 400
+        if batch_mode and len(response_text) < 1 and not audio_bytes:
+            response_text = "(no speech detected)"
 
-        feedback = _build_feedback(
-            response_text,
-            min_words=min_words,
-            timed_out=bool(timed_out),
-            elapsed_sec=elapsed_sec,
-            part_type=item_part,
-        )
-        ref_text = _item_prompt_en(q_meta) or response_text
-        if audio_bytes:
-            soe = evaluate_oral_sentence(audio_bytes, ref_text, audio_format)
-            feedback = merge_soe_into_feedback(feedback, soe)
-            if audio_cos_key:
-                feedback["audioCosKey"] = audio_cos_key
-                feedback["transcriptSource"] = "asr" if asr_ready() else "typed"
+        feedback: dict[str, Any] = {"pending": True} if batch_mode else {}
+        if not batch_mode:
+            feedback = _build_feedback(
+                response_text,
+                min_words=min_words,
+                timed_out=bool(timed_out),
+                elapsed_sec=elapsed_sec,
+                part_type=item_part,
+            )
+            ref_text = _item_prompt_en(q_meta) or response_text
+            if audio_bytes:
+                soe = evaluate_oral_sentence(audio_bytes, ref_text, audio_format)
+                feedback = merge_soe_into_feedback(feedback, soe)
+                if audio_cos_key:
+                    feedback["audioCosKey"] = audio_cos_key
+                    feedback["transcriptSource"] = "asr" if asr_ready() else "typed"
 
         now = _now_iso()
         wc = _word_count(response_text)
@@ -843,7 +1087,10 @@ def register_self_study_speaking_routes(
         )
         conn.commit()
         conn.close()
-        return jsonify({"ok": True, "feedback": feedback, "transcript": response_text})
+        out: dict[str, Any] = {"ok": True, "transcript": response_text, "batchMode": batch_mode}
+        if not batch_mode:
+            out["feedback"] = feedback
+        return jsonify(out)
 
     @app.route("/api/admin/self-study/speaking/sessions", methods=["GET"])
     def admin_speaking_sessions():

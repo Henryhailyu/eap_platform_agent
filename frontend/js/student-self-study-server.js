@@ -178,6 +178,22 @@
     return apiFetch(`/api/student/self-study/speaking/sessions/${sessionId}`);
   }
 
+  async function startSpeakingSession(body) {
+    return apiFetch("/api/student/self-study/speaking/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
+  async function completeSpeakingSession(body) {
+    return apiFetch("/api/student/self-study/speaking/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
   async function submitSpeakingResponse(body) {
     return apiFetch("/api/student/self-study/speaking/respond", {
       method: "POST",
@@ -222,6 +238,8 @@
     submitWriting,
     getSpeakingOverview,
     getSpeakingSession,
+    startSpeakingSession,
+    completeSpeakingSession,
     submitSpeakingResponse,
     getSpeakingHistory,
     getAudioStatus,
