@@ -4,13 +4,19 @@ Generate EAP047 self-study seed drafts (vocabulary 30-day + reading passages) vi
 
 Output JSON for human review BEFORE importing to production DB.
 
-  cd backend
-  set -a && source ../.env && set +a   # EAP_OPENAI_* / Hunyuan
-  python3 scripts/generate_eap047_self_study_seeds.py --out ../data/seeds/eap047_draft.json
+  # Lighthouse: run INSIDE the eap container (host python3 lacks flask/openai).
+  cd ~/eap_platform_agent && set -a && source .env && set +a
+  sudo docker compose exec -T eap python /app/backend/scripts/generate_eap047_self_study_seeds.py \\
+    --days 30 --reading 10 --out /data/seeds/eap047_draft.json
+  sudo docker compose cp eap:/data/seeds/eap047_draft.json ./data/seeds/
+
+  # Local dev (venv with requirements installed):
+  cd backend && source venv/bin/activate && set -a && source ../.env && set +a
   python3 scripts/generate_eap047_self_study_seeds.py --days 30 --reading 10 --out ../data/seeds/eap047_draft.json
 
-After you approve the JSON:
-  python3 scripts/import_eap047_self_study_seeds.py --in ../data/seeds/eap047_draft.json --apply
+After you approve the JSON (import uses production DB in /data):
+  sudo docker compose exec -T eap python /app/backend/scripts/import_eap047_self_study_seeds.py \\
+    --in /data/seeds/eap047_draft.json --apply
 """
 from __future__ import annotations
 
