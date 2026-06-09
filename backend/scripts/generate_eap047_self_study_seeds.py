@@ -23,6 +23,56 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 MAX_RETRIES = 3
+WORDS_PER_DAY = 30
+BATCH_SIZE = 10
+MAX_VOCAB_BATCHES = 9
+
+DAY_THEMES = (
+    "research methodology and academic writing",
+    "environment, climate and sustainability",
+    "economics, business and global markets",
+    "technology, computing and innovation",
+    "health, medicine and public policy",
+    "education, psychology and learning sciences",
+    "law, governance and social justice",
+    "culture, media and communication",
+    "statistics, data and evidence",
+    "urban planning and infrastructure",
+)
+
+
+def _unique_word_list(words: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in words:
+        token = str(raw or "").strip()
+        if not token:
+            continue
+        key = token.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(token)
+    return out
+
+
+def _format_avoid_list(words: list[str], *, max_chars: int = 14000) -> str:
+    tokens = _unique_word_list(words)
+    if not tokens:
+        return "(none yet)"
+    text = ", ".join(tokens)
+    if len(text) <= max_chars:
+        return text
+    head = ", ".join(tokens[:400])
+    tail = ", ".join(tokens[-200:])
+    return (
+        f"{head}, …, {tail} "
+        f"(full list: {len(tokens)} words already used — every one must be avoided)"
+    )
+
+
+def _used_token_set(words: list[str]) -> set[str]:
+    return {w.strip().lower() for w in words if str(w or "").strip()}
 
 
 def _ai_json(system: str, user: str, *, max_tokens: int = 8000) -> dict:
@@ -61,6 +111,7 @@ def generate_vocab_batch(
     *,
     count: int,
     used_words: list[str],
+    theme: str,
 ) -> list[dict]:
     system = (
         "You generate academic English vocabulary for EAP047 (IELTS ~6.5). "
@@ -68,10 +119,14 @@ def generate_vocab_batch(
         "\"prefix\", \"root\", \"suffix\", \"mnemonic\"}]}. "
         "methodPrimary is affix, mnemonic, or mixed. Use empty string for unused affix fields. "
         "One short coreMeaning per word (under 12 words). No phonetic, no example sentences. "
-        f"Exactly {count} unique words."
+        f"Exactly {count} unique words not in the avoid list."
     )
-    avoid = ", ".join(used_words[-60:]) if used_words else "(none)"
-    user = f"Day {day_number}, batch {batch_no}. Generate {count} new words. Do not repeat: {avoid}"
+    avoid = _format_avoid_list(used_words)
+    user = (
+        f"Day {day_number}, batch {batch_no}. Theme: {theme}. "
+        f"Generate {count} NEW academic words on this theme. "
+        f"Every word must differ from ALL words in this avoid list:\n{avoid}"
+    )
     payload = _ai_json(system, user, max_tokens=3500)
     words = payload.get("words") or []
     if len(words) < count:
@@ -99,23 +154,45 @@ def _normalize_word(raw: dict) -> dict:
 
 
 def generate_vocab_day(day_number: int, used_words: list[str]) -> list[dict]:
-    """30 words/day in three API calls (10+10+10) to avoid JSON truncation."""
+    """30 words/day; extra batches top up when AI repeats earlier words."""
+    theme = DAY_THEMES[(day_number - 1) % len(DAY_THEMES)]
+    used_set = _used_token_set(used_words)
     words: list[dict] = []
-    for batch_no, n in ((1, 10), (2, 10), (3, 10)):
-        print(f"    batch {batch_no}/3 ({n} words)…")
+    batch_no = 0
+
+    while len(words) < WORDS_PER_DAY and batch_no < MAX_VOCAB_BATCHES:
+        batch_no += 1
+        need = min(BATCH_SIZE, WORDS_PER_DAY - len(words))
+        print(f"    batch {batch_no} ({need} needed, {len(words)}/{WORDS_PER_DAY} so far)…")
         avoid = used_words + [str(w.get("word") or "") for w in words]
-        avoid = [w for w in avoid if w]
-        batch = generate_vocab_batch(day_number, batch_no, count=n, used_words=avoid)
+        batch = generate_vocab_batch(
+            day_number, batch_no, count=need, used_words=avoid, theme=theme,
+        )
+        added = dupes = empty = 0
+        day_tokens = {str(w.get("word") or "").strip().lower() for w in words}
         for w in batch:
             entry = _normalize_word(w)
             token = str(entry.get("word") or "").strip().lower()
-            if token and token not in {x.lower() for x in used_words} and token not in {
-                str(x.get("word") or "").lower() for x in words
-            }:
-                words.append(entry)
-        if len(words) >= 30:
-            break
-    return words[:30]
+            if not token:
+                empty += 1
+                continue
+            if token in used_set or token in day_tokens:
+                dupes += 1
+                continue
+            words.append(entry)
+            day_tokens.add(token)
+            added += 1
+        if dupes or empty:
+            print(f"    skipped {dupes} duplicate(s), {empty} empty")
+        if added == 0:
+            print(f"    warning: batch {batch_no} added 0 words — retrying…", file=sys.stderr)
+
+    if len(words) < WORDS_PER_DAY:
+        print(
+            f"    warning: day {day_number} only got {len(words)}/{WORDS_PER_DAY} words",
+            file=sys.stderr,
+        )
+    return words[:WORDS_PER_DAY]
 
 
 def generate_reading_passage(index: int, word_target: int = 700) -> dict:
@@ -154,6 +231,11 @@ def main() -> int:
     parser.add_argument("--reading", type=int, default=2)
     parser.add_argument("--out", required=True)
     parser.add_argument("--resume", action="store_true", help="Continue from existing output file")
+    parser.add_argument(
+        "--regen-vocab",
+        action="store_true",
+        help="Regenerate vocabulary from day 1 (keeps reading passages if resuming)",
+    )
     args = parser.parse_args()
 
     out_path = Path(args.out)
@@ -164,14 +246,17 @@ def main() -> int:
 
     if args.resume and out_path.is_file():
         existing = json.loads(out_path.read_text(encoding="utf-8"))
-        vocab_days = existing.get("vocabulary", {}).get("days") or []
         readings = existing.get("reading", {}).get("passages") or []
-        for d in vocab_days:
-            for w in d.get("words") or []:
-                if w.get("word"):
-                    used.append(w["word"])
-        start_day = len(vocab_days) + 1
-        print(f"Resuming from day {start_day} ({len(vocab_days)} days already in file)")
+        if args.regen_vocab:
+            print("Regenerating vocabulary from day 1 (keeping existing reading passages)")
+        else:
+            vocab_days = existing.get("vocabulary", {}).get("days") or []
+            for d in vocab_days:
+                for w in d.get("words") or []:
+                    if w.get("word"):
+                        used.append(w["word"])
+            start_day = len(vocab_days) + 1
+            print(f"Resuming from day {start_day} ({len(vocab_days)} days already in file)")
 
     for d in range(start_day, args.days + 1):
         print(f"Generating vocabulary day {d}/{args.days}…")
