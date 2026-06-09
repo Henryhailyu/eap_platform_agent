@@ -2189,6 +2189,90 @@
   margin: 0.5rem 0 1rem;
 }
 
+/* —— SS-R2 reading exam —— */
+.ssc-reading-exam {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem 1.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ssc-reading-exam__head h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+}
+
+.ssc-reading-exam__tip {
+  color: var(--eap-text-muted, #6e6e73);
+  font-size: 0.9rem;
+}
+
+.ssc-reading-passage {
+  margin: 1.25rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: 10px;
+  background: #fafafa;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  max-height: 42vh;
+  overflow: auto;
+}
+
+.ssc-reading-p__para {
+  margin: 0 0 0.85rem;
+  line-height: 1.65;
+  text-align: justify;
+}
+
+.ssc-reading-p__para:last-child {
+  margin-bottom: 0;
+}
+
+.ssc-reading-questions__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.ssc-reading-q {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ssc-reading-q__type {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--eap-teal, #0a7ea4);
+  margin: 0 0 0.25rem;
+}
+
+.ssc-reading-q__instr {
+  font-size: 0.8rem;
+  color: var(--eap-text-muted, #6e6e73);
+  margin: 0 0 0.35rem;
+}
+
+.ssc-reading-q__prompt {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.ssc-reading-result__feedback {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.admin-code-preview {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  max-height: 200px;
+  overflow: auto;
+  font-size: 0.75rem;
+  background: #f5f5f7;
+  border-radius: 8px;
+  white-space: pre-wrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ssc-module-card {
     transition: none;

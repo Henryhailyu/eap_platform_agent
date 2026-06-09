@@ -321,6 +321,26 @@
               <button type="button" class="btn-secondary" id="admin-reading-push-off" data-i18n="admin_reading_push_off">Disable reading Channel A</button>
               <button type="button" class="btn-secondary" id="admin-reading-export" data-i18n="admin_reading_export">Export passages CSV</button>
             </div>
+            <div class="admin-upload-block" style="margin-top: 1.5rem">
+              <h3 class="section-heading section-heading--nested" data-i18n="admin_reading_upload_heading">Upload source (Channel A)</h3>
+              <p class="admin-panel__hint" data-i18n="admin_reading_upload_hint">PDF, DOCX or TXT → OCR extract → AI structure → publish to class queue.</p>
+              <div class="admin-inline-form admin-mat-form__row">
+                <div class="field">
+                  <label for="admin-reading-upload-class" data-i18n="admin_reading_push_class">Class</label>
+                  <input id="admin-reading-upload-class" type="text" value="EAP047" maxlength="40" />
+                </div>
+                <div class="field">
+                  <label for="admin-reading-upload-file" data-i18n="admin_reading_upload_file">File</label>
+                  <input id="admin-reading-upload-file" type="file" accept=".pdf,.docx,.txt,.doc" />
+                </div>
+              </div>
+              <div class="admin-mat-form__actions">
+                <button type="button" class="btn-primary" id="admin-reading-upload-btn" data-i18n="admin_reading_upload_btn">Upload &amp; extract</button>
+                <button type="button" class="btn-secondary" id="admin-reading-structure-btn" data-i18n="admin_reading_structure_btn" disabled>AI structure</button>
+                <button type="button" class="btn-secondary" id="admin-reading-publish-btn" data-i18n="admin_reading_publish_btn" disabled>Publish to Channel A</button>
+              </div>
+              <pre id="admin-reading-upload-preview" class="admin-code-preview hidden" aria-live="polite"></pre>
+            </div>
           </section>
 
           <section class="content-section admin-panel" id="admin-listening-section" aria-labelledby="admin-listening-heading">

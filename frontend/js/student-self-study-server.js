@@ -112,8 +112,9 @@
     return apiFetch("/api/student/self-study/reading/overview");
   }
 
-  async function getReadingToday() {
-    return apiFetch("/api/student/self-study/reading/today");
+  async function getReadingToday(dayNumber) {
+    const q = dayNumber ? `?day=${encodeURIComponent(String(dayNumber))}` : "";
+    return apiFetch(`/api/student/self-study/reading/today${q}`);
   }
 
   async function completeReading(body) {
