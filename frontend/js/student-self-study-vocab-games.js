@@ -183,4 +183,4 @@
     mountStarBattle,
     mountSpeedRace,
   };
-})();
+})(typeof window !== "undefined" ? window : globalThis);

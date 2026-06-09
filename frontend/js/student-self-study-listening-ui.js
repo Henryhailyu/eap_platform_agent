@@ -426,4 +426,4 @@
   }
 
   global.EAP_LISTENING_UI = { init };
-})();
+})(typeof window !== "undefined" ? window : globalThis);

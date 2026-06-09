@@ -693,4 +693,4 @@
   }
 
   global.EAP_SPEAKING_UI = { init };
-})();
+})(typeof window !== "undefined" ? window : globalThis);

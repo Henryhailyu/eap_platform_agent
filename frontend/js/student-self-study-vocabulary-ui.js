@@ -642,4 +642,4 @@
   }
 
   global.EAP_VOCAB_UI = { init };
-})();
+})(typeof window !== "undefined" ? window : globalThis);

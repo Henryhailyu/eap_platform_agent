@@ -364,4 +364,4 @@
   }
 
   global.EAP_WRITING_UI = { init };
-})();
+})(typeof window !== "undefined" ? window : globalThis);

@@ -206,4 +206,4 @@
     getSpeakingHistory,
     getAudioStatus,
   };
-})();
+})(typeof window !== "undefined" ? window : globalThis);

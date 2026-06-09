@@ -282,4 +282,4 @@
   }
 
   global.EAP_READING_UI = { init };
-})();
+})(typeof window !== "undefined" ? window : globalThis);
