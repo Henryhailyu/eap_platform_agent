@@ -40,6 +40,85 @@
     return (params.get("skill") || "").toLowerCase();
   }
 
+  async function apiLooksReachable() {
+    if (typeof window.isApiReachable === "function") {
+      try {
+        return await window.isApiReachable();
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  function renderVocabServerError(reason, message) {
+    const root = document.getElementById("ssc-module-root");
+    if (!root) return;
+    const hints = {
+      ui_script:
+        "Vocabulary server UI did not load. On the server run: sudo docker compose up -d --build — then hard-refresh this page (Ctrl+Shift+R).",
+      api:
+        message ||
+        "Could not load vocabulary from the server. Log out, log in again as student1, then retry.",
+      init: "Vocabulary UI failed to start. Hard-refresh (Ctrl+Shift+R) or clear site cache for this host.",
+    };
+    const detail = hints[reason] || message || hints.init;
+    root.innerHTML = `
+      <div class="ssc-banner ssc-banner--placement" role="alert">
+        <h2>Vocabulary server UI unavailable</h2>
+        <p>${escapeHtml(detail)}</p>
+        <div class="ssc-placement-actions">
+          <button type="button" class="btn-primary" id="ssc-vocab-retry-btn">Retry</button>
+          <a href="student-self-study.html" class="btn-secondary">${t("self_study_back_hub")}</a>
+        </div>
+      </div>
+    `;
+    document.getElementById("ssc-vocab-retry-btn")?.addEventListener("click", () => window.location.reload());
+  }
+
+  async function bootVocabularyModule(levelId) {
+    const vocabUi = window.EAP_VOCAB_UI;
+    const server = window.EAP_SELF_STUDY_SERVER;
+    if (!server) {
+      if (await apiLooksReachable()) {
+        renderVocabServerError("ui_script");
+        return;
+      }
+      if (!VOCAB) return;
+      initVocabulary(levelId);
+      return;
+    }
+    if (!vocabUi || typeof vocabUi.init !== "function") {
+      if (await apiLooksReachable()) {
+        renderVocabServerError("ui_script");
+        return;
+      }
+      if (!VOCAB) return;
+      initVocabulary(levelId);
+      return;
+    }
+    const ok = await vocabUi.init();
+    if (ok) {
+      window.addEventListener("eap:langchange", () => {
+        void vocabUi.init();
+        if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+      });
+      return;
+    }
+    if (await apiLooksReachable()) {
+      let msg = "";
+      try {
+        await server.getVocabOverview();
+      } catch (e) {
+        msg = e && e.message ? String(e.message) : "";
+      }
+      renderVocabServerError(msg ? "api" : "init", msg);
+      return;
+    }
+    if (!VOCAB) return;
+    initVocabulary(levelId);
+  }
+
   function renderUnsupported(skill) {
     const root = document.getElementById("ssc-module-root");
     if (!root) return;
@@ -490,19 +569,7 @@
     }
 
     if (skill === "vocabulary") {
-      const vocabUi = window.EAP_VOCAB_UI;
-      if (vocabUi && typeof vocabUi.init === "function") {
-        const ok = await vocabUi.init();
-        if (ok) {
-          window.addEventListener("eap:langchange", () => {
-            void vocabUi.init();
-            if (window.EAP_I18N) window.EAP_I18N.applyStatic();
-          });
-          return;
-        }
-      }
-      if (!VOCAB) return;
-      initVocabulary(levelId);
+      await bootVocabularyModule(levelId);
     } else if (skill === "reading") {
       const readingUi = window.EAP_READING_UI;
       if (readingUi && typeof readingUi.init === "function") {

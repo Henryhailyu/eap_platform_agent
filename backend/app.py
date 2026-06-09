@@ -139,7 +139,11 @@ def serve_ui(filename="index.html"):
         abort(404)
     if not os.path.isfile(os.path.join(FRONTEND_DIR, safe)):
         abort(404)
-    return send_from_directory(FRONTEND_DIR, safe)
+    response = send_from_directory(FRONTEND_DIR, safe)
+    # HTML shells reference versioned JS; avoid stale cached pages missing new modules.
+    if safe.endswith(".html"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 # Basic health check used during development and regression testing

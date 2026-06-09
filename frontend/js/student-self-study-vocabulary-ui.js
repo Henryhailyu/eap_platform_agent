@@ -605,6 +605,7 @@
     try {
       state.overview = await SERVER().getVocabOverview();
     } catch (e) {
+      console.error("[EAP_VOCAB_UI] getVocabOverview failed:", e);
       return false;
     }
 
