@@ -14,8 +14,14 @@ mkdir -p "$ROOT/data/seeds"
 sudo docker compose exec -T eap mkdir -p /data/seeds
 
 echo "Generating vocab ${DAYS} days + ${READING} reading passages (AI)…"
+echo "(30 words/day = 2 API batches; checkpoints saved after each day — may take 30–90 min)"
+RESUME=""
+if [[ -f "$OUT_HOST" ]]; then
+  RESUME="--resume"
+  echo "Found existing draft — resuming with --resume"
+fi
 sudo docker compose exec -T eap python /app/backend/scripts/generate_eap047_self_study_seeds.py \
-  --days "$DAYS" --reading "$READING" --out "$OUT_CONTAINER"
+  $RESUME --days "$DAYS" --reading "$READING" --out "$OUT_CONTAINER"
 
 sudo docker compose cp "eap:$OUT_CONTAINER" "$OUT_HOST"
 echo "Saved: $OUT_HOST"
