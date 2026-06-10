@@ -6,6 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260610-mgr" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -39,7 +40,46 @@
           <p id="admin-page-error" class="form-message hidden" role="alert" aria-live="polite"></p>
           <p id="admin-page-status" class="form-message hidden" role="status" aria-live="polite"></p>
 
-          <section class="content-section admin-panel" aria-labelledby="admin-calendar-heading">
+          <nav id="admin-module-breadcrumb" class="admin-module-breadcrumb" hidden aria-label="Module navigation"></nav>
+
+          <div id="admin-hub" class="admin-hub" role="navigation" aria-label="Manager modules">
+            <button type="button" class="admin-hub-card" data-hub-module="school">
+              <span class="admin-hub-card__icon" aria-hidden="true">🏫</span>
+              <span class="admin-hub-card__title" data-i18n="admin_hub_module_school">School &amp; accounts</span>
+              <span class="admin-hub-card__desc" data-i18n="admin_hub_module_school_desc">Calendar, classes, teachers, and students.</span>
+              <span class="admin-hub-card__meta" data-i18n="admin_hub_module_school_meta">4 areas</span>
+            </button>
+            <button type="button" class="admin-hub-card" data-hub-module="self-study">
+              <span class="admin-hub-card__icon" aria-hidden="true">📚</span>
+              <span class="admin-hub-card__title" data-i18n="admin_hub_module_self_study">Self-study centre</span>
+              <span class="admin-hub-card__desc" data-i18n="admin_hub_module_self_study_desc">Materials, five skills, and AI coach instructions.</span>
+              <span class="admin-hub-card__meta" data-i18n="admin_hub_module_self_study_meta">7 areas</span>
+            </button>
+            <button type="button" class="admin-hub-card" data-hub-module="teaching">
+              <span class="admin-hub-card__icon" aria-hidden="true">🎓</span>
+              <span class="admin-hub-card__title" data-i18n="admin_hub_module_teaching">Teaching &amp; lessons</span>
+              <span class="admin-hub-card__desc" data-i18n="admin_hub_module_teaching_desc">AI templates for teacher HTML lesson pages.</span>
+              <span class="admin-hub-card__meta" data-i18n="admin_hub_module_teaching_meta">1 area</span>
+            </button>
+            <button type="button" class="admin-hub-card" data-hub-module="homework">
+              <span class="admin-hub-card__icon" aria-hidden="true">✅</span>
+              <span class="admin-hub-card__title" data-i18n="admin_hub_module_homework">Homework AI</span>
+              <span class="admin-hub-card__desc" data-i18n="admin_hub_module_homework_desc">Marking profiles, descriptors, and analytics.</span>
+              <span class="admin-hub-card__meta" data-i18n="admin_hub_module_homework_meta">1 area</span>
+            </button>
+          </div>
+
+          <nav id="admin-ss-sidebar" class="admin-ss-sidebar" hidden aria-label="Self-study sections">
+            <button type="button" class="admin-ss-sidebar__btn" data-skill="materials" data-i18n="admin_hub_skill_materials">Materials</button>
+            <button type="button" class="admin-ss-sidebar__btn" data-skill="vocabulary" data-i18n="admin_hub_skill_vocabulary">Vocabulary</button>
+            <button type="button" class="admin-ss-sidebar__btn" data-skill="reading" data-i18n="admin_hub_skill_reading">Reading</button>
+            <button type="button" class="admin-ss-sidebar__btn" data-skill="listening" data-i18n="admin_hub_skill_listening">Listening</button>
+            <button type="button" class="admin-ss-sidebar__btn" data-skill="writing" data-i18n="admin_hub_skill_writing">Writing</button>
+            <button type="button" class="admin-ss-sidebar__btn" data-skill="speaking" data-i18n="admin_hub_skill_speaking">Speaking</button>
+            <button type="button" class="admin-ss-sidebar__btn" data-skill="ai" data-i18n="admin_hub_skill_ai">AI instructions</button>
+          </nav>
+
+          <section class="content-section admin-panel" id="admin-calendar-section" data-admin-module="school" hidden aria-labelledby="admin-calendar-heading">
             <h2 id="admin-calendar-heading" class="section-heading" data-i18n="admin_cal_heading">
               Academic calendar
             </h2>
@@ -82,7 +122,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" aria-labelledby="admin-classes-heading">
+          <section class="content-section admin-panel" data-admin-module="school" hidden aria-labelledby="admin-classes-heading">
             <h2 id="admin-classes-heading" class="section-heading" data-i18n="admin_classes_heading">
               Classes
             </h2>
@@ -143,7 +183,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" aria-labelledby="admin-teachers-heading">
+          <section class="content-section admin-panel" data-admin-module="school" hidden aria-labelledby="admin-teachers-heading">
             <h2 id="admin-teachers-heading" class="section-heading" data-i18n="admin_teachers_heading">
               Teachers
             </h2>
@@ -169,7 +209,7 @@
             </p>
           </section>
 
-          <section class="content-section admin-panel" aria-labelledby="admin-mat-heading">
+          <section class="content-section admin-panel" id="admin-mat-section" data-admin-module="self-study" data-admin-skill="materials" hidden aria-labelledby="admin-mat-heading">
             <h2 id="admin-mat-heading" class="section-heading" data-i18n="admin_mat_heading">
               Self-study materials
             </h2>
@@ -244,7 +284,7 @@
             <p id="admin-mat-empty" class="admin-empty hidden" data-i18n="admin_mat_empty">No self-study materials yet.</p>
           </section>
 
-          <section class="content-section admin-panel" id="admin-vocab-section" aria-labelledby="admin-vocab-heading">
+          <section class="content-section admin-panel" id="admin-vocab-section" data-admin-module="self-study" data-admin-skill="vocabulary" hidden aria-labelledby="admin-vocab-heading">
             <h2 id="admin-vocab-heading" class="section-heading" data-i18n="admin_vocab_heading">Vocabulary course &amp; packs</h2>
             <p class="admin-panel__hint" data-i18n="admin_vocab_hint">
               Channel A: push school materials. Channel B: AI course export for manager review.
@@ -290,7 +330,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" id="admin-reading-section" aria-labelledby="admin-reading-heading">
+          <section class="content-section admin-panel" id="admin-reading-section" data-admin-module="self-study" data-admin-skill="reading" hidden aria-labelledby="admin-reading-heading">
             <h2 id="admin-reading-heading" class="section-heading" data-i18n="admin_reading_heading">Reading passages</h2>
             <p class="admin-panel__hint" data-i18n="admin_reading_hint">
               Channel A: push school passages in queue order (1/day). Channel B: AI passages from the library.
@@ -343,7 +383,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" id="admin-listening-section" aria-labelledby="admin-listening-heading">
+          <section class="content-section admin-panel" id="admin-listening-section" data-admin-module="self-study" data-admin-skill="listening" hidden aria-labelledby="admin-listening-heading">
             <h2 id="admin-listening-heading" class="section-heading" data-i18n="admin_listening_heading">Listening items (AI / Channel B)</h2>
             <p class="admin-panel__hint" data-i18n="admin_listening_hint">
               Part 3 and Part 4 alternate daily. Web uses text scripts; Tencent TTS audio comes in a later phase.
@@ -367,7 +407,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" id="admin-writing-section" aria-labelledby="admin-writing-heading">
+          <section class="content-section admin-panel" id="admin-writing-section" data-admin-module="self-study" data-admin-skill="writing" hidden aria-labelledby="admin-writing-heading">
             <h2 id="admin-writing-heading" class="section-heading" data-i18n="admin_writing_heading">Writing tasks (AI / Channel B)</h2>
             <p class="admin-panel__hint" data-i18n="admin_writing_hint">
               Genre rotation Mon/Wed/Fri — no daily push. Students choose tasks autonomously on other days.
@@ -391,7 +431,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" id="admin-speaking-section" aria-labelledby="admin-speaking-heading">
+          <section class="content-section admin-panel" id="admin-speaking-section" data-admin-module="self-study" data-admin-skill="speaking" hidden aria-labelledby="admin-speaking-heading">
             <h2 id="admin-speaking-heading" class="section-heading" data-i18n="admin_speaking_heading">Speaking sessions (AI / Channel B)</h2>
             <p class="admin-panel__hint" data-i18n="admin_speaking_hint">
               P1/P2/P3 + full mock — no daily push. Web uses text; Tencent TTS/STT/SOE in a later phase.
@@ -415,7 +455,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" aria-labelledby="admin-ai-heading">
+          <section class="content-section admin-panel" id="admin-ai-section" data-admin-module="self-study" data-admin-skill="ai" hidden aria-labelledby="admin-ai-heading">
             <h2 id="admin-ai-heading" class="section-heading" data-i18n="admin_ai_heading">AI study coach instructions</h2>
             <p class="admin-panel__hint" data-i18n="admin_ai_hint">
               Set the system prompt for each self-study module. Students receive answers in the same JSON format (vocabulary: root, collocation, derived words, examples, memory tips).
@@ -460,7 +500,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" aria-labelledby="admin-tpt-heading">
+          <section class="content-section admin-panel" id="admin-tpt-section" data-admin-module="teaching" hidden aria-labelledby="admin-tpt-heading">
             <h2 id="admin-tpt-heading" class="section-heading" data-i18n="admin_tpt_heading">Teaching page AI templates</h2>
             <p class="admin-panel__hint" data-i18n="admin_tpt_hint">
               Set the system prompt for each HTML lesson type. Teachers pick a template when generating AI teaching pages.
@@ -511,7 +551,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" id="admin-hm-section" aria-labelledby="admin-hm-heading">
+          <section class="content-section admin-panel" id="admin-hm-section" data-admin-module="homework" hidden aria-labelledby="admin-hm-heading">
             <h2 id="admin-hm-heading" class="section-heading" data-i18n="admin_hm_heading">
               Homework AI marking
             </h2>
@@ -596,7 +636,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" aria-labelledby="admin-students-heading">
+          <section class="content-section admin-panel" data-admin-module="school" hidden aria-labelledby="admin-students-heading">
             <h2 id="admin-students-heading" class="section-heading" data-i18n="admin_students_heading">
               Students
             </h2>
@@ -640,5 +680,6 @@
     <script src="js/admin-teaching-page-templates.js"></script>
     <script src="js/eap-button-state.js"></script>
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
+    <script src="js/admin-hub.js?v=20260610-mgr"></script>
   </body>
 </html>

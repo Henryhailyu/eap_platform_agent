@@ -1,0 +1,143 @@
+/* Manager hub — Phase A */
+
+.admin-hub {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.admin-hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1.35rem 1.5rem;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(10, 126, 164, 0.14);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.admin-hub-card:hover {
+  border-color: rgba(0, 113, 227, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 50, 80, 0.08);
+  transform: translateY(-2px);
+}
+
+.admin-hub-card__icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.admin-hub-card__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin: 0;
+}
+
+.admin-hub-card__desc {
+  font-size: 0.875rem;
+  color: #5c5c62;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.admin-hub-card__meta {
+  font-size: 0.75rem;
+  color: #0a7ea4;
+  margin-top: 0.25rem;
+}
+
+.admin-module-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.admin-hub-back {
+  flex-shrink: 0;
+}
+
+.admin-hub-crumb {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+body.admin-module-active .page-hero {
+  display: none;
+}
+
+body.admin-module-self-study .app-main {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.admin-ss-sidebar {
+  position: sticky;
+  top: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(10, 126, 164, 0.12);
+  border-radius: 12px;
+}
+
+.admin-ss-sidebar__btn {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  font-size: 0.9rem;
+  color: #333;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.admin-ss-sidebar__btn:hover {
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.admin-ss-sidebar__btn--active {
+  background: rgba(0, 113, 227, 0.12);
+  color: #0071e3;
+  font-weight: 600;
+}
+
+body.admin-module-self-study #admin-module-breadcrumb {
+  grid-column: 1 / -1;
+}
+
+body.admin-module-self-study [data-admin-module="self-study"] {
+  grid-column: 2;
+}
+
+@media (max-width: 900px) {
+  body.admin-module-self-study .app-main {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-ss-sidebar {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .admin-ss-sidebar__btn {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
