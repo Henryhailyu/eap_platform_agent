@@ -150,16 +150,23 @@
     return apiFetch("/api/student/self-study/writing/overview");
   }
 
-  async function getWritingTask(taskId) {
-    return apiFetch(`/api/student/self-study/writing/tasks/${taskId}`);
+  async function startWritingSession(body) {
+    return apiFetch("/api/student/self-study/writing/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
+  async function getWritingSession(sessionId) {
+    return apiFetch(`/api/student/self-study/writing/sessions/${sessionId}`);
   }
 
   async function submitWriting(body, file) {
     if (file) {
       const fd = new FormData();
-      fd.append("taskId", String(body.taskId || ""));
+      fd.append("sessionId", String(body.sessionId || body.taskId || ""));
       fd.append("draftText", body.draftText || "");
-      fd.append("useAi", body.useAi === false ? "0" : "1");
       fd.append("file", file);
       return apiFetch("/api/student/self-study/writing/submit", { method: "POST", body: fd });
     }
@@ -234,7 +241,8 @@
     getListeningCoach,
     completeListening,
     getWritingOverview,
-    getWritingTask,
+    startWritingSession,
+    getWritingSession,
     submitWriting,
     getSpeakingOverview,
     getSpeakingSession,

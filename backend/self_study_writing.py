@@ -1,5 +1,5 @@
 """
-SS-W1 — Self-study writing (Channel B; genre rotation Mon/Wed/Fri; IELTS rubric feedback).
+SS-W2 — Self-study writing (Channel B; on-demand AI Essay / Proposal / Mini-dissertation / Research report).
 """
 from __future__ import annotations
 
@@ -15,18 +15,19 @@ from flask import Response, jsonify, request
 WRITING_SKILL = "writing"
 MAX_REVISIONS = 3
 
-GENRE_LABELS = {
-    "IELTS_T2_ESSAY": {"en": "IELTS Task 2 — Opinion essay", "zh": "雅思 Task 2 — 观点议论文"},
-    "ESSAY_ARGUMENT": {"en": "Academic argument essay", "zh": "学术论证短文"},
-    "SUMMARY": {"en": "Academic summary", "zh": "学术摘要"},
-    "PROPOSAL": {"en": "Research proposal", "zh": "研究计划书"},
+MODULE_LABELS = {
+    "ESSAY": {"en": "Essay writing", "zh": "Essay 写作"},
+    "PROPOSAL": {"en": "Proposal writing", "zh": "Proposal 写作"},
+    "MINI_DISSERTATION": {"en": "Mini-dissertation", "zh": "Mini-dissertation"},
+    "RESEARCH_REPORT": {"en": "Research report", "zh": "Research report"},
 }
 
-WEEKDAY_GENRES = {
-    0: "IELTS_T2_ESSAY",
-    2: "SUMMARY",
-    4: "PROPOSAL",
+ESSAY_TYPE_LABELS = {
+    "DISCUSSIVE": {"en": "Discursive essay", "zh": "议论性 Essay（讨论双方）"},
+    "ARGUMENTATIVE": {"en": "Argumentative essay", "zh": "论证性 Essay"},
 }
+
+WRITING_MODULES = ("ESSAY", "PROPOSAL", "MINI_DISSERTATION", "RESEARCH_REPORT")
 
 SEED_TASKS: list[dict[str, Any]] = [
     {
@@ -181,6 +182,36 @@ def _today_weekday() -> int:
 
 
 def migrate_self_study_writing_tables(conn) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS writing_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_username TEXT NOT NULL,
+            class_name TEXT,
+            module_id TEXT NOT NULL,
+            essay_type TEXT,
+            title TEXT NOT NULL,
+            content_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS student_writing_session_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_username TEXT NOT NULL,
+            session_id INTEGER NOT NULL,
+            revision_number INTEGER NOT NULL DEFAULT 1,
+            draft_text TEXT NOT NULL,
+            word_count INTEGER NOT NULL DEFAULT 0,
+            feedback_json TEXT,
+            submitted_at TEXT NOT NULL,
+            UNIQUE(student_username, session_id, revision_number),
+            FOREIGN KEY (session_id) REFERENCES writing_sessions(id) ON DELETE CASCADE
+        )
+        """
+    )
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS writing_tasks (
@@ -518,8 +549,20 @@ def _task_row_to_public(row: Any, include_content: bool = False) -> dict[str, An
     return out
 
 
-def _suggested_genre_today() -> str | None:
-    return WEEKDAY_GENRES.get(_today_weekday())
+def _session_public(row: Any, *, include_content: bool = False) -> dict[str, Any]:
+    content = json.loads(row["content_json"])
+    out: dict[str, Any] = {
+        "sessionId": row["id"],
+        "moduleId": row["module_id"],
+        "essayType": row["essay_type"],
+        "title": row["title"],
+        "createdAt": row["created_at"],
+        "wordMin": content.get("wordMin"),
+        "wordMax": content.get("wordMax"),
+    }
+    if include_content:
+        out["content"] = content
+    return out
 
 
 def register_self_study_writing_routes(
@@ -552,46 +595,48 @@ def register_self_study_writing_routes(
             return jsonify({"error": "Student session required"}), 401
 
         class_name = _student_class_name(conn, username)
-        genre_today = _suggested_genre_today()
-        tasks = conn.execute(
-            """
-            SELECT * FROM writing_tasks
-            WHERE is_active = 1 AND (class_name IS NULL OR class_name = ?)
-            ORDER BY sort_order ASC, id ASC
-            """,
-            (class_name,),
-        ).fetchall()
-
-        suggested = None
-        if genre_today:
-            for t in tasks:
-                if t["genre_id"] == genre_today:
-                    suggested = _task_row_to_public(t)
-                    break
-
         completed = conn.execute(
             """
-            SELECT COUNT(DISTINCT task_id) AS n FROM student_writing_submissions
+            SELECT COUNT(DISTINCT session_id) AS n FROM student_writing_session_submissions
             WHERE student_username = ?
             """,
             (username,),
         ).fetchone()
+        try:
+            from self_study_writing_ai import writing_ai_available
+
+            ai_ok = writing_ai_available()
+        except Exception:
+            ai_ok = False
         conn.close()
+
+        modules = []
+        for mid in WRITING_MODULES:
+            mod: dict[str, Any] = {
+                "moduleId": mid,
+                "labelEn": MODULE_LABELS[mid]["en"],
+                "labelZh": MODULE_LABELS[mid]["zh"],
+            }
+            if mid == "ESSAY":
+                mod["essayTypes"] = [
+                    {"id": k, "labelEn": ESSAY_TYPE_LABELS[k]["en"], "labelZh": ESSAY_TYPE_LABELS[k]["zh"]}
+                    for k in ("DISCUSSIVE", "ARGUMENTATIVE")
+                ]
+            modules.append(mod)
 
         return jsonify(
             {
                 "className": class_name,
                 "channel": "B",
-                "weekdayGenre": genre_today,
-                "suggestedTask": suggested,
-                "library": [_task_row_to_public(t) for t in tasks],
-                "tasksCompleted": int(completed["n"] if completed else 0),
+                "modules": modules,
+                "sessionsCompleted": int(completed["n"] if completed else 0),
                 "noDailyPush": True,
+                "aiAvailable": ai_ok,
             }
         )
 
-    @app.route("/api/student/self-study/writing/tasks/<int:task_id>", methods=["GET"])
-    def student_writing_task(task_id: int):
+    @app.route("/api/student/self-study/writing/start", methods=["POST"])
+    def student_writing_start():
         conn = get_db_connection()
         err = require_session_role_if_enabled(conn, "student")
         if err:
@@ -602,19 +647,80 @@ def register_self_study_writing_routes(
             conn.close()
             return jsonify({"error": "Student session required"}), 401
 
-        row = conn.execute("SELECT * FROM writing_tasks WHERE id = ? AND is_active = 1", (task_id,)).fetchone()
+        data = request.get_json(silent=True) or {}
+        module_id = str(data.get("moduleId") or "").upper()
+        essay_type = str(data.get("essayType") or "").upper() or None
+        if module_id not in WRITING_MODULES:
+            conn.close()
+            return jsonify({"error": "moduleId must be ESSAY, PROPOSAL, MINI_DISSERTATION, or RESEARCH_REPORT"}), 400
+        if module_id == "ESSAY" and essay_type not in ("DISCUSSIVE", "ARGUMENTATIVE"):
+            conn.close()
+            return jsonify({"error": "essayType must be DISCUSSIVE or ARGUMENTATIVE"}), 400
+        if module_id != "ESSAY":
+            essay_type = None
+
+        class_name = _student_class_name(conn, username)
+        try:
+            from self_study_writing_ai import generate_session
+
+            content = generate_session(module_id, essay_type, class_name)
+        except Exception as exc:
+            conn.close()
+            return jsonify({"error": str(exc)}), 500
+
+        now = _now_iso()
+        title = content.get("title") or MODULE_LABELS[module_id]["en"]
+        cur = conn.execute(
+            """
+            INSERT INTO writing_sessions
+                (student_username, class_name, module_id, essay_type, title, content_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                username,
+                class_name,
+                module_id,
+                essay_type,
+                title,
+                json.dumps(content, ensure_ascii=False),
+                now,
+            ),
+        )
+        session_id = int(cur.lastrowid)
+        conn.commit()
+        row = conn.execute("SELECT * FROM writing_sessions WHERE id = ?", (session_id,)).fetchone()
+        out = _session_public(row, include_content=True)
+        conn.close()
+        return jsonify(out)
+
+    @app.route("/api/student/self-study/writing/sessions/<int:session_id>", methods=["GET"])
+    def student_writing_session(session_id: int):
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "student")
+        if err:
+            conn.close()
+            return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
+
+        row = conn.execute(
+            "SELECT * FROM writing_sessions WHERE id = ? AND student_username = ?",
+            (session_id, username),
+        ).fetchone()
         if not row:
             conn.close()
-            return jsonify({"error": "Task not found"}), 404
+            return jsonify({"error": "Session not found"}), 404
 
         subs = conn.execute(
             """
             SELECT revision_number, word_count, submitted_at, feedback_json
-            FROM student_writing_submissions
-            WHERE student_username = ? AND task_id = ?
+            FROM student_writing_session_submissions
+            WHERE student_username = ? AND session_id = ?
             ORDER BY revision_number ASC
             """,
-            (username, task_id),
+            (username, session_id),
         ).fetchall()
         conn.close()
 
@@ -632,7 +738,7 @@ def register_self_study_writing_routes(
 
         return jsonify(
             {
-                "task": _task_row_to_public(row, include_content=True),
+                "session": _session_public(row, include_content=True),
                 "submissions": submissions,
                 "revisionsRemaining": max(0, MAX_REVISIONS - len(submissions)),
             }
@@ -652,25 +758,31 @@ def register_self_study_writing_routes(
 
         data = request.get_json(silent=True) or {}
         if request.content_type and "multipart/form-data" in request.content_type:
-            task_id = int(request.form.get("taskId") or 0)
+            session_id = int(request.form.get("sessionId") or request.form.get("taskId") or 0)
         else:
-            task_id = int(data.get("taskId") or 0)
+            session_id = int(data.get("sessionId") or data.get("taskId") or 0)
         draft, upload_name = _extract_upload_draft()
-        if not task_id:
+        if not session_id:
             conn.close()
-            return jsonify({"error": "taskId required"}), 400
+            return jsonify({"error": "sessionId required"}), 400
         if len(draft) < 20:
             conn.close()
             return jsonify({"error": "Draft too short"}), 400
 
-        row = conn.execute("SELECT * FROM writing_tasks WHERE id = ? AND is_active = 1", (task_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM writing_sessions WHERE id = ? AND student_username = ?",
+            (session_id, username),
+        ).fetchone()
         if not row:
             conn.close()
-            return jsonify({"error": "Task not found"}), 404
+            return jsonify({"error": "Session not found"}), 404
 
         existing = conn.execute(
-            "SELECT COUNT(*) AS n FROM student_writing_submissions WHERE student_username = ? AND task_id = ?",
-            (username, task_id),
+            """
+            SELECT COUNT(*) AS n FROM student_writing_session_submissions
+            WHERE student_username = ? AND session_id = ?
+            """,
+            (username, session_id),
         ).fetchone()
         rev = int(existing["n"] if existing else 0) + 1
         if rev > MAX_REVISIONS:
@@ -678,19 +790,15 @@ def register_self_study_writing_routes(
             return jsonify({"error": f"Maximum {MAX_REVISIONS} submissions reached"}), 400
 
         content = json.loads(row["content_json"])
-        use_ai = True
-        if request.content_type and "multipart/form-data" in request.content_type:
-            use_ai = request.form.get("useAi", "1") != "0"
-        else:
-            use_ai = data.get("useAi", True) is not False
+        from self_study_writing_ai import generate_feedback
+
         try:
-            feedback = _build_feedback_ai(draft, content, rev) if use_ai else _build_feedback(draft, content, rev)
+            feedback = generate_feedback(draft, content, rev)
         except Exception as exc:
             from eap_ai import format_ai_error
 
-            fb = _build_feedback(draft, content, rev)
-            fb["aiError"] = format_ai_error(exc)
-            feedback = fb
+            feedback = _build_feedback(draft, {**content, "genreId": content.get("moduleId")}, rev)
+            feedback["aiError"] = format_ai_error(exc)
         if upload_name:
             feedback["uploadFileName"] = upload_name
         now = _now_iso()
@@ -698,11 +806,11 @@ def register_self_study_writing_routes(
 
         conn.execute(
             """
-            INSERT INTO student_writing_submissions
-                (student_username, task_id, revision_number, draft_text, word_count, feedback_json, submitted_at)
+            INSERT INTO student_writing_session_submissions
+                (student_username, session_id, revision_number, draft_text, word_count, feedback_json, submitted_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (username, task_id, rev, draft[:50000], wc, json.dumps(feedback, ensure_ascii=False), now),
+            (username, session_id, rev, draft[:50000], wc, json.dumps(feedback, ensure_ascii=False), now),
         )
         conn.commit()
         conn.close()
