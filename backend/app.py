@@ -8448,6 +8448,15 @@ register_admin_performance_routes(
     normalize_class_name=normalize_class_name,
 )
 
+from admin_roster_import import register_admin_roster_routes
+
+register_admin_roster_routes(
+    app,
+    get_db_connection=get_db_connection,
+    require_admin_session=require_admin_session,
+    normalize_class_name=normalize_class_name,
+)
+
 # Start the Flask server
 if __name__ == "__main__":
     # Flask is installed in backend/venv, not system Python. Either:

@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260610-mgr2" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260610-roster" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -198,12 +198,32 @@
             <p class="admin-panel__hint" data-i18n="admin_teachers_hint">
               Only authorized teachers can sign in to the teaching calendar.
             </p>
+            <div class="admin-roster-upload">
+              <h3 class="admin-roster-upload__title" data-i18n="admin_roster_upload_teachers">Upload teacher roster</h3>
+              <p class="admin-panel__hint" data-i18n="admin_roster_upload_hint">
+                Word, Excel, PDF, or TXT — AI reads the layout and lists teachers for you to confirm.
+              </p>
+              <form id="admin-roster-form-teacher" class="admin-inline-form admin-roster-form" novalidate>
+                <div class="field">
+                  <label for="admin-roster-file-teacher" data-i18n="admin_roster_file">Roster file</label>
+                  <input id="admin-roster-file-teacher" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required />
+                </div>
+                <div class="field">
+                  <label for="admin-roster-class-teacher" data-i18n="admin_roster_default_class">Default class (optional)</label>
+                  <input id="admin-roster-class-teacher" type="text" placeholder="EAP047" maxlength="40" />
+                </div>
+                <button type="submit" class="btn-primary" data-i18n="admin_roster_parse_btn">Parse with AI</button>
+              </form>
+              <p id="admin-roster-status-teacher" class="form-message hidden" role="status" aria-live="polite"></p>
+              <div id="admin-roster-preview-teacher" class="admin-roster-preview hidden" aria-live="polite"></div>
+            </div>
             <div class="admin-table-wrap">
               <table class="admin-table" id="admin-teachers-table">
                 <thead>
                   <tr>
                     <th scope="col" data-i18n="username">Username</th>
                     <th scope="col" data-i18n="admin_col_name">Name</th>
+                    <th scope="col" data-i18n="admin_col_employee_id">Employee ID</th>
                     <th scope="col" data-i18n="class_label">Class</th>
                     <th scope="col" data-i18n="admin_col_status">Access</th>
                     <th scope="col" data-i18n="admin_col_action">Action</th>
@@ -651,6 +671,25 @@
             <p class="admin-panel__hint" data-i18n="admin_students_hint">
               Registered accounts. Use Performance lookup for individual progress.
             </p>
+            <div class="admin-roster-upload">
+              <h3 class="admin-roster-upload__title" data-i18n="admin_roster_upload_students">Upload student roster</h3>
+              <p class="admin-panel__hint" data-i18n="admin_roster_upload_hint">
+                Word, Excel, PDF, or TXT — AI reads the layout and lists students for you to confirm.
+              </p>
+              <form id="admin-roster-form-student" class="admin-inline-form admin-roster-form" novalidate>
+                <div class="field">
+                  <label for="admin-roster-file-student" data-i18n="admin_roster_file">Roster file</label>
+                  <input id="admin-roster-file-student" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required />
+                </div>
+                <div class="field">
+                  <label for="admin-roster-class-student" data-i18n="admin_roster_default_class">Default class (optional)</label>
+                  <input id="admin-roster-class-student" type="text" placeholder="EAP047" maxlength="40" />
+                </div>
+                <button type="submit" class="btn-primary" data-i18n="admin_roster_parse_btn">Parse with AI</button>
+              </form>
+              <p id="admin-roster-status-student" class="form-message hidden" role="status" aria-live="polite"></p>
+              <div id="admin-roster-preview-student" class="admin-roster-preview hidden" aria-live="polite"></div>
+            </div>
             <div class="admin-table-wrap">
               <table class="admin-table" id="admin-students-table">
                 <thead>
@@ -715,6 +754,7 @@
     <script src="js/eap-button-state.js"></script>
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
     <script src="js/admin-performance.js?v=20260610-perf"></script>
+    <script src="js/admin-roster-import.js?v=20260610-roster"></script>
     <script src="js/admin-hub.js?v=20260610-mgr2"></script>
   </body>
 </html>

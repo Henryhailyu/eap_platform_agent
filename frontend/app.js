@@ -3435,7 +3435,7 @@ function renderAdminTeachersTable(teachers, tbody, emptyEl, onToggle) {
         ? teacher.assigned_classes.join(", ")
         : teacher.class_name || "—";
     tr.innerHTML = "";
-    [teacher.username || "—", teacher.full_name || "—", classLabel].forEach((val) => {
+    [teacher.username || "—", teacher.full_name || "—", teacher.employee_id || "—", classLabel].forEach((val) => {
       const td = document.createElement("td");
       td.textContent = val;
       tr.appendChild(td);
