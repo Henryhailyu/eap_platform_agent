@@ -3457,7 +3457,7 @@ function renderAdminStudentsTable(students, tbody, emptyEl) {
       Array.isArray(student.assigned_classes) && student.assigned_classes.length
         ? student.assigned_classes.join(", ")
         : student.class_name || "—";
-    [student.username || "—", student.full_name || "—", classLabel].forEach((val) => {
+    [student.username || "—", student.full_name || "—", student.student_id || "—", classLabel].forEach((val) => {
       const td = document.createElement("td");
       td.textContent = val;
       tr.appendChild(td);
@@ -3612,10 +3612,17 @@ function initAdminPage() {
         btn.type = "button";
         btn.className = "btn-secondary";
         btn.textContent = t("admin_class_manage_btn");
+        btn.setAttribute("data-class-id", String(cls.id));
         btn.addEventListener("click", async () => {
+          if (window.EAP_ADMIN_HUB && typeof window.EAP_ADMIN_HUB.openClassManage === "function") {
+            window.EAP_ADMIN_HUB.openClassManage(cls.id);
+          }
           try {
             const detail = await apiGet(`/api/admin/classes/${cls.id}`);
             showClassDetail(detail);
+            if (classDetailEl) {
+              classDetailEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
           } catch (err) {
             setAdminPageMessage(errorEl, err.message, true);
           }

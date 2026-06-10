@@ -508,6 +508,34 @@ def migrate_users_add_is_authorized(conn):
         )
 
 
+def migrate_users_add_external_ids(conn):
+    """Manager performance lookup: student_id (students) and employee_id (teachers)."""
+    rows = conn.execute("PRAGMA table_info(users)").fetchall()
+    column_names = [r[1] for r in rows]
+    if "student_id" not in column_names:
+        conn.execute("ALTER TABLE users ADD COLUMN student_id TEXT")
+    if "employee_id" not in column_names:
+        conn.execute("ALTER TABLE users ADD COLUMN employee_id TEXT")
+    conn.execute(
+        """
+        UPDATE users SET student_id = '20260001'
+        WHERE username = 'student1' AND (student_id IS NULL OR TRIM(student_id) = '')
+        """
+    )
+    conn.execute(
+        """
+        UPDATE users SET employee_id = 'T2026001'
+        WHERE username = 'teacher1' AND (employee_id IS NULL OR TRIM(employee_id) = '')
+        """
+    )
+    conn.execute(
+        """
+        UPDATE users SET employee_id = 'T2026002'
+        WHERE username = 'teacher2' AND (employee_id IS NULL OR TRIM(employee_id) = '')
+        """
+    )
+
+
 def user_is_authorized(row):
     """Teachers need is_authorized=1; admin and student are always allowed."""
     role = str(row["role"] or "").strip().lower()
@@ -615,6 +643,7 @@ def init_database():
 
     migrate_users_add_password_hash(conn)
     migrate_users_add_is_authorized(conn)
+    migrate_users_add_external_ids(conn)
 
     from live_teaching import init_live_teaching_tables
 
@@ -864,12 +893,14 @@ def seed_default_users(conn):
             "role": "teacher",
             "full_name": "Demo Teacher",
             "class_name": "EAP047",
+            "employee_id": "T2026001",
         },
         {
             "username": "student1",
             "role": "student",
             "full_name": "Demo Student",
             "class_name": "EAP047",
+            "student_id": "20260001",
         },
         {
             "username": "manager1",
@@ -883,6 +914,7 @@ def seed_default_users(conn):
             "full_name": "Demo Teacher (pending)",
             "class_name": "EAP047",
             "is_authorized": 0,
+            "employee_id": "T2026002",
         },
     ]
 
@@ -895,8 +927,11 @@ def seed_default_users(conn):
             is_auth = u.get("is_authorized", 1)
             conn.execute(
                 """
-                INSERT INTO users (username, password, password_hash, role, full_name, class_name, is_authorized)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (
+                    username, password, password_hash, role, full_name, class_name,
+                    is_authorized, student_id, employee_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     u["username"],
@@ -906,6 +941,8 @@ def seed_default_users(conn):
                     u["full_name"],
                     u["class_name"],
                     is_auth,
+                    u.get("student_id"),
+                    u.get("employee_id"),
                 ),
             )
 
@@ -1022,6 +1059,7 @@ def ensure_e1_demo_users(conn):
             "full_name": "Demo Teacher (pending)",
             "class_name": "EAP047",
             "is_authorized": 0,
+            "employee_id": "T2026002",
         },
     ]
     for u in extras:
@@ -1032,8 +1070,11 @@ def ensure_e1_demo_users(conn):
         if row is None:
             conn.execute(
                 """
-                INSERT INTO users (username, password, password_hash, role, full_name, class_name, is_authorized)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (
+                    username, password, password_hash, role, full_name, class_name,
+                    is_authorized, student_id, employee_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     u["username"],
@@ -1043,6 +1084,8 @@ def ensure_e1_demo_users(conn):
                     u["full_name"],
                     u["class_name"],
                     u["is_authorized"],
+                    u.get("student_id"),
+                    u.get("employee_id"),
                 ),
             )
     conn.execute(
@@ -6494,7 +6537,7 @@ def require_admin_session(conn):
 
 def user_public_dict(row):
     """Safe user fields for admin API (no password)."""
-    return {
+    payload = {
         "id": row["id"],
         "username": row["username"],
         "role": row["role"],
@@ -6502,6 +6545,15 @@ def user_public_dict(row):
         "class_name": row["class_name"],
         "is_authorized": bool(user_is_authorized(row)),
     }
+    try:
+        payload["student_id"] = row["student_id"]
+    except (KeyError, IndexError):
+        payload["student_id"] = None
+    try:
+        payload["employee_id"] = row["employee_id"]
+    except (KeyError, IndexError):
+        payload["employee_id"] = None
+    return payload
 
 
 def admin_user_assigned_class_codes(conn, user_id, role):
@@ -6890,7 +6942,7 @@ def admin_list_teachers():
         return guard
     rows = conn.execute(
         """
-        SELECT id, username, role, full_name, class_name, is_authorized
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id
         FROM users
         WHERE TRIM(COALESCE(role, '')) = 'teacher'
         ORDER BY username ASC
@@ -6911,7 +6963,7 @@ def admin_list_students():
         return guard
     rows = conn.execute(
         """
-        SELECT id, username, role, full_name, class_name, is_authorized
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id
         FROM users
         WHERE TRIM(COALESCE(role, '')) = 'student'
         ORDER BY username ASC
@@ -8384,6 +8436,16 @@ register_tencent_audio_routes(
     app,
     require_session_role_if_enabled=require_session_role_if_enabled,
     get_db_connection=get_db_connection,
+)
+
+from admin_performance import register_admin_performance_routes
+
+register_admin_performance_routes(
+    app,
+    get_db_connection=get_db_connection,
+    require_admin_session=require_admin_session,
+    admin_user_assigned_class_codes=admin_user_assigned_class_codes,
+    normalize_class_name=normalize_class_name,
 )
 
 # Start the Flask server

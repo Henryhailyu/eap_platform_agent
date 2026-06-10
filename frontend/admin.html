@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260610-mgr" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260610-mgr2" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -47,7 +47,7 @@
               <span class="admin-hub-card__icon" aria-hidden="true">🏫</span>
               <span class="admin-hub-card__title" data-i18n="admin_hub_module_school">School &amp; accounts</span>
               <span class="admin-hub-card__desc" data-i18n="admin_hub_module_school_desc">Calendar, classes, teachers, and students.</span>
-              <span class="admin-hub-card__meta" data-i18n="admin_hub_module_school_meta">4 areas</span>
+              <span class="admin-hub-card__meta" data-i18n="admin_hub_module_school_meta">5 areas</span>
             </button>
             <button type="button" class="admin-hub-card" data-hub-module="self-study">
               <span class="admin-hub-card__icon" aria-hidden="true">📚</span>
@@ -69,17 +69,25 @@
             </button>
           </div>
 
-          <nav id="admin-ss-sidebar" class="admin-ss-sidebar" hidden aria-label="Self-study sections">
-            <button type="button" class="admin-ss-sidebar__btn" data-skill="materials" data-i18n="admin_hub_skill_materials">Materials</button>
-            <button type="button" class="admin-ss-sidebar__btn" data-skill="vocabulary" data-i18n="admin_hub_skill_vocabulary">Vocabulary</button>
-            <button type="button" class="admin-ss-sidebar__btn" data-skill="reading" data-i18n="admin_hub_skill_reading">Reading</button>
-            <button type="button" class="admin-ss-sidebar__btn" data-skill="listening" data-i18n="admin_hub_skill_listening">Listening</button>
-            <button type="button" class="admin-ss-sidebar__btn" data-skill="writing" data-i18n="admin_hub_skill_writing">Writing</button>
-            <button type="button" class="admin-ss-sidebar__btn" data-skill="speaking" data-i18n="admin_hub_skill_speaking">Speaking</button>
-            <button type="button" class="admin-ss-sidebar__btn" data-skill="ai" data-i18n="admin_hub_skill_ai">AI instructions</button>
+          <nav id="admin-school-tabs" class="admin-module-tabs" hidden aria-label="School sections">
+            <button type="button" class="admin-module-tabs__btn" data-school-area="calendar" data-i18n="admin_school_tab_calendar">Calendar</button>
+            <button type="button" class="admin-module-tabs__btn" data-school-area="classes" data-i18n="admin_school_tab_classes">Classes</button>
+            <button type="button" class="admin-module-tabs__btn" data-school-area="teachers" data-i18n="admin_school_tab_teachers">Teachers</button>
+            <button type="button" class="admin-module-tabs__btn" data-school-area="students" data-i18n="admin_school_tab_students">Students</button>
+            <button type="button" class="admin-module-tabs__btn" data-school-area="performance" data-i18n="admin_school_tab_performance">Performance</button>
           </nav>
 
-          <section class="content-section admin-panel" id="admin-calendar-section" data-admin-module="school" hidden aria-labelledby="admin-calendar-heading">
+          <nav id="admin-ss-tabs" class="admin-module-tabs" hidden aria-label="Self-study sections">
+            <button type="button" class="admin-module-tabs__btn" data-skill="materials" data-i18n="admin_hub_skill_materials">Materials</button>
+            <button type="button" class="admin-module-tabs__btn" data-skill="vocabulary" data-i18n="admin_hub_skill_vocabulary">Vocabulary</button>
+            <button type="button" class="admin-module-tabs__btn" data-skill="reading" data-i18n="admin_hub_skill_reading">Reading</button>
+            <button type="button" class="admin-module-tabs__btn" data-skill="listening" data-i18n="admin_hub_skill_listening">Listening</button>
+            <button type="button" class="admin-module-tabs__btn" data-skill="writing" data-i18n="admin_hub_skill_writing">Writing</button>
+            <button type="button" class="admin-module-tabs__btn" data-skill="speaking" data-i18n="admin_hub_skill_speaking">Speaking</button>
+            <button type="button" class="admin-module-tabs__btn" data-skill="ai" data-i18n="admin_hub_skill_ai">AI instructions</button>
+          </nav>
+
+          <section class="content-section admin-panel" id="admin-calendar-section" data-admin-module="school" data-admin-school-area="calendar" hidden aria-labelledby="admin-calendar-heading">
             <h2 id="admin-calendar-heading" class="section-heading" data-i18n="admin_cal_heading">
               Academic calendar
             </h2>
@@ -122,7 +130,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" data-admin-module="school" hidden aria-labelledby="admin-classes-heading">
+          <section class="content-section admin-panel" data-admin-module="school" data-admin-school-area="classes" hidden aria-labelledby="admin-classes-heading">
             <h2 id="admin-classes-heading" class="section-heading" data-i18n="admin_classes_heading">
               Classes
             </h2>
@@ -183,7 +191,7 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" data-admin-module="school" hidden aria-labelledby="admin-teachers-heading">
+          <section class="content-section admin-panel" data-admin-module="school" data-admin-school-area="teachers" hidden aria-labelledby="admin-teachers-heading">
             <h2 id="admin-teachers-heading" class="section-heading" data-i18n="admin_teachers_heading">
               Teachers
             </h2>
@@ -636,16 +644,20 @@
             </div>
           </section>
 
-          <section class="content-section admin-panel" data-admin-module="school" hidden aria-labelledby="admin-students-heading">
+          <section class="content-section admin-panel" data-admin-module="school" data-admin-school-area="students" hidden aria-labelledby="admin-students-heading">
             <h2 id="admin-students-heading" class="section-heading" data-i18n="admin_students_heading">
               Students
             </h2>
+            <p class="admin-panel__hint" data-i18n="admin_students_hint">
+              Registered accounts. Use Performance lookup for individual progress.
+            </p>
             <div class="admin-table-wrap">
               <table class="admin-table" id="admin-students-table">
                 <thead>
                   <tr>
                     <th scope="col" data-i18n="username">Username</th>
                     <th scope="col" data-i18n="admin_col_name">Name</th>
+                    <th scope="col" data-i18n="admin_col_student_id">Student ID</th>
                     <th scope="col" data-i18n="class_label">Class</th>
                   </tr>
                 </thead>
@@ -655,6 +667,28 @@
             <p id="admin-students-empty" class="admin-empty hidden" data-i18n="admin_no_students">
               No student accounts found.
             </p>
+          </section>
+
+          <section class="content-section admin-panel" id="admin-performance-section" data-admin-module="school" data-admin-school-area="performance" hidden aria-labelledby="admin-performance-heading">
+            <h2 id="admin-performance-heading" class="section-heading" data-i18n="admin_perf_heading">
+              Student performance lookup
+            </h2>
+            <p class="admin-panel__hint" data-i18n="admin_perf_hint">
+              Enter the student&apos;s registered name and student ID to view homework and self-study progress.
+            </p>
+            <form id="admin-perf-form" class="admin-perf-lookup" novalidate>
+              <div class="field">
+                <label for="admin-perf-name" data-i18n="admin_col_name">Name</label>
+                <input id="admin-perf-name" type="text" required autocomplete="off" />
+              </div>
+              <div class="field">
+                <label for="admin-perf-student-id" data-i18n="admin_col_student_id">Student ID</label>
+                <input id="admin-perf-student-id" type="text" required autocomplete="off" />
+              </div>
+              <button type="submit" class="btn-primary" data-i18n="admin_perf_lookup_btn">View performance</button>
+            </form>
+            <p id="admin-perf-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            <div id="admin-perf-result" class="admin-perf-result hidden" aria-live="polite"></div>
           </section>
         </main>
       </div>
@@ -680,6 +714,7 @@
     <script src="js/admin-teaching-page-templates.js"></script>
     <script src="js/eap-button-state.js"></script>
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
-    <script src="js/admin-hub.js?v=20260610-mgr"></script>
+    <script src="js/admin-performance.js?v=20260610-perf"></script>
+    <script src="js/admin-hub.js?v=20260610-mgr2"></script>
   </body>
 </html>

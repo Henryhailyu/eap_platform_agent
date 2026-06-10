@@ -1,4 +1,10 @@
-/* Manager hub — Phase A */
+/* Manager hub navigation */
+
+#admin-hub[hidden],
+#admin-ss-tabs[hidden],
+#admin-school-tabs[hidden] {
+  display: none !important;
+}
 
 .admin-hub {
   display: grid;
@@ -56,7 +62,7 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
   flex-wrap: wrap;
 }
 
@@ -74,69 +80,123 @@ body.admin-module-active .page-hero {
   display: none;
 }
 
-body.admin-module-self-study .app-main {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 1.5rem;
-  align-items: start;
+/* Horizontal sub-tabs (school + self-study) */
+.admin-module-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid rgba(10, 126, 164, 0.14);
 }
 
-.admin-ss-sidebar {
-  position: sticky;
-  top: 5.5rem;
+.admin-module-tabs__btn {
+  padding: 0.5rem 0.9rem;
+  font-size: 0.875rem;
+  color: #444;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(10, 126, 164, 0.12);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.admin-module-tabs__btn:hover {
+  border-color: rgba(0, 113, 227, 0.3);
+  color: #0071e3;
+}
+
+.admin-module-tabs__btn--active {
+  background: rgba(0, 113, 227, 0.1);
+  border-color: rgba(0, 113, 227, 0.35);
+  color: #0071e3;
+  font-weight: 600;
+}
+
+body.admin-module-active .content-section.admin-panel {
+  margin-bottom: 1.5rem;
+}
+
+/* Student performance lookup */
+.admin-perf-lookup {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.75rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 1.25rem;
+}
+
+.admin-perf-lookup .field {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.admin-perf-result {
+  margin-top: 1rem;
+}
+
+.admin-perf-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.admin-perf-card {
+  padding: 1rem 1.15rem;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(10, 126, 164, 0.12);
   border-radius: 12px;
 }
 
-.admin-ss-sidebar__btn {
-  display: block;
-  width: 100%;
-  padding: 0.65rem 0.85rem;
-  text-align: left;
-  font-size: 0.9rem;
-  color: #333;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-
-.admin-ss-sidebar__btn:hover {
-  background: rgba(0, 113, 227, 0.08);
-}
-
-.admin-ss-sidebar__btn--active {
-  background: rgba(0, 113, 227, 0.12);
-  color: #0071e3;
+.admin-perf-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0a7ea4;
 }
 
-body.admin-module-self-study #admin-module-breadcrumb {
-  grid-column: 1 / -1;
+.admin-perf-card__value {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #1d1d1f;
 }
 
-body.admin-module-self-study [data-admin-module="self-study"] {
-  grid-column: 2;
+.admin-perf-card__sub {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: #5c5c62;
 }
 
-@media (max-width: 900px) {
-  body.admin-module-self-study .app-main {
-    grid-template-columns: 1fr;
+.admin-perf-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.admin-perf-flag {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  background: rgba(255, 149, 0, 0.12);
+  color: #9a6200;
+}
+
+.admin-perf-flag--info {
+  background: rgba(0, 113, 227, 0.1);
+  color: #0071e3;
+}
+
+@media (max-width: 640px) {
+  .admin-module-tabs {
+    gap: 0.35rem;
   }
 
-  .admin-ss-sidebar {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .admin-ss-sidebar__btn {
+  .admin-module-tabs__btn {
     flex: 1 1 auto;
     text-align: center;
   }
