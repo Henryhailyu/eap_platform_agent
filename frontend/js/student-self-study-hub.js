@@ -188,14 +188,31 @@
     if (channel === "A" && ch !== "A") {
       return { type: "hint", text: t("self_study_channel_a_standby") };
     }
-    if (skillId === "vocabulary" && ov?.webReview?.action === "review_yesterday") {
+    const meta = daysByDate(state.calData).get(state.selectedDate);
+    const sched = meta?.schedule?.label || "";
+    const isReviewDay =
+      sched === "review_only" || sched === "new_plus_review_yesterday" || sched === "review_weekend";
+
+    if (skillId === "vocabulary" && channel === "A" && ch === "A" && dayNumber) {
+      return {
+        type: "link",
+        href: skillHref(skillId, dayNumber),
+        label: t("self_study_open_module"),
+      };
+    }
+    if (
+      skillId === "vocabulary" &&
+      ch === "B" &&
+      isReviewDay &&
+      ov?.webReview?.action === "review_yesterday"
+    ) {
       return {
         type: "link",
         href: `student-self-study-module.html?skill=vocabulary&tab=review`,
         label: t("self_study_vocab_review_yesterday"),
       };
     }
-    if (ov?.webReview?.action === "open_today_task") {
+    if (ov?.webReview?.action === "open_today_task" && isReviewDay) {
       return {
         type: "link",
         href: skillHref(skillId, dayNumber),
@@ -292,6 +309,9 @@
         state.calData = await srv.getVocabCalendar();
       } catch (_) {
         state.calData = { days: [] };
+      }
+      if (state.overview?.skills?.vocabulary?.channel === "A") {
+        state.activeChannel = "A";
       }
     }
 

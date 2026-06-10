@@ -19,6 +19,23 @@ _VALID_WORD = re.compile(r"^[A-Za-z][A-Za-z\-']{1,48}$")
 _CHUNK_SIZE = 25
 _MAX_MEANING_WORDS = 22
 _MAX_MEANING_CHARS = 180
+_MIN_WORD_LEN = 4
+
+_STOPWORDS = frozenset(
+    """
+    a an the and or but for nor so yet to of in on at by from with as is are was were be been
+    being have has had do does did will would shall should may might must can could this that
+    these those it its they them their we you he she his her our your my me him us who whom
+    which what when where why how all each every both few more most other some such no not only
+    own same than too very just also into over after before between through during above below
+    up down out off about again further then once here there when all both each few more most
+    other some such no nor not only own same so than too very can will just don should now
+    adj adv n v vi vt prep conj pron det aux modal children child modern use uses used using
+    literacy curriculum essential rising prepares prepare learning help specific
+    """.split()
+)
+
+_POS_TAGS = frozenset({"adj", "adv", "n", "v", "vi", "vt", "prep", "conj", "pron", "det", "aux", "pl", "sing"})
 
 _LIGATURES = (
     ("ﬁ", "fi"),
@@ -40,6 +57,18 @@ def clean_vocab_extracted_text(text: str) -> str:
     return cleaned.strip()
 
 
+def is_academic_vocab_word(word: str) -> bool:
+    token = _sanitize_word_token(word)
+    if not token:
+        return False
+    low = token.lower()
+    if low in _STOPWORDS or low in _POS_TAGS:
+        return False
+    if len(low) < _MIN_WORD_LEN:
+        return False
+    return True
+
+
 def _sanitize_word_token(word: str) -> str | None:
     w = " ".join(str(word or "").split()).strip()
     if not w or len(w) > 48:
@@ -53,10 +82,81 @@ def _sanitize_word_token(word: str) -> str | None:
 def _sanitize_meaning(meaning: str, word: str) -> str:
     m = " ".join(str(meaning or "").split()).strip()
     if not m or len(m) > _MAX_MEANING_CHARS or len(m.split()) > _MAX_MEANING_WORDS:
-        return f"academic vocabulary: {word}"
-    if m.lower() == word.lower():
-        return f"academic vocabulary: {word}"
+        return ""
+    low = m.lower()
+    if low == word.lower() or low.startswith("academic vocabulary:"):
+        return ""
     return m
+
+
+def _needs_meaning_enrichment(word: dict[str, Any]) -> bool:
+    core = str(word.get("core") or word.get("coreMeaning") or "").strip()
+    token = str(word.get("word") or "").strip()
+    if not token:
+        return False
+    if not core:
+        return True
+    low = core.lower()
+    return low.startswith("academic vocabulary:") or low == token.lower()
+
+
+def enrich_vocab_meanings(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fill missing glosses via AI so practice exams use real definitions."""
+    if not vocab_ai_available():
+        return units
+    missing: list[str] = []
+    seen: set[str] = set()
+    for unit in units:
+        for wd in unit.get("words") or []:
+            if not isinstance(wd, dict) or not _needs_meaning_enrichment(wd):
+                continue
+            token = _sanitize_word_token(str(wd.get("word") or ""))
+            if not token or not is_academic_vocab_word(token):
+                continue
+            key = token.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            missing.append(token)
+    if not missing:
+        return units
+
+    gloss_map: dict[str, str] = {}
+    for i in range(0, len(missing), 35):
+        batch = missing[i : i + 35]
+        system = (
+            "You write short academic English glosses for EAP vocabulary. "
+            'Return JSON: {"glosses":[{"word":"analyze","core":"examine in detail"}]}. '
+            "Each core must be under 12 words, no repetition of the headword."
+        )
+        user = "Define these academic words:\n" + "\n".join(f"- {w}" for w in batch)
+        try:
+            payload = _ai_json(system, user, max_tokens=2500)
+        except Exception:
+            continue
+        for item in payload.get("glosses") or []:
+            if not isinstance(item, dict):
+                continue
+            token = _sanitize_word_token(str(item.get("word") or ""))
+            core = _sanitize_meaning(str(item.get("core") or item.get("meaning") or ""), token or "")
+            if token and core:
+                gloss_map[token.lower()] = core
+
+    if not gloss_map:
+        return units
+
+    for unit in units:
+        for wd in unit.get("words") or []:
+            if not isinstance(wd, dict):
+                continue
+            token = _sanitize_word_token(str(wd.get("word") or ""))
+            if not token:
+                continue
+            if _needs_meaning_enrichment(wd):
+                enriched = gloss_map.get(token.lower())
+                if enriched:
+                    wd["core"] = enriched
+    return units
 
 
 def vocab_ai_available() -> bool:
@@ -190,14 +290,15 @@ def _parse_lines_rule_based(text: str) -> list[dict[str, Any]]:
             continue
         m = _WORD_LINE_RE.match(ln)
         if m:
-            _append_word(current_words, seen, m.group(1).strip(), m.group(2).strip())
-        elif re.match(r"^[A-Za-z][A-Za-z\-']{1,48}$", ln):
-            _append_word(current_words, seen, ln, f"academic vocabulary: {ln}")
+            word_tok = m.group(1).strip()
+            if is_academic_vocab_word(word_tok):
+                _append_word(current_words, seen, word_tok, m.group(2).strip())
+        elif re.match(r"^[A-Za-z][A-Za-z\-']{1,48}$", ln) and is_academic_vocab_word(ln):
+            _append_word(current_words, seen, ln, "")
         else:
             tokens = _tokens_from_blob(ln)
-            if len(tokens) >= 2:
-                for token in tokens:
-                    _append_word(current_words, seen, token, f"academic vocabulary: {token}")
+            if len(tokens) == 1 and is_academic_vocab_word(tokens[0]):
+                _append_word(current_words, seen, tokens[0], "")
             continue
         if len(current_words) >= _CHUNK_SIZE:
             flush()
@@ -211,9 +312,8 @@ def _parse_lines_rule_based(text: str) -> list[dict[str, Any]]:
             m = _WORD_LINE_RE.match(ln)
             if m:
                 _append_word(all_words, blob_seen, m.group(1).strip(), m.group(2).strip())
-            else:
-                for token in _tokens_from_blob(ln):
-                    _append_word(all_words, blob_seen, token, f"academic vocabulary: {token}")
+            elif re.match(r"^[A-Za-z][A-Za-z\-']{1,48}$", ln) and is_academic_vocab_word(ln):
+                _append_word(all_words, blob_seen, ln, "")
         for i in range(0, len(all_words), _CHUNK_SIZE):
             chunk = all_words[i : i + _CHUNK_SIZE]
             if chunk:
@@ -246,9 +346,12 @@ def parse_vocabulary_upload(text: str, *, pack_name: str = "") -> list[dict[str,
     cleaned = clean_vocab_extracted_text(text)
     if not cleaned:
         return []
+    units: list[dict[str, Any]] = []
     if vocab_ai_available() and len(cleaned) > 80:
         try:
-            return _parse_with_ai(cleaned, pack_name=pack_name)
+            units = _parse_with_ai(cleaned, pack_name=pack_name)
         except Exception:
-            pass
-    return _parse_lines_rule_based(cleaned)
+            units = []
+    if not units:
+        units = _parse_lines_rule_based(cleaned)
+    return enrich_vocab_meanings(units)

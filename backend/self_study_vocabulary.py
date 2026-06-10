@@ -13,7 +13,11 @@ from flask import Response, jsonify, request
 from werkzeug.utils import secure_filename
 
 from self_study import CHANNEL_B_ONLY
-from self_study_vocabulary_ai import clean_vocab_extracted_text, parse_vocabulary_upload
+from self_study_vocabulary_ai import (
+    clean_vocab_extracted_text,
+    is_academic_vocab_word,
+    parse_vocabulary_upload,
+)
 from teaching_page_source_files import (
     allowed_source_extension,
     extract_text_from_bytes,
@@ -88,6 +92,34 @@ def _word_entry(raw: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
+def _usable_meaning(wd: dict[str, Any]) -> str | None:
+    meaning = str(wd.get("coreMeaning") or wd.get("core") or "").strip()
+    if not meaning:
+        return None
+    low = meaning.lower()
+    word = str(wd.get("word") or "").strip().lower()
+    if low.startswith("academic vocabulary:") or low == f"academic vocabulary: {word}":
+        return None
+    if len(meaning) > 180 or len(meaning.split()) > 22:
+        return None
+    return meaning
+
+
+def _filter_study_words(words: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    seen: set[str] = set()
+    for wd in words:
+        w = str(wd.get("word") or "").strip()
+        if not is_academic_vocab_word(w):
+            continue
+        key = w.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(wd)
+    return out
+
+
 def _shuffle_options(correct: str, pool: list[str]) -> tuple[list[str], int]:
     import random
 
@@ -101,25 +133,39 @@ def _shuffle_options(correct: str, pool: list[str]) -> tuple[list[str], int]:
 def _practice_for_words(words: list[dict]) -> list[dict]:
     """Classic practice — up to 15 items covering the word list (games handle speed rounds)."""
     out: list[dict] = []
+    words = _filter_study_words(words)
     word_list = [wd["word"] for wd in words]
     for i, wd in enumerate(words[:15]):
         w = wd["word"]
-        meaning = wd.get("coreMeaning") or ""
+        meaning = _usable_meaning(wd)
         aff = wd.get("affix") or {}
         parts = [aff.get("prefix"), aff.get("root"), aff.get("suffix")]
         affix_hint = "+".join(p for p in parts if p) or w[:4]
         if i % 3 == 0:
             options, correct_idx = _shuffle_options(w, word_list)
-            out.append(
-                {
-                    "id": f"vp{i + 1}",
-                    "type": "meaning_mcq",
-                    "promptEn": f"Which word means: {meaning}?",
-                    "promptZh": f"哪个词表示：{meaning}？",
-                    "options": options,
-                    "correctIndex": correct_idx,
-                }
-            )
+            if meaning:
+                out.append(
+                    {
+                        "id": f"vp{i + 1}",
+                        "type": "meaning_mcq",
+                        "promptEn": f"Which word matches this definition: «{meaning}»?",
+                        "promptZh": f"哪个词与释义 «{meaning}» 相符？",
+                        "options": options,
+                        "correctIndex": correct_idx,
+                    }
+                )
+            else:
+                collocation = "Scholars need to _____ the evidence before drawing conclusions."
+                out.append(
+                    {
+                        "id": f"vp{i + 1}",
+                        "type": "collocation_mcq",
+                        "promptEn": f"Best academic fit: {collocation}",
+                        "promptZh": f"最佳学术搭配：{collocation}",
+                        "options": options,
+                        "correctIndex": correct_idx,
+                    }
+                )
         elif i % 3 == 1:
             collocation = f"conduct a detailed _____ of the data"
             options, correct_idx = _shuffle_options(w, word_list)
@@ -154,39 +200,56 @@ def _build_practice_exam(words: list[dict], day_number: int) -> dict[str, Any]:
     """Structured mini-exam: MCQ, gap-fill, matching, sentence order, academic writing."""
     import random
 
+    words = _filter_study_words(words)
     pool = list(words)
     random.shuffle(pool)
     word_list = [w["word"] for w in words]
     mcq_items: list[dict] = []
     fill_items: list[dict] = []
-    for i, wd in enumerate(pool[:8]):
+    meaning_items = [wd for wd in pool if _usable_meaning(wd)]
+    mcq_pool = meaning_items if len(meaning_items) >= 4 else pool
+    for i, wd in enumerate(mcq_pool[:8]):
         w = wd["word"]
-        meaning = wd.get("coreMeaning") or w
+        meaning = _usable_meaning(wd)
         others = [x for x in word_list if x != w]
         opts, ci = _shuffle_options(w, others)
-        if i < 5:
+        if i < 5 and meaning:
             mcq_items.append(
                 {
                     "id": f"mcq{i + 1}",
-                    "promptEn": f"Which word means: {meaning}?",
-                    "promptZh": f"哪个词表示：{meaning}？",
+                    "promptEn": f"Which word matches this definition: «{meaning}»?",
+                    "promptZh": f"哪个词与释义 «{meaning}» 相符？",
                     "options": opts,
                     "correctIndex": ci,
                     "answer": w,
                 }
             )
-        else:
+        elif meaning:
             fill_items.append(
                 {
                     "id": f"fill{i - 4}",
-                    "promptEn": f"Gap fill — meaning «{meaning}»: Researchers must _____ the data carefully.",
+                    "promptEn": f"Gap fill — «{meaning}»: Researchers must _____ the data carefully.",
+                    "answer": w,
+                }
+            )
+        else:
+            collocation = "Scholars need to _____ the evidence before drawing conclusions."
+            mcq_items.append(
+                {
+                    "id": f"mcq{i + 1}",
+                    "promptEn": f"Best academic fit: {collocation}",
+                    "promptZh": f"最佳学术搭配：{collocation}",
+                    "options": opts,
+                    "correctIndex": ci,
                     "answer": w,
                 }
             )
     match_pairs = [
-        {"left": wd["word"], "right": wd.get("coreMeaning") or wd["word"]}
-        for wd in pool[:6]
-    ]
+        {"left": wd["word"], "right": _usable_meaning(wd)}
+        for wd in pool[:8]
+        if _usable_meaning(wd)
+    ][:6]
+    random.shuffle(match_pairs)
     order_parts = [
         "In conclusion, the evidence supports a cautious policy response.",
         "For example, peer-reviewed studies document similar trends across regions.",
@@ -455,6 +518,13 @@ def migrate_self_study_vocabulary_tables(conn) -> None:
     pack_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocab_material_packs)").fetchall()}
     if "source_filename" not in pack_cols:
         conn.execute("ALTER TABLE vocab_material_packs ADD COLUMN source_filename TEXT")
+    if "push_selected" not in pack_cols:
+        conn.execute(
+            "ALTER TABLE vocab_material_packs ADD COLUMN push_selected INTEGER NOT NULL DEFAULT 0"
+        )
+    ca_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocab_channel_a_state)").fetchall()}
+    if ca_cols and "pack_ids_json" not in ca_cols:
+        conn.execute("ALTER TABLE vocab_channel_a_state ADD COLUMN pack_ids_json TEXT")
     pack_prog_cols = {
         row[1] for row in conn.execute("PRAGMA table_info(student_vocab_pack_progress)").fetchall()
     }
@@ -704,7 +774,11 @@ def _words_from_upload_units(units_raw: list[dict[str, Any]]) -> list[dict[str, 
     """Convert parser output to stored word entries with practice/games per unit."""
     out: list[dict[str, Any]] = []
     for i, unit in enumerate(units_raw):
-        words = [_word_entry(w) for w in unit.get("words") or []]
+        words = [
+            _word_entry(w)
+            for w in unit.get("words") or []
+            if isinstance(w, dict) and is_academic_vocab_word(str(w.get("word") or ""))
+        ]
         if not words:
             continue
         out.append(
@@ -821,7 +895,7 @@ def _sync_pack_word_bank(
     count = 0
     for unit in units:
         for wd in unit.get("words") or []:
-            if not wd or not wd.get("word"):
+            if not wd or not wd.get("word") or not is_academic_vocab_word(str(wd.get("word"))):
                 continue
             order += 1
             count += 1
@@ -844,6 +918,12 @@ def _pack_word_count(conn, pack_id: int) -> int:
 
 
 def _primary_pack_for_class(conn, class_name: str) -> Any:
+    selected = _selected_pack_ids(conn, class_name)
+    if selected:
+        return conn.execute(
+            "SELECT * FROM vocab_material_packs WHERE id = ? AND is_active = 1",
+            (selected[0],),
+        ).fetchone()
     return conn.execute(
         """
         SELECT * FROM vocab_material_packs
@@ -856,6 +936,57 @@ def _primary_pack_for_class(conn, class_name: str) -> Any:
     ).fetchone()
 
 
+def _selected_pack_ids(conn, class_name: str) -> list[int]:
+    rows = conn.execute(
+        """
+        SELECT id FROM vocab_material_packs
+        WHERE is_active = 1 AND push_selected = 1
+          AND (class_name IS NULL OR TRIM(class_name) = '' OR class_name = ?)
+        ORDER BY sort_order ASC, id ASC
+        """,
+        (class_name,),
+    ).fetchall()
+    return [int(r["id"]) for r in rows]
+
+
+def _state_pack_ids(state: Any) -> list[int]:
+    if not state:
+        return []
+    raw = state["pack_ids_json"] if "pack_ids_json" in state.keys() else None
+    if raw:
+        try:
+            ids = [int(x) for x in json.loads(raw)]
+            if ids:
+                return ids
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+    return [int(state["pack_id"])]
+
+
+def _merged_word_rows(conn, pack_ids: list[int]) -> list[Any]:
+    rows: list[Any] = []
+    for pid in pack_ids:
+        rows.extend(
+            conn.execute(
+                """
+                SELECT word_json FROM vocab_pack_words
+                WHERE pack_id = ?
+                ORDER BY word_order ASC, id ASC
+                """,
+                (pid,),
+            ).fetchall()
+        )
+    return rows
+
+
+def _pack_word_count_for_class(conn, class_name: str) -> int:
+    pack_ids = _selected_pack_ids(conn, class_name)
+    if not pack_ids:
+        pack = _primary_pack_for_class(conn, class_name)
+        pack_ids = [int(pack["id"])] if pack else []
+    return len(_merged_word_rows(conn, pack_ids))
+
+
 def _reset_channel_a_for_pack(conn, pack_id: int) -> None:
     pack = conn.execute(
         "SELECT class_name FROM vocab_material_packs WHERE id = ?",
@@ -866,6 +997,7 @@ def _reset_channel_a_for_pack(conn, pack_id: int) -> None:
     cls = str(pack["class_name"] or "").strip()
     now = _now_iso()
     today = _today_utc().isoformat()
+    conn.execute("DELETE FROM vocab_channel_a_days WHERE pack_id = ?", (pack_id,))
     if cls:
         conn.execute("DELETE FROM vocab_channel_a_days WHERE class_name = ?", (cls,))
         conn.execute(
@@ -926,30 +1058,20 @@ def _channel_a_day_words(conn, class_name: str, day_number: int) -> tuple[list[d
         (class_name, day_number),
     ).fetchone()
     if cached:
-        words = json.loads(cached["words_json"])
-        practice = json.loads(cached["practice_json"] or "null") if cached["practice_json"] else None
-        games = json.loads(cached["games_json"] or "null") if cached["games_json"] else None
-        if not practice:
-            practice = _practice_for_words(words)
-        if not games:
-            games = _game_rounds_for_words(words)
+        words = _filter_study_words(json.loads(cached["words_json"]))
+        practice = _practice_for_words(words)
+        games = _game_rounds_for_words(words)
         return words, {"practice": practice, "games": games}
 
     offset = (max(1, day_number) - 1) * CHANNEL_A_DAILY_WORDS
-    rows = conn.execute(
-        """
-        SELECT word_json FROM vocab_pack_words
-        WHERE pack_id = ?
-        ORDER BY word_order ASC, id ASC
-        """,
-        (state["pack_id"],),
-    ).fetchall()
+    pack_ids = _state_pack_ids(state)
+    rows = _merged_word_rows(conn, pack_ids)
     total = len(rows)
     if offset >= total:
         _complete_channel_a(conn, class_name)
         return None
     batch = rows[offset : offset + CHANNEL_A_DAILY_WORDS]
-    words = [json.loads(r["word_json"]) for r in batch]
+    words = _filter_study_words([json.loads(r["word_json"]) for r in batch])
     practice = _practice_for_words(words)
     games = _game_rounds_for_words(words)
     now = _now_iso()
@@ -989,7 +1111,7 @@ def _channel_a_today_payload(conn, *, class_name: str, username: str) -> dict[st
             "newWords": False,
             "message": "Channel A vocabulary list is complete.",
         }
-    total_words = _pack_word_count(conn, int(state["pack_id"]))
+    total_words = _pack_word_count_for_class(conn, class_name)
     if total_words < 1:
         return {
             "channel": "A",
@@ -1248,7 +1370,7 @@ def register_self_study_vocabulary_routes(
 
     @app.route("/api/student/self-study/vocabulary/day/<int:day_number>", methods=["GET"])
     def student_vocab_day(day_number: int):
-        """Channel B — open a calendar day to view that day's 30 words."""
+        """Open a calendar day to view that day's vocabulary (Channel A or B)."""
         conn = get_db_connection()
         err = require_session_role_if_enabled(conn, "student")
         if err:
@@ -1260,12 +1382,53 @@ def register_self_study_vocabulary_routes(
             return jsonify({"error": "Student session required"}), 401
 
         class_name = _student_class_name(conn, username)
+        day_num = max(1, int(day_number))
+        if _vocab_channel(conn, class_name) == "A" and _has_manager_push(
+            conn, class_name, VOCAB_SKILL
+        ):
+            built = _channel_a_day_words(conn, class_name, day_num)
+            if not built:
+                conn.commit()
+                conn.close()
+                return jsonify({"error": "No lesson for this day", "dayNumber": day_num}), 404
+            words, extras = built
+            state = _channel_a_state(conn, class_name)
+            prog = conn.execute(
+                """
+                SELECT * FROM student_vocab_channel_a_progress
+                WHERE student_username = ? AND class_name = ? AND day_number = ?
+                """,
+                (username, class_name, day_num),
+            ).fetchone()
+            sched = _schedule_label(max(0, day_num - 1))
+            conn.commit()
+            conn.close()
+            return jsonify(
+                {
+                    "channel": "A",
+                    "packId": int(state["pack_id"]) if state else None,
+                    "courseId": None,
+                    "dayNumber": day_num,
+                    "schedule": sched,
+                    "newWords": True,
+                    "words": words,
+                    "wordCount": len(words),
+                    "practice": extras["practice"],
+                    "games": extras["games"],
+                    "progress": {
+                        "learnDone": bool(prog and prog["learn_done"]),
+                        "practiceDone": bool(prog and prog["practice_done"]),
+                        "practiceScore": prog["practice_score"] if prog else None,
+                        "practiceScoreTotal": prog["practice_score_total"] if prog else None,
+                    },
+                }
+            )
+
         course = _active_course(conn, class_name)
         if not course:
             conn.close()
             return jsonify({"error": "No active vocabulary course"}), 404
 
-        day_num = max(1, int(day_number))
         day_row = conn.execute(
             "SELECT * FROM vocab_course_days WHERE course_id = ? AND day_number = ?",
             (course["id"], day_num),
@@ -1274,10 +1437,8 @@ def register_self_study_vocabulary_routes(
             conn.close()
             return jsonify({"error": "No lesson for this day", "dayNumber": day_num}), 404
 
-        words = json.loads(day_row["words_json"])
-        practice = json.loads(day_row["practice_json"] or "[]")
-        if not practice:
-            practice = _practice_for_words(words)
+        words = _filter_study_words(json.loads(day_row["words_json"]))
+        practice = _practice_for_words(words)
         prog = conn.execute(
             """
             SELECT * FROM student_vocab_day_progress
@@ -1345,6 +1506,67 @@ def register_self_study_vocabulary_routes(
             return jsonify({"error": "Student session required"}), 401
 
         class_name = _student_class_name(conn, username)
+        if _vocab_channel(conn, class_name) == "A" and _has_manager_push(
+            conn, class_name, VOCAB_SKILL
+        ):
+            state = _channel_a_state(conn, class_name)
+            if not state:
+                conn.close()
+                return jsonify({"days": [], "channel": "A"})
+            total_words = _pack_word_count_for_class(conn, class_name)
+            course = _channel_a_virtual_course(state, total_words)
+            pack_ids = _state_pack_ids(state)
+            all_rows = _merged_word_rows(conn, pack_ids)
+            start = _parse_start(state["start_date"])
+            prog_rows = {
+                int(r["day_number"]): r
+                for r in conn.execute(
+                    """
+                    SELECT day_number, learn_done, practice_done
+                    FROM student_vocab_channel_a_progress
+                    WHERE student_username = ? AND class_name = ?
+                    """,
+                    (username, class_name),
+                ).fetchall()
+            }
+            days_out = []
+            for i in range(30):
+                d = start + timedelta(days=i)
+                sched = _schedule_label(i)
+                day_num = i + 1 if sched.get("newWords") else None
+                if day_num is None and sched.get("label") == "review_weekend":
+                    day_num = i + 1
+                wc = 0
+                row = None
+                if day_num and sched.get("newWords"):
+                    offset = (day_num - 1) * CHANNEL_A_DAILY_WORDS
+                    if offset < len(all_rows):
+                        batch = all_rows[offset : offset + CHANNEL_A_DAILY_WORDS]
+                        wc = len(_filter_study_words([json.loads(r["word_json"]) for r in batch]))
+                        row = wc > 0
+                pr = prog_rows.get(day_num) if day_num else None
+                days_out.append(
+                    {
+                        "date": d.isoformat(),
+                        "offset": i,
+                        "schedule": sched,
+                        "dayNumber": day_num if row else None,
+                        "wordCount": wc,
+                        "hasLesson": bool(row),
+                        "learnDone": bool(pr and pr["learn_done"]),
+                        "practiceDone": bool(pr and pr["practice_done"]),
+                    }
+                )
+            conn.close()
+            return jsonify(
+                {
+                    "channel": "A",
+                    "startDate": state["start_date"],
+                    "totalDays": int(course["total_days"]),
+                    "days": days_out,
+                }
+            )
+
         course = _active_course(conn, class_name)
         if not course:
             conn.close()
@@ -1737,6 +1959,7 @@ def register_self_study_vocabulary_routes(
                             "isActive": bool(r["is_active"]),
                             "unitCount": int(r["unit_count"] or 0),
                             "sourceFilename": r["source_filename"],
+                            "pushSelected": bool(r["push_selected"] if "push_selected" in r.keys() else 0),
                         }
                         for r in rows
                     ]
@@ -1857,13 +2080,14 @@ def register_self_study_vocabulary_routes(
             "UPDATE vocab_material_packs SET source_filename = ?, updated_at = ? WHERE id = ?",
             (source_name, now, pack_id),
         )
+        word_count = _pack_word_count(conn, pack_id)
         conn.commit()
         conn.close()
         return jsonify(
             {
                 "ok": True,
                 "unitCount": unit_count,
-                "wordCount": unit_count,
+                "wordCount": word_count,
                 "sourceFilename": source_name,
                 "replaced": replace,
             }
@@ -1886,25 +2110,59 @@ def register_self_study_vocabulary_routes(
             conn.close()
             return jsonify({"error": "className required"}), 400
         now = _now_iso()
-        pack = _primary_pack_for_class(conn, class_name)
-        if is_active:
-            if not pack:
-                conn.close()
-                return jsonify({"error": "No vocabulary pack for this class — add a pack first"}), 400
-            if _pack_word_count(conn, int(pack["id"])) < 1:
-                conn.close()
-                return jsonify({"error": "Pack has no words — upload a vocabulary file first"}), 400
+        raw_ids = data.get("packIds") or data.get("pack_ids") or []
+        pack_ids: list[int] = []
+        for raw in raw_ids:
+            try:
+                pack_ids.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        if pack_ids:
             conn.execute(
                 """
-                INSERT INTO vocab_channel_a_state (class_name, pack_id, start_date, status, updated_at)
-                VALUES (?, ?, ?, 'active', ?)
+                UPDATE vocab_material_packs SET push_selected = 0
+                WHERE class_name IS NULL OR TRIM(class_name) = '' OR class_name = ?
+                """,
+                (class_name,),
+            )
+            for pid in pack_ids:
+                conn.execute(
+                    """
+                    UPDATE vocab_material_packs SET push_selected = 1
+                    WHERE id = ? AND is_active = 1
+                      AND (class_name IS NULL OR TRIM(class_name) = '' OR class_name = ?)
+                    """,
+                    (pid, class_name),
+                )
+        pack = _primary_pack_for_class(conn, class_name)
+        pack_ids = _selected_pack_ids(conn, class_name) or ([int(pack["id"])] if pack else [])
+        if is_active:
+            if not pack_ids:
+                conn.close()
+                return jsonify({"error": "No vocabulary pack for this class — add a pack first"}), 400
+            if _pack_word_count_for_class(conn, class_name) < 1:
+                conn.close()
+                return jsonify({"error": "Pack has no words — upload a vocabulary file first"}), 400
+            primary_id = pack_ids[0]
+            conn.execute(
+                """
+                INSERT INTO vocab_channel_a_state
+                    (class_name, pack_id, pack_ids_json, start_date, status, updated_at)
+                VALUES (?, ?, ?, ?, 'active', ?)
                 ON CONFLICT(class_name) DO UPDATE SET
                     pack_id = excluded.pack_id,
+                    pack_ids_json = excluded.pack_ids_json,
                     start_date = excluded.start_date,
                     status = 'active',
                     updated_at = excluded.updated_at
                 """,
-                (class_name, pack["id"], _today_utc().isoformat(), now),
+                (
+                    class_name,
+                    primary_id,
+                    json.dumps(pack_ids),
+                    _today_utc().isoformat(),
+                    now,
+                ),
             )
             conn.execute("DELETE FROM vocab_channel_a_days WHERE class_name = ?", (class_name,))
         conn.execute(

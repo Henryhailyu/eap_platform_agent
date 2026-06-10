@@ -67,6 +67,40 @@
     return files.length;
   }
 
+  function estimateUploadMinutes(fileCount, totalBytes) {
+    if (fileCount > 2 || totalBytes > 2_000_000) return "3–5";
+    if (fileCount > 1 || totalBytes > 500_000) return "1–3";
+    return "1–2";
+  }
+
+  function showUploadOverlay(fileCount, totalBytes) {
+    const section = document.getElementById("admin-vocab-section");
+    if (!section) return;
+    hideUploadOverlay();
+    const mins = estimateUploadMinutes(fileCount, totalBytes);
+    const overlay = document.createElement("div");
+    overlay.id = "admin-vocab-upload-overlay";
+    overlay.className = "admin-vocab-upload-overlay";
+    overlay.setAttribute("role", "status");
+    overlay.setAttribute("aria-live", "polite");
+    overlay.innerHTML = `
+      <div class="admin-vocab-upload-overlay__card">
+        <div class="admin-vocab-upload-spinner" aria-hidden="true"></div>
+        <p class="admin-vocab-upload-overlay__title">${escapeHtml(t("admin_vocab_uploading"))}</p>
+        <p class="admin-vocab-upload-overlay__eta">${escapeHtml(t("admin_vocab_upload_eta", { mins }))}</p>
+      </div>
+    `;
+    section.appendChild(overlay);
+  }
+
+  function hideUploadOverlay() {
+    document.getElementById("admin-vocab-upload-overlay")?.remove();
+  }
+
+  function totalFileBytes(fileList) {
+    return Array.from(fileList || []).reduce((sum, f) => sum + (f.size || 0), 0);
+  }
+
   function setSubmitBusy(form, busy) {
     const btn = form?.querySelector('button[type="submit"]');
     if (!btn) return;
@@ -74,13 +108,22 @@
       btn.disabled = true;
       btn.dataset.eapPrevLabel = btn.textContent;
       btn.textContent = t("admin_vocab_uploading");
+      btn.classList.add("admin-vocab-btn--busy");
     } else {
       btn.disabled = false;
+      btn.classList.remove("admin-vocab-btn--busy");
       if (btn.dataset.eapPrevLabel) {
         btn.textContent = btn.dataset.eapPrevLabel;
         delete btn.dataset.eapPrevLabel;
       }
     }
+  }
+
+  function selectedPackIds(tbody) {
+    if (!tbody) return [];
+    return Array.from(tbody.querySelectorAll("[data-pack-push]:checked"))
+      .map((el) => parseInt(el.getAttribute("data-pack-push"), 10))
+      .filter((id) => id > 0);
   }
 
   async function deletePack(packId, statusEl, tbody, emptyEl) {
@@ -101,6 +144,7 @@
     if (!window.confirm(t("admin_vocab_modify_confirm"))) return;
 
     setStatus(statusEl, t("admin_vocab_uploading"), false);
+    showUploadOverlay(files.length, totalFileBytes(files));
     const fd = new FormData();
     files.forEach((file) => fd.append("files", file));
     fd.append("replace", "true");
@@ -114,6 +158,8 @@
       );
     } catch (e) {
       setStatus(statusEl, e.message || t("admin_vocab_failed"), true);
+    } finally {
+      hideUploadOverlay();
     }
   }
 
@@ -134,7 +180,13 @@
           ? `<span class="admin-vocab-file-tag">${escapeHtml(p.sourceFilename)}</span>`
           : "";
         tr.innerHTML = `
-          <td>${escapeHtml(p.displayName)}${fileHint ? `<br>${fileHint}` : ""}</td>
+          <td class="admin-vocab-pack-name">
+            <label class="admin-vocab-push-check" title="${escapeHtml(t("admin_vocab_push_select_hint"))}">
+              <input type="checkbox" data-pack-push="${p.id}" ${p.pushSelected ? "checked" : ""} aria-label="${escapeHtml(t("admin_vocab_push_select_pack", { name: p.displayName }))}" />
+              <span class="admin-vocab-push-check__box" aria-hidden="true"></span>
+            </label>
+            <span class="admin-vocab-pack-label">${escapeHtml(p.displayName)}${fileHint ? `<br>${fileHint}` : ""}</span>
+          </td>
           <td>${escapeHtml(p.className || "—")}</td>
           <td>${escapeHtml(String(p.unitCount || 0))}</td>
           <td class="admin-table__actions">
@@ -189,6 +241,7 @@
       try {
         if (fileCount > 0) {
           setStatus(statusEl, t("admin_vocab_uploading"), false);
+          showUploadOverlay(fileCount, totalFileBytes(files));
           const fd = new FormData();
           fd.append("displayName", name);
           if (cls) fd.append("className", cls);
@@ -196,7 +249,7 @@
           const result = await postMultipart("/api/admin/self-study/vocabulary/packs", fd);
           setStatus(
             statusEl,
-            t("admin_vocab_upload_done", { n: String(result.unitCount || 0) }),
+            t("admin_vocab_upload_done", { n: String(result.wordCount || result.unitCount || 0) }),
             false,
           );
         } else {
@@ -212,6 +265,7 @@
       } catch (err) {
         setStatus(statusEl, err.message || t("admin_vocab_failed"), true);
       } finally {
+        hideUploadOverlay();
         setSubmitBusy(form, false);
       }
     });
@@ -223,12 +277,18 @@
     const clsInput = document.getElementById("admin-vocab-push-class");
     async function push(isActive) {
       const className = clsInput?.value?.trim() || "EAP047";
+      const tbody = document.getElementById("admin-vocab-tbody");
+      const packIds = selectedPackIds(tbody);
+      if (isActive && !packIds.length) {
+        setStatus(statusEl, t("admin_vocab_push_select_required"), true);
+        return;
+      }
       setStatus(statusEl, "", false);
       try {
         await apiFetch("/api/admin/self-study/vocabulary/push-channel-a", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ className, isActive }),
+          body: JSON.stringify({ className, isActive, packIds }),
         });
         setStatus(statusEl, t("admin_vocab_saved"), false);
       } catch (_) {
