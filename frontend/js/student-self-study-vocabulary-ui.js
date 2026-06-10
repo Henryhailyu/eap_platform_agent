@@ -33,7 +33,41 @@
     return out === key ? sched.label : out;
   }
 
+  /** Channel B — frozen layout helpers (see docs/CHANNEL_B_VOCABULARY_SEALED.md). */
+  function termClassForWord(word) {
+    const n = String(word || "").length;
+    if (n > 16) return "ssc-word-card__term ssc-word-card__term--xl";
+    if (n > 12) return "ssc-word-card__term ssc-word-card__term--lg";
+    return "ssc-word-card__term";
+  }
+
+  function urlDayParam() {
+    return parseInt(new URLSearchParams(global.location.search).get("day") || "", 10) || 0;
+  }
+
+  function syncVocabDayInUrl(dayNumber) {
+    if (state.activeChannel !== "B" || !dayNumber) return;
+    try {
+      const u = new URL(global.location.href);
+      u.searchParams.set("channel", "B");
+      u.searchParams.set("day", String(dayNumber));
+      global.history.replaceState({}, "", u);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function reviewReferenceDay() {
+    const urlDay = urlDayParam();
+    if (state.activeChannel === "B") {
+      return state.selectedDay || urlDay || state.today?.dayNumber || 0;
+    }
+    return state.selectedDay || state.today?.dayNumber || urlDay || 0;
+  }
+
   function renderAffixCard(w, index) {
+    const termClass =
+      state.activeChannel === "B" ? termClassForWord(w.word) : "ssc-word-card__term";
     const aff = w.affix || {};
     const parts = [aff.prefix, aff.root, aff.suffix].filter(Boolean);
     const affixLine = parts.length
@@ -48,7 +82,7 @@
       : "";
     return `
       <button type="button" class="ssc-word-card ssc-word-card--affix ssc-word-card--btn" data-word-idx="${index}" aria-label="${escapeHtml(w.word)}">
-        <h3 class="ssc-word-card__term">${escapeHtml(w.word)}</h3>
+        <h3 class="${termClass}">${escapeHtml(w.word)}</h3>
         ${w.phonetic ? `<p class="ssc-word-card__phonetic">${escapeHtml(w.phonetic)}</p>` : ""}
         <p class="ssc-word-card__def">${escapeHtml(w.coreMeaning || "")}</p>
         ${affixLine}
@@ -331,6 +365,10 @@
     }
 
     const data = state.today;
+    if (state.activeChannel === "B" && data.dayNumber) {
+      state.selectedDay = data.dayNumber;
+      syncVocabDayInUrl(data.dayNumber);
+    }
     if (data.channelAComplete) {
       root.innerHTML = `
         <div class="ssc-banner">
@@ -696,7 +734,7 @@
     root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
     let data;
     try {
-      const reviewRefDay = state.selectedDay || state.today?.dayNumber || 0;
+      const reviewRefDay = reviewReferenceDay();
       data = await SERVER().getVocabReviewYesterday(state.activeChannel, reviewRefDay);
     } catch (e) {
       root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
@@ -827,7 +865,9 @@
     `;
     root.querySelectorAll("[data-day]").forEach((li) => {
       li.addEventListener("click", () => {
-        state.selectedDay = parseInt(li.getAttribute("data-day"), 10);
+        const day = parseInt(li.getAttribute("data-day"), 10);
+        state.selectedDay = day;
+        syncVocabDayInUrl(day);
         state.today = null;
         state.practiceRetake = false;
         showTab("learn");
