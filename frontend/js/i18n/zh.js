@@ -755,6 +755,8 @@ window.EAP_STRINGS_ZH = {
   "self_study_reading_game_done": "论证排序完成，共检查 {attempts} 次。",
   "self_study_reading_complete": "阅读模块已完成 — 做得好！",
   "self_study_reading_complete_short": "今日篇章已完成",
+  "self_study_reading_generating": "正在生成今日阅读文章…",
+  "self_study_reading_generating_hint": "AI 正在准备雅思风格文章与题目，大约需要一分钟，请稍候。",
   "self_study_reading_tab_read": "阅读",
   "self_study_reading_day_label": "第 {day} 天",
   "self_study_reading_mark_read": "标记为已读",

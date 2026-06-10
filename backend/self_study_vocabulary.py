@@ -120,6 +120,19 @@ def _filter_study_words(words: list[dict]) -> list[dict]:
     return out
 
 
+def _clean_prompt_meaning(text: str) -> str:
+    """Strip trailing punctuation so prompts read «…?» not «….?»."""
+    s = " ".join(str(text or "").split()).strip()
+    while s and s[-1] in ".!?;:":
+        s = s[:-1].rstrip()
+    return s
+
+
+def _is_boilerplate_example(text: str) -> bool:
+    low = str(text or "").lower()
+    return "affects academic outcomes" in low or "the study examines how" in low
+
+
 def _shuffle_options(correct: str, pool: list[str]) -> tuple[list[str], int]:
     import random
 
@@ -130,21 +143,31 @@ def _shuffle_options(correct: str, pool: list[str]) -> tuple[list[str], int]:
     return options, options.index(correct)
 
 
-def _exam_meaning(wd: dict[str, Any]) -> str:
-    """Meaning text for exams — prefers real gloss, with safe fallbacks for Channel A packs."""
+def _exam_meaning_channel_a(wd: dict[str, Any]) -> str | None:
+    """Channel A exam gloss — never use auto-generated example sentences as definitions."""
     meaning = _usable_meaning(wd)
     if meaning:
-        return meaning
+        return _clean_prompt_meaning(meaning)
     raw = str(wd.get("coreMeaning") or wd.get("core") or "").strip()
-    if raw and not raw.lower().startswith("academic vocabulary:"):
-        return raw[:120]
+    if raw and not raw.lower().startswith("academic vocabulary:") and not _is_boilerplate_example(raw):
+        return _clean_prompt_meaning(raw[:120])
     mnemonic = str(wd.get("mnemonic") or "").strip()
     if mnemonic:
-        return mnemonic[:120]
-    examples = wd.get("examples") or []
-    if examples:
-        return str(examples[0])[:120]
-    return str(wd.get("word") or "")
+        return _clean_prompt_meaning(mnemonic[:120])
+    for ex in wd.get("examples") or []:
+        s = str(ex).strip()
+        if s and not _is_boilerplate_example(s):
+            return _clean_prompt_meaning(s[:120])
+    aff = wd.get("affix") or {}
+    parts = [aff.get("prefix"), aff.get("root"), aff.get("suffix")]
+    hint = "+".join(p for p in parts if p)
+    if hint and hint != wd.get("word"):
+        return f"built from parts: {hint}"
+    return None
+
+
+def _meaning_for_channel_b(wd: dict[str, Any]) -> str:
+    return _clean_prompt_meaning(wd.get("coreMeaning") or wd.get("word") or "")
 
 
 def _practice_for_words(words: list[dict], *, channel: str = "B") -> list[dict]:
@@ -155,7 +178,7 @@ def _practice_for_words(words: list[dict], *, channel: str = "B") -> list[dict]:
     word_list = [wd["word"] for wd in words]
     for i, wd in enumerate(words[:15]):
         w = wd["word"]
-        meaning = _exam_meaning(wd) if channel == "A" else (wd.get("coreMeaning") or w)
+        meaning = _meaning_for_channel_b(wd) if channel == "B" else (_exam_meaning_channel_a(wd) or w)
         aff = wd.get("affix") or {}
         parts = [aff.get("prefix"), aff.get("root"), aff.get("suffix")]
         affix_hint = "+".join(p for p in parts if p) or w[:4]
@@ -201,44 +224,7 @@ def _practice_for_words(words: list[dict], *, channel: str = "B") -> list[dict]:
     return out
 
 
-def _build_practice_exam(words: list[dict], day_number: int, *, channel: str = "B") -> dict[str, Any]:
-    """Structured mini-exam: MCQ, gap-fill, matching, sentence order, academic writing."""
-    import random
-
-    if channel == "A":
-        words = _filter_study_words(words)
-    pool = list(words)
-    random.shuffle(pool)
-    word_list = [w["word"] for w in words]
-    mcq_items: list[dict] = []
-    fill_items: list[dict] = []
-    meaning_fn = _exam_meaning if channel == "A" else lambda wd: wd.get("coreMeaning") or wd["word"]
-    for i, wd in enumerate(pool[:8]):
-        w = wd["word"]
-        meaning = meaning_fn(wd)
-        others = [x for x in word_list if x != w]
-        opts, ci = _shuffle_options(w, others)
-        if i < 5:
-            mcq_items.append(
-                {
-                    "id": f"mcq{i + 1}",
-                    "promptEn": f"Which word means: {meaning}?",
-                    "promptZh": f"哪个词表示：{meaning}？",
-                    "options": opts,
-                    "correctIndex": ci,
-                    "answer": w,
-                }
-            )
-        else:
-            fill_items.append(
-                {
-                    "id": f"fill{i - 4}",
-                    "promptEn": f"Gap fill — meaning «{meaning}»: Researchers must _____ the data carefully.",
-                    "answer": w,
-                }
-            )
-    match_pairs = [{"left": wd["word"], "right": meaning_fn(wd)} for wd in pool[:6]]
-    random.shuffle(match_pairs)
+def _exam_shell(day_number: int, mcq_items, fill_items, match_pairs) -> dict[str, Any]:
     order_parts = [
         "In conclusion, the evidence supports a cautious policy response.",
         "For example, peer-reviewed studies document similar trends across regions.",
@@ -280,6 +266,153 @@ def _build_practice_exam(words: list[dict], day_number: int, *, channel: str = "
             },
         ],
     }
+
+
+def _build_practice_exam_channel_b(words: list[dict], day_number: int) -> dict[str, Any]:
+    """Channel B — stable AI-course exam (do not change when fixing Channel A)."""
+    import random
+
+    pool = list(words)
+    random.shuffle(pool)
+    word_list = [w["word"] for w in words]
+    mcq_items: list[dict] = []
+    fill_items: list[dict] = []
+    for i, wd in enumerate(pool[:8]):
+        w = wd["word"]
+        meaning = _meaning_for_channel_b(wd)
+        others = [x for x in word_list if x != w]
+        opts, ci = _shuffle_options(w, others)
+        if i < 5:
+            mcq_items.append(
+                {
+                    "id": f"mcq{i + 1}",
+                    "promptEn": f"Which word means: {meaning}?",
+                    "promptZh": f"哪个词表示：{meaning}？",
+                    "options": opts,
+                    "correctIndex": ci,
+                    "answer": w,
+                }
+            )
+        else:
+            fill_items.append(
+                {
+                    "id": f"fill{i - 4}",
+                    "promptEn": f"Gap fill — meaning «{meaning}»: Researchers must _____ the data carefully.",
+                    "answer": w,
+                }
+            )
+    match_pairs = [
+        {"left": wd["word"], "right": _meaning_for_channel_b(wd)} for wd in pool[:6]
+    ]
+    random.shuffle(match_pairs)
+    return _exam_shell(day_number, mcq_items, fill_items, match_pairs)
+
+
+_CHANNEL_A_GAP_TEMPLATES = (
+    "Scholars must understand _____ before analysing the dataset.",
+    "The seminar focused on how _____ shapes academic writing.",
+    "Students practised using _____ in a formal paragraph.",
+    "The reading explained the role of _____ in the field.",
+)
+
+
+def _build_practice_exam_channel_a(words: list[dict], day_number: int) -> dict[str, Any]:
+    """Channel A — school-material packs; separate from Channel B."""
+    import random
+
+    from self_study_vocabulary_ai import enrich_vocab_meanings
+
+    words = _filter_study_words(words)
+    raw_units = [
+        {
+            "label": "exam",
+            "words": [
+                {
+                    "word": wd.get("word"),
+                    "core": wd.get("coreMeaning") or wd.get("core"),
+                    "prefix": (wd.get("affix") or {}).get("prefix"),
+                    "root": (wd.get("affix") or {}).get("root"),
+                    "suffix": (wd.get("affix") or {}).get("suffix"),
+                    "method": wd.get("methodPrimary"),
+                    "mnemonic": wd.get("mnemonic"),
+                }
+                for wd in words
+            ],
+        }
+    ]
+    try:
+        enriched = enrich_vocab_meanings(raw_units)
+        gloss_by_word = {
+            str(w["word"]).lower(): str(w.get("core") or "")
+            for w in (enriched[0].get("words") or [])
+            if w.get("word")
+        }
+        for wd in words:
+            g = gloss_by_word.get(str(wd.get("word")).lower())
+            if g and _usable_meaning({"coreMeaning": g, "word": wd.get("word")}):
+                wd["coreMeaning"] = g
+    except Exception:
+        pass
+
+    pool = list(words)
+    random.shuffle(pool)
+    word_list = [w["word"] for w in words]
+    mcq_items: list[dict] = []
+    fill_items: list[dict] = []
+    fill_idx = 0
+    for i, wd in enumerate(pool[:8]):
+        w = wd["word"]
+        meaning = _exam_meaning_channel_a(wd)
+        others = [x for x in word_list if x != w]
+        opts, ci = _shuffle_options(w, others)
+        if i < 5:
+            if meaning:
+                mcq_items.append(
+                    {
+                        "id": f"mcq{i + 1}",
+                        "promptEn": f"Which word matches this definition: «{meaning}»?",
+                        "promptZh": f"哪个词与释义 «{meaning}» 相符？",
+                        "options": opts,
+                        "correctIndex": ci,
+                        "answer": w,
+                    }
+                )
+            else:
+                aff = wd.get("affix") or {}
+                hint = "+".join(x for x in [aff.get("prefix"), aff.get("root"), aff.get("suffix")] if x) or w[:4]
+                mcq_items.append(
+                    {
+                        "id": f"mcq{i + 1}",
+                        "promptEn": f"Affix pattern «{hint}» → which word from today's list?",
+                        "promptZh": f"词缀 «{hint}» → 今日词表中的哪个词？",
+                        "options": opts,
+                        "correctIndex": ci,
+                        "answer": w,
+                    }
+                )
+        elif meaning:
+            template = _CHANNEL_A_GAP_TEMPLATES[fill_idx % len(_CHANNEL_A_GAP_TEMPLATES)]
+            fill_idx += 1
+            fill_items.append(
+                {
+                    "id": f"fill{fill_idx}",
+                    "promptEn": f"Gap fill — «{meaning}»: {template.replace('_____', '______')}",
+                    "answer": w,
+                }
+            )
+    match_pairs = [
+        {"left": wd["word"], "right": m}
+        for wd in pool[:8]
+        if (m := _exam_meaning_channel_a(wd))
+    ][:6]
+    random.shuffle(match_pairs)
+    return _exam_shell(day_number, mcq_items, fill_items, match_pairs)
+
+
+def _build_practice_exam(words: list[dict], day_number: int, *, channel: str = "B") -> dict[str, Any]:
+    if channel == "A":
+        return _build_practice_exam_channel_a(words, day_number)
+    return _build_practice_exam_channel_b(words, day_number)
 
 
 def _grade_practice_exam(exam: dict, answers: dict) -> dict[str, Any]:
@@ -1477,12 +1610,36 @@ def register_self_study_vocabulary_routes(
             return jsonify({"error": "Student session required"}), 401
 
         class_name = _student_class_name(conn, username)
+        if _requested_vocab_channel(conn, class_name) == "A":
+            ref_day = int(request.args.get("day") or 0)
+            if ref_day > 1:
+                day_num = ref_day - 1
+            else:
+                state = _channel_a_state(conn, class_name)
+                if not state:
+                    conn.close()
+                    return jsonify({"words": [], "dayNumber": 0})
+                total = _pack_word_count_for_class(conn, class_name)
+                virtual = _channel_a_virtual_course(state, total)
+                day_num = max(1, _course_day_number(virtual) - 1)
+            built = _channel_a_day_words(conn, class_name, day_num)
+            conn.commit()
+            conn.close()
+            if not built:
+                return jsonify({"words": [], "dayNumber": day_num})
+            words, _extras = built
+            return jsonify({"dayNumber": day_num, "words": words, "mode": "flashcard", "channel": "A"})
+
         course = _active_course(conn, class_name)
         if not course:
             conn.close()
             return jsonify({"error": "No course"}), 404
 
-        day_num = max(1, _course_day_number(course) - 1)
+        ref_day = int(request.args.get("day") or 0)
+        if ref_day > 1:
+            day_num = ref_day - 1
+        else:
+            day_num = max(1, _course_day_number(course) - 1)
         day_row = conn.execute(
             "SELECT words_json FROM vocab_course_days WHERE course_id = ? AND day_number = ?",
             (course["id"], day_num),

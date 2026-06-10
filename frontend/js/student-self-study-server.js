@@ -65,11 +65,11 @@
     return apiFetch(`/api/student/self-study/vocabulary/today?channel=${encodeURIComponent(ch)}`);
   }
 
-  async function getVocabReviewYesterday(channel) {
+  async function getVocabReviewYesterday(channel, dayNumber) {
     const ch = channel || "B";
-    return apiFetch(
-      `/api/student/self-study/vocabulary/review-yesterday?channel=${encodeURIComponent(ch)}`,
-    );
+    const q = new URLSearchParams({ channel: ch });
+    if (dayNumber > 0) q.set("day", String(dayNumber));
+    return apiFetch(`/api/student/self-study/vocabulary/review-yesterday?${q}`);
   }
 
   async function getVocabCalendar(channel) {

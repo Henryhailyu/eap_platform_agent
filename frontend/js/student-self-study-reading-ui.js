@@ -183,7 +183,18 @@
     });
   }
 
+  function renderGenerating(root) {
+    root.innerHTML = `
+      <div class="ssc-generating-card" role="status" aria-live="polite">
+        <div class="ssc-generating-card__spinner" aria-hidden="true"></div>
+        <p class="ssc-generating-card__title">${escapeHtml(t("self_study_reading_generating"))}</p>
+        <p class="ssc-generating-card__hint">${escapeHtml(t("self_study_reading_generating_hint"))}</p>
+      </div>
+    `;
+  }
+
   async function renderExamPanel(root) {
+    renderGenerating(root);
     let data;
     try {
       state.today = null;

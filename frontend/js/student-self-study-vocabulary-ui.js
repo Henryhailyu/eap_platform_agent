@@ -696,7 +696,8 @@
     root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
     let data;
     try {
-      data = await SERVER().getVocabReviewYesterday(state.activeChannel);
+      const reviewRefDay = state.selectedDay || state.today?.dayNumber || 0;
+      data = await SERVER().getVocabReviewYesterday(state.activeChannel, reviewRefDay);
     } catch (e) {
       root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
       return;

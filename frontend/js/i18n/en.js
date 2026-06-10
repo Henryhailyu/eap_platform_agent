@@ -753,6 +753,8 @@ window.EAP_STRINGS_EN = {
   "self_study_reading_game_done": "Argument Sorting complete in {attempts} checks.",
   "self_study_reading_complete": "Reading module complete — great work!",
   "self_study_reading_complete_short": "Today's passage complete",
+  "self_study_reading_generating": "Generating today's reading passage…",
+  "self_study_reading_generating_hint": "AI is preparing your IELTS-style text and questions. This may take up to a minute.",
   "self_study_reading_tab_read": "Read",
   "self_study_reading_day_label": "Day {day}",
   "self_study_reading_mark_read": "Mark passage as read",
