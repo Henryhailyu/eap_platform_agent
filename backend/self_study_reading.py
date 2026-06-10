@@ -919,8 +919,8 @@ def register_self_study_reading_routes(
         if err:
             conn.close()
             return err
-        actor = get_current_authenticated_user(conn) or {}
-        manager_name = str(actor.get("username") or "manager").strip()
+        actor = get_current_authenticated_user(conn)
+        manager_name = str(actor["username"] if actor else "manager").strip() or "manager"
         data = request.get_json(silent=True) or {}
         class_name = normalize_class_name(str(data.get("className") or data.get("class_name") or ""))
         is_active = 1 if data.get("isActive", data.get("is_active", True)) else 0
@@ -1012,8 +1012,8 @@ def register_self_study_reading_routes(
         if err:
             conn.close()
             return err
-        actor = get_current_authenticated_user(conn) or {}
-        manager = str(actor.get("username") or "manager").strip()
+        actor = get_current_authenticated_user(conn)
+        manager = str(actor["username"] if actor else "manager").strip() or "manager"
         class_name = normalize_class_name(str(request.form.get("className") or "EAP047"))
         upload = request.files.get("file")
         if not upload or not upload.filename:

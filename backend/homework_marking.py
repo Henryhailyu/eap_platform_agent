@@ -483,14 +483,20 @@ def _homework_marking_analytics(conn, class_name: str = "", days: int = 0) -> di
         SELECT COUNT(*) AS c FROM homework_marking_profiles WHERE is_active = 1
         """
     ).fetchone()
-    total = int(row["total_reports"] if row else 0)
-    approved = int(row["approved"] if row else 0)
+    def _sum_int(key: str) -> int:
+        if not row:
+            return 0
+        val = row[key]
+        return int(val) if val is not None else 0
+
+    total = _sum_int("total_reports")
+    approved = _sum_int("approved")
     accept_rate = round(100.0 * approved / total, 1) if total else 0.0
 
     by_status = [
-        {"key": "ready", "count": int(row["ready"] if row else 0)},
-        {"key": "pending", "count": int(row["pending"] if row else 0)},
-        {"key": "failed", "count": int(row["failed"] if row else 0)},
+        {"key": "ready", "count": _sum_int("ready")},
+        {"key": "pending", "count": _sum_int("pending")},
+        {"key": "failed", "count": _sum_int("failed")},
         {"key": "approved", "count": approved},
     ]
 
@@ -528,11 +534,11 @@ def _homework_marking_analytics(conn, class_name: str = "", days: int = 0) -> di
         "class_name": cls or None,
         "days": int(days) if days and days > 0 else None,
         "total_reports": total,
-        "ready": int(row["ready"] if row else 0),
-        "pending": int(row["pending"] if row else 0),
-        "failed": int(row["failed"] if row else 0),
+        "ready": _sum_int("ready"),
+        "pending": _sum_int("pending"),
+        "failed": _sum_int("failed"),
         "approved": approved,
-        "regenerated": int(row["regenerated"] if row else 0),
+        "regenerated": _sum_int("regenerated"),
         "accept_rate_pct": accept_rate,
         "active_profiles": int(profiles["c"] if profiles else 0),
         "by_status": by_status,

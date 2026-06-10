@@ -482,8 +482,8 @@ def register_self_study_routes(
         if err is not None:
             conn.close()
             return err
-        actor = get_current_authenticated_user(conn) or {}
-        manager_name = str(actor.get("username") or "manager").strip()
+        actor = get_current_authenticated_user(conn)
+        manager_name = str(actor["username"] if actor else "manager").strip() or "manager"
 
         data = request.get_json(silent=True) or {}
         class_name = normalize_class_name(str(data.get("className") or data.get("class_name") or ""))
