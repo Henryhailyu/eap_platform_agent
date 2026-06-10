@@ -50,6 +50,40 @@
       .replace(/"/g, "&quot;");
   }
 
+  async function deletePack(packId, statusEl, tbody, emptyEl) {
+    if (!window.confirm(t("admin_vocab_delete_confirm"))) return;
+    setStatus(statusEl, "", false);
+    try {
+      await apiFetch(`/api/admin/self-study/vocabulary/packs/${packId}`, { method: "DELETE" });
+      await loadPacks(tbody, emptyEl);
+      setStatus(statusEl, t("admin_vocab_deleted"), false);
+    } catch (e) {
+      setStatus(statusEl, e.message || t("admin_vocab_failed"), true);
+    }
+  }
+
+  async function uploadPackFile(packId, file, statusEl, tbody, emptyEl) {
+    if (!file) return;
+    setStatus(statusEl, t("admin_vocab_uploading"), false);
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("replace", "true");
+    try {
+      const result = await apiFetch(`/api/admin/self-study/vocabulary/packs/${packId}/upload`, {
+        method: "POST",
+        body: fd,
+      });
+      await loadPacks(tbody, emptyEl);
+      setStatus(
+        statusEl,
+        t("admin_vocab_upload_done", { n: String(result.unitCount || 0) }),
+        false,
+      );
+    } catch (e) {
+      setStatus(statusEl, e.message || t("admin_vocab_failed"), true);
+    }
+  }
+
   async function loadPacks(tbody, emptyEl) {
     if (!tbody) return;
     try {
@@ -63,11 +97,36 @@
       if (emptyEl) emptyEl.classList.add("hidden");
       packs.forEach((p) => {
         const tr = document.createElement("tr");
+        const fileHint = p.sourceFilename
+          ? `<span class="admin-vocab-file-tag">${escapeHtml(p.sourceFilename)}</span>`
+          : "";
         tr.innerHTML = `
-          <td>${escapeHtml(p.displayName)}</td>
+          <td>${escapeHtml(p.displayName)}${fileHint ? `<br>${fileHint}` : ""}</td>
           <td>${escapeHtml(p.className || "—")}</td>
+          <td>${escapeHtml(String(p.unitCount || 0))}</td>
+          <td class="admin-table__actions">
+            <label class="btn-secondary admin-vocab-upload-btn">
+              ${escapeHtml(t("admin_vocab_upload"))}
+              <input type="file" class="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" data-pack-upload="${p.id}" />
+            </label>
+            <button type="button" class="btn-secondary admin-vocab-delete-btn" data-pack-delete="${p.id}">${escapeHtml(t("admin_vocab_delete"))}</button>
+          </td>
         `;
         tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll("[data-pack-delete]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = parseInt(btn.getAttribute("data-pack-delete"), 10);
+          void deletePack(id, document.getElementById("admin-vocab-status"), tbody, emptyEl);
+        });
+      });
+      tbody.querySelectorAll("[data-pack-upload]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const id = parseInt(input.getAttribute("data-pack-upload"), 10);
+          const file = input.files && input.files[0];
+          input.value = "";
+          void uploadPackFile(id, file, document.getElementById("admin-vocab-status"), tbody, emptyEl);
+        });
       });
     } catch (_) {
       if (emptyEl) emptyEl.classList.remove("hidden");
@@ -81,19 +140,37 @@
       e.preventDefault();
       const name = document.getElementById("admin-vocab-pack-name")?.value?.trim();
       const cls = document.getElementById("admin-vocab-pack-class")?.value?.trim();
+      const fileInput = document.getElementById("admin-vocab-pack-file");
+      const file = fileInput?.files?.[0];
       if (!name) return;
       setStatus(statusEl, "", false);
       try {
-        await apiFetch("/api/admin/self-study/vocabulary/packs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ displayName: name, className: cls || null }),
-        });
+        if (file) {
+          const fd = new FormData();
+          fd.append("displayName", name);
+          if (cls) fd.append("className", cls);
+          fd.append("file", file);
+          const result = await apiFetch("/api/admin/self-study/vocabulary/packs", {
+            method: "POST",
+            body: fd,
+          });
+          setStatus(
+            statusEl,
+            t("admin_vocab_upload_done", { n: String(result.unitCount || 0) }),
+            false,
+          );
+        } else {
+          await apiFetch("/api/admin/self-study/vocabulary/packs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ displayName: name, className: cls || null }),
+          });
+          setStatus(statusEl, t("admin_vocab_saved"), false);
+        }
         form.reset();
         await loadPacks(tbody, emptyEl);
-        setStatus(statusEl, t("admin_vocab_saved"), false);
-      } catch (_) {
-        setStatus(statusEl, t("admin_vocab_failed"), true);
+      } catch (err) {
+        setStatus(statusEl, err.message || t("admin_vocab_failed"), true);
       }
     });
   }

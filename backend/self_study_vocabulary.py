@@ -10,8 +10,15 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 
 from flask import Response, jsonify, request
+from werkzeug.utils import secure_filename
 
 from self_study import CHANNEL_B_ONLY
+from self_study_vocabulary_ai import parse_vocabulary_upload
+from teaching_page_source_files import (
+    allowed_source_extension,
+    extract_text_from_bytes,
+    normalize_extracted_text,
+)
 
 VOCAB_SKILL = "vocabulary"
 
@@ -439,6 +446,23 @@ def migrate_self_study_vocabulary_tables(conn) -> None:
         conn.execute(
             "ALTER TABLE student_vocab_day_progress ADD COLUMN practice_score_total INTEGER"
         )
+    unit_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocab_material_units)").fetchall()}
+    if "practice_json" not in unit_cols:
+        conn.execute("ALTER TABLE vocab_material_units ADD COLUMN practice_json TEXT")
+    if "games_json" not in unit_cols:
+        conn.execute("ALTER TABLE vocab_material_units ADD COLUMN games_json TEXT")
+    pack_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocab_material_packs)").fetchall()}
+    if "source_filename" not in pack_cols:
+        conn.execute("ALTER TABLE vocab_material_packs ADD COLUMN source_filename TEXT")
+    pack_prog_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(student_vocab_pack_progress)").fetchall()
+    }
+    if "practice_done" not in pack_prog_cols:
+        conn.execute("ALTER TABLE student_vocab_pack_progress ADD COLUMN practice_done INTEGER NOT NULL DEFAULT 0")
+    if "practice_score" not in pack_prog_cols:
+        conn.execute("ALTER TABLE student_vocab_pack_progress ADD COLUMN practice_score INTEGER")
+    if "practice_score_total" not in pack_prog_cols:
+        conn.execute("ALTER TABLE student_vocab_pack_progress ADD COLUMN practice_score_total INTEGER")
 
     seed_default_vocab_course(conn)
 
@@ -590,6 +614,101 @@ def _course_day_number(course: Any, on_date: date | None = None) -> int:
     if not sched["newWords"]:
         return max(1, min(int(course["total_days"]), offset))
     return max(1, min(int(course["total_days"]), offset + 1))
+
+
+def _words_from_upload_units(units_raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert parser output to stored word entries with practice/games per unit."""
+    out: list[dict[str, Any]] = []
+    for i, unit in enumerate(units_raw):
+        words = [_word_entry(w) for w in unit.get("words") or []]
+        if not words:
+            continue
+        out.append(
+            {
+                "label": str(unit.get("label") or f"Unit {i + 1}").strip()[:120],
+                "words": words,
+                "practice": _practice_for_words(words),
+                "games": _game_rounds_for_words(words),
+            }
+        )
+    return out
+
+
+def _insert_pack_units(conn, pack_id: int, units: list[dict[str, Any]], *, replace: bool = True) -> int:
+    now = _now_iso()
+    if replace:
+        conn.execute("DELETE FROM vocab_material_units WHERE pack_id = ?", (pack_id,))
+    existing = conn.execute(
+        "SELECT COALESCE(MAX(unit_order), 0) FROM vocab_material_units WHERE pack_id = ?",
+        (pack_id,),
+    ).fetchone()[0]
+    order_base = int(existing or 0)
+    count = 0
+    for i, unit in enumerate(units):
+        words = unit.get("words") or []
+        if not words:
+            continue
+        practice = unit.get("practice") or _practice_for_words(words)
+        games = unit.get("games") or _game_rounds_for_words(words)
+        conn.execute(
+            """
+            INSERT INTO vocab_material_units
+                (pack_id, unit_label, unit_order, words_json, practice_json, games_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pack_id,
+                unit.get("label") or f"Unit {order_base + i + 1}",
+                order_base + i + 1,
+                json.dumps(words, ensure_ascii=False),
+                json.dumps(practice, ensure_ascii=False),
+                json.dumps(games, ensure_ascii=False),
+                now,
+            ),
+        )
+        count += 1
+    return count
+
+
+def _parse_vocab_upload_file(data: bytes, filename: str, *, pack_name: str = "") -> list[dict[str, Any]]:
+    name = secure_filename(filename) or "vocab.txt"
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else "txt"
+    if ext == "doc":
+        ext = "docx"
+    if not allowed_source_extension(name) and ext not in {"xls", "xlsx"}:
+        raise ValueError("Allowed: pdf, docx, doc, txt, xls, xlsx")
+    extracted = normalize_extracted_text(extract_text_from_bytes(data, ext))
+    if not extracted.strip():
+        raise ValueError("No text extracted from file")
+    units_raw = parse_vocabulary_upload(extracted, pack_name=pack_name)
+    if not units_raw:
+        raise ValueError("No vocabulary words found in file")
+    return _words_from_upload_units(units_raw)
+
+
+def _unit_detail_payload(row: Any, prog: Any | None = None) -> dict[str, Any]:
+    words = json.loads(row["words_json"])
+    practice = json.loads(row["practice_json"] or "null") if row["practice_json"] else None
+    games = json.loads(row["games_json"] or "null") if row["games_json"] else None
+    if not practice:
+        practice = _practice_for_words(words)
+    if not games:
+        games = _game_rounds_for_words(words)
+    return {
+        "id": row["id"],
+        "label": row["unit_label"],
+        "packId": row["pack_id"],
+        "words": words,
+        "practice": practice,
+        "games": games,
+        "wordCount": len(words),
+        "progress": {
+            "learnDone": bool(prog and prog["completed_at"]),
+            "practiceDone": bool(prog and prog["practice_done"]),
+            "practiceScore": prog["practice_score"] if prog else None,
+            "practiceScoreTotal": prog["practice_score_total"] if prog else None,
+        },
+    }
 
 
 def _record_word_history(conn, student: str, words: list[dict], course_id: int) -> None:
@@ -965,22 +1084,27 @@ def register_self_study_vocabulary_routes(
         if err:
             conn.close()
             return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
         row = conn.execute(
             "SELECT * FROM vocab_material_units WHERE id = ?",
             (unit_id,),
         ).fetchone()
-        conn.close()
         if not row:
+            conn.close()
             return jsonify({"error": "Unit not found"}), 404
-        return jsonify(
-            {
-                "unit": {
-                    "id": row["id"],
-                    "label": row["unit_label"],
-                    "words": json.loads(row["words_json"]),
-                }
-            }
-        )
+        prog = conn.execute(
+            """
+            SELECT completed_at, practice_done, practice_score, practice_score_total
+            FROM student_vocab_pack_progress
+            WHERE student_username = ? AND unit_id = ?
+            """,
+            (username, unit_id),
+        ).fetchone()
+        conn.close()
+        return jsonify({"unit": _unit_detail_payload(row, prog)})
 
     @app.route("/api/student/self-study/vocabulary/complete", methods=["POST"])
     def student_vocab_complete():
@@ -1003,13 +1127,29 @@ def register_self_study_vocabulary_routes(
             if not unit_id:
                 conn.close()
                 return jsonify({"error": "unitId required"}), 400
+            practice_done = 1 if data.get("practiceDone") else 0
+            practice_score = data.get("practiceScore")
+            practice_score_total = data.get("practiceScoreTotal")
+            learn_done = data.get("learnDone", True)
+            completed_at = now if learn_done else None
             conn.execute(
                 """
-                INSERT INTO student_vocab_pack_progress (student_username, unit_id, completed_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(student_username, unit_id) DO UPDATE SET completed_at = excluded.completed_at
+                INSERT INTO student_vocab_pack_progress
+                    (student_username, unit_id, completed_at, practice_done,
+                     practice_score, practice_score_total)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(student_username, unit_id) DO UPDATE SET
+                    completed_at = COALESCE(excluded.completed_at, student_vocab_pack_progress.completed_at),
+                    practice_done = CASE
+                        WHEN excluded.practice_done = 1 OR student_vocab_pack_progress.practice_done = 1 THEN 1
+                        ELSE 0
+                    END,
+                    practice_score = COALESCE(excluded.practice_score, student_vocab_pack_progress.practice_score),
+                    practice_score_total = COALESCE(
+                        excluded.practice_score_total, student_vocab_pack_progress.practice_score_total
+                    )
                 """,
-                (username, unit_id, now),
+                (username, unit_id, completed_at, practice_done, practice_score, practice_score_total),
             )
             conn.commit()
             conn.close()
@@ -1077,11 +1217,26 @@ def register_self_study_vocabulary_routes(
             return jsonify({"error": "Student session required"}), 401
 
         data = request.get_json(silent=True) or {}
+        unit_id = int(data.get("unitId") or 0)
+        if unit_id:
+            unit_row = conn.execute(
+                "SELECT words_json, unit_order, unit_label FROM vocab_material_units WHERE id = ?",
+                (unit_id,),
+            ).fetchone()
+            conn.close()
+            if not unit_row:
+                return jsonify({"error": "Unit not found"}), 404
+            words = json.loads(unit_row["words_json"])
+            exam = _build_practice_exam(words, int(unit_row["unit_order"] or 1))
+            exam["titleEn"] = f"{unit_row['unit_label']} — vocabulary practice"
+            exam["titleZh"] = f"{unit_row['unit_label']} — 词汇练习"
+            return jsonify(exam)
+
         course_id = int(data.get("courseId") or 0)
         day_number = int(data.get("dayNumber") or 0)
         if not course_id or not day_number:
             conn.close()
-            return jsonify({"error": "courseId and dayNumber required"}), 400
+            return jsonify({"error": "courseId and dayNumber required, or unitId"}), 400
 
         day_row = conn.execute(
             "SELECT words_json FROM vocab_course_days WHERE course_id = ? AND day_number = ?",
@@ -1122,7 +1277,13 @@ def register_self_study_vocabulary_routes(
             return err
         if request.method == "GET":
             rows = conn.execute(
-                "SELECT * FROM vocab_material_packs ORDER BY sort_order ASC, id ASC"
+                """
+                SELECT p.*,
+                       (SELECT COUNT(*) FROM vocab_material_units u WHERE u.pack_id = p.id) AS unit_count
+                FROM vocab_material_packs p
+                WHERE p.is_active = 1
+                ORDER BY p.sort_order ASC, p.id ASC
+                """
             ).fetchall()
             conn.close()
             return jsonify(
@@ -1134,30 +1295,121 @@ def register_self_study_vocabulary_routes(
                             "className": r["class_name"],
                             "sortOrder": r["sort_order"],
                             "isActive": bool(r["is_active"]),
+                            "unitCount": int(r["unit_count"] or 0),
+                            "sourceFilename": r["source_filename"],
                         }
                         for r in rows
                     ]
                 }
             )
-        data = request.get_json(silent=True) or {}
-        name = str(data.get("displayName") or data.get("display_name") or "").strip()[:200]
+
+        upload = request.files.get("file")
+        if upload and upload.filename:
+            name = str(request.form.get("displayName") or request.form.get("display_name") or "").strip()[:200]
+            cls_raw = str(request.form.get("className") or request.form.get("class_name") or "").strip()
+        else:
+            data = request.get_json(silent=True) or {}
+            name = str(data.get("displayName") or data.get("display_name") or "").strip()[:200]
+            cls_raw = str(data.get("className") or data.get("class_name") or "").strip()
         if not name:
             conn.close()
             return jsonify({"error": "displayName required"}), 400
-        cls = str(data.get("className") or data.get("class_name") or "").strip()
-        cls = normalize_class_name(cls) if cls else None
+        cls = normalize_class_name(cls_raw) if cls_raw else None
         now = _now_iso()
+        source_name = None
+        unit_count = 0
+        if upload and upload.filename:
+            source_name = secure_filename(upload.filename) or "vocab.txt"
+            try:
+                units = _parse_vocab_upload_file(upload.read(), source_name, pack_name=name)
+            except ValueError as exc:
+                conn.close()
+                return jsonify({"error": str(exc)}), 400
+            except Exception as exc:
+                conn.close()
+                return jsonify({"error": f"Upload parse failed: {exc}"}), 400
+        else:
+            units = []
+
         conn.execute(
             """
-            INSERT INTO vocab_material_packs (display_name, class_name, sort_order, is_active, created_at, updated_at)
-            VALUES (?, ?, 0, 1, ?, ?)
+            INSERT INTO vocab_material_packs
+                (display_name, class_name, sort_order, is_active, source_filename, created_at, updated_at)
+            VALUES (?, ?, 0, 1, ?, ?, ?)
             """,
-            (name, cls, now, now),
+            (name, cls, source_name, now, now),
+        )
+        pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if units:
+            unit_count = _insert_pack_units(conn, pid, units, replace=True)
+        conn.commit()
+        conn.close()
+        return jsonify({"id": pid, "displayName": name, "unitCount": unit_count}), 201
+
+    @app.route("/api/admin/self-study/vocabulary/packs/<int:pack_id>", methods=["DELETE"])
+    def admin_vocab_pack_delete(pack_id: int):
+        conn = get_db_connection()
+        err = require_manager_console_role(conn)
+        if err:
+            conn.close()
+            return err
+        row = conn.execute(
+            "SELECT id FROM vocab_material_packs WHERE id = ? AND is_active = 1",
+            (pack_id,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "Pack not found"}), 404
+        now = _now_iso()
+        conn.execute(
+            "UPDATE vocab_material_packs SET is_active = 0, updated_at = ? WHERE id = ?",
+            (now, pack_id),
         )
         conn.commit()
-        pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.close()
-        return jsonify({"id": pid, "displayName": name}), 201
+        return jsonify({"ok": True})
+
+    @app.route("/api/admin/self-study/vocabulary/packs/<int:pack_id>/upload", methods=["POST"])
+    def admin_vocab_pack_upload(pack_id: int):
+        conn = get_db_connection()
+        err = require_manager_console_role(conn)
+        if err:
+            conn.close()
+            return err
+        pack = conn.execute(
+            "SELECT * FROM vocab_material_packs WHERE id = ? AND is_active = 1",
+            (pack_id,),
+        ).fetchone()
+        if not pack:
+            conn.close()
+            return jsonify({"error": "Pack not found"}), 404
+        upload = request.files.get("file")
+        if not upload or not upload.filename:
+            conn.close()
+            return jsonify({"error": "file required"}), 400
+        source_name = secure_filename(upload.filename) or "vocab.txt"
+        try:
+            units = _parse_vocab_upload_file(
+                upload.read(),
+                source_name,
+                pack_name=str(pack["display_name"] or ""),
+            )
+        except ValueError as exc:
+            conn.close()
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            conn.close()
+            return jsonify({"error": f"Upload parse failed: {exc}"}), 400
+        replace = str(request.form.get("replace", "true")).lower() not in ("0", "false", "no")
+        unit_count = _insert_pack_units(conn, pack_id, units, replace=replace)
+        now = _now_iso()
+        conn.execute(
+            "UPDATE vocab_material_packs SET source_filename = ?, updated_at = ? WHERE id = ?",
+            (source_name, now, pack_id),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "unitCount": unit_count, "sourceFilename": source_name})
 
     @app.route("/api/admin/self-study/vocabulary/push-channel-a", methods=["PUT"])
     def admin_vocab_push_channel_a():

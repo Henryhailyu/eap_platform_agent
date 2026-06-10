@@ -318,7 +318,7 @@
               Channel A: push school materials. Channel B: AI course export for manager review.
             </p>
             <p id="admin-vocab-status" class="form-message hidden" role="status" aria-live="polite"></p>
-            <form id="admin-vocab-pack-form" class="admin-inline-form" novalidate>
+            <form id="admin-vocab-pack-form" class="admin-inline-form" novalidate enctype="multipart/form-data">
               <div class="field">
                 <label for="admin-vocab-pack-name" data-i18n="admin_vocab_pack_name">Pack display name</label>
                 <input id="admin-vocab-pack-name" type="text" required maxlength="200" />
@@ -326,6 +326,11 @@
               <div class="field">
                 <label for="admin-vocab-pack-class" data-i18n="admin_vocab_pack_class">Class (optional)</label>
                 <input id="admin-vocab-pack-class" type="text" maxlength="40" placeholder="EAP047" />
+              </div>
+              <div class="field">
+                <label for="admin-vocab-pack-file" data-i18n="admin_vocab_pack_file">Vocabulary file</label>
+                <input id="admin-vocab-pack-file" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" />
+                <p class="field-hint" data-i18n="admin_vocab_pack_file_hint">PDF, Word, Excel, or TXT — AI splits into units with practice &amp; games.</p>
               </div>
               <button type="submit" class="btn-primary" data-i18n="admin_vocab_add_pack">Add pack</button>
             </form>
@@ -335,6 +340,8 @@
                   <tr>
                     <th scope="col" data-i18n="admin_vocab_col_name">Pack name</th>
                     <th scope="col" data-i18n="admin_vocab_col_class">Class</th>
+                    <th scope="col" data-i18n="admin_vocab_col_units">Units</th>
+                    <th scope="col" data-i18n="admin_col_action">Action</th>
                   </tr>
                 </thead>
                 <tbody id="admin-vocab-tbody"></tbody>
