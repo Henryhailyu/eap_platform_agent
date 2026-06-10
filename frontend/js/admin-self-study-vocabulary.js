@@ -151,9 +151,10 @@
     try {
       const result = await postMultipart(`/api/admin/self-study/vocabulary/packs/${packId}/upload`, fd);
       await loadPacks(tbody, emptyEl);
+      const fileTag = result.sourceFilename ? ` (${result.sourceFilename})` : "";
       setStatus(
         statusEl,
-        t("admin_vocab_upload_done", { n: String(result.unitCount || result.wordCount || 0) }),
+        `${t("admin_vocab_upload_done", { n: String(result.wordCount || result.unitCount || 0) })}${fileTag}`,
         false,
       );
     } catch (e) {

@@ -60,20 +60,28 @@
     return apiFetch("/api/student/self-study/vocabulary/overview");
   }
 
-  async function getVocabToday() {
-    return apiFetch("/api/student/self-study/vocabulary/today");
+  async function getVocabToday(channel) {
+    const ch = channel || "B";
+    return apiFetch(`/api/student/self-study/vocabulary/today?channel=${encodeURIComponent(ch)}`);
   }
 
-  async function getVocabReviewYesterday() {
-    return apiFetch("/api/student/self-study/vocabulary/review-yesterday");
+  async function getVocabReviewYesterday(channel) {
+    const ch = channel || "B";
+    return apiFetch(
+      `/api/student/self-study/vocabulary/review-yesterday?channel=${encodeURIComponent(ch)}`,
+    );
   }
 
-  async function getVocabCalendar() {
-    return apiFetch("/api/student/self-study/vocabulary/calendar");
+  async function getVocabCalendar(channel) {
+    const ch = channel || "B";
+    return apiFetch(`/api/student/self-study/vocabulary/calendar?channel=${encodeURIComponent(ch)}`);
   }
 
-  async function getVocabDay(dayNumber) {
-    return apiFetch(`/api/student/self-study/vocabulary/day/${dayNumber}`);
+  async function getVocabDay(dayNumber, channel) {
+    const ch = channel || "B";
+    return apiFetch(
+      `/api/student/self-study/vocabulary/day/${dayNumber}?channel=${encodeURIComponent(ch)}`,
+    );
   }
 
   async function getVocabPackUnits(packId) {

@@ -172,10 +172,13 @@
     });
   }
 
-  function skillHref(skillId, dayNumber) {
+  function skillHref(skillId, dayNumber, channel) {
     const mod = SKILL_MODULES.find((s) => s.id === skillId);
     if (!mod) return "#";
     let href = mod.href;
+    if (skillId === "vocabulary") {
+      href += `&channel=${encodeURIComponent(channel || state.activeChannel || "B")}`;
+    }
     if ((skillId === "vocabulary" || skillId === "reading" || skillId === "listening") && dayNumber) {
       href += `&day=${dayNumber}`;
     }
@@ -196,7 +199,14 @@
     if (skillId === "vocabulary" && channel === "A" && ch === "A" && dayNumber) {
       return {
         type: "link",
-        href: skillHref(skillId, dayNumber),
+        href: skillHref(skillId, dayNumber, "A"),
+        label: t("self_study_open_module"),
+      };
+    }
+    if (skillId === "vocabulary" && channel === "B") {
+      return {
+        type: "link",
+        href: skillHref(skillId, dayNumber, "B"),
         label: t("self_study_open_module"),
       };
     }
@@ -208,7 +218,7 @@
     ) {
       return {
         type: "link",
-        href: `student-self-study-module.html?skill=vocabulary&tab=review`,
+        href: `student-self-study-module.html?skill=vocabulary&tab=review&channel=B`,
         label: t("self_study_vocab_review_yesterday"),
       };
     }
@@ -221,7 +231,7 @@
     }
     return {
       type: "link",
-      href: skillHref(skillId, dayNumber),
+      href: skillHref(skillId, dayNumber, channel),
       label: t("self_study_open_module"),
     };
   }
@@ -273,8 +283,18 @@
     `;
 
     panel.querySelectorAll("[data-ch]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         state.activeChannel = btn.getAttribute("data-ch") || "B";
+        const srv = SERVER();
+        if (srv) {
+          try {
+            state.calData = await srv.getVocabCalendar(state.activeChannel);
+          } catch (_) {
+            state.calData = { days: [] };
+          }
+        }
+        const calRoot = document.getElementById("ssc-cal-root");
+        if (calRoot) renderCalendarGrid(calRoot);
         renderDayPanel(panel);
       });
     });
@@ -306,12 +326,9 @@
         state.overview = null;
       }
       try {
-        state.calData = await srv.getVocabCalendar();
+        state.calData = await srv.getVocabCalendar(state.activeChannel);
       } catch (_) {
         state.calData = { days: [] };
-      }
-      if (state.overview?.skills?.vocabulary?.channel === "A") {
-        state.activeChannel = "A";
       }
     }
 

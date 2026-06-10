@@ -169,6 +169,7 @@
     overview: null,
     today: null,
     selectedDay: null,
+    activeChannel: "B",
     activeTab: "learn",
     practiceRetake: false,
     packId: null,
@@ -213,7 +214,7 @@
   }
 
   function renderChannelBanner(overview) {
-    const active = overview.channel === "A" ? "A" : "B";
+    const active = state.activeChannel || "B";
     const aOn = overview.channelAEnabled ? t("self_study_vocab_channel_on") : t("self_study_vocab_channel_off");
     const bOn = overview.channelBActive ? t("self_study_vocab_channel_on") : t("self_study_vocab_channel_standby");
     const sched = overview.todaySchedule ? scheduleLabel(overview.todaySchedule) : "";
@@ -283,7 +284,7 @@
 
   function rebuildTabChrome(shell) {
     if (!shell || !state.overview) return;
-    const channel = state.overview.channel || "B";
+    const channel = state.activeChannel || "B";
     const tabs = buildTabs(channel);
     const allowed = new Set(tabs.map((x) => x.id));
     if (!allowed.has(state.activeTab)) {
@@ -315,14 +316,14 @@
     if (state.selectedDay) {
       root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
       try {
-        state.today = await SERVER().getVocabDay(state.selectedDay);
+        state.today = await SERVER().getVocabDay(state.selectedDay, state.activeChannel);
       } catch (e) {
         root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
         return;
       }
     } else if (!state.today) {
       try {
-        state.today = await SERVER().getVocabToday();
+        state.today = await SERVER().getVocabToday(state.activeChannel);
       } catch (e) {
         root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
         return;
@@ -522,8 +523,8 @@
     if (!state.today) {
       try {
         state.today = state.selectedDay
-          ? await SERVER().getVocabDay(state.selectedDay)
-          : await SERVER().getVocabToday();
+          ? await SERVER().getVocabDay(state.selectedDay, state.activeChannel)
+          : await SERVER().getVocabToday(state.activeChannel);
       } catch (e) {
         root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
         return;
@@ -543,13 +544,14 @@
     let exam;
     try {
       exam =
-        data.channel === "A"
+        state.activeChannel === "A"
           ? await SERVER().getVocabPracticeExam({
               channel: "A",
               className: state.overview.className,
               dayNumber: data.dayNumber,
             })
           : await SERVER().getVocabPracticeExam({
+              channel: "B",
               courseId: data.courseId,
               dayNumber: data.dayNumber,
             });
@@ -694,7 +696,7 @@
     root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
     let data;
     try {
-      data = await SERVER().getVocabReviewYesterday();
+      data = await SERVER().getVocabReviewYesterday(state.activeChannel);
     } catch (e) {
       root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
       return;
@@ -753,8 +755,8 @@
     if (!state.today || !state.today.games) {
       try {
         state.today = state.selectedDay
-          ? await SERVER().getVocabDay(state.selectedDay)
-          : await SERVER().getVocabToday();
+          ? await SERVER().getVocabDay(state.selectedDay, state.activeChannel)
+          : await SERVER().getVocabToday(state.activeChannel);
       } catch (_) {
         return null;
       }
@@ -793,7 +795,7 @@
     root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
     let data;
     try {
-      data = await SERVER().getVocabCalendar();
+      data = await SERVER().getVocabCalendar(state.activeChannel);
     } catch (e) {
       root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
       return;
@@ -949,6 +951,8 @@
     const params = new URLSearchParams(global.location.search);
     const dayParam = parseInt(params.get("day") || "", 10);
     const tabParam = params.get("tab") || "";
+    const channelParam = String(params.get("channel") || "B").toUpperCase();
+    state.activeChannel = channelParam === "A" ? "A" : "B";
     if (dayParam > 0) state.selectedDay = dayParam;
     try {
       const st = await SERVER().getStatus();
@@ -957,7 +961,7 @@
       state.placementLevel = "intermediate";
     }
 
-    const channel = state.overview.channel || "B";
+    const channel = state.activeChannel || "B";
     let defaultTab = "learn";
     const allowedTabs = buildTabs(channel).map((x) => x.id);
     if (tabParam && allowedTabs.includes(tabParam)) defaultTab = tabParam;
