@@ -98,22 +98,18 @@
   async function modifyPackFiles(packId, fileList, statusEl, tbody, emptyEl) {
     const files = fileList ? Array.from(fileList) : [];
     if (!files.length) return;
-
-    const replace = window.confirm(t("admin_vocab_modify_confirm"));
-    const append = !replace;
+    if (!window.confirm(t("admin_vocab_modify_confirm"))) return;
 
     setStatus(statusEl, t("admin_vocab_uploading"), false);
     const fd = new FormData();
     files.forEach((file) => fd.append("files", file));
-    fd.append("replace", append ? "false" : "true");
+    fd.append("replace", "true");
     try {
       const result = await postMultipart(`/api/admin/self-study/vocabulary/packs/${packId}/upload`, fd);
       await loadPacks(tbody, emptyEl);
       setStatus(
         statusEl,
-        append
-          ? t("admin_vocab_modify_appended", { n: String(result.unitCount || 0) })
-          : t("admin_vocab_upload_done", { n: String(result.unitCount || 0) }),
+        t("admin_vocab_upload_done", { n: String(result.unitCount || result.wordCount || 0) }),
         false,
       );
     } catch (e) {

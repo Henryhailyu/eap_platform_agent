@@ -12,24 +12,31 @@ Help students learn academic vocabulary efficiently with AI: **记** (acquire) v
 
 ## Student UI
 
-Two panels:
+Two channels:
 
-1. **教务资料 (Channel A)** — multiple manager packs; student chooses pack; **free progress**
+1. **教务资料 (Channel A)** — manager-uploaded word list; **30 words/day** (same cadence as Channel B)
 2. **自主学习 (Channel B)** — AI-approved monthly course; **30 words/day** calendar
 
 **Daily channel:** `A` if manager pushed vocab for class, else `B` (see parent doc).
 
 ---
 
-## Channel A — Manager uploads
+## Channel A — Manager uploads (updated Jun 2026)
 
 | Field | Notes |
 |-------|--------|
 | `display_name` | Required, e.g. *Merriam-Webster Vocabulary Builder 词汇学习* |
-| Files | PDF, Word, Excel, etc. |
-| Structure | By **chapter / unit** |
-| Scope | Class or global |
-| Progress | Student-driven, no daily word cap |
+| Files | PDF, Word, Excel, TXT — one or more per pack |
+| AI parse | Upload → AI/rule parse → flat ordered word bank per pack |
+| Scope | Class or global (latest pack for class wins on push) |
+| Student delivery | **30 words per new-word day**, same week pattern as Channel B |
+| Overflow | Words beyond the daily 30 on a given day are **not** pushed that day; they roll to later new-word days |
+| Completion | When a new-word day has **fewer than 30** words remaining in the pack, deliver the remainder and **Channel A stops** (push auto-disabled for the class) |
+| Modify | Manager **Modify** replaces the pack word bank and resets Channel A delivery for that class |
+
+### Channel A vs old “free pack” model
+
+Previously Channel A used student-chosen packs/units with free progress. **Current behaviour:** once Channel A is enabled, students see **today’s 30 words** (learn · practice · games) like Channel B — not a pack browser.
 
 ---
 
@@ -88,13 +95,15 @@ Stop all vocab pushes; optional manual review on Web.
 
 ## Entities (conceptual)
 
-`VocabularyMaterialPack` · `VocabularyCourse` · `VocabularyWord` · `StudentVocabularyProgress` · `StudentWordHistory` (dedup)
+`VocabularyMaterialPack` · `VocabularyPackWord` · `VocabularyChannelAState` · `VocabularyCourse` · `VocabularyWord` · `StudentVocabularyProgress` · `StudentWordHistory` (dedup)
 
 ---
 
 ## UAT hints
 
-- Manager push EAP047 list → student sees Channel A daily  
+- Manager upload AWL PDF → enable Channel A for EAP047 → student sees 30 words/day (learn + practice + games)  
+- Pack with 65 words → days 1–2: 30 each, day 3: 5 words → Channel A completes  
+- Modify pack with new file → word bank and filename update; delivery resets  
 - No push → Channel B 30 words at 19:00 (App)  
 - Friday no new words; weekend review window  
 - Export CSV analytics (Manager HM-M4 is homework marking — separate)

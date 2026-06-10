@@ -234,20 +234,6 @@
   }
 
   function buildTabs(channel) {
-    if (channel === "A") {
-      const tabs = [
-        { id: "packs", labelKey: "self_study_vocab_tab_packs" },
-        { id: "learn", labelKey: "self_study_tab_learn" },
-      ];
-      if (state.unitId) {
-        tabs.push(
-          { id: "practice", labelKey: "self_study_tab_practice" },
-          { id: "game_star", labelKey: "self_study_vocab_tab_game_star" },
-          { id: "game_race", labelKey: "self_study_vocab_tab_game_race" },
-        );
-      }
-      return tabs;
-    }
     return [
       { id: "learn", labelKey: "self_study_tab_learn" },
       { id: "practice", labelKey: "self_study_tab_practice" },
@@ -326,46 +312,6 @@
   }
 
   async function renderLearnPanel(root) {
-    if (state.overview.channel === "A") {
-      if (!state.unitId) {
-        root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_pick_unit")}</p>`;
-        return;
-      }
-      if (!state.unitWords) {
-        root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
-        try {
-          const data = await SERVER().getVocabUnit(state.unitId);
-          state.unitWords = data.unit;
-        } catch (e) {
-          root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
-          return;
-        }
-      }
-      const words = state.unitWords.words || [];
-      const prog = state.unitWords.progress || {};
-      updateHeader(progressPct(prog), t("self_study_vocab_pack_learn_hint"));
-      root.innerHTML = `
-        <div class="ssc-lesson-card">
-          <h2>${escapeHtml(state.unitWords.label || "")}</h2>
-          <p>${t("self_study_vocab_pack_learn_hint")}</p>
-        </div>
-        <div class="ssc-word-grid">${words.map(renderAffixCard).join("")}</div>
-        <div class="ssc-placement-actions">
-          <button type="button" class="btn-primary" id="ssc-unit-done">${t("self_study_vocab_mark_unit_done")}</button>
-        </div>
-      `;
-      document.getElementById("ssc-unit-done")?.addEventListener("click", async () => {
-        try {
-          await SERVER().completeVocab({ kind: "unit", unitId: state.unitId, learnDone: true });
-          state.unitWords = null;
-          root.insertAdjacentHTML("beforeend", `<p class="ssc-vocab-success" role="status">${t("self_study_vocab_unit_saved")}</p>`);
-        } catch (e) {
-          alert(e.message);
-        }
-      });
-      return;
-    }
-
     if (state.selectedDay) {
       root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
       try {
@@ -378,16 +324,22 @@
       try {
         state.today = await SERVER().getVocabToday();
       } catch (e) {
-        if (e.message && e.message.includes("Channel A")) {
-          root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_use_packs")}</p>`;
-          return;
-        }
         root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
         return;
       }
     }
 
     const data = state.today;
+    if (data.channelAComplete) {
+      root.innerHTML = `
+        <div class="ssc-banner">
+          <h2>${t("self_study_vocab_channel_a_complete")}</h2>
+          <p>${escapeHtml(data.message || "")}</p>
+        </div>
+      `;
+      updateHeader(100, t("self_study_vocab_channel_a_complete"));
+      return;
+    }
     if (!data.newWords) {
       root.innerHTML = `
         <div class="ssc-banner">
@@ -417,6 +369,7 @@
         ${data.schedule ? `<p class="ssc-vocab-sched">${scheduleLabel(data.schedule)}</p>` : ""}
       </div>
       <div class="ssc-word-grid">${words.map((w, i) => renderAffixCard(w, i)).join("")}</div>
+      ${data.channel === "A" ? `<p class="ssc-vocab-hint">${t("self_study_vocab_channel_a_daily_hint")}</p>` : ""}
       <div class="ssc-placement-actions">
         <button type="button" class="btn-primary" id="ssc-learn-done-btn">${prog.learnDone ? t("self_study_vocab_learn_reviewed") : t("self_study_vocab_mark_learn")}</button>
       </div>
@@ -441,19 +394,67 @@
 
     document.getElementById("ssc-learn-done-btn")?.addEventListener("click", async () => {
       try {
-        await SERVER().completeVocab({
-          kind: "day",
-          courseId: data.courseId,
-          dayNumber: data.dayNumber,
-          learnDone: true,
-          practiceDone: prog.practiceDone,
-          practiceScore: prog.practiceScore,
-        });
+        const body =
+          data.channel === "A"
+            ? {
+                kind: "channel_a",
+                className: state.overview.className,
+                dayNumber: data.dayNumber,
+                learnDone: true,
+                practiceDone: prog.practiceDone,
+                practiceScore: prog.practiceScore,
+              }
+            : {
+                kind: "day",
+                courseId: data.courseId,
+                dayNumber: data.dayNumber,
+                learnDone: true,
+                practiceDone: prog.practiceDone,
+                practiceScore: prog.practiceScore,
+              };
+        await SERVER().completeVocab(body);
         state.today = null;
         await renderLearnPanel(root);
       } catch (e) {
         alert(e.message);
       }
+    });
+  }
+
+  function orderedParts(item, answers) {
+    const parts = item.parts || [];
+    const saved = answers[item.id];
+    if (Array.isArray(saved) && saved.length === parts.length) {
+      return saved.map((idx) => parts[idx]).filter(Boolean);
+    }
+    return parts;
+  }
+
+  function bindOrderDragLists(root, answers) {
+    root.querySelectorAll(".ssc-exam-order").forEach((list) => {
+      const orderId = list.getAttribute("data-order");
+      let dragEl = null;
+      list.querySelectorAll("li[draggable]").forEach((li) => {
+        li.addEventListener("dragstart", (ev) => {
+          dragEl = li;
+          li.classList.add("ssc-exam-order__drag");
+          if (ev.dataTransfer) ev.dataTransfer.effectAllowed = "move";
+        });
+        li.addEventListener("dragend", () => {
+          li.classList.remove("ssc-exam-order__drag");
+          dragEl = null;
+          answers[orderId] = [...list.querySelectorAll("li[data-idx]")].map((el) =>
+            parseInt(el.getAttribute("data-idx"), 10),
+          );
+        });
+        li.addEventListener("dragover", (ev) => {
+          ev.preventDefault();
+          if (!dragEl || dragEl === li) return;
+          const rect = li.getBoundingClientRect();
+          const after = ev.clientY > rect.top + rect.height / 2;
+          list.insertBefore(dragEl, after ? li.nextSibling : li);
+        });
+      });
     });
   }
 
@@ -482,25 +483,29 @@
       return items
         .map((item) => {
           const pairs = item.pairs || [];
+          const rights = [...new Set(pairs.map((x) => x.right))];
           return `<div class="ssc-exam-item"><p class="ssc-exam-prompt">${escapeHtml(item.promptEn || t("self_study_exam_match"))}</p>
-            <ul class="ssc-exam-match">${pairs.map((p) => `<li><span>${escapeHtml(p.left)}</span> → <select data-match="${escapeHtml(item.id)}" data-left="${escapeHtml(p.left)}">${["", ...pairs.map((x) => x.right)].map((r) => `<option value="${escapeHtml(r)}"${answers[`${item.id}:${p.left}`] === r ? " selected" : ""}>${escapeHtml(r || "—")}</option>`).join("")}</select></li>`).join("")}</ul></div>`;
+            <ul class="ssc-exam-match">${pairs.map((p) => `<li><span class="ssc-exam-match__left">${escapeHtml(p.left)}</span><select class="ssc-exam-select" data-match="${escapeHtml(item.id)}" data-left="${escapeHtml(p.left)}">${["", ...rights].map((r) => `<option value="${escapeHtml(r)}"${answers[`${item.id}:${p.left}`] === r ? " selected" : ""}>${escapeHtml(r || "—")}</option>`).join("")}</select></li>`).join("")}</ul></div>`;
         })
         .join("");
     }
     if (type === "order") {
       return items
         .map((item) => {
-          const parts = item.parts || [];
+          const parts = orderedParts(item, answers);
+          const idxMap = (item.parts || []).map((p) => parts.indexOf(p));
           return `<div class="ssc-exam-item"><p class="ssc-exam-prompt">${escapeHtml(item.promptEn || t("self_study_exam_order"))}</p>
-            <ol class="ssc-exam-order" data-order="${escapeHtml(item.id)}">${parts.map((p, i) => `<li draggable="true" data-idx="${i}">${escapeHtml(p)}</li>`).join("")}</ol></div>`;
+            <ol class="ssc-exam-order" data-order="${escapeHtml(item.id)}">${parts.map((p, i) => {
+              const origIdx = (item.parts || []).indexOf(p);
+              return `<li draggable="true" data-idx="${origIdx >= 0 ? origIdx : i}">${escapeHtml(p)}</li>`;
+            }).join("")}</ol></div>`;
         })
         .join("");
     }
     if (type === "writing") {
       const val = answers.writing || "";
       return `<div class="ssc-exam-item ssc-exam-writing">
-        <h3>${escapeHtml(section.titleEn || t("self_study_exam_writing_title"))}</h3>
-        <p>${escapeHtml(itemPrompt(section))}</p>
+        <p class="ssc-exam-prompt">${escapeHtml(itemPrompt(section))}</p>
         <textarea id="ssc-exam-writing" class="ssc-exam-textarea" rows="10" placeholder="${t("self_study_exam_writing_ph")}">${escapeHtml(val)}</textarea>
         <p class="ssc-exam-wordcount" id="ssc-exam-wc">${t("self_study_exam_word_count", { n: String(val.trim().split(/\s+/).filter(Boolean).length) })}</p>
       </div>`;
@@ -514,138 +519,6 @@
   }
 
   async function renderPracticePanel(root) {
-    if (state.overview?.channel === "A") {
-      if (!state.unitId) {
-        root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_pick_unit")}</p>`;
-        return;
-      }
-      if (!state.unitWords) {
-        root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
-        try {
-          state.unitWords = (await SERVER().getVocabUnit(state.unitId)).unit;
-        } catch (e) {
-          root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
-          return;
-        }
-      }
-      const unitData = state.unitWords;
-      const prog = unitData.progress || {};
-      if (!(unitData.words || []).length) {
-        root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_no_practice_today")}</p>`;
-        return;
-      }
-      root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
-      let exam;
-      try {
-        exam = await SERVER().getVocabPracticeExam({ unitId: state.unitId });
-      } catch (e) {
-        root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
-        return;
-      }
-      const sections = exam.sections || [];
-      if (!sections.length) {
-        root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_no_practice_today")}</p>`;
-        return;
-      }
-      const answers = {};
-      async function submitUnitExam() {
-        const btn = document.getElementById("ssc-exam-submit");
-        if (btn) btn.disabled = true;
-        root.querySelectorAll(".ssc-exam-order").forEach((list) => {
-          const orderId = list.getAttribute("data-order");
-          answers[orderId] = [...list.querySelectorAll("li[data-idx]")].map((el) =>
-            parseInt(el.getAttribute("data-idx"), 10),
-          );
-        });
-        try {
-          const result = await SERVER().gradeVocabPracticeExam({ answers, exam });
-          await SERVER().completeVocab({
-            kind: "unit",
-            unitId: state.unitId,
-            learnDone: prog.learnDone,
-            practiceDone: true,
-            practiceScore: result.score || 0,
-            practiceScoreTotal: result.total || estimateExamTotal(exam),
-          });
-          state.practiceRetake = false;
-          state.unitWords = null;
-          root.innerHTML = `
-            <div class="ssc-report">
-              <h2>${t("self_study_vocab_practice_done")}</h2>
-              <p>${t("self_study_vocab_practice_score", { correct: String(result.score || 0), total: String(result.total || 0) })}</p>
-              ${result.writingFeedback ? `<div class="ssc-exam-feedback"><h3>${t("self_study_exam_writing_feedback")}</h3><p>${escapeHtml(result.writingFeedback)}</p></div>` : ""}
-            </div>
-          `;
-          updateHeader(100, t("self_study_vocab_complete_short"));
-        } catch (e) {
-          alert(e.message);
-          if (btn) btn.disabled = false;
-        }
-      }
-      function bindUnitExamInteractions() {
-        root.querySelectorAll(".ssc-option").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            answers[btn.getAttribute("data-q")] = parseInt(btn.getAttribute("data-i"), 10);
-            renderUnitExam();
-          });
-        });
-        root.querySelectorAll("[data-fill]").forEach((inp) => {
-          inp.addEventListener("input", () => {
-            answers[inp.getAttribute("data-fill")] = inp.value;
-          });
-        });
-        root.querySelectorAll("[data-match]").forEach((sel) => {
-          sel.addEventListener("change", () => {
-            const id = sel.getAttribute("data-match");
-            const left = sel.getAttribute("data-left");
-            answers[`${id}:${left}`] = sel.value;
-          });
-        });
-        const ta = document.getElementById("ssc-exam-writing");
-        if (ta) {
-          ta.addEventListener("input", () => {
-            answers.writing = ta.value;
-            const wc = ta.value.trim().split(/\s+/).filter(Boolean).length;
-            const wcEl = document.getElementById("ssc-exam-wc");
-            if (wcEl) wcEl.textContent = t("self_study_exam_word_count", { n: String(wc) });
-          });
-        }
-      }
-      function renderUnitExam() {
-        root.innerHTML = `
-          <div class="ssc-exam">
-            <header class="ssc-exam-header">
-              <h2>${t("self_study_exam_title")}</h2>
-              <p>${escapeHtml(exam.titleEn || "")}</p>
-            </header>
-            ${sections.map((sec) => `<section class="ssc-exam-section"><h3>${escapeHtml(sec.titleEn || sec.type || "")}</h3>${renderExamSection(sec, answers)}</section>`).join("")}
-            <div class="ssc-placement-actions">
-              <button type="button" class="btn-primary" id="ssc-exam-submit">${t("self_study_exam_submit")}</button>
-            </div>
-          </div>
-        `;
-        bindUnitExamInteractions();
-        document.getElementById("ssc-exam-submit")?.addEventListener("click", () => void submitUnitExam());
-      }
-      const examTotal = prog.practiceScoreTotal || estimateExamTotal(exam);
-      if (prog.practiceDone && !state.practiceRetake) {
-        root.innerHTML = `
-          <div class="ssc-report">
-            <h2>${t("self_study_vocab_practice_done")}</h2>
-            <p>${t("self_study_vocab_practice_score", { correct: String(prog.practiceScore ?? 0), total: String(examTotal) })}</p>
-            <button type="button" class="btn-secondary" id="ssc-practice-redo">${t("self_study_vocab_redo")}</button>
-          </div>
-        `;
-        document.getElementById("ssc-practice-redo")?.addEventListener("click", () => {
-          state.practiceRetake = true;
-          renderUnitExam();
-        });
-        return;
-      }
-      renderUnitExam();
-      return;
-    }
-
     if (!state.today) {
       try {
         state.today = state.selectedDay
@@ -657,6 +530,10 @@
       }
     }
     const data = state.today;
+    if (data.channelAComplete) {
+      root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_channel_a_complete")}</p>`;
+      return;
+    }
     if (!data.newWords || !(data.words || []).length) {
       root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_no_practice_today")}</p>`;
       return;
@@ -665,10 +542,17 @@
     root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
     let exam;
     try {
-      exam = await SERVER().getVocabPracticeExam({
-        courseId: data.courseId,
-        dayNumber: data.dayNumber,
-      });
+      exam =
+        data.channel === "A"
+          ? await SERVER().getVocabPracticeExam({
+              channel: "A",
+              className: state.overview.className,
+              dayNumber: data.dayNumber,
+            })
+          : await SERVER().getVocabPracticeExam({
+              courseId: data.courseId,
+              dayNumber: data.dayNumber,
+            });
     } catch (e) {
       root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
       return;
@@ -686,8 +570,11 @@
     function bindExamInteractions() {
       root.querySelectorAll(".ssc-option").forEach((btn) => {
         btn.addEventListener("click", () => {
-          answers[btn.getAttribute("data-q")] = parseInt(btn.getAttribute("data-i"), 10);
-          renderExam();
+          const qid = btn.getAttribute("data-q");
+          answers[qid] = parseInt(btn.getAttribute("data-i"), 10);
+          root.querySelectorAll(`.ssc-option[data-q="${qid}"]`).forEach((el) => {
+            el.classList.toggle("ssc-option--selected", el === btn);
+          });
         });
       });
       root.querySelectorAll("[data-fill]").forEach((inp) => {
@@ -711,30 +598,7 @@
           if (wcEl) wcEl.textContent = t("self_study_exam_word_count", { n: String(wc) });
         });
       }
-      root.querySelectorAll(".ssc-exam-order").forEach((list) => {
-        const orderId = list.getAttribute("data-order");
-        let dragEl = null;
-        list.querySelectorAll("li[draggable]").forEach((li) => {
-          li.addEventListener("dragstart", () => {
-            dragEl = li;
-            li.classList.add("ssc-exam-order__drag");
-          });
-          li.addEventListener("dragend", () => {
-            li.classList.remove("ssc-exam-order__drag");
-            dragEl = null;
-            answers[orderId] = [...list.querySelectorAll("li[data-idx]")].map((el) =>
-              parseInt(el.getAttribute("data-idx"), 10),
-            );
-          });
-          li.addEventListener("dragover", (ev) => {
-            ev.preventDefault();
-            if (!dragEl || dragEl === li) return;
-            const rect = li.getBoundingClientRect();
-            const after = ev.clientY > rect.top + rect.height / 2;
-            list.insertBefore(dragEl, after ? li.nextSibling : li);
-          });
-        });
-      });
+      bindOrderDragLists(root, answers);
     }
 
     async function submitExam() {
@@ -753,15 +617,27 @@
           answers,
           exam,
         });
-        await SERVER().completeVocab({
-          kind: "day",
-          courseId: data.courseId,
-          dayNumber: data.dayNumber,
-          learnDone: prog.learnDone,
-          practiceDone: true,
-          practiceScore: result.score || 0,
-          practiceScoreTotal: result.total || estimateExamTotal(exam),
-        });
+        const completeBody =
+          data.channel === "A"
+            ? {
+                kind: "channel_a",
+                className: state.overview.className,
+                dayNumber: data.dayNumber,
+                learnDone: prog.learnDone,
+                practiceDone: true,
+                practiceScore: result.score || 0,
+                practiceScoreTotal: result.total || estimateExamTotal(exam),
+              }
+            : {
+                kind: "day",
+                courseId: data.courseId,
+                dayNumber: data.dayNumber,
+                learnDone: prog.learnDone,
+                practiceDone: true,
+                practiceScore: result.score || 0,
+                practiceScoreTotal: result.total || estimateExamTotal(exam),
+              };
+        await SERVER().completeVocab(completeBody);
         state.practiceRetake = false;
         state.today = null;
         root.innerHTML = `
@@ -874,16 +750,6 @@
   }
 
   async function ensureGamesData() {
-    if (state.overview?.channel === "A" && state.unitId) {
-      if (!state.unitWords) {
-        try {
-          state.unitWords = (await SERVER().getVocabUnit(state.unitId)).unit;
-        } catch (_) {
-          return null;
-        }
-      }
-      return state.unitWords.games;
-    }
     if (!state.today || !state.today.games) {
       try {
         state.today = state.selectedDay
@@ -897,10 +763,6 @@
   }
 
   async function renderGamePanel(root, mode) {
-    if (state.overview?.channel === "A" && !state.unitId) {
-      root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_pick_unit")}</p>`;
-      return;
-    }
     const games = await ensureGamesData();
     if (!games || !global.EAP_VOCAB_GAMES) {
       root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_vocab_no_practice_today")}</p>`;
@@ -1096,7 +958,7 @@
     }
 
     const channel = state.overview.channel || "B";
-    let defaultTab = channel === "A" ? "packs" : "learn";
+    let defaultTab = "learn";
     const allowedTabs = buildTabs(channel).map((x) => x.id);
     if (tabParam && allowedTabs.includes(tabParam)) defaultTab = tabParam;
     state.activeTab = defaultTab;

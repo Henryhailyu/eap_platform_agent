@@ -13,7 +13,7 @@ from flask import Response, jsonify, request
 from werkzeug.utils import secure_filename
 
 from self_study import CHANNEL_B_ONLY
-from self_study_vocabulary_ai import parse_vocabulary_upload
+from self_study_vocabulary_ai import clean_vocab_extracted_text, parse_vocabulary_upload
 from teaching_page_source_files import (
     allowed_source_extension,
     extract_text_from_bytes,
@@ -21,6 +21,7 @@ from teaching_page_source_files import (
 )
 
 VOCAB_SKILL = "vocabulary"
+CHANNEL_A_DAILY_WORDS = 30
 
 DAY1_SEED_WORDS: list[dict[str, Any]] = [
     {"word": "precursor", "prefix": "pre", "root": "cur", "suffix": "or", "core": "one that runs ahead", "method": "affix"},
@@ -463,8 +464,91 @@ def migrate_self_study_vocabulary_tables(conn) -> None:
         conn.execute("ALTER TABLE student_vocab_pack_progress ADD COLUMN practice_score INTEGER")
     if "practice_score_total" not in pack_prog_cols:
         conn.execute("ALTER TABLE student_vocab_pack_progress ADD COLUMN practice_score_total INTEGER")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vocab_pack_words (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pack_id INTEGER NOT NULL,
+            word_order INTEGER NOT NULL,
+            word_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (pack_id) REFERENCES vocab_material_packs(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vocab_channel_a_state (
+            class_name TEXT PRIMARY KEY,
+            pack_id INTEGER NOT NULL,
+            start_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'active',
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (pack_id) REFERENCES vocab_material_packs(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vocab_channel_a_days (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_name TEXT NOT NULL,
+            pack_id INTEGER NOT NULL,
+            day_number INTEGER NOT NULL,
+            words_json TEXT NOT NULL,
+            practice_json TEXT,
+            games_json TEXT,
+            UNIQUE(class_name, day_number),
+            FOREIGN KEY (pack_id) REFERENCES vocab_material_packs(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS student_vocab_channel_a_progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_username TEXT NOT NULL,
+            class_name TEXT NOT NULL,
+            day_number INTEGER NOT NULL,
+            learn_done INTEGER NOT NULL DEFAULT 0,
+            practice_done INTEGER NOT NULL DEFAULT 0,
+            practice_score INTEGER,
+            practice_score_total INTEGER,
+            completed_at TEXT,
+            UNIQUE(student_username, class_name, day_number)
+        )
+        """
+    )
 
+    _backfill_pack_words_from_units(conn)
     seed_default_vocab_course(conn)
+
+
+def _backfill_pack_words_from_units(conn) -> None:
+    packs = conn.execute(
+        "SELECT id FROM vocab_material_packs WHERE is_active = 1"
+    ).fetchall()
+    for pack in packs:
+        pack_id = int(pack["id"])
+        if _pack_word_count(conn, pack_id) > 0:
+            continue
+        rows = conn.execute(
+            """
+            SELECT words_json FROM vocab_material_units
+            WHERE pack_id = ?
+            ORDER BY unit_order ASC, id ASC
+            """,
+            (pack_id,),
+        ).fetchall()
+        if not rows:
+            continue
+        units: list[dict[str, Any]] = []
+        for row in rows:
+            words = json.loads(row["words_json"])
+            if words:
+                units.append({"label": "Imported", "words": words})
+        if units:
+            _sync_pack_word_bank(conn, pack_id, units, replace=True)
 
 
 def _exam_max_total(exam: dict) -> int:
@@ -667,7 +751,11 @@ def _insert_pack_units(conn, pack_id: int, units: list[dict[str, Any]], *, repla
             ),
         )
         count += 1
-    return count
+    word_count = _sync_pack_word_bank(conn, pack_id, units, replace=replace)
+    if word_count == 0 and units:
+        for unit in units:
+            word_count += len(unit.get("words") or [])
+    return max(count, word_count)
 
 
 def _parse_vocab_upload_file(data: bytes, filename: str, *, pack_name: str = "") -> list[dict[str, Any]]:
@@ -677,7 +765,9 @@ def _parse_vocab_upload_file(data: bytes, filename: str, *, pack_name: str = "")
         ext = "docx"
     if not allowed_source_extension(name) and ext not in {"xls", "xlsx"}:
         raise ValueError(f"Unsupported file type: {name}")
-    extracted = normalize_extracted_text(extract_text_from_bytes(data, ext))
+    extracted = clean_vocab_extracted_text(
+        normalize_extracted_text(extract_text_from_bytes(data, ext))
+    )
     if not extracted.strip():
         raise ValueError(f"No text extracted from {name}")
     units_raw = parse_vocabulary_upload(extracted, pack_name=pack_name)
@@ -708,6 +798,252 @@ def _parse_vocab_upload_files(
     if not merged:
         raise ValueError("No vocabulary units parsed from uploaded files")
     return merged, ", ".join(names)[:500]
+
+
+def _sync_pack_word_bank(
+    conn,
+    pack_id: int,
+    units: list[dict[str, Any]],
+    *,
+    replace: bool = True,
+) -> int:
+    now = _now_iso()
+    if replace:
+        conn.execute("DELETE FROM vocab_pack_words WHERE pack_id = ?", (pack_id,))
+    order_base = 0
+    if not replace:
+        row = conn.execute(
+            "SELECT COALESCE(MAX(word_order), 0) FROM vocab_pack_words WHERE pack_id = ?",
+            (pack_id,),
+        ).fetchone()
+        order_base = int(row[0] or 0)
+    order = order_base
+    count = 0
+    for unit in units:
+        for wd in unit.get("words") or []:
+            if not wd or not wd.get("word"):
+                continue
+            order += 1
+            count += 1
+            conn.execute(
+                """
+                INSERT INTO vocab_pack_words (pack_id, word_order, word_json, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (pack_id, order, json.dumps(wd, ensure_ascii=False), now),
+            )
+    return count
+
+
+def _pack_word_count(conn, pack_id: int) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM vocab_pack_words WHERE pack_id = ?",
+        (pack_id,),
+    ).fetchone()
+    return int(row["n"] if row else 0)
+
+
+def _primary_pack_for_class(conn, class_name: str) -> Any:
+    return conn.execute(
+        """
+        SELECT * FROM vocab_material_packs
+        WHERE is_active = 1
+          AND (class_name IS NULL OR TRIM(class_name) = '' OR class_name = ?)
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+        """,
+        (class_name,),
+    ).fetchone()
+
+
+def _reset_channel_a_for_pack(conn, pack_id: int) -> None:
+    pack = conn.execute(
+        "SELECT class_name FROM vocab_material_packs WHERE id = ?",
+        (pack_id,),
+    ).fetchone()
+    if not pack:
+        return
+    cls = str(pack["class_name"] or "").strip()
+    now = _now_iso()
+    today = _today_utc().isoformat()
+    if cls:
+        conn.execute("DELETE FROM vocab_channel_a_days WHERE class_name = ?", (cls,))
+        conn.execute(
+            """
+            UPDATE vocab_channel_a_state
+            SET status = 'active', start_date = ?, updated_at = ?
+            WHERE class_name = ? AND pack_id = ?
+            """,
+            (today, now, cls, pack_id),
+        )
+
+
+def _complete_channel_a(conn, class_name: str) -> None:
+    now = _now_iso()
+    conn.execute(
+        """
+        UPDATE vocab_channel_a_state SET status = 'completed', updated_at = ?
+        WHERE class_name = ?
+        """,
+        (now, class_name),
+    )
+    conn.execute(
+        """
+        UPDATE self_study_skill_push SET is_active = 0
+        WHERE class_name = ? AND skill = ?
+        """,
+        (class_name, VOCAB_SKILL),
+    )
+
+
+def _channel_a_state(conn, class_name: str) -> Any:
+    return conn.execute(
+        "SELECT * FROM vocab_channel_a_state WHERE class_name = ?",
+        (class_name,),
+    ).fetchone()
+
+
+def _channel_a_virtual_course(state: Any, total_words: int) -> dict[str, Any]:
+    total_days = max(1, (total_words + CHANNEL_A_DAILY_WORDS - 1) // CHANNEL_A_DAILY_WORDS)
+    return {
+        "id": -int(state["pack_id"]),
+        "start_date": state["start_date"],
+        "total_days": total_days,
+        "title": "Channel A vocabulary",
+    }
+
+
+def _channel_a_day_words(conn, class_name: str, day_number: int) -> tuple[list[dict], dict[str, Any]] | None:
+    state = _channel_a_state(conn, class_name)
+    if not state or state["status"] != "active":
+        return None
+    cached = conn.execute(
+        """
+        SELECT words_json, practice_json, games_json
+        FROM vocab_channel_a_days
+        WHERE class_name = ? AND day_number = ?
+        """,
+        (class_name, day_number),
+    ).fetchone()
+    if cached:
+        words = json.loads(cached["words_json"])
+        practice = json.loads(cached["practice_json"] or "null") if cached["practice_json"] else None
+        games = json.loads(cached["games_json"] or "null") if cached["games_json"] else None
+        if not practice:
+            practice = _practice_for_words(words)
+        if not games:
+            games = _game_rounds_for_words(words)
+        return words, {"practice": practice, "games": games}
+
+    offset = (max(1, day_number) - 1) * CHANNEL_A_DAILY_WORDS
+    rows = conn.execute(
+        """
+        SELECT word_json FROM vocab_pack_words
+        WHERE pack_id = ?
+        ORDER BY word_order ASC, id ASC
+        """,
+        (state["pack_id"],),
+    ).fetchall()
+    total = len(rows)
+    if offset >= total:
+        _complete_channel_a(conn, class_name)
+        return None
+    batch = rows[offset : offset + CHANNEL_A_DAILY_WORDS]
+    words = [json.loads(r["word_json"]) for r in batch]
+    practice = _practice_for_words(words)
+    games = _game_rounds_for_words(words)
+    now = _now_iso()
+    conn.execute(
+        """
+        INSERT INTO vocab_channel_a_days
+            (class_name, pack_id, day_number, words_json, practice_json, games_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(class_name, day_number) DO UPDATE SET
+            pack_id = excluded.pack_id,
+            words_json = excluded.words_json,
+            practice_json = excluded.practice_json,
+            games_json = excluded.games_json
+        """,
+        (
+            class_name,
+            state["pack_id"],
+            day_number,
+            json.dumps(words, ensure_ascii=False),
+            json.dumps(practice, ensure_ascii=False),
+            json.dumps(games, ensure_ascii=False),
+        ),
+    )
+    if len(batch) < CHANNEL_A_DAILY_WORDS:
+        _complete_channel_a(conn, class_name)
+    return words, {"practice": practice, "games": games}
+
+
+def _channel_a_today_payload(conn, *, class_name: str, username: str) -> dict[str, Any]:
+    state = _channel_a_state(conn, class_name)
+    if not state:
+        raise ValueError("Channel A not configured for this class")
+    if state["status"] == "completed":
+        return {
+            "channel": "A",
+            "channelAComplete": True,
+            "newWords": False,
+            "message": "Channel A vocabulary list is complete.",
+        }
+    total_words = _pack_word_count(conn, int(state["pack_id"]))
+    if total_words < 1:
+        return {
+            "channel": "A",
+            "channelAComplete": True,
+            "newWords": False,
+            "message": "No vocabulary words in the manager pack yet.",
+        }
+    course = _channel_a_virtual_course(state, total_words)
+    offset = max(0, (_today_utc() - _parse_start(state["start_date"])).days)
+    sched = _schedule_label(offset)
+    day_num = _course_day_number(course)
+    if not sched["newWords"]:
+        return {
+            "channel": "A",
+            "schedule": sched,
+            "newWords": False,
+            "message": "No new words today — use review.",
+            "dayNumber": day_num,
+            "packId": state["pack_id"],
+        }
+    built = _channel_a_day_words(conn, class_name, day_num)
+    if not built:
+        return {
+            "channel": "A",
+            "channelAComplete": True,
+            "newWords": False,
+            "message": "Channel A vocabulary list is complete.",
+        }
+    words, extras = built
+    prog = conn.execute(
+        """
+        SELECT * FROM student_vocab_channel_a_progress
+        WHERE student_username = ? AND class_name = ? AND day_number = ?
+        """,
+        (username, class_name, day_num),
+    ).fetchone()
+    return {
+        "channel": "A",
+        "packId": int(state["pack_id"]),
+        "courseId": None,
+        "dayNumber": day_num,
+        "schedule": sched,
+        "newWords": True,
+        "words": words,
+        "wordCount": len(words),
+        "practice": extras["practice"],
+        "games": extras["games"],
+        "progress": {
+            "learnDone": bool(prog and prog["learn_done"]),
+            "practiceDone": bool(prog and prog["practice_done"]),
+            "practiceScore": prog["practice_score"] if prog else None,
+            "practiceScoreTotal": prog["practice_score_total"] if prog else None,
+        },
+    }
 
 
 def _unit_detail_payload(row: Any, prog: Any | None = None) -> dict[str, Any]:
@@ -797,6 +1133,11 @@ def register_self_study_vocabulary_routes(
             (class_name,),
         ).fetchall()
         channel_a_on = _has_manager_push(conn, class_name, VOCAB_SKILL)
+        channel_a_state = _channel_a_state(conn, class_name) if channel_a_on else None
+        channel_a_pack = _primary_pack_for_class(conn, class_name) if channel_a_on else None
+        channel_a_words = (
+            _pack_word_count(conn, int(channel_a_pack["id"])) if channel_a_pack else 0
+        )
         conn.close()
 
         today = _today_utc()
@@ -808,6 +1149,10 @@ def register_self_study_vocabulary_routes(
                 "className": class_name,
                 "channel": channel,
                 "channelAEnabled": channel_a_on,
+                "channelAComplete": bool(
+                    channel_a_state and channel_a_state["status"] == "completed"
+                ),
+                "channelAWordCount": channel_a_words,
                 "channelBActive": channel == "B",
                 "vocabEntryLevel": bool(placement and placement["vocab_entry_level"]),
                 "course": {
@@ -845,8 +1190,10 @@ def register_self_study_vocabulary_routes(
 
         class_name = _student_class_name(conn, username)
         if _vocab_channel(conn, class_name) == "A" and _has_manager_push(conn, class_name, VOCAB_SKILL):
+            payload = _channel_a_today_payload(conn, class_name=class_name, username=username)
+            conn.commit()
             conn.close()
-            return jsonify({"error": "Today uses Channel A — open a material pack", "channel": "A"}), 400
+            return jsonify(payload)
 
         course = _active_course(conn, class_name)
         if not course:
@@ -1146,6 +1493,58 @@ def register_self_study_vocabulary_routes(
         now = _now_iso()
         kind = str(data.get("kind") or "day").strip()
 
+        if kind in ("channel_a", "channelA"):
+            class_name = normalize_class_name(
+                str(data.get("className") or data.get("class_name") or _student_class_name(conn, username))
+            )
+            day_number = int(data.get("dayNumber") or 0)
+            learn_done = 1 if data.get("learnDone", True) else 0
+            practice_done = 1 if data.get("practiceDone") else 0
+            practice_score = data.get("practiceScore")
+            practice_score_total = data.get("practiceScoreTotal")
+            if not day_number:
+                conn.close()
+                return jsonify({"error": "dayNumber required"}), 400
+            completed_at = now if learn_done and practice_done else None
+            conn.execute(
+                """
+                INSERT INTO student_vocab_channel_a_progress
+                    (student_username, class_name, day_number, learn_done, practice_done,
+                     practice_score, practice_score_total, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(student_username, class_name, day_number) DO UPDATE SET
+                    learn_done = CASE
+                        WHEN excluded.learn_done = 1 OR student_vocab_channel_a_progress.learn_done = 1 THEN 1
+                        ELSE 0
+                    END,
+                    practice_done = CASE
+                        WHEN excluded.practice_done = 1 OR student_vocab_channel_a_progress.practice_done = 1 THEN 1
+                        ELSE 0
+                    END,
+                    practice_score = COALESCE(
+                        excluded.practice_score, student_vocab_channel_a_progress.practice_score
+                    ),
+                    practice_score_total = COALESCE(
+                        excluded.practice_score_total,
+                        student_vocab_channel_a_progress.practice_score_total
+                    ),
+                    completed_at = COALESCE(excluded.completed_at, student_vocab_channel_a_progress.completed_at)
+                """,
+                (
+                    username,
+                    class_name,
+                    day_number,
+                    learn_done,
+                    practice_done,
+                    practice_score,
+                    practice_score_total,
+                    completed_at,
+                ),
+            )
+            conn.commit()
+            conn.close()
+            return jsonify({"ok": True})
+
         if kind == "unit":
             unit_id = int(data.get("unitId") or 0)
             if not unit_id:
@@ -1241,6 +1640,23 @@ def register_self_study_vocabulary_routes(
             return jsonify({"error": "Student session required"}), 401
 
         data = request.get_json(silent=True) or {}
+        channel = str(data.get("channel") or "").strip().upper()
+        class_name = normalize_class_name(
+            str(data.get("className") or data.get("class_name") or "")
+        )
+        day_number = int(data.get("dayNumber") or 0)
+        if channel == "A" and class_name and day_number:
+            built = _channel_a_day_words(conn, class_name, day_number)
+            conn.commit()
+            conn.close()
+            if not built:
+                return jsonify({"error": "Channel A day not available"}), 404
+            words, _extras = built
+            exam = _build_practice_exam(words, day_number)
+            exam["titleEn"] = f"Day {day_number} vocabulary practice"
+            exam["titleZh"] = f"第 {day_number} 天词汇练习"
+            return jsonify(exam)
+
         unit_id = int(data.get("unitId") or 0)
         if unit_id:
             unit_row = conn.execute(
@@ -1303,7 +1719,7 @@ def register_self_study_vocabulary_routes(
             rows = conn.execute(
                 """
                 SELECT p.*,
-                       (SELECT COUNT(*) FROM vocab_material_units u WHERE u.pack_id = p.id) AS unit_count
+                       (SELECT COUNT(*) FROM vocab_pack_words w WHERE w.pack_id = p.id) AS unit_count
                 FROM vocab_material_packs p
                 WHERE p.is_active = 1
                 ORDER BY p.sort_order ASC, p.id ASC
@@ -1370,6 +1786,7 @@ def register_self_study_vocabulary_routes(
         pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         if units:
             unit_count = _insert_pack_units(conn, pid, units, replace=True)
+            _reset_channel_a_for_pack(conn, pid)
         conn.commit()
         conn.close()
         return jsonify({"id": pid, "displayName": name, "unitCount": unit_count}), 201
@@ -1433,6 +1850,8 @@ def register_self_study_vocabulary_routes(
             return jsonify({"error": f"Upload parse failed: {exc}"}), 400
         replace = str(request.form.get("replace", "true")).lower() not in ("0", "false", "no")
         unit_count = _insert_pack_units(conn, pack_id, units, replace=replace)
+        if replace:
+            _reset_channel_a_for_pack(conn, pack_id)
         now = _now_iso()
         conn.execute(
             "UPDATE vocab_material_packs SET source_filename = ?, updated_at = ? WHERE id = ?",
@@ -1440,7 +1859,15 @@ def register_self_study_vocabulary_routes(
         )
         conn.commit()
         conn.close()
-        return jsonify({"ok": True, "unitCount": unit_count, "sourceFilename": source_name, "replaced": replace})
+        return jsonify(
+            {
+                "ok": True,
+                "unitCount": unit_count,
+                "wordCount": unit_count,
+                "sourceFilename": source_name,
+                "replaced": replace,
+            }
+        )
 
     @app.route("/api/admin/self-study/vocabulary/push-channel-a", methods=["PUT"])
     def admin_vocab_push_channel_a():
@@ -1459,6 +1886,27 @@ def register_self_study_vocabulary_routes(
             conn.close()
             return jsonify({"error": "className required"}), 400
         now = _now_iso()
+        pack = _primary_pack_for_class(conn, class_name)
+        if is_active:
+            if not pack:
+                conn.close()
+                return jsonify({"error": "No vocabulary pack for this class — add a pack first"}), 400
+            if _pack_word_count(conn, int(pack["id"])) < 1:
+                conn.close()
+                return jsonify({"error": "Pack has no words — upload a vocabulary file first"}), 400
+            conn.execute(
+                """
+                INSERT INTO vocab_channel_a_state (class_name, pack_id, start_date, status, updated_at)
+                VALUES (?, ?, ?, 'active', ?)
+                ON CONFLICT(class_name) DO UPDATE SET
+                    pack_id = excluded.pack_id,
+                    start_date = excluded.start_date,
+                    status = 'active',
+                    updated_at = excluded.updated_at
+                """,
+                (class_name, pack["id"], _today_utc().isoformat(), now),
+            )
+            conn.execute("DELETE FROM vocab_channel_a_days WHERE class_name = ?", (class_name,))
         conn.execute(
             """
             INSERT INTO self_study_skill_push (class_name, skill, is_active, pushed_at, pushed_by, notes)

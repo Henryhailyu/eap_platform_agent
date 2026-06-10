@@ -2111,7 +2111,26 @@
 }
 
 .ssc-exam-match li {
-  margin: 0.35rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.ssc-exam-match__left {
+  min-width: 6rem;
+  font-weight: 500;
+}
+
+.ssc-exam-match .ssc-exam-select {
+  flex: 0 1 16rem;
+  max-width: 16rem;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
 }
 
 .ssc-exam-order {

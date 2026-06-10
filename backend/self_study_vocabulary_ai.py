@@ -14,7 +14,49 @@ _UNIT_HEADER_RE = re.compile(
 _WORD_LINE_RE = re.compile(
     r"^([A-Za-z][A-Za-z\-']{1,48})\s*(?:[:\t|,，;；\-–—]\s*|\s{2,})(.+)$"
 )
+_TOKEN_RE = re.compile(r"\b[A-Za-z][A-Za-z\-']{2,48}\b")
+_VALID_WORD = re.compile(r"^[A-Za-z][A-Za-z\-']{1,48}$")
 _CHUNK_SIZE = 25
+_MAX_MEANING_WORDS = 22
+_MAX_MEANING_CHARS = 180
+
+_LIGATURES = (
+    ("ﬁ", "fi"),
+    ("ﬂ", "fl"),
+    ("ﬀ", "ff"),
+    ("ﬃ", "ffi"),
+    ("ﬄ", "ffl"),
+)
+
+
+def clean_vocab_extracted_text(text: str) -> str:
+    """Fix common PDF / copy-paste artefacts before parsing."""
+    cleaned = re.sub(r"\r\n?", "\n", str(text or ""))
+    for src, dst in _LIGATURES:
+        cleaned = cleaned.replace(src, dst)
+    cleaned = re.sub(r"(?<=[a-zA-Z])9(?=[a-zA-Z])", "ti", cleaned)
+    cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def _sanitize_word_token(word: str) -> str | None:
+    w = " ".join(str(word or "").split()).strip()
+    if not w or len(w) > 48:
+        return None
+    w = re.sub(r"(?<=[a-zA-Z])9(?=[a-zA-Z])", "ti", w)
+    if not _VALID_WORD.match(w):
+        return None
+    return w
+
+
+def _sanitize_meaning(meaning: str, word: str) -> str:
+    m = " ".join(str(meaning or "").split()).strip()
+    if not m or len(m) > _MAX_MEANING_CHARS or len(m.split()) > _MAX_MEANING_WORDS:
+        return f"academic vocabulary: {word}"
+    if m.lower() == word.lower():
+        return f"academic vocabulary: {word}"
+    return m
 
 
 def vocab_ai_available() -> bool:
@@ -50,24 +92,27 @@ def _ai_json(system: str, user: str, *, max_tokens: int = 8000) -> dict[str, Any
 
 
 def _normalize_word(raw: dict[str, Any]) -> dict[str, Any] | None:
-    word = str(raw.get("word") or "").strip()
-    if not word or len(word) < 2:
+    word = _sanitize_word_token(str(raw.get("word") or ""))
+    if not word:
         return None
     method = str(raw.get("method") or raw.get("methodPrimary") or "affix").strip().lower()
     if method not in ("affix", "mnemonic", "mixed"):
         method = "affix"
-    core = str(raw.get("core") or raw.get("coreMeaning") or raw.get("meaning") or "").strip()
+    core = _sanitize_meaning(
+        str(raw.get("core") or raw.get("coreMeaning") or raw.get("meaning") or ""),
+        word,
+    )
     entry: dict[str, Any] = {
         "word": word,
-        "prefix": str(raw.get("prefix") or "").strip(),
-        "root": str(raw.get("root") or "").strip(),
-        "suffix": str(raw.get("suffix") or "").strip(),
-        "core": core or f"academic vocabulary: {word}",
+        "prefix": str(raw.get("prefix") or "").strip()[:24],
+        "root": str(raw.get("root") or word[:4])[:24],
+        "suffix": str(raw.get("suffix") or "").strip()[:24],
+        "core": core,
         "method": method,
     }
     mnemonic = raw.get("mnemonic")
     if mnemonic:
-        entry["mnemonic"] = str(mnemonic).strip()
+        entry["mnemonic"] = str(mnemonic).strip()[:240]
     return entry
 
 
@@ -91,6 +136,40 @@ def _normalize_units(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return units_out
 
 
+def _append_word(
+    words: list[dict[str, Any]],
+    seen: set[str],
+    word: str,
+    meaning: str,
+) -> None:
+    token = _sanitize_word_token(word)
+    if not token:
+        return
+    key = token.lower()
+    if key in seen:
+        return
+    seen.add(key)
+    words.append(
+        {
+            "word": token,
+            "prefix": "",
+            "root": token[:4] if len(token) > 4 else token,
+            "suffix": "",
+            "core": _sanitize_meaning(meaning, token),
+            "method": "affix",
+        }
+    )
+
+
+def _tokens_from_blob(line: str) -> list[str]:
+    out: list[str] = []
+    for raw in _TOKEN_RE.findall(line):
+        token = _sanitize_word_token(raw)
+        if token:
+            out.append(token)
+    return out
+
+
 def _parse_lines_rule_based(text: str) -> list[dict[str, Any]]:
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     units: list[dict[str, Any]] = []
@@ -111,62 +190,30 @@ def _parse_lines_rule_based(text: str) -> list[dict[str, Any]]:
             continue
         m = _WORD_LINE_RE.match(ln)
         if m:
-            word = m.group(1).strip()
-            meaning = m.group(2).strip()
+            _append_word(current_words, seen, m.group(1).strip(), m.group(2).strip())
         elif re.match(r"^[A-Za-z][A-Za-z\-']{1,48}$", ln):
-            word = ln
-            meaning = f"academic vocabulary: {word}"
+            _append_word(current_words, seen, ln, f"academic vocabulary: {ln}")
         else:
+            tokens = _tokens_from_blob(ln)
+            if len(tokens) >= 2:
+                for token in tokens:
+                    _append_word(current_words, seen, token, f"academic vocabulary: {token}")
             continue
-        key = word.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        current_words.append(
-            {
-                "word": word,
-                "prefix": "",
-                "root": word[:4] if len(word) > 4 else word,
-                "suffix": "",
-                "core": meaning,
-                "method": "affix",
-            }
-        )
         if len(current_words) >= _CHUNK_SIZE:
             flush()
-            if not current_label.startswith("Unit"):
-                current_label = f"Unit {len(units) + 1}"
-            else:
-                current_label = f"Unit {len(units) + 1}"
+            current_label = f"Unit {len(units) + 1}"
 
     flush()
     if not units:
         all_words: list[dict[str, Any]] = []
+        blob_seen: set[str] = set()
         for ln in lines:
             m = _WORD_LINE_RE.match(ln)
             if m:
-                all_words.append(
-                    {
-                        "word": m.group(1).strip(),
-                        "prefix": "",
-                        "root": m.group(1).strip()[:4],
-                        "suffix": "",
-                        "core": m.group(2).strip(),
-                        "method": "affix",
-                    }
-                )
-            elif re.match(r"^[A-Za-z][A-Za-z\-']{1,48}$", ln):
-                w = ln
-                all_words.append(
-                    {
-                        "word": w,
-                        "prefix": "",
-                        "root": w[:4],
-                        "suffix": "",
-                        "core": f"academic vocabulary: {w}",
-                        "method": "affix",
-                    }
-                )
+                _append_word(all_words, blob_seen, m.group(1).strip(), m.group(2).strip())
+            else:
+                for token in _tokens_from_blob(ln):
+                    _append_word(all_words, blob_seen, token, f"academic vocabulary: {token}")
         for i in range(0, len(all_words), _CHUNK_SIZE):
             chunk = all_words[i : i + _CHUNK_SIZE]
             if chunk:
@@ -181,8 +228,10 @@ def _parse_with_ai(text: str, *, pack_name: str = "") -> list[dict[str, Any]]:
         "Return JSON: {\"units\":[{\"label\":\"Unit 1\",\"words\":[{\"word\":\"analyze\","
         "\"prefix\":\"\",\"root\":\"lyz\",\"suffix\":\"\",\"core\":\"break apart to examine\","
         "\"method\":\"affix\",\"mnemonic\":null}]}]}. "
+        "Each word must be ONE English headword only (no phrases). "
+        "core must be a short gloss under 15 words. "
         "Split by chapters/units when headings exist; otherwise ~25 words per unit. "
-        "Use affix breakdown when possible; mnemonic for opaque words. English core meanings."
+        "Use affix breakdown when possible; mnemonic for opaque words."
     )
     user = f"Pack name: {pack_name or 'Vocabulary'}\n\nSource text:\n{sample}"
     payload = _ai_json(system, user)
@@ -194,7 +243,7 @@ def _parse_with_ai(text: str, *, pack_name: str = "") -> list[dict[str, Any]]:
 
 def parse_vocabulary_upload(text: str, *, pack_name: str = "") -> list[dict[str, Any]]:
     """Parse extracted file text into units with raw word dicts for _word_entry()."""
-    cleaned = re.sub(r"\r\n?", "\n", str(text or "")).strip()
+    cleaned = clean_vocab_extracted_text(text)
     if not cleaned:
         return []
     if vocab_ai_available() and len(cleaned) > 80:
