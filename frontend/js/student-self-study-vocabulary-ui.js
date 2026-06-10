@@ -33,7 +33,7 @@
     return out === key ? sched.label : out;
   }
 
-  /** Channel B — frozen layout helpers (see docs/CHANNEL_B_VOCABULARY_SEALED.md). */
+  /** Channel B — frozen layout helpers (see docs/CHANNEL_B_SEALED.md). */
   function termClassForWord(word) {
     const n = String(word || "").length;
     if (n > 16) return "ssc-word-card__term ssc-word-card__term--xl";

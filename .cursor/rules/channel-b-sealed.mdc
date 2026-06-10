@@ -1,0 +1,44 @@
+---
+description: Channel B (AI self-study) is sealed for all skills until rehearsal — ask the user before any change that touches Channel B.
+globs:
+  - backend/self_study.py
+  - backend/self_study_vocabulary.py
+  - backend/self_study_reading.py
+  - backend/self_study_reading_ai.py
+  - backend/self_study_listening.py
+  - backend/self_study_listening_ai.py
+  - backend/self_study_writing.py
+  - backend/self_study_writing_ai.py
+  - backend/self_study_speaking.py
+  - backend/self_study_speaking_ai.py
+  - frontend/js/student-self-study-hub.js
+  - frontend/js/student-self-study-server.js
+  - frontend/js/student-self-study-vocabulary-ui.js
+  - frontend/js/student-self-study-reading-ui.js
+  - frontend/js/student-self-study-listening-ui.js
+  - frontend/js/student-self-study-writing-ui.js
+  - frontend/js/student-self-study-speaking-ui.js
+  - frontend/css/student-self-study.css
+alwaysApply: true
+---
+
+# Channel B — SEALED (vocabulary · reading · listening · writing · speaking)
+
+Read `docs/CHANNEL_B_SEALED.md` before editing any matched file.
+
+## Mandatory
+
+- **Ask the user for explicit permission** before making any change that could affect Channel B behaviour, UI, APIs, AI prompts, scoring, or layout.
+- If the user has not approved Channel B changes in the current task, **stop** and describe what you want to change; wait for approval.
+- Channel A fixes must use **isolated** paths (`channel=A`, `source_channel='A'`, admin-only modules). Do not rewrite Channel B branches.
+
+## Do not (without permission)
+
+- Modify `_build_practice_exam_channel_b`, Channel B review/day/calendar logic, or B skill UIs listed in the doc.
+- Change shared hub/server/CSS in ways that alter the AI self-study (B) student experience.
+- “Clean up” or refactor sealed code if it risks changing B outputs.
+
+## Allowed without unsealing (if truly B-neutral)
+
+- Channel A–only files (e.g. `self_study_vocabulary_ai.py`, `admin-self-study-*.js`) when changes cannot affect B.
+- Comments/docs that do not change runtime behaviour.
