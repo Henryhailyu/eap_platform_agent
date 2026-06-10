@@ -676,14 +676,38 @@ def _parse_vocab_upload_file(data: bytes, filename: str, *, pack_name: str = "")
     if ext == "doc":
         ext = "docx"
     if not allowed_source_extension(name) and ext not in {"xls", "xlsx"}:
-        raise ValueError("Allowed: pdf, docx, doc, txt, xls, xlsx")
+        raise ValueError(f"Unsupported file type: {name}")
     extracted = normalize_extracted_text(extract_text_from_bytes(data, ext))
     if not extracted.strip():
-        raise ValueError("No text extracted from file")
+        raise ValueError(f"No text extracted from {name}")
     units_raw = parse_vocabulary_upload(extracted, pack_name=pack_name)
     if not units_raw:
-        raise ValueError("No vocabulary words found in file")
+        raise ValueError(f"No vocabulary words found in {name}")
     return _words_from_upload_units(units_raw)
+
+
+def _parse_vocab_upload_files(
+    file_items: list[tuple[bytes, str]],
+    *,
+    pack_name: str = "",
+) -> tuple[list[dict[str, Any]], str]:
+    if not file_items:
+        raise ValueError("At least one file required")
+    merged: list[dict[str, Any]] = []
+    names: list[str] = []
+    multi = len(file_items) > 1
+    for data, filename in file_items:
+        safe_name = secure_filename(filename) or "vocab.txt"
+        names.append(safe_name)
+        units = _parse_vocab_upload_file(data, safe_name, pack_name=pack_name)
+        if multi:
+            stem = safe_name.rsplit(".", 1)[0][:60]
+            for unit in units:
+                unit["label"] = f"{stem} — {unit.get('label') or 'Unit'}"[:120]
+        merged.extend(units)
+    if not merged:
+        raise ValueError("No vocabulary units parsed from uploaded files")
+    return merged, ", ".join(names)[:500]
 
 
 def _unit_detail_payload(row: Any, prog: Any | None = None) -> dict[str, Any]:
@@ -1303,8 +1327,12 @@ def register_self_study_vocabulary_routes(
                 }
             )
 
-        upload = request.files.get("file")
-        if upload and upload.filename:
+        uploads = [f for f in request.files.getlist("files") if f and f.filename]
+        if not uploads:
+            single = request.files.get("file")
+            if single and single.filename:
+                uploads = [single]
+        if uploads:
             name = str(request.form.get("displayName") or request.form.get("display_name") or "").strip()[:200]
             cls_raw = str(request.form.get("className") or request.form.get("class_name") or "").strip()
         else:
@@ -1318,10 +1346,10 @@ def register_self_study_vocabulary_routes(
         now = _now_iso()
         source_name = None
         unit_count = 0
-        if upload and upload.filename:
-            source_name = secure_filename(upload.filename) or "vocab.txt"
+        if uploads:
             try:
-                units = _parse_vocab_upload_file(upload.read(), source_name, pack_name=name)
+                file_items = [(f.read(), f.filename or "vocab.txt") for f in uploads]
+                units, source_name = _parse_vocab_upload_files(file_items, pack_name=name)
             except ValueError as exc:
                 conn.close()
                 return jsonify({"error": str(exc)}), 400
@@ -1383,15 +1411,18 @@ def register_self_study_vocabulary_routes(
         if not pack:
             conn.close()
             return jsonify({"error": "Pack not found"}), 404
-        upload = request.files.get("file")
-        if not upload or not upload.filename:
+        uploads = [f for f in request.files.getlist("files") if f and f.filename]
+        if not uploads:
+            single = request.files.get("file")
+            if single and single.filename:
+                uploads = [single]
+        if not uploads:
             conn.close()
-            return jsonify({"error": "file required"}), 400
-        source_name = secure_filename(upload.filename) or "vocab.txt"
+            return jsonify({"error": "At least one file required"}), 400
         try:
-            units = _parse_vocab_upload_file(
-                upload.read(),
-                source_name,
+            file_items = [(f.read(), f.filename or "vocab.txt") for f in uploads]
+            units, source_name = _parse_vocab_upload_files(
+                file_items,
                 pack_name=str(pack["display_name"] or ""),
             )
         except ValueError as exc:
@@ -1409,7 +1440,7 @@ def register_self_study_vocabulary_routes(
         )
         conn.commit()
         conn.close()
-        return jsonify({"ok": True, "unitCount": unit_count, "sourceFilename": source_name})
+        return jsonify({"ok": True, "unitCount": unit_count, "sourceFilename": source_name, "replaced": replace})
 
     @app.route("/api/admin/self-study/vocabulary/push-channel-a", methods=["PUT"])
     def admin_vocab_push_channel_a():
