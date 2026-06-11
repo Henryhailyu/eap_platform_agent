@@ -212,12 +212,22 @@ def _practice_for_words(words: list[dict], *, channel: str = "B") -> list[dict]:
             )
         else:
             options, correct_idx = _shuffle_options(w, word_list)
+            affix_prompt = (
+                f"Affix pattern {affix_hint} → which word?"
+                if channel == "A"
+                else f"Affix pattern «{affix_hint}» → which word?"
+            )
+            affix_prompt_zh = (
+                f"词缀 {affix_hint} → 哪个词？"
+                if channel == "A"
+                else f"词缀 «{affix_hint}» → 哪个词？"
+            )
             out.append(
                 {
                     "id": f"vp{i + 1}",
                     "type": "affix_drill",
-                    "promptEn": f"Affix pattern «{affix_hint}» → which word?",
-                    "promptZh": f"词缀 «{affix_hint}» → 哪个词？",
+                    "promptEn": affix_prompt,
+                    "promptZh": affix_prompt_zh,
                     "options": options,
                     "correctIndex": correct_idx,
                 }
@@ -383,8 +393,8 @@ def _build_practice_exam_channel_a(words: list[dict], day_number: int) -> dict[s
                 mcq_items.append(
                     {
                         "id": f"mcq{i + 1}",
-                        "promptEn": f"Which word matches this definition: «{meaning}»?",
-                        "promptZh": f"哪个词与释义 «{meaning}» 相符？",
+                        "promptEn": f"Which word matches this definition: {meaning}?",
+                        "promptZh": f"哪个词与释义 {meaning} 相符？",
                         "options": opts,
                         "correctIndex": ci,
                         "answer": w,
@@ -396,8 +406,8 @@ def _build_practice_exam_channel_a(words: list[dict], day_number: int) -> dict[s
                 mcq_items.append(
                     {
                         "id": f"mcq{i + 1}",
-                        "promptEn": f"Affix pattern «{hint}» → which word from today's list?",
-                        "promptZh": f"词缀 «{hint}» → 今日词表中的哪个词？",
+                        "promptEn": f"Affix pattern {hint} → which word from today's list?",
+                        "promptZh": f"词缀 {hint} → 今日词表中的哪个词？",
                         "options": opts,
                         "correctIndex": ci,
                         "answer": w,
@@ -409,7 +419,7 @@ def _build_practice_exam_channel_a(words: list[dict], day_number: int) -> dict[s
             fill_items.append(
                 {
                     "id": f"fill{fill_idx}",
-                    "promptEn": f"Gap fill — «{meaning}»: {template.replace('_____', '______')}",
+                    "promptEn": f"Gap fill — meaning: {meaning}. {template.replace('_____', '______')}",
                     "answer": w,
                 }
             )
@@ -746,30 +756,59 @@ def _grade_practice_exam(exam: dict, answers: dict) -> dict[str, Any]:
     }
 
 
-def _game_rounds_for_words(words: list[dict]) -> dict[str, Any]:
+def _game_rounds_for_words(words: list[dict], *, channel: str = "B") -> dict[str, Any]:
     """Payload for Star Battle + Speed Race front-end games."""
     import random
 
+    study_words = _filter_study_words(words) if channel == "A" else list(words)
     rounds = []
-    pool = list(words)
+    pool = list(study_words)
     random.shuffle(pool)
     for i, wd in enumerate(pool[:20]):
         w = wd["word"]
-        meaning = wd.get("coreMeaning") or w
-        others = [x["word"] for x in words if x["word"] != w]
-        random.shuffle(others)
-        options, correct_idx = _shuffle_options(w, others)
-        rounds.append(
-            {
-                "id": f"vg{i + 1}",
-                "word": w,
-                "promptEn": meaning,
-                "promptZh": meaning,
-                "options": options,
-                "correctIndex": correct_idx,
-                "mode": "collocation" if i % 4 == 1 else "meaning",
-            }
-        )
+        if channel == "A":
+            correct_meaning = _exam_meaning_channel_a(wd)
+            if not correct_meaning:
+                continue
+            distractors: list[str] = []
+            seen = {correct_meaning.lower()}
+            for owd in study_words:
+                if owd["word"] == w:
+                    continue
+                gloss = _exam_meaning_channel_a(owd)
+                if gloss and gloss.lower() not in seen:
+                    seen.add(gloss.lower())
+                    distractors.append(gloss)
+            if len(distractors) < 3:
+                continue
+            options, correct_idx = _shuffle_options(correct_meaning, distractors)
+            rounds.append(
+                {
+                    "id": f"vg{i + 1}",
+                    "word": w,
+                    "promptEn": f"Select the meaning of: {w}",
+                    "promptZh": f"选择含义：{w}",
+                    "options": options,
+                    "correctIndex": correct_idx,
+                    "mode": "meaning_pick",
+                }
+            )
+        else:
+            meaning = wd.get("coreMeaning") or w
+            others = [x["word"] for x in words if x["word"] != w]
+            random.shuffle(others)
+            options, correct_idx = _shuffle_options(w, others)
+            rounds.append(
+                {
+                    "id": f"vg{i + 1}",
+                    "word": w,
+                    "promptEn": meaning,
+                    "promptZh": meaning,
+                    "options": options,
+                    "correctIndex": correct_idx,
+                    "mode": "collocation" if i % 4 == 1 else "meaning",
+                }
+            )
     return {
         "rounds": rounds,
         "timeLimitSec": 45,
@@ -1218,8 +1257,8 @@ def _words_from_upload_units(units_raw: list[dict[str, Any]]) -> list[dict[str, 
             {
                 "label": str(unit.get("label") or f"Unit {i + 1}").strip()[:120],
                 "words": words,
-                "practice": _practice_for_words(words),
-                "games": _game_rounds_for_words(words),
+                "practice": _practice_for_words(words, channel="A"),
+                "games": _game_rounds_for_words(words, channel="A"),
             }
         )
     return out
@@ -1239,8 +1278,8 @@ def _insert_pack_units(conn, pack_id: int, units: list[dict[str, Any]], *, repla
         words = unit.get("words") or []
         if not words:
             continue
-        practice = unit.get("practice") or _practice_for_words(words)
-        games = unit.get("games") or _game_rounds_for_words(words)
+        practice = unit.get("practice") or _practice_for_words(words, channel="A")
+        games = unit.get("games") or _game_rounds_for_words(words, channel="A")
         conn.execute(
             """
             INSERT INTO vocab_material_units
@@ -1498,7 +1537,7 @@ def _channel_a_day_words(conn, class_name: str, day_number: int) -> tuple[list[d
     if cached:
         words = _filter_study_words(json.loads(cached["words_json"]))
         practice = _practice_for_words(words, channel="A")
-        games = _game_rounds_for_words(words)
+        games = _game_rounds_for_words(words, channel="A")
         return words, {"practice": practice, "games": games}
 
     offset = (max(1, day_number) - 1) * CHANNEL_A_DAILY_WORDS
@@ -1511,7 +1550,7 @@ def _channel_a_day_words(conn, class_name: str, day_number: int) -> tuple[list[d
     batch = rows[offset : offset + CHANNEL_A_DAILY_WORDS]
     words = _filter_study_words([json.loads(r["word_json"]) for r in batch])
     practice = _practice_for_words(words, channel="A")
-    games = _game_rounds_for_words(words)
+    games = _game_rounds_for_words(words, channel="A")
     now = _now_iso()
     conn.execute(
         """
@@ -1603,12 +1642,8 @@ def _channel_a_today_payload(conn, *, class_name: str, username: str) -> dict[st
 
 def _unit_detail_payload(row: Any, prog: Any | None = None) -> dict[str, Any]:
     words = json.loads(row["words_json"])
-    practice = json.loads(row["practice_json"] or "null") if row["practice_json"] else None
-    games = json.loads(row["games_json"] or "null") if row["games_json"] else None
-    if not practice:
-        practice = _practice_for_words(words)
-    if not games:
-        games = _game_rounds_for_words(words)
+    practice = _practice_for_words(words, channel="A")
+    games = _game_rounds_for_words(words, channel="A")
     return {
         "id": row["id"],
         "label": row["unit_label"],
