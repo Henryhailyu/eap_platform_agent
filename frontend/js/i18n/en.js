@@ -121,6 +121,8 @@ window.EAP_STRINGS_EN = {
   "admin_cal_save": "Save calendar",
   "admin_cal_saved": "Academic calendar saved.",
   "admin_cal_load_error": "Could not load academic calendar.",
+  "admin_cal_preview_heading": "Calendar preview",
+  "admin_cal_preview_hint": "Same layout as teacher and student calendars — ISO week and teaching week labels appear in the left column of each row.",
   "admin_classes_heading": "Classes",
   "admin_classes_hint": "Create classes and assign teachers and students. Membership controls calendar access.",
   "admin_class_code": "Class code",

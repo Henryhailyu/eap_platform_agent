@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260610-roster" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260611-cal1" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -123,6 +123,17 @@
               <button type="button" class="btn-primary" id="admin-calendar-save-btn" data-i18n="admin_cal_save">
                 Save calendar
               </button>
+            </div>
+            <div id="admin-calendar-preview-wrap" class="admin-calendar-preview hidden">
+              <h3 class="section-heading section-heading--nested" data-i18n="admin_cal_preview_heading">Calendar preview</h3>
+              <p class="admin-panel__hint" data-i18n="admin_cal_preview_hint">
+                Same layout as teacher and student calendars — week numbers and teaching weeks on the right of each row.
+              </p>
+              <div
+                id="admin-calendar-preview-root"
+                class="eap-calendar-root"
+                aria-label="Academic calendar preview"
+              ></div>
             </div>
           </section>
 

@@ -121,6 +121,8 @@ window.EAP_STRINGS_ZH = {
   "admin_cal_save": "保存日历",
   "admin_cal_saved": "学年日历已保存。",
   "admin_cal_load_error": "无法加载学年日历。",
+  "admin_cal_preview_heading": "日历预览",
+  "admin_cal_preview_hint": "与教师、学生日历相同 — 每行左侧显示 ISO 周次与教学周次。",
   "admin_classes_heading": "班级",
   "admin_classes_hint": "创建班级并分配教师与学生。成员关系决定可使用的教学日历。",
   "admin_class_code": "班级代码",

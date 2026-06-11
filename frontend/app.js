@@ -2451,7 +2451,7 @@ let ACADEMIC_CALENDAR = {
   teachingWeeks: 16,
   notableDates: {},
 };
-let academicCalendarLoadPromise = null;
+let academicCalendarFetchedAt = 0;
 
 function applyAcademicCalendarPayload(payload) {
   if (!payload || typeof payload !== "object") return;
@@ -2466,18 +2466,20 @@ function applyAcademicCalendarPayload(payload) {
   }
 }
 
-async function ensureAcademicCalendarLoaded() {
-  if (!academicCalendarLoadPromise) {
-    academicCalendarLoadPromise = (async () => {
-      try {
-        const data = await apiGet("/api/academic-calendar");
-        applyAcademicCalendarPayload(data);
-      } catch {
-        /* keep in-page defaults */
-      }
-    })();
+async function ensureAcademicCalendarLoaded(options = {}) {
+  const force = options.force === true;
+  const maxAgeMs = options.maxAgeMs != null ? Number(options.maxAgeMs) : 15000;
+  const now = Date.now();
+  if (!force && academicCalendarFetchedAt && now - academicCalendarFetchedAt < maxAgeMs) {
+    return;
   }
-  await academicCalendarLoadPromise;
+  try {
+    const data = await apiGet("/api/academic-calendar");
+    applyAcademicCalendarPayload(data);
+    academicCalendarFetchedAt = now;
+  } catch {
+    /* keep in-page defaults */
+  }
 }
 
 function formatNotableDatesForTextarea(notableDates) {
@@ -3685,19 +3687,100 @@ function initAdminPage() {
     const calWeeksEl = document.getElementById("admin-calendar-teaching-weeks");
     const calNotesEl = document.getElementById("admin-calendar-notes");
     const calSaveBtn = document.getElementById("admin-calendar-save-btn");
+    const adminCalendarPreviewState = {
+      viewYear: new Date().getFullYear(),
+      viewMonth: new Date().getMonth(),
+      selectedISO: null,
+    };
+    let adminCalendarPreviewTimer = null;
+
+    function academicCalendarPayloadFromAdminForm() {
+      return {
+        semester_start_date: calStartEl?.value || "",
+        teaching_weeks: Number(calWeeksEl?.value, 10) || 16,
+        notable_dates: parseNotableDatesFromTextarea(calNotesEl?.value || ""),
+      };
+    }
+
+    function syncAdminPreviewMonthFromStart() {
+      const iso = calStartEl?.value;
+      if (!iso) return;
+      const parts = iso.split("-").map(Number);
+      if (parts.length >= 2 && parts[0] && parts[1]) {
+        adminCalendarPreviewState.viewYear = parts[0];
+        adminCalendarPreviewState.viewMonth = parts[1] - 1;
+      }
+    }
+
+    function paintAdminCalendarPreview() {
+      const mount = document.getElementById("admin-calendar-preview-root");
+      const wrap = document.getElementById("admin-calendar-preview-wrap");
+      if (!mount || !wrap || !calStartEl?.value) {
+        wrap?.classList.add("hidden");
+        return;
+      }
+      applyAcademicCalendarPayload(academicCalendarPayloadFromAdminForm());
+      wrap.classList.remove("hidden");
+      renderMonthlyCalendarInto(mount, {
+        year: adminCalendarPreviewState.viewYear,
+        monthIndex: adminCalendarPreviewState.viewMonth,
+        selectedISO: adminCalendarPreviewState.selectedISO,
+        todayISO: getTodayISODateLocal(),
+        tasksByDate: {},
+        onSelectDate(iso) {
+          adminCalendarPreviewState.selectedISO = iso;
+          paintAdminCalendarPreview();
+        },
+        onPrevMonth() {
+          if (adminCalendarPreviewState.viewMonth === 0) {
+            adminCalendarPreviewState.viewMonth = 11;
+            adminCalendarPreviewState.viewYear -= 1;
+          } else {
+            adminCalendarPreviewState.viewMonth -= 1;
+          }
+          paintAdminCalendarPreview();
+        },
+        onNextMonth() {
+          if (adminCalendarPreviewState.viewMonth === 11) {
+            adminCalendarPreviewState.viewMonth = 0;
+            adminCalendarPreviewState.viewYear += 1;
+          } else {
+            adminCalendarPreviewState.viewMonth += 1;
+          }
+          paintAdminCalendarPreview();
+        },
+      });
+    }
+
+    function scheduleAdminCalendarPreview() {
+      if (adminCalendarPreviewTimer) clearTimeout(adminCalendarPreviewTimer);
+      adminCalendarPreviewTimer = setTimeout(() => paintAdminCalendarPreview(), 250);
+    }
 
     async function loadAdminCalendarForm() {
       if (!calStartEl) return;
       try {
         const data = await apiGet("/api/admin/academic-calendar");
         applyAcademicCalendarPayload(data);
+        academicCalendarFetchedAt = Date.now();
         calStartEl.value = data.semester_start_date || "";
         calWeeksEl.value = String(data.teaching_weeks != null ? data.teaching_weeks : 16);
         calNotesEl.value = formatNotableDatesForTextarea(data.notable_dates);
+        syncAdminPreviewMonthFromStart();
+        paintAdminCalendarPreview();
       } catch (err) {
         setAdminPageMessage(errorEl, err.message || t("admin_cal_load_error"), true);
       }
     }
+
+    if (calStartEl) {
+      calStartEl.addEventListener("change", () => {
+        syncAdminPreviewMonthFromStart();
+        scheduleAdminCalendarPreview();
+      });
+    }
+    calWeeksEl?.addEventListener("input", scheduleAdminCalendarPreview);
+    calNotesEl?.addEventListener("input", scheduleAdminCalendarPreview);
 
     if (calSaveBtn) {
       calSaveBtn.addEventListener("click", async () => {
@@ -3710,9 +3793,11 @@ function initAdminPage() {
             notable_dates: parseNotableDatesFromTextarea(calNotesEl.value),
           });
           applyAcademicCalendarPayload(saved);
-          academicCalendarLoadPromise = null;
-          await ensureAcademicCalendarLoaded();
+          academicCalendarFetchedAt = Date.now();
+          await ensureAcademicCalendarLoaded({ force: true });
           calNotesEl.value = formatNotableDatesForTextarea(saved.notable_dates);
+          syncAdminPreviewMonthFromStart();
+          paintAdminCalendarPreview();
           setAdminPageMessage(statusEl, t("admin_cal_saved"), false);
         } catch (err) {
           setAdminPageMessage(errorEl, err.message, true);
@@ -6013,7 +6098,8 @@ function initTeacherPage() {
   }
 
   /** Redraw the big month grid using whatever is already inside plannerState.tasksAll. */
-  function paintPlannerCalendar() {
+  async function paintPlannerCalendar() {
+    await ensureAcademicCalendarLoaded();
     const byDate = bucketTasksByDate(plannerState.tasksAll);
     renderMonthlyCalendarInto(calendarRoot, {
       year: plannerState.viewYear,
@@ -8675,7 +8761,8 @@ function initStudentPage() {
     await reloadStudentView();
   });
 
-  function paintStudentPlanner() {
+  async function paintStudentPlanner() {
+    await ensureAcademicCalendarLoaded();
     const byDate = bucketTasksByDate(plannerState.tasksAll);
     renderMonthlyCalendarInto(calendarRoot, {
       year: plannerState.viewYear,
