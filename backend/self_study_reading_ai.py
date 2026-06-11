@@ -52,30 +52,105 @@ def _ai_json(system: str, user: str, *, max_tokens: int = 3500) -> dict[str, Any
     return json.loads(raw)
 
 
-def _normalize_questions(questions: list[dict]) -> list[dict]:
+def _first_nonempty(data: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        val = data.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return ""
+
+
+def _coerce_option_list(raw: Any) -> list[str]:
+    if not raw:
+        return []
+    if isinstance(raw, dict):
+        ordered = []
+        for letter in ("A", "B", "C", "D", "E", "F"):
+            if letter in raw and str(raw[letter]).strip():
+                ordered.append(str(raw[letter]).strip())
+        if ordered:
+            return ordered
+        return [str(v).strip() for v in raw.values() if str(v).strip()]
+    if isinstance(raw, str):
+        s = raw.strip()
+        return [s] if s else []
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        if isinstance(item, str):
+            s = item.strip()
+            if s:
+                out.append(s)
+        elif isinstance(item, dict):
+            s = _first_nonempty(item, "text", "label", "option", "value", "content", "en", "optionEn")
+            if s:
+                out.append(s)
+    return out
+
+
+def _coerce_questions_list(raw: Any) -> list[dict[str, Any]]:
+    if isinstance(raw, dict):
+        items: list[dict[str, Any]] = []
+        for key, value in raw.items():
+            if isinstance(value, dict):
+                item = dict(value)
+                item.setdefault("id", str(key))
+                items.append(item)
+        return items
+    if isinstance(raw, list):
+        return [q for q in raw if isinstance(q, dict)]
+    return []
+
+
+def _normalize_questions(questions: Any) -> list[dict]:
     out: list[dict] = []
-    for i, q in enumerate(questions or []):
-        qid = str(q.get("id") or f"q{i + 1}")
-        type_id = str(q.get("typeId") or "MC").upper()
+    for i, q in enumerate(_coerce_questions_list(questions)):
+        qid = _first_nonempty(q, "id", "questionId", "qid") or f"q{i + 1}"
+        type_id = (_first_nonempty(q, "typeId", "type", "questionType", "format") or "MC").upper()
         if type_id not in {"MC", "TFNG", "YNNG", "GAP", "MH"}:
             type_id = "MC"
+        prompt_en = _first_nonempty(
+            q,
+            "promptEn",
+            "prompt",
+            "questionEn",
+            "question",
+            "stem",
+            "text",
+            "questionText",
+            "body",
+        )
+        prompt_zh = _first_nonempty(q, "promptZh", "questionZh", "prompt_zh", "question_zh")
+        options_en = _coerce_option_list(
+            q.get("optionsEn")
+            or q.get("options")
+            or q.get("choices")
+            or q.get("answers")
+            or q.get("options_en")
+        )
+        options_zh = _coerce_option_list(q.get("optionsZh") or q.get("options_zh") or q.get("choicesZh"))
         item: dict[str, Any] = {
             "id": qid,
             "typeId": type_id,
-            "instructionEn": str(q.get("instructionEn") or "").strip(),
-            "instructionZh": str(q.get("instructionZh") or "").strip(),
-            "promptEn": str(q.get("promptEn") or "").strip(),
-            "promptZh": str(q.get("promptZh") or "").strip(),
-            "optionsEn": list(q.get("optionsEn") or []),
-            "optionsZh": list(q.get("optionsZh") or []),
-            "evidenceEn": str(q.get("evidenceEn") or "").strip(),
-            "evidenceZh": str(q.get("evidenceZh") or "").strip(),
+            "instructionEn": _first_nonempty(q, "instructionEn", "instruction", "directionEn"),
+            "instructionZh": _first_nonempty(q, "instructionZh", "directionZh"),
+            "promptEn": prompt_en,
+            "promptZh": prompt_zh,
+            "optionsEn": options_en,
+            "optionsZh": options_zh,
+            "evidenceEn": _first_nonempty(q, "evidenceEn", "evidence", "explanationEn"),
+            "evidenceZh": _first_nonempty(q, "evidenceZh", "explanationZh"),
         }
         if type_id == "GAP":
-            item["correctAnswer"] = str(q.get("correctAnswer") or "").strip()
-            item["wordLimit"] = int(q.get("wordLimit") or 3)
+            item["correctAnswer"] = _first_nonempty(q, "correctAnswer", "answer", "correct")
+            item["wordLimit"] = int(q.get("wordLimit") or q.get("word_limit") or 3)
         else:
-            item["correctIndex"] = int(q.get("correctIndex") or 0)
+            ci = q.get("correctIndex", q.get("correct_index", q.get("answerIndex", 0)))
+            try:
+                item["correctIndex"] = int(ci if ci is not None else 0)
+            except (TypeError, ValueError):
+                item["correctIndex"] = 0
         if type_id in ("TFNG", "YNNG") and not item["optionsEn"]:
             item["optionsEn"] = (
                 ["TRUE", "FALSE", "NOT GIVEN"]
@@ -87,6 +162,8 @@ def _normalize_questions(questions: list[dict]) -> list[dict]:
                 if type_id == "TFNG"
                 else ["是", "否", "未给出"]
             )
+        if not item["promptEn"]:
+            continue
         out.append(item)
     return out
 
@@ -165,13 +242,26 @@ def passage_needs_upgrade(content: dict[str, Any]) -> bool:
     return passage_word_count(content) < _MIN_PASSAGE_WORDS or len(content.get("questions") or []) < _MIN_QUESTION_COUNT
 
 
+def _usable_question_count(content: dict[str, Any]) -> int:
+    return sum(
+        1
+        for q in content.get("questions") or []
+        if str(q.get("promptEn") or "").strip()
+        and (str(q.get("typeId") or "").upper() == "GAP" or list(q.get("optionsEn") or []))
+    )
+
+
+def _questions_need_regeneration(content: dict[str, Any]) -> bool:
+    return _usable_question_count(content) < _MIN_QUESTION_COUNT
+
+
 def _validate_passage_content(content: dict[str, Any]) -> None:
     wc = passage_word_count(content)
-    qn = len(content.get("questions") or [])
+    qn = _usable_question_count(content)
     if wc < _MIN_PASSAGE_WORDS:
         raise RuntimeError(f"Passage too short ({wc} words; need {_MIN_PASSAGE_WORDS}+)")
     if qn < _MIN_QUESTION_COUNT:
-        raise RuntimeError(f"Too few questions ({qn}; need {_MIN_QUESTION_COUNT}+)")
+        raise RuntimeError(f"Too few usable questions ({qn}; need {_MIN_QUESTION_COUNT}+)")
 
 
 def generate_daily_passage(
@@ -205,7 +295,28 @@ def generate_daily_passage(
 _STRUCTURE_SYSTEM = """You are an EAP reading editor. Convert manager source text into IELTS-style reading JSON.
 Use the same JSON schema as daily generation (title, passageLevel, lessonEn, lessonZh, paragraphsEn, paragraphsZh, questions).
 Infer paragraph breaks from the source. If source is short, expand into a 700-1000 word academic passage while keeping the topic.
-Create 10-15 questions covering the content. Mix MC, TFNG, YNNG, GAP, and MH. Keep answers evidence-based in the text."""
+Create 10-15 questions covering the content. Mix MC, TFNG, YNNG, GAP, and MH. Keep answers evidence-based in the text.
+CRITICAL: Every question MUST include non-empty promptEn and optionsEn (for MC/TFNG/YNNG/MH) or correctAnswer (for GAP)."""
+
+_QUESTIONS_ONLY_SYSTEM = """You are an IELTS Academic Reading item writer.
+Return ONLY valid JSON: { "questions": [ ... ] } using the same question object schema as daily reading generation.
+Write exactly 10-15 questions for the passage provided. Mix MC, TFNG, YNNG, GAP, and MH.
+Every question MUST have non-empty promptEn. MC/TFNG/YNNG/MH MUST have optionsEn with 3-4 choices."""
+
+
+def _generate_questions_for_passage(content: dict[str, Any]) -> list[dict]:
+    passage = str(content.get("passageEn") or "").strip()
+    if not passage:
+        passage = "\n\n".join(str(p) for p in (content.get("paragraphsEn") or []))
+    if not passage.strip():
+        raise RuntimeError("Cannot generate questions without passage text")
+    user = (
+        f"Title: {content.get('title') or 'Reading passage'}\n"
+        f"Level: {content.get('passageLevel') or 'P2'}\n\n"
+        f"Passage:\n{passage[:9000]}"
+    )
+    payload = _ai_json(_QUESTIONS_ONLY_SYSTEM, user, max_tokens=4000)
+    return _normalize_questions(payload.get("questions") or [])
 
 
 def structure_passage_from_text(
@@ -224,11 +335,35 @@ def structure_passage_from_text(
         f"Target passage level: {passage_level}\n\n"
         f"Source text:\n{cleaned}"
     )
-    payload = _ai_json(_STRUCTURE_SYSTEM, user, max_tokens=4500)
-    content = normalize_passage_content(payload)
-    if not content.get("paragraphsEn") and content.get("passageEn"):
-        content["paragraphsEn"] = [p.strip() for p in content["passageEn"].split("\n\n") if p.strip()]
-    return content
+    last_err: Exception | None = None
+    content: dict[str, Any] | None = None
+    for attempt in range(2):
+        try:
+            payload = _ai_json(_STRUCTURE_SYSTEM, user, max_tokens=7000)
+            content = normalize_passage_content(payload)
+            if not content.get("paragraphsEn") and content.get("passageEn"):
+                content["paragraphsEn"] = [
+                    p.strip() for p in content["passageEn"].split("\n\n") if p.strip()
+                ]
+            if _questions_need_regeneration(content):
+                content["questions"] = _generate_questions_for_passage(content)
+            if _questions_need_regeneration(content):
+                raise RuntimeError("AI returned questions without prompts or options")
+            return content
+        except Exception as exc:
+            last_err = exc
+            user += (
+                " Previous attempt failed — every question needs promptEn text and optionsEn "
+                "(or correctAnswer for GAP)."
+            )
+    if content and passage_word_count(content) >= 200:
+        try:
+            content["questions"] = _generate_questions_for_passage(content)
+            if not _questions_need_regeneration(content):
+                return content
+        except Exception as exc:
+            last_err = exc
+    raise RuntimeError(str(last_err) if last_err else "AI structure failed")
 
 
 _FEEDBACK_SYSTEM = """You are an IELTS Academic Reading examiner. Given passage, questions, student answers, and auto-mark results,

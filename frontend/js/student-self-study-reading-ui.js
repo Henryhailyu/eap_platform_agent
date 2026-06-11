@@ -81,11 +81,32 @@
     return `<p class="ssc-reading-p__para">${escapeHtml(flat)}</p>`;
   }
 
+  function questionPrompt(q) {
+    return (
+      pickLang(q, "promptEn", "promptZh") ||
+      q.prompt ||
+      q.question ||
+      q.questionEn ||
+      q.stem ||
+      q.text ||
+      ""
+    );
+  }
+
+  function questionOptions(q) {
+    const zh = isZh();
+    const primary = zh ? q.optionsZh || q.optionsEn : q.optionsEn || q.optionsZh;
+    if (primary && primary.length) return primary;
+    if (Array.isArray(q.options)) return q.options.map((o) => (typeof o === "string" ? o : o.text || o.label || ""));
+    if (Array.isArray(q.choices)) return q.choices.map((o) => (typeof o === "string" ? o : o.text || o.label || ""));
+    return [];
+  }
+
   function renderQuestionItem(q, answers) {
-    const typeId = (q.typeId || "MC").toUpperCase();
-    const instruction = pickLang(q, "instructionEn", "instructionZh");
-    const prompt = pickLang(q, "promptEn", "promptZh");
-    const opts = isZh() ? q.optionsZh || q.optionsEn : q.optionsEn || q.optionsZh;
+    const typeId = (q.typeId || q.type || "MC").toUpperCase();
+    const instruction = pickLang(q, "instructionEn", "instructionZh") || q.instruction || "";
+    const prompt = questionPrompt(q);
+    const opts = questionOptions(q);
     const chosen = answers[q.id];
 
     if (typeId === "GAP") {

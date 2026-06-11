@@ -726,6 +726,48 @@ def _update_passage_content(conn, passage_id: int, data: dict) -> None:
     )
 
 
+def _passage_has_usable_questions(content: dict[str, Any]) -> bool:
+    try:
+        from self_study_reading_ai import _usable_question_count
+
+        return _usable_question_count(content) >= 4
+    except Exception:
+        qs = content.get("questions") or []
+        return any(str(q.get("promptEn") or "").strip() for q in qs)
+
+
+def _repair_channel_a_passage_questions(conn, passage: Any) -> Any:
+    """Re-normalize or regenerate questions when AI stored empty prompts/options."""
+    if not passage:
+        return passage
+    try:
+        raw = json.loads(passage["content_json"])
+        from self_study_reading_ai import (
+            _generate_questions_for_passage,
+            _usable_question_count,
+            normalize_passage_content,
+            reading_ai_available,
+        )
+    except Exception:
+        return passage
+
+    try:
+        content = normalize_passage_content(raw)
+        usable = _usable_question_count(content)
+        if usable >= 4:
+            return passage
+        if not reading_ai_available():
+            return passage
+        content["questions"] = _generate_questions_for_passage(content)
+        if _usable_question_count(content) < 4:
+            return passage
+        _update_passage_content(conn, int(passage["id"]), content)
+        conn.commit()
+        return conn.execute("SELECT * FROM reading_passages WHERE id = ?", (passage["id"],)).fetchone()
+    except Exception:
+        return passage
+
+
 def _maybe_upgrade_passage(
     conn,
     passage: Any,
@@ -773,6 +815,8 @@ def _ensure_passage_for_day(
     else:
         passage = _passage_for_day(conn, schedule["id"], day_number)
     if passage:
+        if channel == "A":
+            passage = _repair_channel_a_passage_questions(conn, passage)
         return _maybe_upgrade_passage(
             conn,
             passage,
