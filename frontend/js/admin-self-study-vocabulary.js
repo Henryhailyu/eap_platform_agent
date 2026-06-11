@@ -138,32 +138,6 @@
     }
   }
 
-  async function modifyPackFiles(packId, fileList, statusEl, tbody, emptyEl) {
-    const files = fileList ? Array.from(fileList) : [];
-    if (!files.length) return;
-    if (!window.confirm(t("admin_vocab_modify_confirm"))) return;
-
-    setStatus(statusEl, t("admin_vocab_uploading"), false);
-    showUploadOverlay(files.length, totalFileBytes(files));
-    const fd = new FormData();
-    files.forEach((file) => fd.append("files", file));
-    fd.append("replace", "true");
-    try {
-      const result = await postMultipart(`/api/admin/self-study/vocabulary/packs/${packId}/upload`, fd);
-      await loadPacks(tbody, emptyEl);
-      const fileTag = result.sourceFilename ? ` (${result.sourceFilename})` : "";
-      setStatus(
-        statusEl,
-        `${t("admin_vocab_upload_done", { n: String(result.wordCount || result.unitCount || 0) })}${fileTag}`,
-        false,
-      );
-    } catch (e) {
-      setStatus(statusEl, e.message || t("admin_vocab_failed"), true);
-    } finally {
-      hideUploadOverlay();
-    }
-  }
-
   async function loadPacks(tbody, emptyEl) {
     if (!tbody) return;
     try {
@@ -191,10 +165,6 @@
           <td>${escapeHtml(p.className || "—")}</td>
           <td>${escapeHtml(String(p.unitCount || 0))}</td>
           <td class="admin-table__actions">
-            <label class="btn-secondary admin-vocab-modify-btn">
-              ${escapeHtml(t("admin_vocab_modify"))}
-              <input type="file" class="hidden" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" data-pack-modify="${p.id}" />
-            </label>
             <button type="button" class="btn-secondary admin-vocab-delete-btn" data-pack-delete="${p.id}">${escapeHtml(t("admin_vocab_delete"))}</button>
           </td>
         `;
@@ -204,14 +174,6 @@
         btn.addEventListener("click", () => {
           const id = parseInt(btn.getAttribute("data-pack-delete"), 10);
           void deletePack(id, document.getElementById("admin-vocab-status"), tbody, emptyEl);
-        });
-      });
-      tbody.querySelectorAll("[data-pack-modify]").forEach((input) => {
-        input.addEventListener("change", () => {
-          const id = parseInt(input.getAttribute("data-pack-modify"), 10);
-          const files = input.files;
-          input.value = "";
-          void modifyPackFiles(id, files, document.getElementById("admin-vocab-status"), tbody, emptyEl);
         });
       });
     } catch (e) {

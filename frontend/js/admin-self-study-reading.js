@@ -5,6 +5,7 @@
   let draftQueue = [];
   let selectedDraftId = null;
   let structuredContent = null;
+  let showChannelBPassages = false;
 
   function apiBase() {
     if (window.EAP_API_BASE_RESOLVED) {
@@ -256,18 +257,48 @@
     }
   }
 
+  function updateChannelBToggle(channelBCount) {
+    const btn = document.getElementById("admin-reading-toggle-channel-b");
+    const countEl = document.getElementById("admin-reading-channel-b-count");
+    if (btn) {
+      btn.textContent = t(
+        showChannelBPassages ? "admin_reading_hide_channel_b" : "admin_reading_show_channel_b",
+      );
+      btn.setAttribute(
+        "aria-expanded",
+        showChannelBPassages ? "true" : "false",
+      );
+    }
+    if (countEl) {
+      if (!showChannelBPassages && channelBCount > 0) {
+        countEl.textContent = t("admin_reading_channel_b_hidden", { n: String(channelBCount) });
+        countEl.classList.remove("hidden");
+      } else {
+        countEl.textContent = "";
+        countEl.classList.add("hidden");
+      }
+    }
+  }
+
   async function loadPassages(tbody, emptyEl) {
     if (!tbody) return;
     try {
       const data = await apiFetch("/api/admin/self-study/reading/passages");
       const list = data.passages || [];
+      const channelBCount = list.filter(
+        (p) => String(p.sourceChannel || "").toUpperCase() === "B",
+      ).length;
+      const visible = showChannelBPassages
+        ? list
+        : list.filter((p) => String(p.sourceChannel || "").toUpperCase() !== "B");
       tbody.innerHTML = "";
-      if (!list.length) {
+      updateChannelBToggle(channelBCount);
+      if (!visible.length) {
         if (emptyEl) emptyEl.classList.remove("hidden");
         return;
       }
       if (emptyEl) emptyEl.classList.add("hidden");
-      list.forEach((p) => {
+      visible.forEach((p) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${escapeHtml(p.title)}</td>
@@ -280,6 +311,13 @@
     } catch (_) {
       if (emptyEl) emptyEl.classList.remove("hidden");
     }
+  }
+
+  function bindChannelBToggle(tbody, emptyEl) {
+    document.getElementById("admin-reading-toggle-channel-b")?.addEventListener("click", () => {
+      showChannelBPassages = !showChannelBPassages;
+      void loadPassages(tbody, emptyEl);
+    });
   }
 
   function bindPush(statusEl) {
@@ -428,6 +466,7 @@
     const emptyEl = document.getElementById("admin-reading-empty");
     bindPush(statusEl);
     bindExport();
+    bindChannelBToggle(tbody, emptyEl);
     bindUpload(statusEl, tbody, emptyEl);
     void loadPassages(tbody, emptyEl);
   }

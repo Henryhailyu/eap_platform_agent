@@ -2746,6 +2746,18 @@
   color: #6e6e73;
 }
 
+.admin-reading-channel-b-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-reading-channel-b-toggle .admin-panel__hint {
+  margin: 0;
+}
+
 .admin-reading-draft-list {
   margin-top: 0.75rem;
 }
