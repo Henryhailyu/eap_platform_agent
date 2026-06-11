@@ -412,9 +412,11 @@
               </div>
               <div class="admin-mat-form__actions">
                 <button type="button" class="btn-primary" id="admin-reading-upload-btn" data-i18n="admin_reading_upload_btn">Upload &amp; extract</button>
-                <button type="button" class="btn-secondary" id="admin-reading-structure-btn" data-i18n="admin_reading_structure_btn" disabled>AI structure</button>
-                <button type="button" class="btn-secondary" id="admin-reading-publish-btn" data-i18n="admin_reading_publish_btn" disabled>Publish to Channel A</button>
+                <button type="button" class="btn-secondary" id="admin-reading-structure-btn" data-i18n="admin_reading_ai_parse_btn" disabled>Submit to AI</button>
+                <button type="button" class="btn-secondary" id="admin-reading-regenerate-btn" data-i18n="admin_reading_regenerate_btn" disabled>Regenerate with AI</button>
+                <button type="button" class="btn-secondary" id="admin-reading-publish-btn" data-i18n="admin_reading_push_student_btn" disabled>Push to student Channel A</button>
               </div>
+              <div id="admin-reading-draft-list" class="admin-reading-draft-list hidden" aria-live="polite"></div>
               <div id="admin-reading-upload-preview" class="admin-reading-preview hidden" aria-live="polite"></div>
             </div>
           </section>
@@ -752,7 +754,7 @@
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-materials.js"></script>
     <script src="js/admin-self-study-vocabulary.js"></script>
-    <script src="js/admin-self-study-reading.js?v=20260611-r4a"></script>
+    <script src="js/admin-self-study-reading.js?v=20260611-r5a"></script>
     <script src="js/admin-self-study-listening.js"></script>
     <script src="js/admin-self-study-writing.js"></script>
     <script src="js/admin-self-study-speaking.js"></script>

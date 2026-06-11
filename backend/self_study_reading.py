@@ -570,6 +570,26 @@ def _passage_for_day(conn, schedule_id: int, day_number: int) -> Any:
     ).fetchone()
 
 
+def _passage_for_channel_a_day(conn, schedule_id: int, day_number: int) -> Any:
+    """Channel A: exact schedule day, else latest published passage in queue."""
+    passage = _passage_for_day(conn, schedule_id, day_number)
+    if passage:
+        return passage
+    row = conn.execute(
+        """
+        SELECT d.day_number FROM reading_schedule_days d
+        JOIN reading_passages p ON p.id = d.passage_id
+        WHERE d.schedule_id = ? AND p.source_channel = 'A' AND p.is_active = 1
+        ORDER BY d.day_number DESC
+        LIMIT 1
+        """,
+        (schedule_id,),
+    ).fetchone()
+    if not row:
+        return None
+    return _passage_for_day(conn, schedule_id, int(row["day_number"]))
+
+
 def _strip_answers(content: dict) -> dict:
     out = dict(content)
     qs = []
@@ -748,7 +768,10 @@ def _ensure_passage_for_day(
     channel: str,
     class_name: str,
 ) -> Any:
-    passage = _passage_for_day(conn, schedule["id"], day_number)
+    if channel == "A":
+        passage = _passage_for_channel_a_day(conn, schedule["id"], day_number)
+    else:
+        passage = _passage_for_day(conn, schedule["id"], day_number)
     if passage:
         return _maybe_upgrade_passage(
             conn,
@@ -1197,6 +1220,59 @@ def register_self_study_reading_routes(
                 "errors": errors,
             }
         )
+
+    @app.route("/api/admin/self-study/reading/drafts/<int:draft_id>", methods=["GET"])
+    def admin_reading_draft_get(draft_id: int):
+        conn = get_db_connection()
+        err = require_manager_console_role(conn)
+        if err:
+            conn.close()
+            return err
+        row = conn.execute("SELECT * FROM reading_source_drafts WHERE id = ?", (draft_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "Draft not found"}), 404
+        content = None
+        if row["structured_json"]:
+            try:
+                content = _strip_answers(json.loads(row["structured_json"]))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                content = None
+        conn.close()
+        return jsonify(
+            {
+                "id": row["id"],
+                "className": row["class_name"],
+                "originalName": row["original_name"],
+                "status": row["status"],
+                "charCount": len(row["extracted_text"] or ""),
+                "content": content,
+            }
+        )
+
+    @app.route("/api/admin/self-study/reading/drafts/<int:draft_id>", methods=["DELETE"])
+    def admin_reading_draft_delete(draft_id: int):
+        conn = get_db_connection()
+        err = require_manager_console_role(conn)
+        if err:
+            conn.close()
+            return err
+        row = conn.execute("SELECT * FROM reading_source_drafts WHERE id = ?", (draft_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "Draft not found"}), 404
+        if row["stored_name"]:
+            upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "reading_sources")
+            stored_path = os.path.join(upload_dir, row["stored_name"])
+            if os.path.isfile(stored_path):
+                try:
+                    os.remove(stored_path)
+                except OSError:
+                    pass
+        conn.execute("DELETE FROM reading_source_drafts WHERE id = ?", (draft_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "draftId": draft_id})
 
     @app.route("/api/admin/self-study/reading/drafts", methods=["GET"])
     def admin_reading_drafts_list():

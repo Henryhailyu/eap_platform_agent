@@ -2,8 +2,9 @@
  * Manager centre — SS-R2 reading Channel A push, upload/OCR, and passage export.
  */
 (function () {
-  let lastDraftId = null;
   let draftQueue = [];
+  let selectedDraftId = null;
+  let structuredContent = null;
 
   function apiBase() {
     if (window.EAP_API_BASE_RESOLVED) {
@@ -50,28 +51,137 @@
       .replace(/>/g, "&gt;");
   }
 
-  function excerpt(text, max) {
-    const clean = String(text || "").replace(/\s+/g, " ").trim();
-    if (clean.length <= max) return clean;
-    return `${clean.slice(0, max)}…`;
+  function isZh() {
+    return !!(window.EAP_I18N && window.EAP_I18N.getLang() === "zh");
   }
 
-  function renderUploadPreview(preview, drafts, structured) {
-    if (!preview) return;
-    if (!drafts || !drafts.length) {
-      preview.innerHTML = "";
-      preview.classList.add("hidden");
+  function pickLang(obj, enKey, zhKey) {
+    if (!obj) return "";
+    return isZh() ? obj[zhKey] || obj[enKey] || "" : obj[enKey] || obj[zhKey] || "";
+  }
+
+  function updateActionButtons(structureBtn, regenerateBtn, publishBtn) {
+    const hasSelection = !!selectedDraftId;
+    const hasStructured = !!structuredContent;
+    if (structureBtn) structureBtn.disabled = !hasSelection;
+    if (regenerateBtn) regenerateBtn.disabled = !hasSelection || !hasStructured;
+    if (publishBtn) publishBtn.disabled = !hasSelection || !hasStructured;
+  }
+
+  function renderDraftList(listEl, structureBtn, regenerateBtn, publishBtn) {
+    if (!listEl) return;
+    if (!draftQueue.length) {
+      listEl.innerHTML = "";
+      listEl.classList.add("hidden");
       return;
     }
+    listEl.classList.remove("hidden");
+    listEl.innerHTML = `
+      <p class="admin-reading-draft-list__hint">${escapeHtml(t("admin_reading_select_hint"))}</p>
+      <ul class="admin-reading-draft-list__items">
+        ${draftQueue
+          .map(
+            (d) => `
+          <li class="admin-reading-draft-row${d.draftId === selectedDraftId ? " admin-reading-draft-row--selected" : ""}">
+            <label class="admin-reading-draft-row__pick">
+              <input type="checkbox" class="admin-reading-draft-check" data-draft-id="${d.draftId}"${
+                d.draftId === selectedDraftId ? " checked" : ""
+              } />
+              <span class="admin-reading-draft-row__name">${escapeHtml(d.originalName)}</span>
+            </label>
+            <span class="admin-reading-draft-row__meta">${escapeHtml(
+              t("admin_reading_preview_chars", { n: String(d.charCount || 0) }),
+            )}</span>
+            <button type="button" class="btn-secondary admin-reading-draft-delete" data-draft-id="${d.draftId}" data-i18n="admin_reading_delete_btn">${escapeHtml(
+              t("admin_reading_delete_btn"),
+            )}</button>
+          </li>
+        `,
+          )
+          .join("")}
+      </ul>
+    `;
+
+    listEl.querySelectorAll(".admin-reading-draft-check").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        if (cb.checked) {
+          selectedDraftId = parseInt(cb.getAttribute("data-draft-id") || "", 10) || null;
+          structuredContent = null;
+          listEl.querySelectorAll(".admin-reading-draft-check").forEach((other) => {
+            if (other !== cb) other.checked = false;
+          });
+        } else if (selectedDraftId === parseInt(cb.getAttribute("data-draft-id") || "", 10)) {
+          selectedDraftId = null;
+          structuredContent = null;
+        }
+        listEl.querySelectorAll(".admin-reading-draft-row").forEach((row) => {
+          row.classList.toggle(
+            "admin-reading-draft-row--selected",
+            parseInt(row.querySelector(".admin-reading-draft-check")?.getAttribute("data-draft-id") || "", 10) ===
+              selectedDraftId,
+          );
+        });
+        updateActionButtons(structureBtn, regenerateBtn, publishBtn);
+        const preview = document.getElementById("admin-reading-upload-preview");
+        if (preview) {
+          preview.innerHTML = "";
+          preview.classList.add("hidden");
+        }
+      });
+    });
+
+    listEl.querySelectorAll(".admin-reading-draft-delete").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = parseInt(btn.getAttribute("data-draft-id") || "", 10);
+        void deleteDraft(id, listEl, structureBtn, regenerateBtn, publishBtn);
+      });
+    });
+  }
+
+  async function deleteDraft(draftId, listEl, structureBtn, regenerateBtn, publishBtn) {
+    try {
+      await apiFetch(`/api/admin/self-study/reading/drafts/${draftId}`, { method: "DELETE" });
+      draftQueue = draftQueue.filter((d) => d.draftId !== draftId);
+      if (selectedDraftId === draftId) {
+        selectedDraftId = null;
+        structuredContent = null;
+      }
+      const preview = document.getElementById("admin-reading-upload-preview");
+      if (preview) {
+        preview.innerHTML = "";
+        preview.classList.add("hidden");
+      }
+      renderDraftList(listEl, structureBtn, regenerateBtn, publishBtn);
+      updateActionButtons(structureBtn, regenerateBtn, publishBtn);
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  function renderGenerating(preview) {
+    if (!preview) return;
     preview.classList.remove("hidden");
-    if (structured) {
-      const c = structured;
-      const title = c.title || c.titleEn || t("admin_reading_preview_untitled");
-      const paras = c.paragraphsEn || (c.passageEn ? [c.passageEn] : []);
-      const questions = c.questions || [];
-      const wordCount = (paras.join(" ") || c.passageEn || "").trim().split(/\s+/).filter(Boolean).length;
-      preview.innerHTML = `
-        <article class="admin-reading-preview__passage">
+    preview.innerHTML = `
+      <div class="ssc-generating-card admin-reading-generating" role="status" aria-live="polite">
+        <div class="ssc-generating-card__spinner" aria-hidden="true"></div>
+        <p class="ssc-generating-card__title">${escapeHtml(t("admin_reading_ai_generating"))}</p>
+        <p class="ssc-generating-card__hint">${escapeHtml(t("admin_reading_ai_generating_hint"))}</p>
+      </div>
+    `;
+  }
+
+  function renderStructuredPreview(preview, content) {
+    if (!preview || !content) return;
+    const title = content.title || content.titleEn || t("admin_reading_preview_untitled");
+    const paras = content.paragraphsEn || (content.passageEn ? [content.passageEn] : []);
+    const questions = content.questions || [];
+    const wordCount = (paras.join(" ") || content.passageEn || "").trim().split(/\s+/).filter(Boolean).length;
+    const lesson = pickLang(content, "lessonEn", "lessonZh");
+
+    preview.classList.remove("hidden");
+    preview.innerHTML = `
+      <article class="admin-reading-preview__full">
+        <header class="admin-reading-preview__head">
           <p class="admin-reading-preview__label">${escapeHtml(t("admin_reading_preview_structured"))}</p>
           <h4 class="admin-reading-preview__title">${escapeHtml(title)}</h4>
           <p class="admin-reading-preview__meta">${escapeHtml(
@@ -80,36 +190,70 @@
               questions: String(questions.length),
             }),
           )}</p>
-          ${paras
-            .slice(0, 2)
-            .map((p) => `<p class="admin-reading-preview__para">${escapeHtml(p)}</p>`)
-            .join("")}
-          ${paras.length > 2 ? `<p class="admin-reading-preview__more">…</p>` : ""}
-        </article>
-      `;
-      return;
-    }
-    preview.innerHTML = drafts
-      .map(
-        (d, i) => `
-        <article class="admin-reading-preview__card${i === 0 ? " admin-reading-preview__card--active" : ""}">
-          <h4 class="admin-reading-preview__title">${escapeHtml(d.originalName)}</h4>
-          <p class="admin-reading-preview__meta">${escapeHtml(
-            t("admin_reading_preview_chars", { n: String(d.charCount || 0) }),
-          )}</p>
-          <p class="admin-reading-preview__para">${escapeHtml(excerpt(d.preview, 320))}</p>
-        </article>
-      `,
-      )
-      .join("");
+          ${lesson ? `<p class="admin-reading-preview__lesson">${escapeHtml(lesson)}</p>` : ""}
+        </header>
+        <section class="admin-reading-preview__scroll" tabindex="0" aria-label="${escapeHtml(t("admin_reading_preview_scroll_label"))}">
+          <div class="admin-reading-preview__section">
+            <h5>${escapeHtml(t("admin_reading_preview_passage_heading"))}</h5>
+            ${paras.map((p) => `<p class="admin-reading-preview__para">${escapeHtml(p)}</p>`).join("")}
+          </div>
+          <div class="admin-reading-preview__section">
+            <h5>${escapeHtml(t("admin_reading_preview_questions_heading", { n: String(questions.length) }))}</h5>
+            ${questions
+              .map((q, idx) => {
+                const typeId = (q.typeId || "MC").toUpperCase();
+                const instruction = pickLang(q, "instructionEn", "instructionZh");
+                const prompt = pickLang(q, "promptEn", "promptZh");
+                const opts = isZh() ? q.optionsZh || q.optionsEn : q.optionsEn || q.optionsZh;
+                const optionsHtml =
+                  typeId === "GAP"
+                    ? `<p class="admin-reading-preview__gap">${escapeHtml(t("admin_reading_preview_gap"))}</p>`
+                    : `<ol class="admin-reading-preview__options">
+                        ${(opts || [])
+                          .map((opt) => `<li>${escapeHtml(opt)}</li>`)
+                          .join("")}
+                      </ol>`;
+                return `
+                  <div class="admin-reading-preview__question">
+                    <p class="admin-reading-preview__qnum">${idx + 1}. ${escapeHtml(typeId)}</p>
+                    ${instruction ? `<p class="admin-reading-preview__instr">${escapeHtml(instruction)}</p>` : ""}
+                    <p class="admin-reading-preview__prompt">${escapeHtml(prompt)}</p>
+                    ${optionsHtml}
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+        </section>
+      </article>
+    `;
   }
 
-  function advanceDraftQueue(preview, structureBtn, publishBtn) {
-    draftQueue = draftQueue.filter((d) => d.draftId !== lastDraftId);
-    lastDraftId = draftQueue.length ? draftQueue[0].draftId : null;
-    if (structureBtn) structureBtn.disabled = !lastDraftId;
+  async function runStructure(statusEl, preview, structureBtn, regenerateBtn, publishBtn, isRegenerate) {
+    if (!selectedDraftId) return;
+    setStatus(statusEl, isRegenerate ? t("admin_reading_regenerating") : t("admin_reading_structuring"), false);
+    if (structureBtn) structureBtn.disabled = true;
+    if (regenerateBtn) regenerateBtn.disabled = true;
     if (publishBtn) publishBtn.disabled = true;
-    renderUploadPreview(preview, draftQueue, null);
+    renderGenerating(preview);
+    try {
+      const data = await apiFetch(`/api/admin/self-study/reading/drafts/${selectedDraftId}/structure`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passageLevel: "P2" }),
+      });
+      structuredContent = data.content || null;
+      renderStructuredPreview(preview, structuredContent);
+      setStatus(statusEl, t("admin_reading_structure_ok"), false);
+    } catch (e) {
+      if (preview) {
+        preview.innerHTML = "";
+        preview.classList.add("hidden");
+      }
+      setStatus(statusEl, e.message, true);
+    } finally {
+      updateActionButtons(structureBtn, regenerateBtn, publishBtn);
+    }
   }
 
   async function loadPassages(tbody, emptyEl) {
@@ -173,8 +317,10 @@
   function bindUpload(statusEl, tbody, emptyEl) {
     const uploadBtn = document.getElementById("admin-reading-upload-btn");
     const structureBtn = document.getElementById("admin-reading-structure-btn");
+    const regenerateBtn = document.getElementById("admin-reading-regenerate-btn");
     const publishBtn = document.getElementById("admin-reading-publish-btn");
     const preview = document.getElementById("admin-reading-upload-preview");
+    const draftList = document.getElementById("admin-reading-draft-list");
     const fileInput = document.getElementById("admin-reading-upload-file");
     const classInput = document.getElementById("admin-reading-upload-class");
 
@@ -198,7 +344,7 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Upload failed");
-        draftQueue = data.drafts || [
+        const newDrafts = data.drafts || [
           {
             draftId: data.draftId,
             originalName: data.originalName,
@@ -206,11 +352,21 @@
             preview: data.preview,
           },
         ];
-        lastDraftId = draftQueue[0]?.draftId || data.draftId;
-        if (structureBtn) structureBtn.disabled = !lastDraftId;
-        if (publishBtn) publishBtn.disabled = true;
-        renderUploadPreview(preview, draftQueue, null);
-        const fileCount = data.fileCount || draftQueue.length;
+        const existingIds = new Set(draftQueue.map((d) => d.draftId));
+        newDrafts.forEach((d) => {
+          if (!existingIds.has(d.draftId)) draftQueue.push(d);
+        });
+        if (!selectedDraftId && draftQueue.length) {
+          selectedDraftId = draftQueue[0].draftId;
+        }
+        structuredContent = null;
+        if (preview) {
+          preview.innerHTML = "";
+          preview.classList.add("hidden");
+        }
+        renderDraftList(draftList, structureBtn, regenerateBtn, publishBtn);
+        updateActionButtons(structureBtn, regenerateBtn, publishBtn);
+        const fileCount = data.fileCount || newDrafts.length;
         let msg = t("admin_reading_upload_ok_multi", {
           files: String(fileCount),
           n: String(data.charCount || 0),
@@ -219,37 +375,26 @@
           msg = `${msg} ${t("admin_reading_upload_partial", { n: String(data.errors.length) })}`;
         }
         setStatus(statusEl, msg, false);
+        if (fileInput) fileInput.value = "";
       } catch (e) {
         setStatus(statusEl, e.message, true);
       }
     });
 
-    structureBtn?.addEventListener("click", async () => {
-      if (!lastDraftId) return;
-      setStatus(statusEl, t("admin_reading_structuring"), false);
-      if (structureBtn) structureBtn.disabled = true;
-      try {
-        const data = await apiFetch(`/api/admin/self-study/reading/drafts/${lastDraftId}/structure`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ passageLevel: "P2" }),
-        });
-        if (publishBtn) publishBtn.disabled = false;
-        renderUploadPreview(preview, draftQueue, data.content || null);
-        setStatus(statusEl, t("admin_reading_structure_ok"), false);
-      } catch (e) {
-        setStatus(statusEl, e.message, true);
-      } finally {
-        if (structureBtn) structureBtn.disabled = !lastDraftId;
-      }
+    structureBtn?.addEventListener("click", () => {
+      void runStructure(statusEl, preview, structureBtn, regenerateBtn, publishBtn, false);
+    });
+
+    regenerateBtn?.addEventListener("click", () => {
+      void runStructure(statusEl, preview, structureBtn, regenerateBtn, publishBtn, true);
     });
 
     publishBtn?.addEventListener("click", async () => {
-      if (!lastDraftId) return;
+      if (!selectedDraftId || !structuredContent) return;
       setStatus(statusEl, t("admin_reading_publishing"), false);
       if (publishBtn) publishBtn.disabled = true;
       try {
-        const data = await apiFetch(`/api/admin/self-study/reading/drafts/${lastDraftId}/publish`, {
+        const data = await apiFetch(`/api/admin/self-study/reading/drafts/${selectedDraftId}/publish`, {
           method: "POST",
         });
         const pubMsg = t("admin_reading_publish_ok", { day: String(data.scheduleDay || "") });
@@ -258,11 +403,19 @@
           msg = `${msg} ${t("admin_reading_schedule_synced", { n: String(data.scheduleDaysSynced) })}`;
         }
         setStatus(statusEl, msg, false);
-        advanceDraftQueue(preview, structureBtn, publishBtn);
+        draftQueue = draftQueue.filter((d) => d.draftId !== selectedDraftId);
+        selectedDraftId = draftQueue.length ? draftQueue[0].draftId : null;
+        structuredContent = null;
+        if (preview) {
+          preview.innerHTML = "";
+          preview.classList.add("hidden");
+        }
+        renderDraftList(draftList, structureBtn, regenerateBtn, publishBtn);
+        updateActionButtons(structureBtn, regenerateBtn, publishBtn);
         void loadPassages(tbody, emptyEl);
       } catch (e) {
         setStatus(statusEl, e.message, true);
-        if (publishBtn) publishBtn.disabled = false;
+        updateActionButtons(structureBtn, regenerateBtn, publishBtn);
       }
     });
   }
