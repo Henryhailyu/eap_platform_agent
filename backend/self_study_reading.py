@@ -474,6 +474,50 @@ def _ensure_channel_a_reading_schedule(conn, class_name: str) -> Any:
     return _active_schedule(conn, class_name, "A")
 
 
+def _sync_channel_a_schedule_queue(conn, class_name: str) -> int:
+    """Map published Channel A passages to schedule days 1…N in manager queue order."""
+    schedule = _ensure_channel_a_reading_schedule(conn, class_name)
+    if not schedule:
+        return 0
+    rows = conn.execute(
+        """
+        SELECT id FROM reading_passages
+        WHERE class_name = ? AND source_channel = 'A' AND is_active = 1
+        ORDER BY sort_order ASC, id ASC
+        """,
+        (class_name,),
+    ).fetchall()
+    for idx, row in enumerate(rows):
+        _attach_passage_to_schedule(conn, int(schedule["id"]), idx + 1, int(row["id"]))
+    return len(rows)
+
+
+def _insert_reading_source_draft(
+    conn,
+    *,
+    manager: str,
+    class_name: str,
+    original_name: str,
+    file_bytes: bytes,
+    extracted: str,
+) -> int:
+    upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "reading_sources")
+    os.makedirs(upload_dir, exist_ok=True)
+    stored = f"{uuid.uuid4().hex}_{secure_filename(original_name) or 'source.txt'}"
+    with open(os.path.join(upload_dir, stored), "wb") as fh:
+        fh.write(file_bytes)
+    now = _now_iso()
+    conn.execute(
+        """
+        INSERT INTO reading_source_drafts
+            (manager_username, class_name, original_name, stored_name, extracted_text, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)
+        """,
+        (manager, class_name, original_name[:512], stored, extracted, now, now),
+    )
+    return int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+
+
 def _enable_reading_channel_a_push(
     conn,
     *,
@@ -829,14 +873,18 @@ def register_self_study_reading_routes(
             )
             return jsonify({"error": hint, "channel": channel, "code": "no_schedule"}), 404
 
-        day_arg = request.args.get("day")
-        if day_arg:
-            try:
-                day_num = max(1, int(day_arg))
-            except (TypeError, ValueError):
-                day_num = _day_number(schedule)
-        else:
+        if channel == "A":
+            # Channel A follows the class reading schedule, not vocab calendar ?day= links.
             day_num = _day_number(schedule)
+        else:
+            day_arg = request.args.get("day")
+            if day_arg:
+                try:
+                    day_num = max(1, int(day_arg))
+                except (TypeError, ValueError):
+                    day_num = _day_number(schedule)
+            else:
+                day_num = _day_number(schedule)
 
         passage = _ensure_passage_for_day(
             conn,
@@ -981,8 +1029,10 @@ def register_self_study_reading_routes(
             return jsonify({"error": "className required"}), 400
         now = _now_iso()
         warning = None
+        schedule_days_synced = 0
         if is_active:
             _ensure_channel_a_reading_schedule(conn, class_name)
+            schedule_days_synced = _sync_channel_a_schedule_queue(conn, class_name)
             pub_count = conn.execute(
                 """
                 SELECT COUNT(*) AS n FROM reading_passages
@@ -1005,7 +1055,12 @@ def register_self_study_reading_routes(
         )
         conn.commit()
         conn.close()
-        out: dict[str, Any] = {"ok": True, "className": class_name, "isActive": bool(is_active)}
+        out: dict[str, Any] = {
+            "ok": True,
+            "className": class_name,
+            "isActive": bool(is_active),
+            "scheduleDaysSynced": schedule_days_synced,
+        }
         if warning:
             out["warning"] = warning
         return jsonify(out)
@@ -1073,7 +1128,7 @@ def register_self_study_reading_routes(
 
     @app.route("/api/admin/self-study/reading/upload", methods=["POST"])
     def admin_reading_upload():
-        """SS-R2: upload PDF/DOCX/TXT → OCR draft."""
+        """SS-R2: upload one or more PDF/DOCX/TXT files → OCR draft(s)."""
         conn = get_db_connection()
         err = require_manager_console_role(conn)
         if err:
@@ -1082,49 +1137,64 @@ def register_self_study_reading_routes(
         actor = get_current_authenticated_user(conn)
         manager = str(actor["username"] if actor else "manager").strip() or "manager"
         class_name = normalize_class_name(str(request.form.get("className") or "EAP047"))
-        upload = request.files.get("file")
-        if not upload or not upload.filename:
+        uploads = list(request.files.getlist("files") or request.files.getlist("file"))
+        uploads = [u for u in uploads if u and u.filename]
+        if not uploads:
             conn.close()
-            return jsonify({"error": "file required"}), 400
-        name = secure_filename(upload.filename) or "source.pdf"
-        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
-        if ext not in {"pdf", "docx", "txt", "doc"}:
-            conn.close()
-            return jsonify({"error": "Allowed: pdf, docx, txt"}), 400
-        try:
-            from teaching_page_source_files import extract_text_from_bytes, normalize_extracted_text
+            return jsonify({"error": "At least one file required (pdf, docx, txt)"}), 400
 
-            data = upload.read()
-            extracted = normalize_extracted_text(extract_text_from_bytes(data, ext if ext != "doc" else "docx"))
-        except Exception as exc:
+        from teaching_page_source_files import extract_text_from_bytes, normalize_extracted_text
+
+        drafts: list[dict[str, Any]] = []
+        errors: list[str] = []
+        for upload in uploads:
+            name = secure_filename(upload.filename) or "source.pdf"
+            ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            if ext not in {"pdf", "docx", "txt", "doc"}:
+                errors.append(f"{name}: unsupported type")
+                continue
+            try:
+                data = upload.read()
+                extracted = normalize_extracted_text(
+                    extract_text_from_bytes(data, ext if ext != "doc" else "docx")
+                )
+            except Exception as exc:
+                errors.append(f"{name}: {exc}")
+                continue
+            if not extracted:
+                errors.append(f"{name}: no text extracted")
+                continue
+            draft_id = _insert_reading_source_draft(
+                conn,
+                manager=manager,
+                class_name=class_name,
+                original_name=name,
+                file_bytes=data,
+                extracted=extracted,
+            )
+            drafts.append(
+                {
+                    "draftId": draft_id,
+                    "originalName": name,
+                    "charCount": len(extracted),
+                    "preview": extracted[:600],
+                }
+            )
+        if not drafts:
             conn.close()
-            return jsonify({"error": f"Extract failed: {exc}"}), 400
-        if not extracted:
-            conn.close()
-            return jsonify({"error": "No text extracted"}), 400
-        upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "reading_sources")
-        os.makedirs(upload_dir, exist_ok=True)
-        stored = f"{uuid.uuid4().hex}_{name}"
-        with open(os.path.join(upload_dir, stored), "wb") as fh:
-            fh.write(data)
-        now = _now_iso()
-        conn.execute(
-            """
-            INSERT INTO reading_source_drafts
-                (manager_username, class_name, original_name, stored_name, extracted_text, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)
-            """,
-            (manager, class_name, name[:512], stored, extracted, now, now),
-        )
-        draft_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            return jsonify({"error": "; ".join(errors) or "No files could be extracted"}), 400
         conn.commit()
         conn.close()
+        first = drafts[0]
         return jsonify(
             {
-                "draftId": draft_id,
-                "originalName": name,
-                "charCount": len(extracted),
-                "preview": extracted[:1200],
+                "draftId": first["draftId"],
+                "originalName": first["originalName"],
+                "charCount": sum(int(d["charCount"]) for d in drafts),
+                "preview": first["preview"],
+                "drafts": drafts,
+                "fileCount": len(drafts),
+                "errors": errors,
             }
         )
 
@@ -1232,6 +1302,15 @@ def register_self_study_reading_routes(
             manager_name=manager_name,
             notes="reading Channel A (auto on publish)",
         )
+        synced = _sync_channel_a_schedule_queue(conn, class_name)
         conn.commit()
         conn.close()
-        return jsonify({"ok": True, "passageId": pid, "scheduleDay": day_num, "channelAEnabled": True})
+        return jsonify(
+            {
+                "ok": True,
+                "passageId": pid,
+                "scheduleDay": day_num,
+                "channelAEnabled": True,
+                "scheduleDaysSynced": synced,
+            }
+        )

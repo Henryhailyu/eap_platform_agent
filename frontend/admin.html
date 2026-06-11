@@ -405,8 +405,9 @@
                   <input id="admin-reading-upload-class" type="text" value="EAP047" maxlength="40" />
                 </div>
                 <div class="field">
-                  <label for="admin-reading-upload-file" data-i18n="admin_reading_upload_file">File</label>
-                  <input id="admin-reading-upload-file" type="file" accept=".pdf,.docx,.txt,.doc" />
+                  <label for="admin-reading-upload-file" data-i18n="admin_reading_upload_files">Files</label>
+                  <input id="admin-reading-upload-file" type="file" accept=".pdf,.docx,.txt,.doc" multiple />
+                  <p class="admin-panel__hint" data-i18n="admin_reading_upload_multi_hint">Select one or more PDF, DOCX, or TXT files (Ctrl/Cmd+click).</p>
                 </div>
               </div>
               <div class="admin-mat-form__actions">
@@ -414,7 +415,7 @@
                 <button type="button" class="btn-secondary" id="admin-reading-structure-btn" data-i18n="admin_reading_structure_btn" disabled>AI structure</button>
                 <button type="button" class="btn-secondary" id="admin-reading-publish-btn" data-i18n="admin_reading_publish_btn" disabled>Publish to Channel A</button>
               </div>
-              <pre id="admin-reading-upload-preview" class="admin-code-preview hidden" aria-live="polite"></pre>
+              <div id="admin-reading-upload-preview" class="admin-reading-preview hidden" aria-live="polite"></div>
             </div>
           </section>
 
@@ -751,7 +752,7 @@
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-materials.js"></script>
     <script src="js/admin-self-study-vocabulary.js"></script>
-    <script src="js/admin-self-study-reading.js"></script>
+    <script src="js/admin-self-study-reading.js?v=20260611-r4a"></script>
     <script src="js/admin-self-study-listening.js"></script>
     <script src="js/admin-self-study-writing.js"></script>
     <script src="js/admin-self-study-speaking.js"></script>

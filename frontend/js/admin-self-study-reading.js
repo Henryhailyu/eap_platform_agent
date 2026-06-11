@@ -3,6 +3,7 @@
  */
 (function () {
   let lastDraftId = null;
+  let draftQueue = [];
 
   function apiBase() {
     if (window.EAP_API_BASE_RESOLVED) {
@@ -28,8 +29,8 @@
     return data;
   }
 
-  function t(key) {
-    if (typeof window.t === "function") return window.t(key);
+  function t(key, params) {
+    if (typeof window.t === "function") return window.t(key, params);
     return key;
   }
 
@@ -47,6 +48,68 @@
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
+  }
+
+  function excerpt(text, max) {
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
+    if (clean.length <= max) return clean;
+    return `${clean.slice(0, max)}…`;
+  }
+
+  function renderUploadPreview(preview, drafts, structured) {
+    if (!preview) return;
+    if (!drafts || !drafts.length) {
+      preview.innerHTML = "";
+      preview.classList.add("hidden");
+      return;
+    }
+    preview.classList.remove("hidden");
+    if (structured) {
+      const c = structured;
+      const title = c.title || c.titleEn || t("admin_reading_preview_untitled");
+      const paras = c.paragraphsEn || (c.passageEn ? [c.passageEn] : []);
+      const questions = c.questions || [];
+      const wordCount = (paras.join(" ") || c.passageEn || "").trim().split(/\s+/).filter(Boolean).length;
+      preview.innerHTML = `
+        <article class="admin-reading-preview__passage">
+          <p class="admin-reading-preview__label">${escapeHtml(t("admin_reading_preview_structured"))}</p>
+          <h4 class="admin-reading-preview__title">${escapeHtml(title)}</h4>
+          <p class="admin-reading-preview__meta">${escapeHtml(
+            t("admin_reading_preview_meta", {
+              words: String(wordCount),
+              questions: String(questions.length),
+            }),
+          )}</p>
+          ${paras
+            .slice(0, 2)
+            .map((p) => `<p class="admin-reading-preview__para">${escapeHtml(p)}</p>`)
+            .join("")}
+          ${paras.length > 2 ? `<p class="admin-reading-preview__more">…</p>` : ""}
+        </article>
+      `;
+      return;
+    }
+    preview.innerHTML = drafts
+      .map(
+        (d, i) => `
+        <article class="admin-reading-preview__card${i === 0 ? " admin-reading-preview__card--active" : ""}">
+          <h4 class="admin-reading-preview__title">${escapeHtml(d.originalName)}</h4>
+          <p class="admin-reading-preview__meta">${escapeHtml(
+            t("admin_reading_preview_chars", { n: String(d.charCount || 0) }),
+          )}</p>
+          <p class="admin-reading-preview__para">${escapeHtml(excerpt(d.preview, 320))}</p>
+        </article>
+      `,
+      )
+      .join("");
+  }
+
+  function advanceDraftQueue(preview, structureBtn, publishBtn) {
+    draftQueue = draftQueue.filter((d) => d.draftId !== lastDraftId);
+    lastDraftId = draftQueue.length ? draftQueue[0].draftId : null;
+    if (structureBtn) structureBtn.disabled = !lastDraftId;
+    if (publishBtn) publishBtn.disabled = true;
+    renderUploadPreview(preview, draftQueue, null);
   }
 
   async function loadPassages(tbody, emptyEl) {
@@ -88,11 +151,11 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ className, isActive }),
         });
-        setStatus(
-          statusEl,
-          data.warning ? `${t("admin_reading_saved")} — ${data.warning}` : t("admin_reading_saved"),
-          false,
-        );
+        let msg = data.warning ? `${t("admin_reading_saved")} — ${data.warning}` : t("admin_reading_saved");
+        if (isActive && data.scheduleDaysSynced > 0) {
+          msg = `${msg} ${t("admin_reading_schedule_synced", { n: String(data.scheduleDaysSynced) })}`;
+        }
+        setStatus(statusEl, msg, false);
       } catch (_) {
         setStatus(statusEl, t("admin_reading_failed"), true);
       }
@@ -116,14 +179,14 @@
     const classInput = document.getElementById("admin-reading-upload-class");
 
     uploadBtn?.addEventListener("click", async () => {
-      const file = fileInput?.files?.[0];
-      if (!file) {
+      const files = fileInput?.files ? Array.from(fileInput.files) : [];
+      if (!files.length) {
         setStatus(statusEl, t("admin_reading_upload_no_file"), true);
         return;
       }
       const className = classInput?.value?.trim() || "EAP047";
       const fd = new FormData();
-      fd.append("file", file);
+      files.forEach((file) => fd.append("files", file));
       fd.append("className", className);
       setStatus(statusEl, t("admin_reading_uploading"), false);
       try {
@@ -135,14 +198,27 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Upload failed");
-        lastDraftId = data.draftId;
-        if (structureBtn) structureBtn.disabled = false;
+        draftQueue = data.drafts || [
+          {
+            draftId: data.draftId,
+            originalName: data.originalName,
+            charCount: data.charCount,
+            preview: data.preview,
+          },
+        ];
+        lastDraftId = draftQueue[0]?.draftId || data.draftId;
+        if (structureBtn) structureBtn.disabled = !lastDraftId;
         if (publishBtn) publishBtn.disabled = true;
-        if (preview) {
-          preview.textContent = data.preview || "";
-          preview.classList.remove("hidden");
+        renderUploadPreview(preview, draftQueue, null);
+        const fileCount = data.fileCount || draftQueue.length;
+        let msg = t("admin_reading_upload_ok_multi", {
+          files: String(fileCount),
+          n: String(data.charCount || 0),
+        });
+        if (data.errors && data.errors.length) {
+          msg = `${msg} ${t("admin_reading_upload_partial", { n: String(data.errors.length) })}`;
         }
-        setStatus(statusEl, t("admin_reading_upload_ok", { n: String(data.charCount || 0) }), false);
+        setStatus(statusEl, msg, false);
       } catch (e) {
         setStatus(statusEl, e.message, true);
       }
@@ -159,14 +235,12 @@
           body: JSON.stringify({ passageLevel: "P2" }),
         });
         if (publishBtn) publishBtn.disabled = false;
-        if (preview && data.content) {
-          preview.textContent = JSON.stringify(data.content, null, 2).slice(0, 4000);
-        }
+        renderUploadPreview(preview, draftQueue, data.content || null);
         setStatus(statusEl, t("admin_reading_structure_ok"), false);
       } catch (e) {
         setStatus(statusEl, e.message, true);
       } finally {
-        if (structureBtn) structureBtn.disabled = false;
+        if (structureBtn) structureBtn.disabled = !lastDraftId;
       }
     });
 
@@ -179,13 +253,12 @@
           method: "POST",
         });
         const pubMsg = t("admin_reading_publish_ok", { day: String(data.scheduleDay || "") });
-        setStatus(
-          statusEl,
-          data.channelAEnabled ? `${pubMsg} ${t("admin_reading_push_auto")}` : pubMsg,
-          false,
-        );
-        lastDraftId = null;
-        if (structureBtn) structureBtn.disabled = true;
+        let msg = data.channelAEnabled ? `${pubMsg} ${t("admin_reading_push_auto")}` : pubMsg;
+        if (data.scheduleDaysSynced > 0) {
+          msg = `${msg} ${t("admin_reading_schedule_synced", { n: String(data.scheduleDaysSynced) })}`;
+        }
+        setStatus(statusEl, msg, false);
+        advanceDraftQueue(preview, structureBtn, publishBtn);
         void loadPassages(tbody, emptyEl);
       } catch (e) {
         setStatus(statusEl, e.message, true);

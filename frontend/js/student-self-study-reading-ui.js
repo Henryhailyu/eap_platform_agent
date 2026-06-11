@@ -60,9 +60,9 @@
     return n > 0 ? n : null;
   }
 
-  async function loadToday() {
+  async function loadToday(channel) {
     if (!state.today) {
-      const day = state.selectedDay || parseDayFromUrl();
+      const day = channel === "A" ? null : state.selectedDay || parseDayFromUrl();
       state.today = await SERVER().getReadingToday(day);
     }
     return state.today;
@@ -224,7 +224,7 @@
     let data;
     try {
       state.today = null;
-      data = await loadToday();
+      data = await loadToday(channel);
     } catch (e) {
       root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(readingErrorMessage(e))}</p>`;
       return;
@@ -332,7 +332,6 @@
     if (titleEl) titleEl.textContent = t("self_study_mod_reading");
     if (levelEl) levelEl.hidden = true;
 
-    state.selectedDay = parseDayFromUrl();
     state.today = null;
     state.lastScoring = null;
     state.practiceRetake = false;
@@ -344,8 +343,14 @@
       return false;
     }
 
+    const isChannelA = overview.channel === "A";
+    state.selectedDay = isChannelA ? null : parseDayFromUrl();
+    const bannerDay = isChannelA
+      ? overview.schedule && overview.schedule.dayNumber
+      : state.selectedDay || (overview.schedule && overview.schedule.dayNumber);
+
     shell.innerHTML = `
-      ${channelBanner({ channel: overview.channel, dayNumber: state.selectedDay || (overview.schedule && overview.schedule.dayNumber) })}
+      ${channelBanner({ channel: overview.channel, dayNumber: bannerDay })}
       <div id="ssc-reading-panel" class="ssc-reading-panel"></div>
     `;
 
