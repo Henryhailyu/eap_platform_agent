@@ -1,5 +1,5 @@
 ---
-description: Channel B (AI self-study) is sealed for all skills until rehearsal — ask the user before any change that touches Channel B.
+description: Channel B (AI self-study) is TOTALLY SEALED — warn the owner before any change that touches Channel B; Channel A fixes only.
 globs:
   - backend/self_study.py
   - backend/self_study_vocabulary.py
@@ -22,23 +22,34 @@ globs:
 alwaysApply: true
 ---
 
-# Channel B — SEALED (vocabulary · reading · listening · writing · speaking)
+# Channel B — TOTALLY SEALED (vocabulary · reading · listening · writing · speaking)
+
+**Verified OK:** 2026-06-11 (owner testing). **Do not touch Channel B** unless the owner explicitly unseals.
 
 Read `docs/CHANNEL_B_SEALED.md` before editing any matched file.
 
-## Mandatory
+## Mandatory warning (every task that might touch Channel B)
 
-- **Ask the user for explicit permission** before making any change that could affect Channel B behaviour, UI, APIs, AI prompts, scoring, or layout.
-- If the user has not approved Channel B changes in the current task, **stop** and describe what you want to change; wait for approval.
-- Channel A fixes must use **isolated** paths (`channel=A`, `source_channel='A'`, admin-only modules). Do not rewrite Channel B branches.
+If a user prompt, bug fix, refactor, or feature **could affect Channel B** in any way, **stop first** and tell the owner:
 
-## Do not (without permission)
+> **⚠️ WARNING: The requested changes want to touch Channel B (AI self-study).**  
+> Channel B is totally sealed. Do you want to proceed? If not, I will limit the work to Channel A only.
 
-- Modify `_build_practice_exam_channel_b`, Channel B review/day/calendar logic, or B skill UIs listed in the doc.
-- Change shared hub/server/CSS in ways that alter the AI self-study (B) student experience.
-- “Clean up” or refactor sealed code if it risks changing B outputs.
+Do **not** edit sealed files until the owner approves in that conversation.
 
-## Allowed without unsealing (if truly B-neutral)
+## Default mode: Channel A only
 
-- Channel A–only files (e.g. `self_study_vocabulary_ai.py`, `admin-self-study-*.js`) when changes cannot affect B.
-- Comments/docs that do not change runtime behaviour.
+- Fix Channel A exams, packs, manager upload, calendar, and school-materials UX.
+- Use **isolated** paths: `channel=A`, `source_channel='A'`, `_build_practice_exam_channel_a`, admin-only modules.
+- Do **not** rewrite Channel B branches, shared hub behaviour for B, or B skill UIs.
+
+## Do not (without owner approval)
+
+- Modify `_build_practice_exam_channel_b`, Channel B review/day/calendar/grade logic, or any B skill UI.
+- Change shared hub/server/CSS if it alters the AI self-study (B) student experience.
+- “Clean up”, optimise, or refactor sealed code when it risks changing B outputs.
+
+## Allowed without unsealing (only if truly B-neutral)
+
+- Channel A–only files (e.g. `self_study_vocabulary_ai.py`, `admin-self-study-*.js`) when runtime cannot affect B.
+- Documentation that does not change behaviour (e.g. this seal notice).
