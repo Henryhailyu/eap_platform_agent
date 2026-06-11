@@ -315,7 +315,7 @@ def _build_practice_exam_channel_b(words: list[dict], day_number: int) -> dict[s
             fill_items.append(
                 {
                     "id": f"fill{i - 4}",
-                    "promptEn": f"Gap fill — meaning «{meaning}»: {template}",
+                    "promptEn": f"Gap fill — meaning: {meaning}. {template}",
                     "answer": w,
                 }
             )
@@ -785,11 +785,18 @@ def _practice_progress_payload(prog) -> dict[str, Any]:
         "practiceScoreTotal": prog["practice_score_total"] if prog else None,
         "practiceResult": None,
     }
-    if prog and prog.get("practice_result_json"):
+    if prog:
+        raw_result = None
         try:
-            out["practiceResult"] = json.loads(prog["practice_result_json"])
-        except (TypeError, json.JSONDecodeError):
-            pass
+            if "practice_result_json" in prog.keys():
+                raw_result = prog["practice_result_json"]
+        except Exception:
+            raw_result = None
+        if raw_result:
+            try:
+                out["practiceResult"] = json.loads(raw_result)
+            except (TypeError, json.JSONDecodeError):
+                pass
     return out
 
 

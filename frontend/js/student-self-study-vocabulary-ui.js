@@ -744,6 +744,16 @@
       bindOrderDragLists(root, answers);
     }
 
+    function renderExamScoring() {
+      root.innerHTML = `
+        <div class="ssc-generating-card" role="status" aria-live="polite">
+          <div class="ssc-generating-card__spinner" aria-hidden="true"></div>
+          <p class="ssc-generating-card__title">${escapeHtml(t("self_study_exam_scoring"))}</p>
+          <p class="ssc-generating-card__hint">${escapeHtml(t("self_study_exam_scoring_hint"))}</p>
+        </div>
+      `;
+    }
+
     async function submitExam() {
       const btn = document.getElementById("ssc-exam-submit");
       if (btn) btn.disabled = true;
@@ -753,6 +763,7 @@
           parseInt(el.getAttribute("data-idx"), 10),
         );
       });
+      renderExamScoring();
       try {
         const result = await SERVER().gradeVocabPracticeExam({
           courseId: data.courseId,
@@ -808,7 +819,10 @@
           </header>
           ${sections.map((sec) => `<section class="ssc-exam-section"><h3>${escapeHtml(sec.titleEn || sec.type || "")}</h3>${renderExamSection(sec, answers)}</section>`).join("")}
           <div class="ssc-placement-actions">
-            <button type="button" class="btn-primary" id="ssc-exam-submit">${t("self_study_exam_submit")}</button>
+            <button type="button" class="btn-primary ssc-reading-submit-btn" id="ssc-exam-submit">
+              <span class="ssc-reading-submit__spinner" id="ssc-exam-submit-spinner" hidden aria-hidden="true"></span>
+              <span class="ssc-reading-submit__label">${t("self_study_exam_submit")}</span>
+            </button>
           </div>
         </div>
       `;

@@ -545,6 +545,8 @@ window.EAP_STRINGS_EN = {
   "self_study_vocab_game_wave": "Wave {current} / {total}",
   "self_study_exam_title": "Vocabulary practice exam",
   "self_study_exam_submit": "Submit for scoring",
+  "self_study_exam_scoring": "Scoring your practice…",
+  "self_study_exam_scoring_hint": "Checking answers and generating writing feedback. This may take a few seconds.",
   "self_study_exam_type_answer": "Type your answer",
   "self_study_exam_match": "Match each word to its meaning",
   "self_study_exam_order": "Put sentences in logical order",

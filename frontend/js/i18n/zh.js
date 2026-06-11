@@ -547,6 +547,8 @@ window.EAP_STRINGS_ZH = {
   "self_study_vocab_game_wave": "第 {current} / {total} 波",
   "self_study_exam_title": "词汇练习小测",
   "self_study_exam_submit": "提交批改",
+  "self_study_exam_scoring": "正在批改…",
+  "self_study_exam_scoring_hint": "正在核对答案并生成写作反馈，可能需要几秒钟。",
   "self_study_exam_type_answer": "填写答案",
   "self_study_exam_match": "将单词与释义连线",
   "self_study_exam_order": "将句子按逻辑排序",
