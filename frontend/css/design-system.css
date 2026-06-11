@@ -7,8 +7,10 @@
   --eap-teal-soft: rgba(10, 126, 164, 0.12);
   --eap-text: #1d1d1f;
   --eap-text-secondary: #86868b;
-  --eap-surface: rgba(255, 255, 255, 0.7);
-  --eap-surface-strong: rgba(255, 255, 255, 0.7);
+  /* Content panels: 30% transparency (70% opaque) for readability on photo backgrounds */
+  --eap-content-panel: rgba(255, 255, 255, 0.7);
+  --eap-surface: var(--eap-content-panel);
+  --eap-surface-strong: var(--eap-content-panel);
   --eap-border: rgba(0, 0, 0, 0.08);
   --eap-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
   --eap-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.1);

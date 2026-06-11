@@ -9,7 +9,7 @@
   --wix-teal: #0a7ea4;
   --wix-text: #162d3d;
   --wix-muted: #5e6b78;
-  --wix-card: rgba(255, 255, 255, 0.7);
+  --wix-card: var(--eap-content-panel, rgba(255, 255, 255, 0.7));
   --wix-card-border: rgba(22, 45, 61, 0.08);
   --wix-shadow: 0 8px 40px rgba(17, 109, 255, 0.08);
   --wix-radius: 16px;

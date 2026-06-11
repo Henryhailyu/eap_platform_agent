@@ -78,12 +78,8 @@
           </nav>
 
           <nav id="admin-ss-tabs" class="admin-module-tabs" hidden aria-label="Self-study sections">
-            <button type="button" class="admin-module-tabs__btn" data-skill="materials" data-i18n="admin_hub_skill_materials">Materials</button>
             <button type="button" class="admin-module-tabs__btn" data-skill="vocabulary" data-i18n="admin_hub_skill_vocabulary">Vocabulary</button>
             <button type="button" class="admin-module-tabs__btn" data-skill="reading" data-i18n="admin_hub_skill_reading">Reading</button>
-            <button type="button" class="admin-module-tabs__btn" data-skill="listening" data-i18n="admin_hub_skill_listening">Listening</button>
-            <button type="button" class="admin-module-tabs__btn" data-skill="writing" data-i18n="admin_hub_skill_writing">Writing</button>
-            <button type="button" class="admin-module-tabs__btn" data-skill="speaking" data-i18n="admin_hub_skill_speaking">Speaking</button>
             <button type="button" class="admin-module-tabs__btn" data-skill="ai" data-i18n="admin_hub_skill_ai">AI instructions</button>
           </nav>
 
@@ -237,81 +233,6 @@
             </p>
           </section>
 
-          <section class="content-section admin-panel" id="admin-mat-section" data-admin-module="self-study" data-admin-skill="materials" hidden aria-labelledby="admin-mat-heading">
-            <h2 id="admin-mat-heading" class="section-heading" data-i18n="admin_mat_heading">
-              Self-study materials
-            </h2>
-            <p class="admin-panel__hint" data-i18n="admin_mat_hint">
-              Upload resources for the AI Self-Study Centre. Tag by skill module and level (manual tags in this demo; AI organisation comes in Phase K).
-            </p>
-            <p id="admin-mat-status" class="form-message hidden" role="status" aria-live="polite"></p>
-            <form id="admin-mat-form" class="admin-mat-form" novalidate>
-              <div class="admin-inline-form admin-mat-form__row">
-                <div class="field">
-                  <label for="admin-mat-title" data-i18n="admin_mat_title">Title (English)</label>
-                  <input id="admin-mat-title" type="text" required maxlength="120" />
-                </div>
-                <div class="field">
-                  <label for="admin-mat-title-zh" data-i18n="admin_mat_title_zh">Title (中文, optional)</label>
-                  <input id="admin-mat-title-zh" type="text" maxlength="120" />
-                </div>
-              </div>
-              <div class="admin-inline-form admin-mat-form__row">
-                <div class="field">
-                  <label for="admin-mat-module" data-i18n="admin_mat_module">Skill module</label>
-                  <select id="admin-mat-module" required></select>
-                </div>
-                <div class="field">
-                  <label for="admin-mat-level" data-i18n="admin_mat_level">Level</label>
-                  <select id="admin-mat-level" required></select>
-                </div>
-                <div class="field">
-                  <label for="admin-mat-format" data-i18n="admin_mat_format">Format</label>
-                  <select id="admin-mat-format" required></select>
-                </div>
-              </div>
-              <div class="field">
-                <label for="admin-mat-file" data-i18n="admin_mat_file">File (PDF, Word, PPT, or TXT)</label>
-                <input id="admin-mat-file" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,text/plain" />
-              </div>
-              <div class="field admin-mat-url-field">
-                <label for="admin-mat-url" data-i18n="admin_mat_url">Web link (when format is Web link)</label>
-                <input id="admin-mat-url" type="url" placeholder="https://..." />
-              </div>
-              <div class="field">
-                <label for="admin-mat-notes" data-i18n="admin_mat_notes">Notes for students (optional)</label>
-                <textarea id="admin-mat-notes" rows="3" maxlength="500"></textarea>
-              </div>
-              <div class="field">
-                <label for="admin-mat-unit" data-i18n="admin_mat_unit">Unit (optional)</label>
-                <input id="admin-mat-unit" type="text" maxlength="120" placeholder="e.g. Unit 3" />
-              </div>
-              <p id="admin-mat-suggest-hint" class="admin-mat-suggest hidden" role="status"></p>
-              <div class="admin-mat-form__actions">
-                <button type="button" class="btn-secondary" id="admin-mat-suggest-btn" data-i18n="admin_mat_suggest">
-                  Suggest tags (demo)
-                </button>
-                <button type="submit" class="btn-primary" data-i18n="admin_mat_save">Save material</button>
-              </div>
-            </form>
-            <div class="admin-table-wrap">
-              <table class="admin-table" id="admin-mat-table">
-                <thead>
-                  <tr>
-                    <th scope="col" data-i18n="admin_mat_col_title">Title</th>
-                    <th scope="col" data-i18n="admin_mat_module">Module</th>
-                    <th scope="col" data-i18n="admin_mat_level">Level</th>
-                    <th scope="col" data-i18n="admin_mat_format">Format</th>
-                    <th scope="col" data-i18n="admin_mat_col_file">File / link</th>
-                    <th scope="col" data-i18n="admin_col_action">Action</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-mat-tbody"></tbody>
-              </table>
-            </div>
-            <p id="admin-mat-empty" class="admin-empty hidden" data-i18n="admin_mat_empty">No self-study materials yet.</p>
-          </section>
-
           <section class="content-section admin-panel" id="admin-vocab-section" data-admin-module="self-study" data-admin-skill="vocabulary" hidden aria-labelledby="admin-vocab-heading">
             <h2 id="admin-vocab-heading" class="section-heading" data-i18n="admin_vocab_heading">Vocabulary course &amp; packs</h2>
             <p class="admin-panel__hint" data-i18n="admin_vocab_hint">
@@ -418,78 +339,6 @@
               </div>
               <div id="admin-reading-draft-list" class="admin-reading-draft-list hidden" aria-live="polite"></div>
               <div id="admin-reading-upload-preview" class="admin-reading-preview hidden" aria-live="polite"></div>
-            </div>
-          </section>
-
-          <section class="content-section admin-panel" id="admin-listening-section" data-admin-module="self-study" data-admin-skill="listening" hidden aria-labelledby="admin-listening-heading">
-            <h2 id="admin-listening-heading" class="section-heading" data-i18n="admin_listening_heading">Listening items (AI / Channel B)</h2>
-            <p class="admin-panel__hint" data-i18n="admin_listening_hint">
-              Part 3 and Part 4 alternate daily. Web uses text scripts; Tencent TTS audio comes in a later phase.
-            </p>
-            <div class="admin-table-wrap">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th scope="col" data-i18n="admin_reading_col_title">Title</th>
-                    <th scope="col" data-i18n="admin_listening_col_part">Part</th>
-                    <th scope="col" data-i18n="admin_reading_col_class">Class</th>
-                    <th scope="col" data-i18n="admin_reading_col_order">Order</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-listening-tbody"></tbody>
-              </table>
-            </div>
-            <p id="admin-listening-empty" class="admin-empty hidden" data-i18n="admin_listening_empty">No listening items yet.</p>
-            <div class="admin-mat-form__actions" style="margin-top: 1rem">
-              <button type="button" class="btn-secondary" id="admin-listening-export" data-i18n="admin_listening_export">Export items CSV</button>
-            </div>
-          </section>
-
-          <section class="content-section admin-panel" id="admin-writing-section" data-admin-module="self-study" data-admin-skill="writing" hidden aria-labelledby="admin-writing-heading">
-            <h2 id="admin-writing-heading" class="section-heading" data-i18n="admin_writing_heading">Writing tasks (AI / Channel B)</h2>
-            <p class="admin-panel__hint" data-i18n="admin_writing_hint">
-              Genre rotation Mon/Wed/Fri — no daily push. Students choose tasks autonomously on other days.
-            </p>
-            <div class="admin-table-wrap">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th scope="col" data-i18n="admin_reading_col_title">Title</th>
-                    <th scope="col" data-i18n="admin_writing_col_genre">Genre</th>
-                    <th scope="col" data-i18n="admin_reading_col_class">Class</th>
-                    <th scope="col" data-i18n="admin_reading_col_order">Order</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-writing-tbody"></tbody>
-              </table>
-            </div>
-            <p id="admin-writing-empty" class="admin-empty hidden" data-i18n="admin_writing_empty">No writing tasks yet.</p>
-            <div class="admin-mat-form__actions" style="margin-top: 1rem">
-              <button type="button" class="btn-secondary" id="admin-writing-export" data-i18n="admin_writing_export">Export tasks CSV</button>
-            </div>
-          </section>
-
-          <section class="content-section admin-panel" id="admin-speaking-section" data-admin-module="self-study" data-admin-skill="speaking" hidden aria-labelledby="admin-speaking-heading">
-            <h2 id="admin-speaking-heading" class="section-heading" data-i18n="admin_speaking_heading">Speaking sessions (AI / Channel B)</h2>
-            <p class="admin-panel__hint" data-i18n="admin_speaking_hint">
-              P1/P2/P3 + full mock — no daily push. Web uses text; Tencent TTS/STT/SOE in a later phase.
-            </p>
-            <div class="admin-table-wrap">
-              <table class="admin-table">
-                <thead>
-                  <tr>
-                    <th scope="col" data-i18n="admin_reading_col_title">Title</th>
-                    <th scope="col" data-i18n="admin_speaking_col_part">Part</th>
-                    <th scope="col" data-i18n="admin_reading_col_class">Class</th>
-                    <th scope="col" data-i18n="admin_reading_col_order">Order</th>
-                  </tr>
-                </thead>
-                <tbody id="admin-speaking-tbody"></tbody>
-              </table>
-            </div>
-            <p id="admin-speaking-empty" class="admin-empty hidden" data-i18n="admin_speaking_empty">No speaking sessions yet.</p>
-            <div class="admin-mat-form__actions" style="margin-top: 1rem">
-              <button type="button" class="btn-secondary" id="admin-speaking-export" data-i18n="admin_speaking_export">Export sessions CSV</button>
             </div>
           </section>
 
@@ -748,16 +597,10 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="js/manager-self-study-materials-mock.js"></script>
     <script src="app.js"></script>
-    <script src="js/self-study-materials-api.js"></script>
     <script src="js/self-study-ai-api.js"></script>
-    <script src="js/admin-self-study-materials.js"></script>
     <script src="js/admin-self-study-vocabulary.js"></script>
     <script src="js/admin-self-study-reading.js?v=20260611-r5a"></script>
-    <script src="js/admin-self-study-listening.js"></script>
-    <script src="js/admin-self-study-writing.js"></script>
-    <script src="js/admin-self-study-speaking.js"></script>
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>
@@ -765,6 +608,6 @@
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
     <script src="js/admin-performance.js?v=20260610-perf"></script>
     <script src="js/admin-roster-import.js?v=20260610-roster"></script>
-    <script src="js/admin-hub.js?v=20260610-mgr2"></script>
+    <script src="js/admin-hub.js?v=20260611-mgr3"></script>
   </body>
 </html>

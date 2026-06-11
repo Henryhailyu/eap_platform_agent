@@ -2,6 +2,38 @@
  * Student AI Self-Study Centre (Phase S1–S2)
  */
 
+/* Readable content panels on photo backgrounds — 30% transparency */
+.ssc-banner,
+.ssc-daily-plan__list > li:not(.ssc-daily-task),
+.ssc-daily-task,
+.ssc-module-card,
+.ssc-question-card,
+.ssc-report,
+.ssc-lesson-card,
+.ssc-word-card,
+.ssc-ai-coach-panel,
+.ssc-tab-panel,
+.ssc-reading-exam,
+.ssc-reading-passage,
+.ssc-reading-result,
+.ssc-reading-q,
+.ssc-generating-card,
+.ssc-passage-block,
+.ssc-script-block,
+.ssc-sort-item,
+.ssc-game-board,
+.ssc-exam-section,
+.ssc-vocab-exam,
+.ssc-listening-exam,
+.ssc-writing-exam,
+.ssc-speaking-exam,
+.admin-reading-preview__card,
+.admin-reading-preview__passage,
+.admin-reading-preview__scroll,
+.admin-reading-preview__full {
+  background: var(--eap-content-panel, rgba(255, 255, 255, 0.7));
+}
+
 .btn-self-study-link {
   font-size: 0.8125rem;
   padding: 0.4rem 0.75rem;
@@ -1204,11 +1236,11 @@
 }
 
 .ssc-reading-result--ok {
-  background: rgba(10, 126, 164, 0.06);
+  border-left: 4px solid rgba(10, 126, 164, 0.55);
 }
 
 .ssc-reading-result--bad {
-  background: rgba(180, 60, 40, 0.06);
+  border-left: 4px solid rgba(180, 60, 40, 0.55);
 }
 
 .ssc-reading-result__status {
@@ -2329,7 +2361,6 @@
 
 /* —— SS-R2 reading exam —— */
 .ssc-reading-exam {
-  background: rgba(255, 255, 255, 0.95);
   border-radius: 14px;
   padding: 1.25rem 1.5rem 1.5rem;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -2349,7 +2380,6 @@
   margin: 1.25rem 0;
   padding: 1rem 1.1rem;
   border-radius: 10px;
-  background: #fafafa;
   border: 1px solid rgba(0, 0, 0, 0.06);
   max-height: 42vh;
   overflow: auto;
@@ -2372,8 +2402,9 @@
 
 .ssc-reading-q {
   margin-bottom: 1.25rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 0.85rem 1rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .ssc-reading-q__type {
@@ -2903,7 +2934,6 @@
   min-height: 12rem;
   padding: 2rem 1.5rem;
   text-align: center;
-  background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(10, 126, 164, 0.14);
   border-radius: 14px;
 }

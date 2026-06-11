@@ -3,7 +3,7 @@
  */
 (function (global) {
   const MODULES = ["school", "self-study", "teaching", "homework"];
-  const SKILLS = ["materials", "vocabulary", "reading", "listening", "writing", "speaking", "ai"];
+  const SKILLS = ["vocabulary", "reading", "ai"];
   const SCHOOL_AREAS = ["calendar", "classes", "teachers", "students", "performance"];
   const MODULE_I18N = {
     school: "admin_hub_module_school",
@@ -29,19 +29,19 @@
   function parseRoute() {
     const q = new URLSearchParams(global.location.search);
     const module = q.get("module");
-    const skill = q.get("skill") || "materials";
+    const skill = q.get("skill") || "vocabulary";
     const area = q.get("area") || "calendar";
     const classId = q.get("class_id");
     if (module && MODULES.includes(module)) {
       return {
         view: "module",
         module,
-        skill: SKILLS.includes(skill) ? skill : "materials",
+        skill: SKILLS.includes(skill) ? skill : "vocabulary",
         area: SCHOOL_AREAS.includes(area) ? area : "calendar",
         classId: classId ? String(classId) : null,
       };
     }
-    return { view: "hub", module: null, skill: "materials", area: "calendar", classId: null };
+    return { view: "hub", module: null, skill: "vocabulary", area: "calendar", classId: null };
   }
 
   function setRoute(module, opts) {
@@ -55,7 +55,7 @@
     } else {
       url.searchParams.set("module", module);
       if (module === "self-study") {
-        url.searchParams.set("skill", options.skill || "materials");
+        url.searchParams.set("skill", options.skill || "vocabulary");
         url.searchParams.delete("area");
       } else if (module === "school") {
         url.searchParams.set("area", options.area || "calendar");
@@ -206,7 +206,7 @@
       card.addEventListener("click", () => {
         const mod = card.getAttribute("data-hub-module");
         if (mod === "self-study") {
-          setRoute(mod, { skill: "materials" });
+          setRoute(mod, { skill: "vocabulary" });
         } else if (mod === "school") {
           setRoute(mod, { area: "calendar" });
         } else {
