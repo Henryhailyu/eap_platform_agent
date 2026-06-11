@@ -974,7 +974,7 @@ def academic_calendar_payload(conn):
     """Public academic calendar shape for API + frontend."""
     row = conn.execute(
         """
-        SELECT semester_start_date, teaching_weeks
+        SELECT semester_start_date, teaching_weeks, updated_at
         FROM academic_calendar_config
         WHERE id = 1
         """
@@ -983,9 +983,11 @@ def academic_calendar_payload(conn):
     if row is None:
         semester_start = defaults["semester_start_date"]
         teaching_weeks = defaults["teaching_weeks"]
+        updated_at = None
     else:
         semester_start = row["semester_start_date"] or defaults["semester_start_date"]
         teaching_weeks = int(row["teaching_weeks"] or defaults["teaching_weeks"])
+        updated_at = row["updated_at"]
 
     note_rows = conn.execute(
         "SELECT date, label FROM academic_calendar_notes ORDER BY date ASC"
@@ -998,6 +1000,7 @@ def academic_calendar_payload(conn):
         "semester_start_date": semester_start,
         "teaching_weeks": teaching_weeks,
         "notable_dates": notable_dates,
+        "updated_at": updated_at,
     }
 
 

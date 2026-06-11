@@ -2452,6 +2452,34 @@ let ACADEMIC_CALENDAR = {
   notableDates: {},
 };
 let academicCalendarFetchedAt = 0;
+let academicCalendarSyncFingerprint = "";
+const ACADEMIC_CALENDAR_SYNC_MS = 3000;
+const ACADEMIC_CALENDAR_BC = "eap-academic-calendar";
+
+function academicCalendarFingerprint(payload) {
+  if (!payload || typeof payload !== "object") return "";
+  const notes = payload.notable_dates || {};
+  const pairs = Object.entries(notes)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([d, l]) => `${d}:${l}`)
+    .join(";");
+  return [
+    payload.semester_start_date || "",
+    String(payload.teaching_weeks != null ? payload.teaching_weeks : ""),
+    payload.updated_at || "",
+    pairs,
+  ].join("|");
+}
+
+function notifyAcademicCalendarUpdated() {
+  try {
+    if (typeof BroadcastChannel !== "undefined") {
+      new BroadcastChannel(ACADEMIC_CALENDAR_BC).postMessage({ type: "updated" });
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 function applyAcademicCalendarPayload(payload) {
   if (!payload || typeof payload !== "object") return;
@@ -2466,6 +2494,24 @@ function applyAcademicCalendarPayload(payload) {
   }
 }
 
+async function syncAcademicCalendarFromServer(options = {}) {
+  const force = options.force === true;
+  try {
+    const data = await apiGet("/api/academic-calendar");
+    const fp = academicCalendarFingerprint(data);
+    if (!force && fp === academicCalendarSyncFingerprint) {
+      academicCalendarFetchedAt = Date.now();
+      return false;
+    }
+    applyAcademicCalendarPayload(data);
+    academicCalendarSyncFingerprint = fp;
+    academicCalendarFetchedAt = Date.now();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function ensureAcademicCalendarLoaded(options = {}) {
   const force = options.force === true;
   const maxAgeMs = options.maxAgeMs != null ? Number(options.maxAgeMs) : 15000;
@@ -2473,12 +2519,34 @@ async function ensureAcademicCalendarLoaded(options = {}) {
   if (!force && academicCalendarFetchedAt && now - academicCalendarFetchedAt < maxAgeMs) {
     return;
   }
+  await syncAcademicCalendarFromServer({ force: true });
+}
+
+function startAcademicCalendarLiveSync(getRepaintFn) {
+  if (window.__eapAcademicCalendarLiveSync) return;
+  window.__eapAcademicCalendarLiveSync = true;
+
+  const pullAndRepaint = async (force) => {
+    const changed = await syncAcademicCalendarFromServer({ force: !!force });
+    if (changed) {
+      const repaint = typeof getRepaintFn === "function" ? getRepaintFn() : null;
+      if (repaint) await repaint();
+    }
+  };
+
+  setInterval(() => void pullAndRepaint(true), ACADEMIC_CALENDAR_SYNC_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void pullAndRepaint(true);
+  });
   try {
-    const data = await apiGet("/api/academic-calendar");
-    applyAcademicCalendarPayload(data);
-    academicCalendarFetchedAt = now;
+    if (typeof BroadcastChannel !== "undefined") {
+      const ch = new BroadcastChannel(ACADEMIC_CALENDAR_BC);
+      ch.onmessage = (ev) => {
+        if (ev && ev.data && ev.data.type === "updated") void pullAndRepaint(true);
+      };
+    }
   } catch {
-    /* keep in-page defaults */
+    /* ignore */
   }
 }
 
@@ -3762,6 +3830,7 @@ function initAdminPage() {
       try {
         const data = await apiGet("/api/admin/academic-calendar");
         applyAcademicCalendarPayload(data);
+        academicCalendarSyncFingerprint = academicCalendarFingerprint(data);
         academicCalendarFetchedAt = Date.now();
         calStartEl.value = data.semester_start_date || "";
         calWeeksEl.value = String(data.teaching_weeks != null ? data.teaching_weeks : 16);
@@ -3793,8 +3862,9 @@ function initAdminPage() {
             notable_dates: parseNotableDatesFromTextarea(calNotesEl.value),
           });
           applyAcademicCalendarPayload(saved);
+          academicCalendarSyncFingerprint = academicCalendarFingerprint(saved);
           academicCalendarFetchedAt = Date.now();
-          await ensureAcademicCalendarLoaded({ force: true });
+          notifyAcademicCalendarUpdated();
           calNotesEl.value = formatNotableDatesForTextarea(saved.notable_dates);
           syncAdminPreviewMonthFromStart();
           paintAdminCalendarPreview();
@@ -6132,6 +6202,7 @@ function initTeacherPage() {
     });
   }
   window.__eapTeacherRepaintCalendar = paintPlannerCalendar;
+  startAcademicCalendarLiveSync(() => window.__eapTeacherRepaintCalendar);
 
   /** Fetch every task for the current class once, then repaint pills (cheap month hops afterwards). */
   async function reloadPlannerTasksFromApi() {
@@ -8795,6 +8866,7 @@ function initStudentPage() {
     });
   }
   window.__eapStudentRepaintCalendar = paintStudentPlanner;
+  startAcademicCalendarLiveSync(() => window.__eapStudentRepaintCalendar);
 
   /** One GET lists every task for this student’s class — enough to paint every day in the month. */
   async function reloadStudentPlannerTasksFromApi() {
