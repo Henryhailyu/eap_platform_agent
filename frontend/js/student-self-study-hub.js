@@ -188,7 +188,9 @@
     if (skillId === "vocabulary") {
       href += `&channel=${encodeURIComponent(channel || state.activeChannel || "B")}`;
     }
-    if ((skillId === "vocabulary" || skillId === "reading" || skillId === "listening") && dayNumber) {
+    if ((skillId === "vocabulary" || skillId === "listening") && dayNumber) {
+      href += `&day=${dayNumber}`;
+    } else if (skillId === "reading" && dayNumber && channel !== "A") {
       href += `&day=${dayNumber}`;
     }
     return href;

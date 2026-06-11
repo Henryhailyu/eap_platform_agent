@@ -458,6 +458,44 @@ def _reading_channel(conn, class_name: str) -> str:
     return "A" if _has_manager_push(conn, class_name, READING_SKILL) else "B"
 
 
+def _ensure_channel_a_reading_schedule(conn, class_name: str) -> Any:
+    """Create Channel A reading schedule if missing (manager push / publish)."""
+    schedule = _active_schedule(conn, class_name, "A")
+    if schedule:
+        return schedule
+    now = _now_iso()
+    conn.execute(
+        """
+        INSERT INTO reading_schedules (class_name, channel, start_date, status, created_at, updated_at)
+        VALUES (?, 'A', ?, 'active', ?, ?)
+        """,
+        (class_name, _today_utc().isoformat(), now, now),
+    )
+    return _active_schedule(conn, class_name, "A")
+
+
+def _enable_reading_channel_a_push(
+    conn,
+    *,
+    class_name: str,
+    manager_name: str,
+    notes: str = "reading Channel A",
+) -> None:
+    now = _now_iso()
+    conn.execute(
+        """
+        INSERT INTO self_study_skill_push (class_name, skill, is_active, pushed_at, pushed_by, notes)
+        VALUES (?, ?, 1, ?, ?, ?)
+        ON CONFLICT(class_name, skill) DO UPDATE SET
+            is_active = 1,
+            pushed_at = excluded.pushed_at,
+            pushed_by = excluded.pushed_by,
+            notes = excluded.notes
+        """,
+        (class_name, READING_SKILL, now, manager_name, notes),
+    )
+
+
 def _active_schedule(conn, class_name: str, channel: str) -> Any:
     return conn.execute(
         """
@@ -632,7 +670,9 @@ def _maybe_upgrade_passage(
     channel: str,
     class_name: str,
 ) -> Any:
-    """Replace legacy short seed passages (SS-R1) with full IELTS-length AI sets."""
+    """Replace legacy short seed passages (SS-R1) with full IELTS-length AI sets (Channel B only)."""
+    if channel == "A" or str(passage.get("source_channel") or "").upper() == "A":
+        return passage
     try:
         from self_study_reading_ai import (
             generate_daily_passage,
@@ -782,7 +822,12 @@ def register_self_study_reading_routes(
         schedule = _active_schedule(conn, class_name, channel)
         if not schedule:
             conn.close()
-            return jsonify({"error": "No active reading schedule"}), 404
+            hint = (
+                "Manager has not published school reading yet — publish a passage in the manager centre."
+                if channel == "A"
+                else "No active reading schedule"
+            )
+            return jsonify({"error": hint, "channel": channel, "code": "no_schedule"}), 404
 
         day_arg = request.args.get("day")
         if day_arg:
@@ -802,7 +847,14 @@ def register_self_study_reading_routes(
         )
         if not passage:
             conn.close()
-            return jsonify({"error": "No passage for this day", "dayNumber": day_num}), 404
+            hint = (
+                f"No school reading for day {day_num} yet — ask your manager to publish more passages."
+                if channel == "A"
+                else "No passage for this day"
+            )
+            return jsonify(
+                {"error": hint, "dayNumber": day_num, "channel": channel, "code": "no_passage"}
+            ), 404
 
         content = json.loads(passage["content_json"])
         prog = conn.execute(
@@ -928,6 +980,18 @@ def register_self_study_reading_routes(
             conn.close()
             return jsonify({"error": "className required"}), 400
         now = _now_iso()
+        warning = None
+        if is_active:
+            _ensure_channel_a_reading_schedule(conn, class_name)
+            pub_count = conn.execute(
+                """
+                SELECT COUNT(*) AS n FROM reading_passages
+                WHERE class_name = ? AND source_channel = 'A' AND is_active = 1
+                """,
+                (class_name,),
+            ).fetchone()["n"]
+            if not int(pub_count or 0):
+                warning = "Channel A enabled — publish at least one reading passage for students to see content."
         conn.execute(
             """
             INSERT INTO self_study_skill_push (class_name, skill, is_active, pushed_at, pushed_by, notes)
@@ -941,7 +1005,10 @@ def register_self_study_reading_routes(
         )
         conn.commit()
         conn.close()
-        return jsonify({"ok": True, "className": class_name, "isActive": bool(is_active)})
+        out: dict[str, Any] = {"ok": True, "className": class_name, "isActive": bool(is_active)}
+        if warning:
+            out["warning"] = warning
+        return jsonify(out)
 
     @app.route("/api/admin/self-study/reading/passages", methods=["GET"])
     def admin_reading_passages():
@@ -1144,17 +1211,9 @@ def register_self_study_reading_routes(
             return jsonify({"error": "Structured draft required — run structure first"}), 400
         content = json.loads(row["structured_json"])
         class_name = normalize_class_name(row["class_name"] or "EAP047")
-        schedule = _active_schedule(conn, class_name, "A")
-        if not schedule:
-            now = _now_iso()
-            conn.execute(
-                """
-                INSERT INTO reading_schedules (class_name, channel, start_date, status, created_at, updated_at)
-                VALUES (?, 'A', ?, 'active', ?, ?)
-                """,
-                (class_name, _today_utc().isoformat(), now, now),
-            )
-            schedule = _active_schedule(conn, class_name, "A")
+        actor = get_current_authenticated_user(conn)
+        manager_name = str(actor["username"] if actor else "manager").strip() or "manager"
+        schedule = _ensure_channel_a_reading_schedule(conn, class_name)
         sort_row = conn.execute(
             "SELECT COALESCE(MAX(sort_order), 0) AS mx FROM reading_passages WHERE class_name = ? AND source_channel = 'A'",
             (class_name,),
@@ -1167,6 +1226,12 @@ def register_self_study_reading_routes(
             "UPDATE reading_source_drafts SET status = 'published', updated_at = ? WHERE id = ?",
             (now, draft_id),
         )
+        _enable_reading_channel_a_push(
+            conn,
+            class_name=class_name,
+            manager_name=manager_name,
+            notes="reading Channel A (auto on publish)",
+        )
         conn.commit()
         conn.close()
-        return jsonify({"ok": True, "passageId": pid, "scheduleDay": day_num})
+        return jsonify({"ok": True, "passageId": pid, "scheduleDay": day_num, "channelAEnabled": True})

@@ -193,14 +193,40 @@
     `;
   }
 
-  async function renderExamPanel(root) {
-    renderGenerating(root);
+  function readingLoadMessage(channel) {
+    return channel === "A"
+      ? `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`
+      : "";
+  }
+
+  function readingErrorMessage(err) {
+    const msg = String((err && err.message) || "");
+    if (msg.includes("No school reading for day") || msg.includes("publish more passages")) {
+      return t("self_study_reading_no_passage_a");
+    }
+    if (
+      msg.includes("not published school reading") ||
+      msg.includes("No active reading schedule") ||
+      msg.includes("publish a passage")
+    ) {
+      return t("self_study_reading_no_schedule_a");
+    }
+    return msg;
+  }
+
+  async function renderExamPanel(root, overview) {
+    const channel = (overview && overview.channel) || "B";
+    if (channel === "B") {
+      renderGenerating(root);
+    } else {
+      root.innerHTML = readingLoadMessage(channel);
+    }
     let data;
     try {
       state.today = null;
       data = await loadToday();
     } catch (e) {
-      root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
+      root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(readingErrorMessage(e))}</p>`;
       return;
     }
 
@@ -323,7 +349,7 @@
       <div id="ssc-reading-panel" class="ssc-reading-panel"></div>
     `;
 
-    await renderExamPanel(document.getElementById("ssc-reading-panel"));
+    await renderExamPanel(document.getElementById("ssc-reading-panel"), overview);
     return true;
   }
 

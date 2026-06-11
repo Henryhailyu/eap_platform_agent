@@ -37,17 +37,25 @@
 - `js/admin-self-study-reading.js` — manager push + export
 - Mock fallback when server unavailable
 
+### Manager workflow (Channel A)
+
+1. **Upload & extract** → **AI structure** → **Publish to Channel A** (auto-enables reading Channel A for the class)  
+2. Optional: **Enable reading Channel A** manually (creates schedule; warns if no passages yet)  
+3. Student hub **School materials (A)** → **Reading** opens today's manager passage (not AI-generated)
+
+Channel A manager passages are **never** auto-upgraded by Channel B AI.
+
 ### Deferred (later SS-R1+)
 
-- OCR upload → paraphrase 3 styles → push workflow
+- Paraphrase 3 styles before publish
 - Full IELTS question types (TFNG, gap-fill word limits, etc.)
 - Per-question live AI explanation API
 - App 19:00 reminder + streak
 
 ## UAT
 
-1. `student1` → Reading → today's passage + MC questions → submit → evidence feedback  
-2. `manager1` → Enable reading Channel A EAP047 → student sees Channel A passage  
+1. `manager1` → upload → structure → publish → student `student1` hub Channel A → Reading → passage + questions → submit  
+2. `student1` Channel B reading still uses AI generation (unchanged)  
 3. Export CSV lists passages and question keys  
 
 ## Next

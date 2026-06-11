@@ -83,12 +83,16 @@
       const className = clsInput?.value?.trim() || "EAP047";
       setStatus(statusEl, "", false);
       try {
-        await apiFetch("/api/admin/self-study/reading/push-channel-a", {
+        const data = await apiFetch("/api/admin/self-study/reading/push-channel-a", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ className, isActive }),
         });
-        setStatus(statusEl, t("admin_reading_saved"), false);
+        setStatus(
+          statusEl,
+          data.warning ? `${t("admin_reading_saved")} — ${data.warning}` : t("admin_reading_saved"),
+          false,
+        );
       } catch (_) {
         setStatus(statusEl, t("admin_reading_failed"), true);
       }
@@ -174,9 +178,10 @@
         const data = await apiFetch(`/api/admin/self-study/reading/drafts/${lastDraftId}/publish`, {
           method: "POST",
         });
+        const pubMsg = t("admin_reading_publish_ok", { day: String(data.scheduleDay || "") });
         setStatus(
           statusEl,
-          t("admin_reading_publish_ok", { day: String(data.scheduleDay || "") }),
+          data.channelAEnabled ? `${pubMsg} ${t("admin_reading_push_auto")}` : pubMsg,
           false,
         );
         lastDraftId = null;
