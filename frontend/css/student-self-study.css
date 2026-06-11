@@ -1222,6 +1222,68 @@
   line-height: 1.45;
 }
 
+.ssc-exam-answer-key {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ssc-exam-result__prompt {
+  margin: 0 0 0.35rem;
+  line-height: 1.45;
+}
+
+.ssc-exam-result__answer {
+  margin: 0.2rem 0 0;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.ssc-exam-result__answer span {
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+.ssc-exam-result__answer--key {
+  color: #8b3a2a;
+}
+
+.ssc-exam-result__section {
+  font-weight: 400;
+  color: var(--eap-text-muted, #6e6e73);
+}
+
+.ssc-exam-feedback {
+  margin-top: 1.5rem;
+  padding: 1rem 1.15rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(10, 126, 164, 0.04);
+}
+
+.ssc-exam-feedback h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.ssc-exam-feedback h4 {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.ssc-exam-feedback ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ssc-exam-feedback__summary {
+  margin: 0;
+  line-height: 1.55;
+}
+
 .ssc-listening-notes {
   margin: 1rem 0;
 }

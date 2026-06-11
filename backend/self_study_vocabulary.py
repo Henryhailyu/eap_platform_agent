@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 
@@ -224,7 +225,21 @@ def _practice_for_words(words: list[dict], *, channel: str = "B") -> list[dict]:
     return out
 
 
+_VOCAB_GAP_TEMPLATES = (
+    "Scholars must understand _____ before analysing the dataset.",
+    "The seminar focused on how _____ shapes academic writing.",
+    "Students practised using _____ in a formal paragraph.",
+    "The reading explained the role of _____ in the field.",
+    "Researchers must _____ the data carefully.",
+    "The lecture highlighted how _____ affects policy design.",
+)
+
+
 def _exam_shell(day_number: int, mcq_items, fill_items, match_pairs) -> dict[str, Any]:
+    import random
+
+    match_options = [p["right"] for p in match_pairs]
+    random.shuffle(match_options)
     order_parts = [
         "In conclusion, the evidence supports a cautious policy response.",
         "For example, peer-reviewed studies document similar trends across regions.",
@@ -245,7 +260,7 @@ def _exam_shell(day_number: int, mcq_items, fill_items, match_pairs) -> dict[str
             {
                 "type": "match",
                 "titleEn": "Section C — Match word to meaning",
-                "items": [{"id": "match1", "pairs": match_pairs}],
+                "items": [{"id": "match1", "pairs": match_pairs, "matchOptions": match_options}],
             },
             {
                 "type": "order",
@@ -277,6 +292,7 @@ def _build_practice_exam_channel_b(words: list[dict], day_number: int) -> dict[s
     word_list = [w["word"] for w in words]
     mcq_items: list[dict] = []
     fill_items: list[dict] = []
+    fill_idx = 0
     for i, wd in enumerate(pool[:8]):
         w = wd["word"]
         meaning = _meaning_for_channel_b(wd)
@@ -294,10 +310,12 @@ def _build_practice_exam_channel_b(words: list[dict], day_number: int) -> dict[s
                 }
             )
         else:
+            template = _VOCAB_GAP_TEMPLATES[fill_idx % len(_VOCAB_GAP_TEMPLATES)]
+            fill_idx += 1
             fill_items.append(
                 {
                     "id": f"fill{i - 4}",
-                    "promptEn": f"Gap fill — meaning «{meaning}»: Researchers must _____ the data carefully.",
+                    "promptEn": f"Gap fill — meaning «{meaning}»: {template}",
                     "answer": w,
                 }
             )
@@ -308,12 +326,7 @@ def _build_practice_exam_channel_b(words: list[dict], day_number: int) -> dict[s
     return _exam_shell(day_number, mcq_items, fill_items, match_pairs)
 
 
-_CHANNEL_A_GAP_TEMPLATES = (
-    "Scholars must understand _____ before analysing the dataset.",
-    "The seminar focused on how _____ shapes academic writing.",
-    "Students practised using _____ in a formal paragraph.",
-    "The reading explained the role of _____ in the field.",
-)
+_CHANNEL_A_GAP_TEMPLATES = _VOCAB_GAP_TEMPLATES
 
 
 def _build_practice_exam_channel_a(words: list[dict], day_number: int) -> dict[str, Any]:
@@ -415,51 +428,308 @@ def _build_practice_exam(words: list[dict], day_number: int, *, channel: str = "
     return _build_practice_exam_channel_b(words, day_number)
 
 
+def _vocab_writing_ai_available() -> bool:
+    try:
+        from eap_ai import ai_is_configured
+
+        return bool(ai_is_configured and ai_is_configured())
+    except Exception:
+        return False
+
+
+def _vocab_writing_word_count(text: str) -> int:
+    return len(re.findall(r"[A-Za-z0-9\u4e00-\u9fff]+", text or ""))
+
+
+def _exam_target_words(exam: dict) -> list[str]:
+    words: set[str] = set()
+    for section in exam.get("sections") or []:
+        st = section.get("type")
+        for item in section.get("items") or []:
+            if st == "mcq":
+                ans = item.get("answer")
+                if ans:
+                    words.add(str(ans).strip())
+                else:
+                    opts = item.get("options") or []
+                    ci = int(item.get("correctIndex") or 0)
+                    if 0 <= ci < len(opts):
+                        words.add(str(opts[ci]).strip())
+            elif st == "fill":
+                if item.get("answer"):
+                    words.add(str(item["answer"]).strip())
+            elif st == "match":
+                for pair in item.get("pairs") or []:
+                    if pair.get("left"):
+                        words.add(str(pair["left"]).strip())
+    return sorted(w for w in words if w)
+
+
+def _writing_prompt_from_exam(exam: dict) -> str:
+    for section in exam.get("sections") or []:
+        if section.get("type") != "writing":
+            continue
+        for item in section.get("items") or []:
+            prompt = str(item.get("promptEn") or item.get("prompt") or "").strip()
+            if prompt:
+                return prompt
+    return (
+        "Write a 150-word academic English paragraph using at least five words from today's list. "
+        "Include: (1) a clear topic sentence, (2) one supporting reason, (3) a concrete example, "
+        "and (4) a brief summary sentence. Use formal EAP register."
+    )
+
+
+def _fallback_vocab_writing_feedback(draft: str, prompt: str, target_words: list[str]) -> dict[str, Any]:
+    wc = _vocab_writing_word_count(draft)
+    low = draft.lower()
+    used = [w for w in target_words if w.lower() in low]
+    missed = [w for w in target_words if w.lower() not in low][:8]
+    connectors = ("however", "therefore", "for example", "in addition", "furthermore", "in conclusion")
+    has_connector = any(c in low for c in connectors)
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", draft) if p.strip()]
+    strengths: list[str] = []
+    priorities: list[str] = []
+    if wc >= 120:
+        strengths.append(f"Word count is on target ({wc} words).")
+    elif wc >= 80:
+        priorities.append(f"Expand toward ~150 words (currently {wc}).")
+    else:
+        priorities.append(f"Paragraph is too short ({wc} words); aim for 120–180.")
+    if used:
+        strengths.append(f"Used target vocabulary: {', '.join(used[:6])}.")
+    if missed:
+        priorities.append(f"Try weaving in: {', '.join(missed[:5])}.")
+    if has_connector:
+        strengths.append("Uses cohesive linking devices.")
+    else:
+        priorities.append("Add connectors (e.g. therefore, for example, in conclusion).")
+    if len(paragraphs) >= 1:
+        strengths.append("Clear paragraph structure detected.")
+    rubric = {
+        "topicSentence": "Check your opening sentence states the main idea clearly.",
+        "supportingReason": "Ensure one explicit reason supports the topic sentence.",
+        "example": "Add a concrete example to illustrate your point.",
+        "summary": "End with a brief summary sentence (no new ideas).",
+        "vocabUse": (
+            f"Used {len(used)} of {len(target_words)} target words."
+            if target_words
+            else "Include at least five words from today's list."
+        ),
+        "register": "Maintain formal EAP register — avoid contractions and slang.",
+    }
+    summary_en = (
+        f"You submitted {wc} words. "
+        + (" ".join(strengths[:2]) if strengths else "Keep developing your academic paragraph.")
+        + (" Focus on: " + "; ".join(priorities[:2]) + "." if priorities else "")
+    )
+    return {
+        "wordCount": wc,
+        "summaryEn": summary_en,
+        "summaryZh": (
+            f"共 {wc} 词。"
+            + (" ".join(priorities[:2]) if priorities else "继续完善学术段落结构。")
+        ),
+        "strengths": strengths,
+        "priorities": priorities,
+        "rubric": rubric,
+        "wordsUsed": used,
+        "wordsMissed": missed,
+        "source": "rule",
+        "promptEn": prompt,
+    }
+
+
+def _generate_vocab_writing_feedback(
+    draft: str, *, exam: dict, target_words: list[str] | None = None
+) -> dict[str, Any]:
+    prompt = _writing_prompt_from_exam(exam)
+    words = target_words if target_words is not None else _exam_target_words(exam)
+    if not draft.strip():
+        return {
+            "wordCount": 0,
+            "summaryEn": "No writing submitted.",
+            "summaryZh": "未提交写作内容。",
+            "strengths": [],
+            "priorities": ["Write a 150-word paragraph following the prompt."],
+            "rubric": {},
+            "wordsUsed": [],
+            "wordsMissed": words[:8],
+            "source": "empty",
+            "promptEn": prompt,
+        }
+    if not _vocab_writing_ai_available():
+        return _fallback_vocab_writing_feedback(draft, prompt, words)
+
+    system = (
+        "You are an EAP writing tutor marking a short 150-word academic paragraph practice. "
+        "Evaluate against the prompt and today's vocabulary list. "
+        "Return ONLY valid JSON with keys: "
+        "summaryEn (2-4 sentences), summaryZh (Chinese mirror), "
+        "strengths (string array), priorities (string array), "
+        "rubric {topicSentence, supportingReason, example, summary, vocabUse, register} "
+        "(each value: one sentence of specific feedback), "
+        "wordsUsed (target words found in draft), wordsMissed (important target words absent)."
+    )
+    user = (
+        f"Prompt:\n{prompt}\n\n"
+        f"Target vocabulary ({len(words)} words): {', '.join(words[:40])}\n\n"
+        f"Student draft ({_vocab_writing_word_count(draft)} words):\n{draft[:12000]}"
+    )
+    try:
+        from eap_ai import create_chat_completion, get_openai_client
+
+        client, profile = get_openai_client()
+        response = create_chat_completion(
+            client,
+            profile,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=2200,
+            temperature=0.35,
+            response_format={"type": "json_object"},
+        )
+        raw = ""
+        if response.choices:
+            raw = (response.choices[0].message.content or "").strip()
+        if not raw:
+            raise RuntimeError("Empty AI response")
+        data = json.loads(raw)
+        return {
+            "wordCount": _vocab_writing_word_count(draft),
+            "summaryEn": str(data.get("summaryEn") or "").strip(),
+            "summaryZh": str(data.get("summaryZh") or "").strip(),
+            "strengths": list(data.get("strengths") or []),
+            "priorities": list(data.get("priorities") or []),
+            "rubric": dict(data.get("rubric") or {}),
+            "wordsUsed": list(data.get("wordsUsed") or []),
+            "wordsMissed": list(data.get("wordsMissed") or []),
+            "source": "ai",
+            "promptEn": prompt,
+        }
+    except Exception:
+        return _fallback_vocab_writing_feedback(draft, prompt, words)
+
+
 def _grade_practice_exam(exam: dict, answers: dict) -> dict[str, Any]:
     score = 0
     total = 0
+    results: list[dict[str, Any]] = []
     for section in exam.get("sections") or []:
         st = section.get("type")
+        section_title = section.get("titleEn") or st or ""
         if st in ("mcq", "fill"):
             for item in section.get("items") or []:
                 total += 1
                 iid = item.get("id")
+                row: dict[str, Any] = {
+                    "id": iid,
+                    "sectionType": st,
+                    "sectionTitle": section_title,
+                    "promptEn": item.get("promptEn") or item.get("prompt") or "",
+                    "promptZh": item.get("promptZh") or "",
+                }
                 if st == "mcq":
-                    if answers.get(iid) == item.get("correctIndex"):
+                    opts = item.get("options") or []
+                    ci = int(item.get("correctIndex") or 0)
+                    chosen_idx = answers.get(iid)
+                    try:
+                        chosen_idx = int(chosen_idx) if chosen_idx is not None else None
+                    except (TypeError, ValueError):
+                        chosen_idx = None
+                    ok = chosen_idx is not None and chosen_idx == ci
+                    correct_answer = item.get("answer") or (opts[ci] if 0 <= ci < len(opts) else "")
+                    your_answer = opts[chosen_idx] if chosen_idx is not None and 0 <= chosen_idx < len(opts) else ""
+                    row.update(
+                        {
+                            "correct": ok,
+                            "yourAnswer": your_answer,
+                            "correctAnswer": correct_answer,
+                        }
+                    )
+                    if ok:
                         score += 1
                 else:
-                    given = str(answers.get(iid) or "").strip().lower()
-                    expect = str(item.get("answer") or "").strip().lower()
-                    if given and given == expect:
+                    given = str(answers.get(iid) or "").strip()
+                    expect = str(item.get("answer") or "").strip()
+                    ok = bool(given) and given.lower() == expect.lower()
+                    row.update(
+                        {
+                            "correct": ok,
+                            "yourAnswer": given,
+                            "correctAnswer": expect,
+                        }
+                    )
+                    if ok:
                         score += 1
+                results.append(row)
         elif st == "match":
             for item in section.get("items") or []:
+                iid = item.get("id")
                 for pair in item.get("pairs") or []:
                     total += 1
-                    key = f"{item.get('id')}:{pair.get('left')}"
-                    if answers.get(key) == pair.get("right"):
+                    left = pair.get("left") or ""
+                    key = f"{iid}:{left}"
+                    expect = pair.get("right") or ""
+                    given = str(answers.get(key) or "").strip()
+                    ok = bool(given) and given == expect
+                    results.append(
+                        {
+                            "id": f"{iid}:{left}",
+                            "sectionType": "match",
+                            "sectionTitle": section_title,
+                            "promptEn": f"Match «{left}» to its meaning",
+                            "correct": ok,
+                            "yourAnswer": given,
+                            "correctAnswer": expect,
+                        }
+                    )
+                    if ok:
                         score += 1
         elif st == "order":
             for item in section.get("items") or []:
                 total += 1
                 iid = item.get("id")
+                parts = item.get("parts") or []
                 given = answers.get(iid)
                 expect = item.get("correctOrder")
+                ok = False
                 if isinstance(given, list) and isinstance(expect, list) and given == expect:
-                    score += 1
+                    ok = True
                 elif not expect and given:
+                    ok = True
+                your_order = (
+                    [parts[i] for i in given if isinstance(i, int) and 0 <= i < len(parts)]
+                    if isinstance(given, list)
+                    else []
+                )
+                correct_order = (
+                    [parts[i] for i in expect if isinstance(i, int) and 0 <= i < len(parts)]
+                    if isinstance(expect, list)
+                    else list(parts)
+                )
+                results.append(
+                    {
+                        "id": iid,
+                        "sectionType": "order",
+                        "sectionTitle": section_title,
+                        "promptEn": item.get("promptEn") or "Put sentences in logical order",
+                        "correct": ok,
+                        "yourAnswer": your_order,
+                        "correctAnswer": correct_order,
+                    }
+                )
+                if ok:
                     score += 1
         elif st == "writing":
             pass
     writing_text = str(answers.get("writing") or "").strip()
-    writing_feedback = ""
-    if writing_text:
-        wc = len(writing_text.split())
-        writing_feedback = (
-            f"Submitted {wc} words. "
-            "Check: topic sentence, supporting reason, example, and summary. "
-            "AI rubric feedback will refine this in the next release."
-        )
+    writing_feedback: dict[str, Any] | None = None
+    if writing_text or any(s.get("type") == "writing" for s in exam.get("sections") or []):
+        writing_feedback = _generate_vocab_writing_feedback(writing_text, exam=exam)
+        wc = int(writing_feedback.get("wordCount") or 0)
         if 120 <= wc <= 180:
             score += 2
             total += 2
@@ -468,7 +738,12 @@ def _grade_practice_exam(exam: dict, answers: dict) -> dict[str, Any]:
             total += 2
         else:
             total += 2
-    return {"score": score, "total": max(total, 1), "writingFeedback": writing_feedback}
+    return {
+        "score": score,
+        "total": max(total, 1),
+        "results": results,
+        "writingFeedback": writing_feedback,
+    }
 
 
 def _game_rounds_for_words(words: list[dict]) -> dict[str, Any]:
@@ -502,6 +777,22 @@ def _game_rounds_for_words(words: list[dict]) -> dict[str, Any]:
     }
 
 
+def _practice_progress_payload(prog) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "learnDone": bool(prog and prog["learn_done"]),
+        "practiceDone": bool(prog and prog["practice_done"]),
+        "practiceScore": prog["practice_score"] if prog else None,
+        "practiceScoreTotal": prog["practice_score_total"] if prog else None,
+        "practiceResult": None,
+    }
+    if prog and prog.get("practice_result_json"):
+        try:
+            out["practiceResult"] = json.loads(prog["practice_result_json"])
+        except (TypeError, json.JSONDecodeError):
+            pass
+    return out
+
+
 def _vocab_day_payload(
     *,
     course,
@@ -523,12 +814,7 @@ def _vocab_day_payload(
         "wordCount": len(words),
         "practice": practice,
         "games": _game_rounds_for_words(words),
-        "progress": {
-            "learnDone": bool(prog and prog["learn_done"]),
-            "practiceDone": bool(prog and prog["practice_done"]),
-            "practiceScore": prog["practice_score"] if prog else None,
-            "practiceScoreTotal": prog["practice_score_total"] if prog else None,
-        },
+        "progress": _practice_progress_payload(prog),
     }
 
 
@@ -632,6 +918,8 @@ def migrate_self_study_vocabulary_tables(conn) -> None:
         conn.execute(
             "ALTER TABLE student_vocab_day_progress ADD COLUMN practice_score_total INTEGER"
         )
+    if "practice_result_json" not in cols:
+        conn.execute("ALTER TABLE student_vocab_day_progress ADD COLUMN practice_result_json TEXT")
     unit_cols = {row[1] for row in conn.execute("PRAGMA table_info(vocab_material_units)").fetchall()}
     if "practice_json" not in unit_cols:
         conn.execute("ALTER TABLE vocab_material_units ADD COLUMN practice_json TEXT")
@@ -711,6 +999,13 @@ def migrate_self_study_vocabulary_tables(conn) -> None:
         )
         """
     )
+    ca_prog_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(student_vocab_channel_a_progress)").fetchall()
+    }
+    if "practice_result_json" not in ca_prog_cols:
+        conn.execute(
+            "ALTER TABLE student_vocab_channel_a_progress ADD COLUMN practice_result_json TEXT"
+        )
 
     _backfill_pack_words_from_units(conn)
     seed_default_vocab_course(conn)
@@ -1295,12 +1590,7 @@ def _channel_a_today_payload(conn, *, class_name: str, username: str) -> dict[st
         "wordCount": len(words),
         "practice": extras["practice"],
         "games": extras["games"],
-        "progress": {
-            "learnDone": bool(prog and prog["learn_done"]),
-            "practiceDone": bool(prog and prog["practice_done"]),
-            "practiceScore": prog["practice_score"] if prog else None,
-            "practiceScoreTotal": prog["practice_score_total"] if prog else None,
-        },
+        "progress": _practice_progress_payload(prog),
     }
 
 
@@ -1551,12 +1841,7 @@ def register_self_study_vocabulary_routes(
                     "wordCount": len(words),
                     "practice": extras["practice"],
                     "games": extras["games"],
-                    "progress": {
-                        "learnDone": bool(prog and prog["learn_done"]),
-                        "practiceDone": bool(prog and prog["practice_done"]),
-                        "practiceScore": prog["practice_score"] if prog else None,
-                        "practiceScoreTotal": prog["practice_score_total"] if prog else None,
-                    },
+                    "progress": _practice_progress_payload(prog),
                 }
             )
 
@@ -1885,6 +2170,9 @@ def register_self_study_vocabulary_routes(
             practice_done = 1 if data.get("practiceDone") else 0
             practice_score = data.get("practiceScore")
             practice_score_total = data.get("practiceScoreTotal")
+            practice_result_json = None
+            if data.get("practiceResult") is not None:
+                practice_result_json = json.dumps(data.get("practiceResult"), ensure_ascii=False)
             if not day_number:
                 conn.close()
                 return jsonify({"error": "dayNumber required"}), 400
@@ -1893,8 +2181,8 @@ def register_self_study_vocabulary_routes(
                 """
                 INSERT INTO student_vocab_channel_a_progress
                     (student_username, class_name, day_number, learn_done, practice_done,
-                     practice_score, practice_score_total, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     practice_score, practice_score_total, practice_result_json, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(student_username, class_name, day_number) DO UPDATE SET
                     learn_done = CASE
                         WHEN excluded.learn_done = 1 OR student_vocab_channel_a_progress.learn_done = 1 THEN 1
@@ -1911,6 +2199,10 @@ def register_self_study_vocabulary_routes(
                         excluded.practice_score_total,
                         student_vocab_channel_a_progress.practice_score_total
                     ),
+                    practice_result_json = COALESCE(
+                        excluded.practice_result_json,
+                        student_vocab_channel_a_progress.practice_result_json
+                    ),
                     completed_at = COALESCE(excluded.completed_at, student_vocab_channel_a_progress.completed_at)
                 """,
                 (
@@ -1921,6 +2213,7 @@ def register_self_study_vocabulary_routes(
                     practice_done,
                     practice_score,
                     practice_score_total,
+                    practice_result_json,
                     completed_at,
                 ),
             )
@@ -1967,6 +2260,9 @@ def register_self_study_vocabulary_routes(
         practice_done = 1 if data.get("practiceDone") else 0
         practice_score = data.get("practiceScore")
         practice_score_total = data.get("practiceScoreTotal")
+        practice_result_json = None
+        if data.get("practiceResult") is not None:
+            practice_result_json = json.dumps(data.get("practiceResult"), ensure_ascii=False)
         if not course_id or not day_number:
             conn.close()
             return jsonify({"error": "courseId and dayNumber required"}), 400
@@ -1984,14 +2280,17 @@ def register_self_study_vocabulary_routes(
             """
             INSERT INTO student_vocab_day_progress
                 (student_username, course_id, day_number, learn_done, practice_done,
-                 practice_score, practice_score_total, completed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 practice_score, practice_score_total, practice_result_json, completed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(student_username, course_id, day_number) DO UPDATE SET
                 learn_done = CASE WHEN excluded.learn_done = 1 OR student_vocab_day_progress.learn_done = 1 THEN 1 ELSE 0 END,
                 practice_done = CASE WHEN excluded.practice_done = 1 OR student_vocab_day_progress.practice_done = 1 THEN 1 ELSE 0 END,
                 practice_score = COALESCE(excluded.practice_score, student_vocab_day_progress.practice_score),
                 practice_score_total = COALESCE(
                     excluded.practice_score_total, student_vocab_day_progress.practice_score_total
+                ),
+                practice_result_json = COALESCE(
+                    excluded.practice_result_json, student_vocab_day_progress.practice_result_json
                 ),
                 completed_at = COALESCE(excluded.completed_at, student_vocab_day_progress.completed_at)
             """,
@@ -2003,6 +2302,7 @@ def register_self_study_vocabulary_routes(
                 practice_done,
                 practice_score,
                 practice_score_total,
+                practice_result_json,
                 completed_at,
             ),
         )

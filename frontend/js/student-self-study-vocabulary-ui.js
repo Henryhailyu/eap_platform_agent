@@ -522,7 +522,7 @@
       return items
         .map((item) => {
           const pairs = item.pairs || [];
-          const rights = [...new Set(pairs.map((x) => x.right))];
+          const rights = matchDropdownOptions(item);
           return `<div class="ssc-exam-item"><p class="ssc-exam-prompt">${escapeHtml(item.promptEn || t("self_study_exam_match"))}</p>
             <ul class="ssc-exam-match">${pairs.map((p) => `<li><span class="ssc-exam-match__left">${escapeHtml(p.left)}</span><select class="ssc-exam-select" data-match="${escapeHtml(item.id)}" data-left="${escapeHtml(p.left)}">${["", ...rights].map((r) => `<option value="${escapeHtml(r)}"${answers[`${item.id}:${p.left}`] === r ? " selected" : ""}>${escapeHtml(r || "—")}</option>`).join("")}</select></li>`).join("")}</ul></div>`;
         })
@@ -555,6 +555,109 @@
   function itemPrompt(section) {
     const items = section.items || [];
     return items[0]?.promptEn || items[0]?.prompt || section.promptEn || "";
+  }
+
+  function shuffleArray(arr) {
+    const out = arr.slice();
+    for (let i = out.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
+  function matchDropdownOptions(item) {
+    const pairs = item.pairs || [];
+    if (Array.isArray(item.matchOptions) && item.matchOptions.length) {
+      return item.matchOptions;
+    }
+    return shuffleArray([...new Set(pairs.map((x) => x.right))]);
+  }
+
+  function formatAnswerValue(val) {
+    if (Array.isArray(val)) {
+      return val.map((line, i) => `${i + 1}. ${line}`).join("\n");
+    }
+    return String(val == null ? "" : val);
+  }
+
+  function renderWritingFeedbackHtml(wf) {
+    if (!wf) return "";
+    if (typeof wf === "string") {
+      return `<div class="ssc-exam-feedback"><h3>${t("self_study_exam_writing_feedback")}</h3><p>${escapeHtml(wf)}</p></div>`;
+    }
+    const summary = isZh() ? wf.summaryZh || wf.summaryEn : wf.summaryEn || wf.summaryZh;
+    const strengths = wf.strengths || [];
+    const priorities = wf.priorities || [];
+    const rubric = wf.rubric || {};
+    const rubricLabels = {
+      topicSentence: t("self_study_exam_rubric_topic"),
+      supportingReason: t("self_study_exam_rubric_support"),
+      example: t("self_study_exam_rubric_example"),
+      summary: t("self_study_exam_rubric_summary"),
+      vocabUse: t("self_study_exam_rubric_vocab"),
+      register: t("self_study_exam_rubric_register"),
+    };
+    const rubricHtml = Object.entries(rubricLabels)
+      .filter(([key]) => rubric[key])
+      .map(([key, label]) => `<li><strong>${escapeHtml(label)}</strong> ${escapeHtml(rubric[key])}</li>`)
+      .join("");
+    return `
+      <div class="ssc-exam-feedback">
+        <h3>${t("self_study_exam_writing_feedback")}</h3>
+        ${summary ? `<p class="ssc-exam-feedback__summary">${escapeHtml(summary)}</p>` : ""}
+        ${strengths.length ? `<h4>${t("self_study_exam_writing_strengths")}</h4><ul>${strengths.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>` : ""}
+        ${priorities.length ? `<h4>${t("self_study_exam_writing_priorities")}</h4><ul>${priorities.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>` : ""}
+        ${rubricHtml ? `<h4>${t("self_study_exam_writing_rubric")}</h4><ul class="ssc-exam-rubric">${rubricHtml}</ul>` : ""}
+        ${wf.wordCount != null ? `<p class="ssc-exam-wordcount">${t("self_study_exam_word_count", { n: String(wf.wordCount) })}</p>` : ""}
+      </div>
+    `;
+  }
+
+  function renderPracticeResultItems(results) {
+    return (results || [])
+      .map((r) => {
+        const status = r.correct ? t("self_study_reading_correct") : t("self_study_reading_incorrect");
+        const prompt = isZh() ? r.promptZh || r.promptEn : r.promptEn || r.promptZh;
+        const yourAns = formatAnswerValue(r.yourAnswer);
+        const correctAns = formatAnswerValue(r.correctAnswer);
+        const section = r.sectionTitle
+          ? `<span class="ssc-exam-result__section">${escapeHtml(r.sectionTitle)}</span>`
+          : "";
+        return `
+          <li class="ssc-reading-result${r.correct ? " ssc-reading-result--ok" : " ssc-reading-result--bad"}">
+            <p class="ssc-reading-result__status">${status} · ${escapeHtml(r.id || "")} ${section}</p>
+            ${prompt ? `<p class="ssc-exam-result__prompt">${escapeHtml(prompt)}</p>` : ""}
+            <p class="ssc-exam-result__answer"><span>${t("self_study_exam_your_answer")}</span> ${escapeHtml(yourAns || "—")}</p>
+            ${!r.correct ? `<p class="ssc-exam-result__answer ssc-exam-result__answer--key"><span>${t("self_study_exam_correct_answer")}</span> ${escapeHtml(correctAns || "—")}</p>` : ""}
+            ${r.correct && correctAns ? `<p class="ssc-exam-result__answer"><span>${t("self_study_exam_correct_answer")}</span> ${escapeHtml(correctAns)}</p>` : ""}
+          </li>
+        `;
+      })
+      .join("");
+  }
+
+  function renderPracticeResultsPanel(root, result, opts) {
+    const options = opts || {};
+    const items = renderPracticeResultItems(result.results);
+    root.innerHTML = `
+      <div class="ssc-report">
+        <h2>${t("self_study_vocab_practice_done")}</h2>
+        <p>${t("self_study_vocab_practice_score", {
+          correct: String(options.score ?? result.score ?? 0),
+          total: String(options.total ?? result.total ?? 0),
+        })}</p>
+        ${options.showRedo ? `<button type="button" class="btn-secondary" id="ssc-practice-redo">${t("self_study_vocab_redo")}</button>` : ""}
+      </div>
+      ${items ? `<h3 class="ssc-exam-answer-key">${t("self_study_exam_answer_key")}</h3><ul class="ssc-reading-results">${items}</ul>` : ""}
+      ${renderWritingFeedbackHtml(result.writingFeedback)}
+    `;
+    if (options.showRedo) {
+      document.getElementById("ssc-practice-redo")?.addEventListener("click", () => {
+        state.practiceRetake = true;
+        void renderPracticePanel(root);
+      });
+    }
   }
 
   async function renderPracticePanel(root) {
@@ -657,6 +760,12 @@
           answers,
           exam,
         });
+        const practiceResult = {
+          score: result.score || 0,
+          total: result.total || estimateExamTotal(exam),
+          results: result.results || [],
+          writingFeedback: result.writingFeedback || null,
+        };
         const completeBody =
           data.channel === "A"
             ? {
@@ -665,8 +774,9 @@
                 dayNumber: data.dayNumber,
                 learnDone: prog.learnDone,
                 practiceDone: true,
-                practiceScore: result.score || 0,
-                practiceScoreTotal: result.total || estimateExamTotal(exam),
+                practiceScore: practiceResult.score,
+                practiceScoreTotal: practiceResult.total,
+                practiceResult,
               }
             : {
                 kind: "day",
@@ -674,19 +784,14 @@
                 dayNumber: data.dayNumber,
                 learnDone: prog.learnDone,
                 practiceDone: true,
-                practiceScore: result.score || 0,
-                practiceScoreTotal: result.total || estimateExamTotal(exam),
+                practiceScore: practiceResult.score,
+                practiceScoreTotal: practiceResult.total,
+                practiceResult,
               };
         await SERVER().completeVocab(completeBody);
         state.practiceRetake = false;
-        state.today = null;
-        root.innerHTML = `
-          <div class="ssc-report">
-            <h2>${t("self_study_vocab_practice_done")}</h2>
-            <p>${t("self_study_vocab_practice_score", { correct: String(result.score || 0), total: String(result.total || 0) })}</p>
-            ${result.writingFeedback ? `<div class="ssc-exam-feedback"><h3>${t("self_study_exam_writing_feedback")}</h3><p>${escapeHtml(result.writingFeedback)}</p></div>` : ""}
-          </div>
-        `;
+        if (data.progress) data.progress.practiceResult = practiceResult;
+        renderPracticeResultsPanel(root, practiceResult);
         updateHeader(100, t("self_study_vocab_complete_short"));
       } catch (e) {
         alert(e.message);
@@ -714,17 +819,25 @@
     const examTotal = prog.practiceScoreTotal || estimateExamTotal(exam);
 
     if (prog.practiceDone && !state.practiceRetake) {
-      root.innerHTML = `
-        <div class="ssc-report">
-          <h2>${t("self_study_vocab_practice_done")}</h2>
-          <p>${t("self_study_vocab_practice_score", { correct: String(prog.practiceScore ?? 0), total: String(examTotal) })}</p>
-          <button type="button" class="btn-secondary" id="ssc-practice-redo">${t("self_study_vocab_redo")}</button>
-        </div>
-      `;
-      document.getElementById("ssc-practice-redo")?.addEventListener("click", () => {
-        state.practiceRetake = true;
-        renderExam();
-      });
+      if (prog.practiceResult) {
+        renderPracticeResultsPanel(root, prog.practiceResult, {
+          score: prog.practiceScore ?? prog.practiceResult.score,
+          total: examTotal,
+          showRedo: true,
+        });
+      } else {
+        root.innerHTML = `
+          <div class="ssc-report">
+            <h2>${t("self_study_vocab_practice_done")}</h2>
+            <p>${t("self_study_vocab_practice_score", { correct: String(prog.practiceScore ?? 0), total: String(examTotal) })}</p>
+            <button type="button" class="btn-secondary" id="ssc-practice-redo">${t("self_study_vocab_redo")}</button>
+          </div>
+        `;
+        document.getElementById("ssc-practice-redo")?.addEventListener("click", () => {
+          state.practiceRetake = true;
+          renderExam();
+        });
+      }
       return;
     }
     renderExam();
