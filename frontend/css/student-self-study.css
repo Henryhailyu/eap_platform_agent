@@ -1762,6 +1762,9 @@
   font-weight: 600;
   text-align: center;
   margin: 0.75rem 0 1rem;
+  color: #e8f0ff;
+  position: relative;
+  z-index: 3;
 }
 
 .ssc-game-options {
@@ -2310,6 +2313,14 @@
   z-index: 3;
   font-size: 0.8rem;
   overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.ssc-game-options--race .ssc-game-opt {
+  text-align: left;
+  line-height: 1.35;
+  font-size: 0.85rem;
 }
 
 .ssc-game-track-wrap {

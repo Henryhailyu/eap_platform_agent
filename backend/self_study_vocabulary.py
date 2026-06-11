@@ -167,6 +167,56 @@ def _exam_meaning_channel_a(wd: dict[str, Any]) -> str | None:
     return None
 
 
+def _gloss_for_channel_a_game(wd: dict[str, Any]) -> str | None:
+    """Star Battle / Speed Race — real gloss only (no affix-stem fallbacks)."""
+    meaning = _usable_meaning(wd)
+    if meaning:
+        return _clean_prompt_meaning(meaning)
+    return None
+
+
+def _enrich_channel_a_words(words: list[dict]) -> list[dict]:
+    """Fill missing Channel A glosses via AI so games and exams use real definitions."""
+    import copy
+
+    from self_study_vocabulary_ai import enrich_vocab_meanings
+
+    words = copy.deepcopy(_filter_study_words(words))
+    if not words:
+        return words
+    raw_units = [
+        {
+            "label": "batch",
+            "words": [
+                {
+                    "word": wd.get("word"),
+                    "core": wd.get("coreMeaning") or wd.get("core"),
+                    "prefix": (wd.get("affix") or {}).get("prefix"),
+                    "root": (wd.get("affix") or {}).get("root"),
+                    "suffix": (wd.get("affix") or {}).get("suffix"),
+                    "method": wd.get("methodPrimary"),
+                    "mnemonic": wd.get("mnemonic"),
+                }
+                for wd in words
+            ],
+        }
+    ]
+    try:
+        enriched = enrich_vocab_meanings(raw_units)
+        gloss_by_word = {
+            str(w["word"]).lower(): str(w.get("core") or "")
+            for w in (enriched[0].get("words") or [])
+            if w.get("word")
+        }
+        for wd in words:
+            g = gloss_by_word.get(str(wd.get("word")).lower())
+            if g and _usable_meaning({"coreMeaning": g, "word": wd.get("word")}):
+                wd["coreMeaning"] = g
+    except Exception:
+        pass
+    return words
+
+
 def _meaning_for_channel_b(wd: dict[str, Any]) -> str:
     return _clean_prompt_meaning(wd.get("coreMeaning") or wd.get("word") or "")
 
@@ -343,39 +393,7 @@ def _build_practice_exam_channel_a(words: list[dict], day_number: int) -> dict[s
     """Channel A — school-material packs; separate from Channel B."""
     import random
 
-    from self_study_vocabulary_ai import enrich_vocab_meanings
-
-    words = _filter_study_words(words)
-    raw_units = [
-        {
-            "label": "exam",
-            "words": [
-                {
-                    "word": wd.get("word"),
-                    "core": wd.get("coreMeaning") or wd.get("core"),
-                    "prefix": (wd.get("affix") or {}).get("prefix"),
-                    "root": (wd.get("affix") or {}).get("root"),
-                    "suffix": (wd.get("affix") or {}).get("suffix"),
-                    "method": wd.get("methodPrimary"),
-                    "mnemonic": wd.get("mnemonic"),
-                }
-                for wd in words
-            ],
-        }
-    ]
-    try:
-        enriched = enrich_vocab_meanings(raw_units)
-        gloss_by_word = {
-            str(w["word"]).lower(): str(w.get("core") or "")
-            for w in (enriched[0].get("words") or [])
-            if w.get("word")
-        }
-        for wd in words:
-            g = gloss_by_word.get(str(wd.get("word")).lower())
-            if g and _usable_meaning({"coreMeaning": g, "word": wd.get("word")}):
-                wd["coreMeaning"] = g
-    except Exception:
-        pass
+    words = _enrich_channel_a_words(words)
 
     pool = list(words)
     random.shuffle(pool)
@@ -760,14 +778,14 @@ def _game_rounds_for_words(words: list[dict], *, channel: str = "B") -> dict[str
     """Payload for Star Battle + Speed Race front-end games."""
     import random
 
-    study_words = _filter_study_words(words) if channel == "A" else list(words)
+    study_words = _enrich_channel_a_words(words) if channel == "A" else list(words)
     rounds = []
     pool = list(study_words)
     random.shuffle(pool)
     for i, wd in enumerate(pool[:20]):
         w = wd["word"]
         if channel == "A":
-            correct_meaning = _exam_meaning_channel_a(wd)
+            correct_meaning = _gloss_for_channel_a_game(wd)
             if not correct_meaning:
                 continue
             distractors: list[str] = []
@@ -775,7 +793,7 @@ def _game_rounds_for_words(words: list[dict], *, channel: str = "B") -> dict[str
             for owd in study_words:
                 if owd["word"] == w:
                     continue
-                gloss = _exam_meaning_channel_a(owd)
+                gloss = _gloss_for_channel_a_game(owd)
                 if gloss and gloss.lower() not in seen:
                     seen.add(gloss.lower())
                     distractors.append(gloss)
@@ -1535,7 +1553,7 @@ def _channel_a_day_words(conn, class_name: str, day_number: int) -> tuple[list[d
         (class_name, day_number),
     ).fetchone()
     if cached:
-        words = _filter_study_words(json.loads(cached["words_json"]))
+        words = _enrich_channel_a_words(json.loads(cached["words_json"]))
         practice = _practice_for_words(words, channel="A")
         games = _game_rounds_for_words(words, channel="A")
         return words, {"practice": practice, "games": games}
@@ -1548,7 +1566,7 @@ def _channel_a_day_words(conn, class_name: str, day_number: int) -> tuple[list[d
         _complete_channel_a(conn, class_name)
         return None
     batch = rows[offset : offset + CHANNEL_A_DAILY_WORDS]
-    words = _filter_study_words([json.loads(r["word_json"]) for r in batch])
+    words = _enrich_channel_a_words([json.loads(r["word_json"]) for r in batch])
     practice = _practice_for_words(words, channel="A")
     games = _game_rounds_for_words(words, channel="A")
     now = _now_iso()
