@@ -10,6 +10,15 @@
     { id: "speaking", icon: "🎤", titleKey: "self_study_mod_speaking", href: "student-self-study-module.html?skill=speaking" },
     { id: "writing", icon: "✍️", titleKey: "self_study_mod_writing", href: "student-self-study-module.html?skill=writing" },
   ];
+  /** Channel A — manager push exists for vocabulary + reading only (see docs/VISION_SELF_STUDY.md). */
+  const CHANNEL_A_HUB_SKILLS = new Set(["vocabulary", "reading"]);
+
+  function skillsForHubChannel(channel) {
+    if (channel === "A") {
+      return SKILL_MODULES.filter((m) => CHANNEL_A_HUB_SKILLS.has(m.id));
+    }
+    return SKILL_MODULES;
+  }
 
   const state = {
     placement: null,
@@ -260,7 +269,7 @@
       </div>
     `;
 
-    const skillsHtml = SKILL_MODULES.map((mod) => {
+    const skillsHtml = skillsForHubChannel(ch).map((mod) => {
       const action = channelSkillAction(mod.id, ch, dayNum);
       const title = t(mod.titleKey);
       if (action.type === "hint") {

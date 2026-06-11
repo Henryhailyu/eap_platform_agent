@@ -61,7 +61,8 @@ daily_channel(skill) = manager_has_push(skill) ? 'A' : 'B'
 | Neither pushed | B | B |
 | Both pushed | A | A |
 
-- **Writing / listening (current):** AI-only → always **Channel B**
+- **Listening / speaking / writing:** AI-only → always **Channel B** (no manager Channel A push in admin)
+- **Hub — School materials (A) tab:** student UI lists **Vocabulary** and **Reading** only; Listening, Speaking, and Writing appear only under **AI self-study (B)**
 - Channel A browse allowed; only the routed channel counts for **daily completion / Streak** (where Streak applies)
 
 ### Manager
