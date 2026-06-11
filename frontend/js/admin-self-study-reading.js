@@ -5,6 +5,7 @@
   let draftQueue = [];
   let selectedDraftId = null;
   let structuredContent = null;
+  let showChannelAPassages = false;
   let showChannelBPassages = false;
 
   function apiBase() {
@@ -257,46 +258,71 @@
     }
   }
 
-  function updateChannelBToggle(channelBCount) {
-    const btn = document.getElementById("admin-reading-toggle-channel-b");
-    const countEl = document.getElementById("admin-reading-channel-b-count");
-    if (btn) {
-      btn.textContent = t(
+  function passageChannel(p) {
+    return String(p.sourceChannel || "").toUpperCase();
+  }
+
+  function updatePassageToggles(channelACount, channelBCount) {
+    const btnA = document.getElementById("admin-reading-toggle-channel-a");
+    const btnB = document.getElementById("admin-reading-toggle-channel-b");
+    const hintEl = document.getElementById("admin-reading-passage-hidden-hint");
+    if (btnA) {
+      btnA.textContent = t(
+        showChannelAPassages ? "admin_reading_hide_channel_a" : "admin_reading_show_channel_a",
+      );
+      btnA.setAttribute("aria-expanded", showChannelAPassages ? "true" : "false");
+    }
+    if (btnB) {
+      btnB.textContent = t(
         showChannelBPassages ? "admin_reading_hide_channel_b" : "admin_reading_show_channel_b",
       );
-      btn.setAttribute(
-        "aria-expanded",
-        showChannelBPassages ? "true" : "false",
-      );
+      btnB.setAttribute("aria-expanded", showChannelBPassages ? "true" : "false");
     }
-    if (countEl) {
+    if (hintEl) {
+      const parts = [];
+      if (!showChannelAPassages && channelACount > 0) {
+        parts.push(t("admin_reading_channel_a_hidden", { n: String(channelACount) }));
+      }
       if (!showChannelBPassages && channelBCount > 0) {
-        countEl.textContent = t("admin_reading_channel_b_hidden", { n: String(channelBCount) });
-        countEl.classList.remove("hidden");
+        parts.push(t("admin_reading_channel_b_hidden", { n: String(channelBCount) }));
+      }
+      if (parts.length) {
+        hintEl.textContent = parts.join(" · ");
+        hintEl.classList.remove("hidden");
       } else {
-        countEl.textContent = "";
-        countEl.classList.add("hidden");
+        hintEl.textContent = "";
+        hintEl.classList.add("hidden");
       }
     }
   }
 
   async function loadPassages(tbody, emptyEl) {
     if (!tbody) return;
+    const tableWrap = document.getElementById("admin-reading-table-wrap");
     try {
       const data = await apiFetch("/api/admin/self-study/reading/passages");
       const list = data.passages || [];
-      const channelBCount = list.filter(
-        (p) => String(p.sourceChannel || "").toUpperCase() === "B",
-      ).length;
-      const visible = showChannelBPassages
-        ? list
-        : list.filter((p) => String(p.sourceChannel || "").toUpperCase() !== "B");
+      const channelACount = list.filter((p) => passageChannel(p) === "A").length;
+      const channelBCount = list.filter((p) => passageChannel(p) === "B").length;
+      const visible = list.filter((p) => {
+        const ch = passageChannel(p);
+        if (ch === "A") return showChannelAPassages;
+        if (ch === "B") return showChannelBPassages;
+        return showChannelAPassages || showChannelBPassages;
+      });
       tbody.innerHTML = "";
-      updateChannelBToggle(channelBCount);
-      if (!visible.length) {
+      updatePassageToggles(channelACount, channelBCount);
+      if (!list.length) {
+        if (tableWrap) tableWrap.classList.add("hidden");
         if (emptyEl) emptyEl.classList.remove("hidden");
         return;
       }
+      if (!visible.length) {
+        if (tableWrap) tableWrap.classList.add("hidden");
+        if (emptyEl) emptyEl.classList.add("hidden");
+        return;
+      }
+      if (tableWrap) tableWrap.classList.remove("hidden");
       if (emptyEl) emptyEl.classList.add("hidden");
       visible.forEach((p) => {
         const tr = document.createElement("tr");
@@ -309,11 +335,16 @@
         tbody.appendChild(tr);
       });
     } catch (_) {
+      if (tableWrap) tableWrap.classList.add("hidden");
       if (emptyEl) emptyEl.classList.remove("hidden");
     }
   }
 
-  function bindChannelBToggle(tbody, emptyEl) {
+  function bindPassageToggles(tbody, emptyEl) {
+    document.getElementById("admin-reading-toggle-channel-a")?.addEventListener("click", () => {
+      showChannelAPassages = !showChannelAPassages;
+      void loadPassages(tbody, emptyEl);
+    });
     document.getElementById("admin-reading-toggle-channel-b")?.addEventListener("click", () => {
       showChannelBPassages = !showChannelBPassages;
       void loadPassages(tbody, emptyEl);
@@ -466,7 +497,7 @@
     const emptyEl = document.getElementById("admin-reading-empty");
     bindPush(statusEl);
     bindExport();
-    bindChannelBToggle(tbody, emptyEl);
+    bindPassageToggles(tbody, emptyEl);
     bindUpload(statusEl, tbody, emptyEl);
     void loadPassages(tbody, emptyEl);
   }

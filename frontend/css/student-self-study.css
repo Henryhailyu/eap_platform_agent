@@ -2746,7 +2746,7 @@
   color: #6e6e73;
 }
 
-.admin-reading-channel-b-toggle {
+.admin-reading-passage-toggles {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2754,7 +2754,8 @@
   margin-bottom: 0.75rem;
 }
 
-.admin-reading-channel-b-toggle .admin-panel__hint {
+.admin-reading-passage-toggles .admin-panel__hint {
+  flex: 1 1 100%;
   margin: 0;
 }
 

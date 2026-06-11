@@ -292,11 +292,12 @@
               Channel A: push school passages in queue order (1/day). Channel B: AI passages from the library.
             </p>
             <p id="admin-reading-status" class="form-message hidden" role="status" aria-live="polite"></p>
-            <div class="admin-reading-channel-b-toggle">
+            <div class="admin-reading-passage-toggles">
+              <button type="button" class="btn-secondary" id="admin-reading-toggle-channel-a" data-i18n="admin_reading_show_channel_a">Show Channel A queue</button>
               <button type="button" class="btn-secondary" id="admin-reading-toggle-channel-b" data-i18n="admin_reading_show_channel_b">Show Channel B library</button>
-              <span id="admin-reading-channel-b-count" class="admin-panel__hint hidden" aria-live="polite"></span>
+              <p id="admin-reading-passage-hidden-hint" class="admin-panel__hint hidden" aria-live="polite"></p>
             </div>
-            <div class="admin-table-wrap">
+            <div class="admin-table-wrap hidden" id="admin-reading-table-wrap">
               <table class="admin-table">
                 <thead>
                   <tr>
@@ -604,7 +605,7 @@
     <script src="app.js"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-vocabulary.js?v=20260611-v1"></script>
-    <script src="js/admin-self-study-reading.js?v=20260611-r6b"></script>
+    <script src="js/admin-self-study-reading.js?v=20260611-r6c"></script>
     <script src="js/admin-self-study-ai-prompts.js"></script>
     <script src="js/teacher-teaching-pages-api.js"></script>
     <script src="js/admin-teaching-page-templates.js"></script>
