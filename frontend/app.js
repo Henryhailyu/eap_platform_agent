@@ -2471,10 +2471,13 @@ function academicCalendarFingerprint(payload) {
   ].join("|");
 }
 
-function notifyAcademicCalendarUpdated() {
+function notifyAcademicCalendarUpdated(payload) {
   try {
     if (typeof BroadcastChannel !== "undefined") {
-      new BroadcastChannel(ACADEMIC_CALENDAR_BC).postMessage({ type: "updated" });
+      new BroadcastChannel(ACADEMIC_CALENDAR_BC).postMessage({
+        type: "updated",
+        payload: payload && typeof payload === "object" ? payload : null,
+      });
     }
   } catch {
     /* ignore */
@@ -2526,23 +2529,34 @@ function startAcademicCalendarLiveSync(getRepaintFn) {
   if (window.__eapAcademicCalendarLiveSync) return;
   window.__eapAcademicCalendarLiveSync = true;
 
-  const pullAndRepaint = async () => {
-    const changed = await syncAcademicCalendarFromServer();
-    if (changed) {
-      const repaint = typeof getRepaintFn === "function" ? getRepaintFn() : null;
-      if (repaint) await repaint();
-    }
+  const repaintIfLoaded = async () => {
+    const repaint = typeof getRepaintFn === "function" ? getRepaintFn() : null;
+    if (repaint) await repaint();
+  };
+
+  const pullAndRepaint = async (options = {}) => {
+    const changed = await syncAcademicCalendarFromServer(options);
+    if (changed) await repaintIfLoaded();
   };
 
   setInterval(() => void pullAndRepaint(), ACADEMIC_CALENDAR_SYNC_MS);
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void pullAndRepaint();
+    if (document.visibilityState === "visible") void pullAndRepaint({ force: true });
   });
   try {
     if (typeof BroadcastChannel !== "undefined") {
       const ch = new BroadcastChannel(ACADEMIC_CALENDAR_BC);
       ch.onmessage = (ev) => {
-        if (ev && ev.data && ev.data.type === "updated") void pullAndRepaint();
+        if (!ev || !ev.data || ev.data.type !== "updated") return;
+        const payload = ev.data.payload;
+        if (payload && typeof payload === "object") {
+          applyAcademicCalendarPayload(payload);
+          academicCalendarSyncFingerprint = academicCalendarFingerprint(payload);
+          academicCalendarFetchedAt = Date.now();
+          void repaintIfLoaded();
+          return;
+        }
+        void pullAndRepaint({ force: true });
       };
     }
   } catch {
@@ -4191,6 +4205,19 @@ function initAdminPage() {
       }
     }
 
+    function applyAdminCalendarFormToGlobals() {
+      applyAcademicCalendarPayload(academicCalendarPayloadFromAdminForm());
+    }
+
+    function flashAdminCalendarPreview() {
+      const wrap = document.getElementById("admin-calendar-preview-wrap");
+      if (!wrap) return;
+      wrap.classList.remove("admin-calendar-preview--updated");
+      void wrap.offsetWidth;
+      wrap.classList.add("admin-calendar-preview--updated");
+      window.setTimeout(() => wrap.classList.remove("admin-calendar-preview--updated"), 1200);
+    }
+
     function paintAdminCalendarPreview() {
       const mount = document.getElementById("admin-calendar-preview-root");
       const wrap = document.getElementById("admin-calendar-preview-wrap");
@@ -4198,8 +4225,9 @@ function initAdminPage() {
         wrap?.classList.add("hidden");
         return;
       }
-      applyAcademicCalendarPayload(academicCalendarPayloadFromAdminForm());
+      applyAdminCalendarFormToGlobals();
       wrap.classList.remove("hidden");
+      mount.replaceChildren();
       renderMonthlyCalendarInto(mount, {
         year: adminCalendarPreviewState.viewYear,
         monthIndex: adminCalendarPreviewState.viewMonth,
@@ -4254,12 +4282,15 @@ function initAdminPage() {
     }
 
     if (calStartEl) {
-      calStartEl.addEventListener("change", () => {
+      const onSemesterStartEdited = () => {
         syncAdminPreviewMonthFromStart();
         scheduleAdminCalendarPreview();
-      });
+      };
+      calStartEl.addEventListener("input", onSemesterStartEdited);
+      calStartEl.addEventListener("change", onSemesterStartEdited);
     }
     calWeeksEl?.addEventListener("input", scheduleAdminCalendarPreview);
+    calWeeksEl?.addEventListener("change", scheduleAdminCalendarPreview);
     calNotesEl?.addEventListener("input", scheduleAdminCalendarPreview);
 
     if (calSaveBtn) {
@@ -4275,10 +4306,13 @@ function initAdminPage() {
           applyAcademicCalendarPayload(saved);
           academicCalendarSyncFingerprint = academicCalendarFingerprint(saved);
           academicCalendarFetchedAt = Date.now();
-          notifyAcademicCalendarUpdated();
+          if (saved.semester_start_date) calStartEl.value = saved.semester_start_date;
+          if (saved.teaching_weeks != null) calWeeksEl.value = String(saved.teaching_weeks);
           calNotesEl.value = formatNotableDatesForTextarea(saved.notable_dates);
           syncAdminPreviewMonthFromStart();
           paintAdminCalendarPreview();
+          flashAdminCalendarPreview();
+          notifyAcademicCalendarUpdated(saved);
           setAdminPageMessage(statusEl, t("admin_cal_saved"), false);
         } catch (err) {
           setAdminPageMessage(errorEl, err.message, true);

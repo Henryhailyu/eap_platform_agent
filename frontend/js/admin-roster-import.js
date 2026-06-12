@@ -19,11 +19,58 @@
 
   function setMsg(el, text, isError) {
     if (!el) return;
+    el.innerHTML = "";
     el.textContent = text || "";
     el.classList.toggle("hidden", !text);
     el.classList.toggle("form-message--error", Boolean(isError && text));
-    el.classList.remove("form-message--success");
+    el.classList.remove("form-message--success", "form-message--warning");
     if (text && !isError) el.classList.add("form-message--success");
+  }
+
+  function setImportStatus(el, summary, errors, hasPartialSuccess) {
+    if (!el) return;
+    el.textContent = "";
+    el.classList.remove("form-message--success", "form-message--error", "form-message--warning");
+    if (!summary && (!errors || !errors.length)) {
+      el.classList.add("hidden");
+      el.innerHTML = "";
+      return;
+    }
+    el.classList.remove("hidden");
+    const wrap = document.createElement("div");
+    wrap.className = "admin-roster-import-status";
+    if (summary) {
+      const p = document.createElement("p");
+      p.className = "admin-roster-import-status__summary";
+      p.textContent = summary;
+      wrap.appendChild(p);
+    }
+    if (Array.isArray(errors) && errors.length) {
+      const title = document.createElement("p");
+      title.className = "admin-roster-import-status__errors-title";
+      title.textContent = t("admin_roster_import_errors_title", { n: errors.length });
+      wrap.appendChild(title);
+      const list = document.createElement("ul");
+      list.className = "admin-roster-import-status__errors";
+      errors.forEach((err) => {
+        const li = document.createElement("li");
+        li.textContent = String(err);
+        list.appendChild(li);
+      });
+      wrap.appendChild(list);
+    }
+    el.appendChild(wrap);
+    if (errors && errors.length) {
+      el.classList.add(hasPartialSuccess ? "form-message--warning" : "form-message--error");
+    } else {
+      el.classList.add("form-message--success");
+    }
+  }
+
+  function applyFixedClassToPeople(people, classCode) {
+    const code = classCode ? String(classCode).trim().toUpperCase() : "";
+    if (!code || !Array.isArray(people)) return people;
+    return people.map((row) => ({ ...row, class_codes: [code] }));
   }
 
   function idField(role) {
@@ -195,21 +242,24 @@
     if (confirmBtn) confirmBtn.disabled = true;
     try {
       const pwdEl = document.getElementById(passwordId);
-      const out = await global.apiPost("/api/admin/roster/confirm", {
+      const fixedClass = opts.getFixedClass ? opts.getFixedClass() : null;
+      const peoplePayload = fixedClass ? applyFixedClassToPeople(selected, fixedClass) : selected;
+      const body = {
         role,
-        people: selected,
+        people: peoplePayload,
         default_password: pwdEl && pwdEl.value ? pwdEl.value : "123456",
-      });
+      };
+      if (fixedClass) body.fixed_class_code = fixedClass;
+      const out = await global.apiPost("/api/admin/roster/confirm", body);
       const r = out.result || {};
-      let msg = t("admin_roster_import_done", {
+      const summary = t("admin_roster_import_done", {
         created: r.created || 0,
         updated: r.updated || 0,
         skipped: r.skipped || 0,
       });
-      if (Array.isArray(r.errors) && r.errors.length) {
-        msg += ` ${r.errors.join("; ")}`;
-      }
-      setMsg(statusEl, msg, false);
+      const errors = Array.isArray(r.errors) ? r.errors : [];
+      const hasPartialSuccess = (r.created || 0) + (r.updated || 0) > 0;
+      setImportStatus(statusEl, summary, errors, hasPartialSuccess);
       if (fileEl) fileEl.value = "";
       previewEl._eapRosterCache = null;
       previewEl.classList.add("hidden");
@@ -244,7 +294,13 @@
 
     previewEl?.addEventListener("click", (ev) => {
       const btn = ev.target.closest(`#${previewOpts.confirmId}`);
-      if (btn) void confirmImport(role, previewEl, fileEl, statusEl, { ...previewOpts, onImportSuccess: opts.onImportSuccess });
+      if (btn) {
+        void confirmImport(role, previewEl, fileEl, statusEl, {
+          ...previewOpts,
+          onImportSuccess: opts.onImportSuccess,
+          getFixedClass: opts.getFixedClass,
+        });
+      }
     });
 
     form.addEventListener("submit", async (ev) => {
@@ -273,6 +329,7 @@
         fd.append("use_ai", "1");
         const defaultClass = fixedClass || (classEl && classEl.value.trim()) || "";
         if (defaultClass) fd.append("default_class", defaultClass);
+        if (opts.scopeClass && defaultClass) fd.append("scope_class", "1");
         const base = global.EAP_API_BASE_RESOLVED || "";
         const res = await global.eapPostMultipart(`${base}/api/admin/roster/parse`, fd);
         let data = {};
@@ -282,6 +339,9 @@
           data = {};
         }
         if (!res.ok) throw new Error(data.error || t("admin_roster_parse_failed"));
+        if (fixedClass && Array.isArray(data.people)) {
+          data.people = applyFixedClassToPeople(data.people, fixedClass);
+        }
         previewEl._eapRosterCache = data;
         renderPreview(previewEl, role, data, previewOpts);
         setMsg(statusEl, t("admin_roster_parse_ok", { n: (data.people || []).length }), false);
@@ -309,6 +369,7 @@
       passwordId: "admin-class-roster-password-teacher",
       checkAllId: "admin-class-roster-check-all-teacher",
       hideClass: true,
+      scopeClass: true,
       requireClass: true,
       getFixedClass: () => classRosterContext.classCode,
       onImportSuccess: onSuccess,
@@ -322,6 +383,7 @@
       passwordId: "admin-class-roster-password-student",
       checkAllId: "admin-class-roster-check-all-student",
       hideClass: true,
+      scopeClass: true,
       requireClass: true,
       getFixedClass: () => classRosterContext.classCode,
       onImportSuccess: onSuccess,

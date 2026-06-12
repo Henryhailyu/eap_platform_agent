@@ -86,6 +86,7 @@ window.EAP_STRINGS_ZH = {
   "admin_roster_none_selected": "请至少选择一行导入。",
   "admin_roster_importing": "正在导入…",
   "admin_roster_import_done": "完成 — 新建 {created}，更新 {updated}，跳过 {skipped}。",
+  "admin_roster_import_errors_title": "导入时有 {n} 个问题：",
   "admin_roster_import_failed": "导入失败。",
   "admin_students_hint": "名册信息由班级页推送。选择模块与小组，或按姓名、学号、邮箱、手机号搜索。",
   "admin_students_search_label": "搜索学生",

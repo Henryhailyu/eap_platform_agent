@@ -2,6 +2,11 @@
   margin-top: 1.75rem;
   padding-top: 1.25rem;
   border-top: 1px solid rgba(10, 126, 164, 0.12);
+  transition: box-shadow 0.35s ease;
+}
+
+.admin-calendar-preview--updated {
+  box-shadow: 0 0 0 2px rgba(10, 126, 164, 0.35);
 }
 
 .admin-calendar-preview .eap-calendar-root {
@@ -263,6 +268,31 @@ body.admin-module-active .content-section.admin-panel {
 
 .admin-roster-preview {
   margin-top: 1rem;
+}
+
+.form-message--warning {
+  color: #8a5a00;
+  background: rgba(255, 193, 7, 0.12);
+}
+
+.admin-roster-import-status__summary {
+  margin: 0 0 0.35rem;
+}
+
+.admin-roster-import-status__errors-title {
+  margin: 0.5rem 0 0.25rem;
+  font-weight: 600;
+}
+
+.admin-roster-import-status__errors {
+  margin: 0;
+  padding-left: 1.25rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.admin-roster-import-status__errors li + li {
+  margin-top: 0.2rem;
 }
 
 .admin-roster-warnings {

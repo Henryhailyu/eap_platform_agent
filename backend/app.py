@@ -1047,8 +1047,6 @@ def academic_calendar_payload(conn):
         "SELECT date, label FROM academic_calendar_notes ORDER BY date ASC"
     ).fetchall()
     notable_dates = {str(r["date"]): str(r["label"]) for r in note_rows}
-    if not notable_dates:
-        notable_dates = dict(defaults["notable_dates"])
 
     return {
         "semester_start_date": semester_start,

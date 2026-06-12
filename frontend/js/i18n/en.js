@@ -86,6 +86,7 @@ window.EAP_STRINGS_EN = {
   "admin_roster_none_selected": "Select at least one row to import.",
   "admin_roster_importing": "Importing…",
   "admin_roster_import_done": "Done — {created} created, {updated} updated, {skipped} skipped.",
+  "admin_roster_import_errors_title": "{n} issue(s) during import:",
   "admin_roster_import_failed": "Import failed.",
   "admin_students_hint": "Roster details are pushed from Classes. Pick a module and group, or search by name, student ID, email, or mobile.",
   "admin_students_search_label": "Search students",

@@ -35,7 +35,13 @@ def _slug_username(base: str, fallback: str) -> str:
     return fallback[:40]
 
 
-def _parse_roster_ai(text: str, role: str) -> dict[str, Any]:
+def _parse_roster_ai(
+    text: str,
+    role: str,
+    *,
+    default_class: str | None = None,
+    scope_class: bool = False,
+) -> dict[str, Any]:
     from eap_ai import ai_is_configured, create_chat_completion, format_ai_error, get_openai_client, parse_ai_json_object
 
     if not ai_is_configured():
@@ -74,6 +80,12 @@ def _parse_roster_ai(text: str, role: str) -> dict[str, Any]:
         "for teachers authorized is true only when the document clearly says approved/active. "
         "Use empty strings for unknown fields, not null."
     )
+    if scope_class and default_class:
+        system += (
+            f" This upload is scoped to class {default_class} only — "
+            f"set class_codes to [\"{default_class}\"] for every person and ignore any class/module "
+            "column in the document."
+        )
     user = f"Role: {role}\n\nDocument text:\n{text}"
 
     client, profile = get_openai_client(None)
@@ -218,7 +230,13 @@ def _parse_roster_rule_based(text: str, role: str) -> dict[str, Any]:
     return {"people": people, "warnings": warnings, "ai_used": False}
 
 
-def _normalize_people(raw_people: list, role: str, default_class: str | None) -> tuple[list[dict], list[str]]:
+def _normalize_people(
+    raw_people: list,
+    role: str,
+    default_class: str | None,
+    *,
+    force_class_code: str | None = None,
+) -> tuple[list[dict], list[str]]:
     id_key = "employee_id" if role == "teacher" else "student_id"
     out: list[dict] = []
     warnings: list[str] = []
@@ -236,9 +254,19 @@ def _normalize_people(raw_people: list, role: str, default_class: str | None) ->
         class_codes = row.get("class_codes")
         if not isinstance(class_codes, list):
             class_codes = []
-        codes = [_normalize_class_code(c) for c in class_codes if _normalize_class_code(c)]
-        if not codes and default_class:
-            codes = [_normalize_class_code(default_class)]
+        parsed_codes = [_normalize_class_code(c) for c in class_codes if _normalize_class_code(c)]
+        forced = _normalize_class_code(force_class_code) if force_class_code else ""
+        if forced:
+            if parsed_codes and parsed_codes != [forced]:
+                warnings.append(
+                    f"{full_name or ext_id or f'Row {i + 1}'}: class set to {forced} "
+                    f"(document had {', '.join(parsed_codes)})"
+                )
+            codes = [forced]
+        else:
+            codes = parsed_codes
+            if not codes and default_class:
+                codes = [_normalize_class_code(default_class)]
 
         username = str(row.get("username") or "").strip().lower()
         if not username:
@@ -478,6 +506,12 @@ def register_admin_roster_routes(
             return jsonify({"error": "role must be teacher or student"}), 400
 
         default_class = _normalize_class_code(request.form.get("default_class") or "") or None
+        scope_class = str(request.form.get("scope_class") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        force_class_code = default_class if scope_class and default_class else None
         use_ai = str(request.form.get("use_ai") or "1").strip() not in ("0", "false", "no")
 
         upload = request.files.get("file")
@@ -515,7 +549,12 @@ def register_admin_roster_routes(
 
         if use_ai:
             try:
-                parsed = _parse_roster_ai(text, role)
+                parsed = _parse_roster_ai(
+                    text,
+                    role,
+                    default_class=default_class,
+                    scope_class=scope_class,
+                )
                 raw_people = parsed.get("people") or []
                 warnings.extend(parsed.get("warnings") or [])
                 ai_used = True
@@ -529,7 +568,12 @@ def register_admin_roster_routes(
             raw_people = parsed.get("people") or []
             warnings.extend(parsed.get("warnings") or [])
 
-        people, norm_warnings = _normalize_people(raw_people, role, default_class)
+        people, norm_warnings = _normalize_people(
+            raw_people,
+            role,
+            default_class,
+            force_class_code=force_class_code,
+        )
         warnings.extend(norm_warnings)
         conn.close()
 
@@ -568,6 +612,12 @@ def register_admin_roster_routes(
         if len(default_password) < 6:
             conn.close()
             return jsonify({"error": "default_password must be at least 6 characters"}), 400
+
+        fixed_class_code = _normalize_class_code(body.get("fixed_class_code") or "") or None
+        if fixed_class_code:
+            for row in rows:
+                if isinstance(row, dict):
+                    row["class_codes"] = [fixed_class_code]
 
         try:
             result = _import_people(
