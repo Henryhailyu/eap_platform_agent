@@ -65,7 +65,8 @@ def _parse_roster_ai(
         )
         field_rules = (
             "student_id = official student ID number; "
-            "group_code = teaching group number within the module (e.g. 12 or G12); "
+            "group_code = teaching group within the class (e.g. G1, G12, 12, EAP039); "
+            "always fill group_code when the document has a group/小组/组别/教学班/group number column; "
             "email = official school email address; "
             "mobile_phone = registered phone number; "
         )
@@ -82,9 +83,11 @@ def _parse_roster_ai(
     )
     if scope_class and default_class:
         system += (
-            f" This upload is scoped to class {default_class} only — "
-            f"set class_codes to [\"{default_class}\"] for every person and ignore any class/module "
-            "column in the document."
+            f" This upload enrolls every row in class {default_class} — "
+            f"set class_codes to [\"{default_class}\"] for every person. "
+            "Still read group_code from group/小组/组别/教学班/group-number columns. "
+            "If the document lists a cohort or module code (e.g. EAP039) separate from the "
+            f"enrollment class, put that value in group_code, not class_codes."
         )
     user = f"Role: {role}\n\nDocument text:\n{text}"
 
@@ -124,7 +127,9 @@ def _header_map(headers: list[str]) -> dict[str, int]:
             mapping["student_id"] = i
         elif any(x in key for x in ("工号", "employee", "staff", "职工")):
             mapping["employee_id"] = i
-        elif any(x in key for x in ("班级", "class", "module", "eap")):
+        elif any(x in key for x in ("组", "group", "小组", "教学班", "组别", "section", "cohort", "stream", "tutorial")):
+            mapping["group_code"] = i
+        elif any(x in key for x in ("班级", "class", "module", "eap")) and "group" not in key:
             mapping["class"] = i
         elif "username" in key or "账号" in key or "登录" in key:
             mapping["username"] = i
@@ -138,8 +143,6 @@ def _header_map(headers: list[str]) -> dict[str, int]:
             mapping["mobile_phone"] = i
         elif any(x in key for x in ("学校邮箱", "school email", "official email")):
             mapping["email"] = i
-        elif any(x in key for x in ("组", "group", "小组", "教学班")):
-            mapping["group_code"] = i
     return mapping
 
 
@@ -222,12 +225,95 @@ def _parse_roster_rule_based(text: str, role: str) -> dict[str, Any]:
             if role == "teacher":
                 entry["authorized"] = False
             if len(parts) > 2 and parts[2].strip():
-                entry["class_codes"] = [_normalize_class_code(parts[2].strip())]
+                extra = parts[2].strip()
+                if role == "student":
+                    entry["group_code"] = extra
+                else:
+                    entry["class_codes"] = [_normalize_class_code(extra)]
+            if role == "student" and len(parts) > 3 and parts[3].strip():
+                entry.setdefault("email", parts[3].strip())
             people.append(entry)
 
     if not people:
         warnings.append("No rows detected — try AI parse or check column headers (姓名, 学号/工号, 班级).")
     return {"people": people, "warnings": warnings, "ai_used": False}
+
+
+_GROUP_FIELD_ALIASES = (
+    "group_code",
+    "group",
+    "group_number",
+    "group_no",
+    "group_num",
+    "section",
+    "tutorial",
+    "tutorial_group",
+    "cohort",
+    "stream",
+    "小组",
+    "组别",
+    "教学班",
+)
+
+
+def _extract_group_code_from_row(row: dict, forced_class: str | None = None) -> str:
+    """Pull teaching group from AI/rule rows, including alternate key names."""
+    for key in _GROUP_FIELD_ALIASES:
+        val = str(row.get(key) or "").strip()
+        if val:
+            return val
+    for key, val in row.items():
+        if val is None:
+            continue
+        key_l = str(key).lower().replace(" ", "_")
+        if any(token in key_l for token in ("group", "小组", "组别", "教学班", "section", "cohort")):
+            text = str(val).strip()
+            if text:
+                return text
+    forced = _normalize_class_code(forced_class) if forced_class else ""
+    class_codes = row.get("class_codes")
+    if isinstance(class_codes, list):
+        for code in class_codes:
+            normalized = _normalize_class_code(code)
+            if normalized and normalized != forced:
+                return normalized
+    for key in ("class", "module", "班级", "class_name", "module_code"):
+        normalized = _normalize_class_code(str(row.get(key) or "").strip())
+        if normalized and normalized != forced:
+            return normalized
+    return ""
+
+
+def _merge_rule_based_groups(raw_people: list, text: str, role: str) -> list:
+    """Fill missing group_code on AI rows from table-rule extraction."""
+    if role != "student" or not raw_people:
+        return raw_people
+    rb_people = (_parse_roster_rule_based(text, role).get("people") or [])
+    if not rb_people:
+        return raw_people
+    by_id: dict[str, dict] = {}
+    by_name: dict[str, dict] = {}
+    for row in rb_people:
+        sid = str(row.get("student_id") or "").strip()
+        name = str(row.get("full_name") or "").strip().lower()
+        if sid:
+            by_id[sid] = row
+        if name:
+            by_name[name] = row
+    for row in raw_people:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("group_code") or "").strip():
+            continue
+        sid = str(row.get("student_id") or "").strip()
+        name = str(row.get("full_name") or "").strip().lower()
+        src = by_id.get(sid) or by_name.get(name)
+        if not src:
+            continue
+        gc = _extract_group_code_from_row(src)
+        if gc:
+            row["group_code"] = gc
+    return raw_people
 
 
 def _normalize_people(
@@ -257,11 +343,6 @@ def _normalize_people(
         parsed_codes = [_normalize_class_code(c) for c in class_codes if _normalize_class_code(c)]
         forced = _normalize_class_code(force_class_code) if force_class_code else ""
         if forced:
-            if parsed_codes and parsed_codes != [forced]:
-                warnings.append(
-                    f"{full_name or ext_id or f'Row {i + 1}'}: class set to {forced} "
-                    f"(document had {', '.join(parsed_codes)})"
-                )
             codes = [forced]
         else:
             codes = parsed_codes
@@ -287,9 +368,9 @@ def _normalize_people(
         if role == "teacher":
             entry["authorized"] = bool(row.get("authorized"))
         if role == "student":
-            gc = str(row.get("group_code") or "").strip()
+            gc = _extract_group_code_from_row(row, forced or default_class)
             if gc:
-                entry["group_code"] = gc
+                entry["group_code"] = _normalize_group_code(gc)
         for field in ("email", "office_number", "office_phone", "mobile_phone"):
             val = str(row.get(field) or "").strip()
             if val:
@@ -556,6 +637,8 @@ def register_admin_roster_routes(
                     scope_class=scope_class,
                 )
                 raw_people = parsed.get("people") or []
+                if role == "student":
+                    raw_people = _merge_rule_based_groups(raw_people, text, role)
                 warnings.extend(parsed.get("warnings") or [])
                 ai_used = True
             except Exception as exc:
@@ -575,6 +658,20 @@ def register_admin_roster_routes(
             force_class_code=force_class_code,
         )
         warnings.extend(norm_warnings)
+        if scope_class and role == "student" and default_class:
+            warnings.insert(
+                0,
+                f"All students are enrolled in class {default_class}. "
+                "Group numbers from the file are kept when detected.",
+            )
+            missing_group = sum(
+                1 for p in people if not str(p.get("group_code") or "").strip()
+            )
+            if missing_group:
+                warnings.append(
+                    f"{missing_group} row(s) have no group number — "
+                    "check the file has a Group/小组/组别 column or edit before push."
+                )
         conn.close()
 
         return jsonify(

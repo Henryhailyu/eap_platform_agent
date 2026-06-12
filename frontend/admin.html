@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-cal-roster" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-bulk-roster" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -191,6 +191,12 @@
               <div class="admin-class-detail__grid">
                 <div>
                   <h4 data-i18n="admin_class_teachers">Teachers in class</h4>
+                  <div id="admin-class-teachers-bulk-bar" class="admin-bulk-bar admin-bulk-bar--compact hidden">
+                    <button type="button" id="admin-class-teachers-bulk-remove" class="btn-secondary btn-danger" data-i18n="admin_bulk_remove_from_class">
+                      Remove selected from class
+                    </button>
+                    <span id="admin-class-teachers-bulk-count" class="admin-bulk-bar__count"></span>
+                  </div>
                   <ul id="admin-class-teachers-list" class="admin-member-list"></ul>
                   <div class="admin-roster-upload admin-class-roster-upload">
                     <h5 class="admin-roster-upload__title" data-i18n="admin_class_roster_teachers">Upload teacher list</h5>
@@ -210,6 +216,12 @@
                 </div>
                 <div>
                   <h4 data-i18n="admin_class_students">Students in class</h4>
+                  <div id="admin-class-students-bulk-bar" class="admin-bulk-bar admin-bulk-bar--compact hidden">
+                    <button type="button" id="admin-class-students-bulk-remove" class="btn-secondary btn-danger" data-i18n="admin_bulk_remove_from_class">
+                      Remove selected from class
+                    </button>
+                    <span id="admin-class-students-bulk-count" class="admin-bulk-bar__count"></span>
+                  </div>
                   <ul id="admin-class-students-list" class="admin-member-list"></ul>
                   <div class="admin-roster-upload admin-class-roster-upload">
                     <h5 class="admin-roster-upload__title" data-i18n="admin_class_roster_students">Upload student list</h5>
@@ -249,10 +261,19 @@
                 placeholder="Search by name, staff ID, office number, or mobile"
               />
             </div>
+            <div id="admin-teachers-bulk-bar" class="admin-bulk-bar hidden">
+              <button type="button" id="admin-teachers-bulk-delete" class="btn-secondary btn-danger" data-i18n="admin_bulk_delete_selected">
+                Delete selected
+              </button>
+              <span id="admin-teachers-bulk-count" class="admin-bulk-bar__count"></span>
+            </div>
             <div class="admin-table-wrap admin-roster-sheet-wrap">
               <table class="admin-table admin-roster-sheet" id="admin-teachers-table">
                 <thead>
                   <tr>
+                    <th scope="col" class="admin-bulk-check-col">
+                      <input type="checkbox" id="admin-teachers-check-all" aria-label="Select all teachers" />
+                    </th>
                     <th scope="col" data-i18n="admin_col_name">Name</th>
                     <th scope="col" data-i18n="admin_col_employee_id">Staff ID</th>
                     <th scope="col" data-i18n="admin_col_office_number">Office</th>
@@ -597,10 +618,19 @@
               <p class="admin-roster-filters__label" data-i18n="admin_students_group_label">Group</p>
               <div id="admin-students-group-filters" class="admin-roster-filters__pills" role="group" aria-label="Group filter"></div>
             </div>
+            <div id="admin-students-bulk-bar" class="admin-bulk-bar hidden">
+              <button type="button" id="admin-students-bulk-delete" class="btn-secondary btn-danger" data-i18n="admin_bulk_delete_selected">
+                Delete selected
+              </button>
+              <span id="admin-students-bulk-count" class="admin-bulk-bar__count"></span>
+            </div>
             <div class="admin-table-wrap admin-roster-sheet-wrap">
               <table class="admin-table admin-roster-sheet" id="admin-students-table">
                 <thead>
                   <tr>
+                    <th scope="col" class="admin-bulk-check-col">
+                      <input type="checkbox" id="admin-students-check-all" aria-label="Select all students" />
+                    </th>
                     <th scope="col" data-i18n="admin_col_name">Name</th>
                     <th scope="col" data-i18n="admin_col_student_id">Student ID</th>
                     <th scope="col" data-i18n="admin_col_group">Group</th>
@@ -643,7 +673,7 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js?v=20260612-students-filter"></script>
+    <script src="app.js?v=20260612-bulk-roster"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-vocabulary.js?v=20260611-v1"></script>
     <script src="js/admin-self-study-reading.js?v=20260611-r6c"></script>
@@ -653,7 +683,7 @@
     <script src="js/eap-button-state.js"></script>
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
     <script src="js/admin-performance.js?v=20260612-students"></script>
-    <script src="js/admin-roster-import.js?v=20260612-cal-roster"></script>
+    <script src="js/admin-roster-import.js?v=20260612-bulk-roster"></script>
     <script src="js/admin-hub.js?v=20260612-hubguide"></script>
   </body>
 </html>

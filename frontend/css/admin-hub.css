@@ -328,6 +328,58 @@ body.admin-module-active .content-section.admin-panel {
   margin-top: 0.75rem;
 }
 
+.admin-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(10, 126, 164, 0.06);
+  border: 1px solid rgba(10, 126, 164, 0.12);
+}
+
+.admin-bulk-bar.hidden {
+  display: none;
+}
+
+.admin-bulk-bar--compact {
+  margin-top: 0.35rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.admin-bulk-bar__count {
+  font-size: 0.9rem;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.admin-bulk-check-col {
+  width: 2.25rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.admin-bulk-check-col input[type="checkbox"],
+.admin-member-list__check input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.admin-member-list__check {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 0.15rem;
+}
+
+.admin-member-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
 .admin-member-list__body {
   display: flex;
   flex-direction: column;

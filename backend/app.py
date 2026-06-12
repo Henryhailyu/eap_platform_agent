@@ -7245,6 +7245,160 @@ def admin_set_teacher_authorized(user_id):
     return jsonify(user_public_dict(updated))
 
 
+@app.route("/api/admin/teachers/bulk-delete", methods=["POST"])
+def admin_bulk_delete_teachers():
+    """Delete multiple teacher accounts (admin only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get("ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        conn.close()
+        return jsonify({"error": "ids array is required"}), 400
+
+    deleted = 0
+    errors: list[str] = []
+    seen: set[int] = set()
+    for raw_id in raw_ids:
+        try:
+            user_id = int(raw_id)
+        except (TypeError, ValueError):
+            errors.append(f"Invalid id: {raw_id}")
+            continue
+        if user_id in seen:
+            continue
+        seen.add(user_id)
+        row = conn.execute(
+            "SELECT id, username, role FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            errors.append(f"User {user_id} not found")
+            continue
+        if str(row["role"] or "").strip().lower() != "teacher":
+            errors.append(f"{row['username'] or user_id}: not a teacher")
+            continue
+        conn.execute("DELETE FROM teacher_classes WHERE teacher_id = ?", (user_id,))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        deleted += 1
+
+    conn.commit()
+    conn.close()
+    return jsonify({"deleted": deleted, "errors": errors})
+
+
+@app.route("/api/admin/students/bulk-delete", methods=["POST"])
+def admin_bulk_delete_students():
+    """Delete multiple student accounts (admin only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get("ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        conn.close()
+        return jsonify({"error": "ids array is required"}), 400
+
+    deleted = 0
+    errors: list[str] = []
+    seen: set[int] = set()
+    for raw_id in raw_ids:
+        try:
+            user_id = int(raw_id)
+        except (TypeError, ValueError):
+            errors.append(f"Invalid id: {raw_id}")
+            continue
+        if user_id in seen:
+            continue
+        seen.add(user_id)
+        row = conn.execute(
+            "SELECT id, username, role FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            errors.append(f"User {user_id} not found")
+            continue
+        if str(row["role"] or "").strip().lower() != "student":
+            errors.append(f"{row['username'] or user_id}: not a student")
+            continue
+        conn.execute("DELETE FROM class_enrollments WHERE student_id = ?", (user_id,))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        deleted += 1
+
+    conn.commit()
+    conn.close()
+    return jsonify({"deleted": deleted, "errors": errors})
+
+
+@app.route("/api/admin/classes/<int:class_id>/members/bulk-remove", methods=["POST"])
+def admin_class_bulk_remove_members(class_id):
+    """Remove multiple teachers or students from a class (unassign / unenroll)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    if conn.execute("SELECT id FROM classes WHERE id = ?", (class_id,)).fetchone() is None:
+        conn.close()
+        return jsonify({"error": "Class not found"}), 404
+
+    body = request.get_json(silent=True) or {}
+    role = str(body.get("role") or "").strip().lower()
+    if role not in ("teacher", "student"):
+        conn.close()
+        return jsonify({"error": "role must be teacher or student"}), 400
+
+    raw_ids = body.get("user_ids") or body.get("ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        conn.close()
+        return jsonify({"error": "user_ids array is required"}), 400
+
+    removed = 0
+    errors: list[str] = []
+    seen: set[int] = set()
+    for raw_id in raw_ids:
+        try:
+            user_id = int(raw_id)
+        except (TypeError, ValueError):
+            errors.append(f"Invalid id: {raw_id}")
+            continue
+        if user_id in seen:
+            continue
+        seen.add(user_id)
+        if role == "teacher":
+            cur = conn.execute(
+                "DELETE FROM teacher_classes WHERE class_id = ? AND teacher_id = ?",
+                (class_id, user_id),
+            )
+            if cur.rowcount < 1:
+                errors.append(f"Teacher {user_id} was not in this class")
+                continue
+        else:
+            cur = conn.execute(
+                "DELETE FROM class_enrollments WHERE class_id = ? AND student_id = ?",
+                (class_id, user_id),
+            )
+            if cur.rowcount < 1:
+                errors.append(f"Student {user_id} was not in this class")
+                continue
+        removed += 1
+
+    conn.commit()
+    payload = admin_class_detail_payload(conn, class_id)
+    conn.close()
+    if payload is None:
+        return jsonify({"error": "Class not found"}), 404
+    return jsonify({"class": payload, "removed": removed, "errors": errors})
+
+
 @app.route("/api/admin/teachers/<int:user_id>", methods=["DELETE"])
 def admin_delete_teacher(user_id):
     """Remove a teacher account and unlink all class assignments (admin only)."""

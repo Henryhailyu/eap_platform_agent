@@ -67,6 +67,18 @@
     }
   }
 
+  function dismissRosterPreview(previewEl, fileEl, statusEl) {
+    if (previewEl) {
+      previewEl._eapRosterCache = null;
+      previewEl.classList.add("hidden");
+      previewEl.innerHTML = "";
+    }
+    if (fileEl) fileEl.value = "";
+    if (statusEl) {
+      setMsg(statusEl, t("admin_roster_pushed_preview_cleared"), false);
+    }
+  }
+
   function applyFixedClassToPeople(people, classCode) {
     const code = classCode ? String(classCode).trim().toUpperCase() : "";
     if (!code || !Array.isArray(people)) return people;
@@ -259,11 +271,15 @@
       });
       const errors = Array.isArray(r.errors) ? r.errors : [];
       const hasPartialSuccess = (r.created || 0) + (r.updated || 0) > 0;
-      setImportStatus(statusEl, summary, errors, hasPartialSuccess);
-      if (fileEl) fileEl.value = "";
-      previewEl._eapRosterCache = null;
-      previewEl.classList.add("hidden");
-      previewEl.innerHTML = "";
+      const pushed = hasPartialSuccess || errors.length === 0;
+      if (pushed) {
+        dismissRosterPreview(previewEl, fileEl, statusEl);
+        if (errors.length) {
+          setImportStatus(statusEl, summary, errors, hasPartialSuccess);
+        }
+      } else {
+        setImportStatus(statusEl, summary, errors, false);
+      }
       if (typeof opts?.onImportSuccess === "function") {
         await opts.onImportSuccess();
       } else if (typeof global.__eapAdminLangRefresh === "function") {
