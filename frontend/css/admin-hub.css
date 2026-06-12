@@ -10,7 +10,6 @@
 
 /* Manager hub navigation */
 
-#admin-hub[hidden],
 #admin-ss-tabs[hidden],
 #admin-school-tabs[hidden] {
   display: none !important;
@@ -68,26 +67,65 @@
   margin-top: 0.25rem;
 }
 
-.admin-module-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
+body.admin-module-active .page-hero {
+  display: none;
 }
 
-.admin-hub-back {
-  flex-shrink: 0;
+body.admin-module-active #admin-hub-guide {
+  display: none !important;
 }
 
-.admin-hub-crumb {
+#admin-hub[hidden],
+#admin-hub-guide[hidden] {
+  display: none !important;
+}
+
+.admin-hub-guide {
+  margin-top: 0.5rem;
+  margin-bottom: 2rem;
+  padding: 1.35rem 1.5rem;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(10, 126, 164, 0.14);
+  border-radius: 14px;
+}
+
+.admin-hub-guide__title {
+  margin: 0 0 0.65rem;
   font-size: 1.05rem;
   font-weight: 600;
   color: #1d1d1f;
 }
 
-body.admin-module-active .page-hero {
-  display: none;
+.admin-hub-guide__intro {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #444;
+}
+
+.admin-hub-guide__steps {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: #444;
+}
+
+.admin-hub-guide__steps li {
+  margin-bottom: 0.5rem;
+}
+
+.admin-hub-guide__steps li:last-child {
+  margin-bottom: 0;
+}
+
+.admin-hub-guide__workflow {
+  margin: 0;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(10, 126, 164, 0.12);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #5c5c62;
 }
 
 /* Horizontal sub-tabs (school + self-study) */

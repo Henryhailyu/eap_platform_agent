@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-students" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-hubguide" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -33,14 +33,12 @@
           <div class="page-hero">
             <h1 data-i18n="admin_page_title">Manager centre</h1>
             <p data-i18n="admin_page_lead">
-              Authorize teachers, manage classes and rosters, and edit the school academic calendar.
+              Choose a module below. Each area opens in its own workspace.
             </p>
           </div>
 
           <p id="admin-page-error" class="form-message hidden" role="alert" aria-live="polite"></p>
           <p id="admin-page-status" class="form-message hidden" role="status" aria-live="polite"></p>
-
-          <nav id="admin-module-breadcrumb" class="admin-module-breadcrumb" hidden aria-label="Module navigation"></nav>
 
           <div id="admin-hub" class="admin-hub" role="navigation" aria-label="Manager modules">
             <button type="button" class="admin-hub-card" data-hub-module="school">
@@ -68,6 +66,24 @@
               <span class="admin-hub-card__meta" data-i18n="admin_hub_module_homework_meta">1 area</span>
             </button>
           </div>
+
+          <section id="admin-hub-guide" class="admin-hub-guide" aria-labelledby="admin-hub-guide-heading">
+            <h2 id="admin-hub-guide-heading" class="admin-hub-guide__title" data-i18n="admin_hub_guide_heading">
+              How to use the manager centre
+            </h2>
+            <p class="admin-hub-guide__intro" data-i18n="admin_hub_guide_intro">
+              Open a module card above. Use the tabs inside each module to move between areas. Click EAP Platform at the top left to return here.
+            </p>
+            <ol class="admin-hub-guide__steps">
+              <li data-i18n="admin_hub_guide_step_school">School &amp; accounts — Set the academic calendar, create classes, push rosters from Classes → Manage, authorize teachers, and review students by module and group.</li>
+              <li data-i18n="admin_hub_guide_step_self_study">Self-study centre — Upload vocabulary and reading materials and edit AI coach instructions students see in self-study.</li>
+              <li data-i18n="admin_hub_guide_step_teaching">Teaching &amp; lessons — Maintain AI templates teachers use when building HTML lesson pages.</li>
+              <li data-i18n="admin_hub_guide_step_homework">Homework AI — Configure marking profiles, descriptors, and class analytics for AI-assisted feedback.</li>
+            </ol>
+            <p class="admin-hub-guide__workflow" data-i18n="admin_hub_guide_workflow">
+              Suggested order for a new term: Calendar → Classes (rosters) → Teachers (authorize) → Students → Self-study push.
+            </p>
+          </section>
 
           <nav id="admin-school-tabs" class="admin-module-tabs" hidden aria-label="School sections">
             <button type="button" class="admin-module-tabs__btn" data-school-area="calendar" data-i18n="admin_school_tab_calendar">Calendar</button>
@@ -638,6 +654,6 @@
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
     <script src="js/admin-performance.js?v=20260612-students"></script>
     <script src="js/admin-roster-import.js?v=20260612-students"></script>
-    <script src="js/admin-hub.js?v=20260612-teachers"></script>
+    <script src="js/admin-hub.js?v=20260612-hubguide"></script>
   </body>
 </html>

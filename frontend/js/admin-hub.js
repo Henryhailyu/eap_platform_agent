@@ -5,19 +5,6 @@
   const MODULES = ["school", "self-study", "teaching", "homework"];
   const SKILLS = ["vocabulary", "reading", "ai"];
   const SCHOOL_AREAS = ["calendar", "classes", "teachers", "students"];
-  const MODULE_I18N = {
-    school: "admin_hub_module_school",
-    "self-study": "admin_hub_module_self_study",
-    teaching: "admin_hub_module_teaching",
-    homework: "admin_hub_module_homework",
-  };
-  const SCHOOL_AREA_I18N = {
-    calendar: "admin_school_tab_calendar",
-    classes: "admin_school_tab_classes",
-    teachers: "admin_school_tab_teachers",
-    students: "admin_school_tab_students",
-  };
-
   let pendingClassId = null;
 
   function t(key, params) {
@@ -76,13 +63,6 @@
     return Array.from(document.querySelectorAll("[data-admin-module]"));
   }
 
-  function escapeHtml(text) {
-    return String(text == null ? "" : text)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
   function syncTabButtons(container, attr, activeValue) {
     if (!container) return;
     container.querySelectorAll(`[${attr}]`).forEach((btn) => {
@@ -124,7 +104,7 @@
 
   function applyView(route) {
     const hub = document.getElementById("admin-hub");
-    const breadcrumb = document.getElementById("admin-module-breadcrumb");
+    const guide = document.getElementById("admin-hub-guide");
     const ssTabs = document.getElementById("admin-ss-tabs");
     const schoolTabs = document.getElementById("admin-school-tabs");
     const hero = document.querySelector(".page-hero");
@@ -132,7 +112,7 @@
     if (route.view === "hub") {
       document.body.classList.remove("admin-module-active");
       if (hub) hub.hidden = false;
-      if (breadcrumb) breadcrumb.hidden = true;
+      if (guide) guide.hidden = false;
       if (ssTabs) ssTabs.hidden = true;
       if (schoolTabs) schoolTabs.hidden = true;
       if (hero) hero.hidden = false;
@@ -144,27 +124,8 @@
 
     document.body.classList.add("admin-module-active");
     if (hub) hub.hidden = true;
-    if (breadcrumb) breadcrumb.hidden = false;
+    if (guide) guide.hidden = true;
     if (hero) hero.hidden = true;
-
-    const moduleLabel = t(MODULE_I18N[route.module] || route.module);
-    let crumbExtra = "";
-    if (route.module === "self-study") {
-      crumbExtra = ` › ${escapeHtml(t(`admin_hub_skill_${route.skill}`))}`;
-    } else if (route.module === "school") {
-      crumbExtra = ` › ${escapeHtml(t(SCHOOL_AREA_I18N[route.area] || route.area))}`;
-    }
-
-    if (breadcrumb) {
-      breadcrumb.innerHTML = `
-        <button type="button" class="btn-secondary admin-hub-back" id="admin-hub-back">${t("admin_hub_back")}</button>
-        <span class="admin-hub-crumb">${escapeHtml(moduleLabel)}${crumbExtra}</span>
-      `;
-      document.getElementById("admin-hub-back")?.addEventListener("click", () => {
-        setRoute(null);
-        applyView(parseRoute());
-      });
-    }
 
     if (ssTabs) {
       ssTabs.hidden = route.module !== "self-study";
@@ -201,6 +162,14 @@
   }
 
   function bindHub() {
+    document.querySelector(".site-logo")?.addEventListener("click", (ev) => {
+      if (document.body.getAttribute("data-page") !== "admin") return;
+      if (parseRoute().view === "hub") return;
+      ev.preventDefault();
+      setRoute(null);
+      applyView(parseRoute());
+    });
+
     document.querySelectorAll("[data-hub-module]").forEach((card) => {
       card.addEventListener("click", () => {
         const mod = card.getAttribute("data-hub-module");
