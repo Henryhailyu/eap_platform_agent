@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-teachers" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-students" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -560,35 +560,38 @@
               Students
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_students_hint">
-              Registered accounts. Open Performance under a student&apos;s name for homework and self-study progress. Delete removes them from all classes.
+              Roster details are pushed from Classes. Pick a module and group, or search by name, student ID, email, or mobile.
             </p>
-            <div class="admin-roster-upload">
-              <h3 class="admin-roster-upload__title" data-i18n="admin_roster_upload_students">Upload student roster</h3>
-              <p class="admin-panel__hint" data-i18n="admin_roster_upload_hint">
-                Word, Excel, PDF, or TXT — AI reads the layout and lists students for you to confirm.
-              </p>
-              <form id="admin-roster-form-student" class="admin-inline-form admin-roster-form" novalidate>
-                <div class="field">
-                  <label for="admin-roster-file-student" data-i18n="admin_roster_file">Roster file</label>
-                  <input id="admin-roster-file-student" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required />
-                </div>
-                <div class="field">
-                  <label for="admin-roster-class-student" data-i18n="admin_roster_default_class">Default class (optional)</label>
-                  <input id="admin-roster-class-student" type="text" placeholder="EAP047" maxlength="40" />
-                </div>
-                <button type="submit" class="btn-primary" data-i18n="admin_roster_parse_btn">Parse with AI</button>
-              </form>
-              <p id="admin-roster-status-student" class="form-message hidden" role="status" aria-live="polite"></p>
-              <div id="admin-roster-preview-student" class="admin-roster-preview hidden" aria-live="polite"></div>
+            <div class="admin-roster-search">
+              <label class="visually-hidden" for="admin-students-search" data-i18n="admin_students_search_label">Search students</label>
+              <input
+                id="admin-students-search"
+                type="search"
+                class="admin-roster-search__input"
+                autocomplete="off"
+                data-i18n-placeholder="admin_students_search_placeholder"
+                placeholder="Search by name, student ID, email, or mobile"
+              />
             </div>
-            <div class="admin-table-wrap">
-              <table class="admin-table" id="admin-students-table">
+            <div class="admin-roster-filters">
+              <p class="admin-roster-filters__label" data-i18n="admin_students_module_label">Module</p>
+              <div id="admin-students-module-filters" class="admin-roster-filters__pills" role="group" aria-label="Module filter"></div>
+            </div>
+            <div id="admin-students-group-filters-wrap" class="admin-roster-filters hidden">
+              <p class="admin-roster-filters__label" data-i18n="admin_students_group_label">Group</p>
+              <div id="admin-students-group-filters" class="admin-roster-filters__pills" role="group" aria-label="Group filter"></div>
+            </div>
+            <div class="admin-table-wrap admin-roster-sheet-wrap">
+              <table class="admin-table admin-roster-sheet" id="admin-students-table">
                 <thead>
                   <tr>
                     <th scope="col" data-i18n="admin_col_name">Name</th>
-                    <th scope="col" data-i18n="username">Username</th>
                     <th scope="col" data-i18n="admin_col_student_id">Student ID</th>
-                    <th scope="col" data-i18n="class_label">Class</th>
+                    <th scope="col" data-i18n="admin_col_group">Group</th>
+                    <th scope="col" data-i18n="admin_col_school_email">School email</th>
+                    <th scope="col" data-i18n="admin_col_registered_phone">Mobile</th>
+                    <th scope="col" data-i18n="username">Username</th>
+                    <th scope="col" data-i18n="class_label">Module</th>
                     <th scope="col" data-i18n="admin_col_action">Action</th>
                   </tr>
                 </thead>
@@ -597,6 +600,9 @@
             </div>
             <p id="admin-students-empty" class="admin-empty hidden" data-i18n="admin_no_students">
               No student accounts found.
+            </p>
+            <p id="admin-students-no-match" class="admin-empty hidden" data-i18n="admin_students_no_match">
+              No students match your filters.
             </p>
           </section>
 
@@ -621,7 +627,7 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js?v=20260612-teachers"></script>
+    <script src="app.js?v=20260612-students"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-vocabulary.js?v=20260611-v1"></script>
     <script src="js/admin-self-study-reading.js?v=20260611-r6c"></script>
@@ -630,8 +636,8 @@
     <script src="js/admin-teaching-page-templates.js"></script>
     <script src="js/eap-button-state.js"></script>
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
-    <script src="js/admin-performance.js?v=20260612-teachers"></script>
-    <script src="js/admin-roster-import.js?v=20260612-edit"></script>
+    <script src="js/admin-performance.js?v=20260612-students"></script>
+    <script src="js/admin-roster-import.js?v=20260612-students"></script>
     <script src="js/admin-hub.js?v=20260612-teachers"></script>
   </body>
 </html>

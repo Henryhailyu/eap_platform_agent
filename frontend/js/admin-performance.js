@@ -34,10 +34,15 @@
     const ss = data.self_study || {};
     const flags = Array.isArray(data.risk_flags) ? data.risk_flags : [];
 
-    const classes =
+    let classes =
       Array.isArray(profile.assigned_classes) && profile.assigned_classes.length
         ? profile.assigned_classes.join(", ")
         : profile.class_name || "—";
+    if (Array.isArray(profile.enrollments) && profile.enrollments.length) {
+      classes = profile.enrollments
+        .map((e) => `${e.class_code || ""}/${e.group_code || "G1"}`)
+        .join(", ");
+    }
 
     const readingPct =
       ss.reading && ss.reading.score_percent != null ? `${ss.reading.score_percent}%` : "—";

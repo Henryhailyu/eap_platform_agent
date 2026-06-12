@@ -56,6 +56,7 @@ def register_admin_performance_routes(
             if assigned
             else (str(row["class_name"]).strip() if row["class_name"] else None)
         )
+        enrollments = _student_enrollments(conn, row["id"])
 
         payload = {
             "profile": {
@@ -65,6 +66,7 @@ def register_admin_performance_routes(
                 "student_id": row["student_id"],
                 "class_name": row["class_name"],
                 "assigned_classes": assigned,
+                "enrollments": enrollments,
             },
             "homework": _homework_summary(conn, username, primary_class, normalize_class_name),
             "self_study": _self_study_summary(conn, username),
@@ -131,6 +133,26 @@ def register_admin_performance_routes(
         }
         conn.close()
         return jsonify({"performance": payload})
+
+
+def _student_enrollments(conn, user_id: int) -> list[dict[str, str]]:
+    rows = conn.execute(
+        """
+        SELECT c.class_code, ce.group_code
+        FROM class_enrollments ce
+        INNER JOIN classes c ON c.id = ce.class_id
+        WHERE ce.student_id = ?
+        ORDER BY c.class_code ASC
+        """,
+        (user_id,),
+    ).fetchall()
+    return [
+        {
+            "class_code": str(r["class_code"]),
+            "group_code": str(r["group_code"] or "").strip() or "G1",
+        }
+        for r in rows
+    ]
 
 
 def _submission_has_feedback_sql(alias: str = "s") -> str:

@@ -335,6 +335,52 @@ body.admin-module-active .content-section.admin-panel {
   border: 0;
 }
 
+.admin-roster-filters {
+  margin-bottom: 0.85rem;
+}
+
+.admin-roster-filters.hidden {
+  display: none !important;
+}
+
+.admin-roster-filters__label {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5c5c62;
+}
+
+.admin-roster-filters__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-roster-filters__pill {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+  color: #444;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(10, 126, 164, 0.14);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.admin-roster-filters__pill:hover {
+  border-color: rgba(0, 113, 227, 0.3);
+  color: #0071e3;
+}
+
+.admin-roster-filters__pill--active {
+  background: rgba(0, 113, 227, 0.1);
+  border-color: rgba(0, 113, 227, 0.35);
+  color: #0071e3;
+  font-weight: 600;
+}
+
 .admin-roster-search {
   margin-bottom: 1rem;
 }

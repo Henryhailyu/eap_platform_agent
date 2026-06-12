@@ -49,6 +49,7 @@
       );
     } else {
       cols.push(
+        { key: "group_code", label: t("admin_col_group") },
         { key: "email", label: t("admin_col_school_email") },
         { key: "mobile_phone", label: t("admin_col_registered_phone") },
       );
@@ -329,7 +330,6 @@
 
   function init() {
     if (document.body.getAttribute("data-page") !== "admin") return;
-    bindPanel("student");
     initClassRosterPanels();
   }
 

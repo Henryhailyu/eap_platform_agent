@@ -54,11 +54,12 @@ def _parse_roster_ai(text: str, role: str) -> dict[str, Any]:
         )
     else:
         shape = (
-            '{"people":[{"full_name":"","student_id":"","email":"","mobile_phone":"",'
+            '{"people":[{"full_name":"","student_id":"","group_code":"","email":"","mobile_phone":"",'
             '"username":"","class_codes":["EAP047"]}],"warnings":[]}'
         )
         field_rules = (
             "student_id = official student ID number; "
+            "group_code = teaching group number within the module (e.g. 12 or G12); "
             "email = official school email address; "
             "mobile_phone = registered phone number; "
         )
@@ -125,6 +126,8 @@ def _header_map(headers: list[str]) -> dict[str, int]:
             mapping["mobile_phone"] = i
         elif any(x in key for x in ("学校邮箱", "school email", "official email")):
             mapping["email"] = i
+        elif any(x in key for x in ("组", "group", "小组", "教学班")):
+            mapping["group_code"] = i
     return mapping
 
 
@@ -176,6 +179,10 @@ def _parse_roster_rule_based(text: str, role: str) -> dict[str, Any]:
                 fidx = colmap.get(field, -1)
                 if fidx >= 0 and fidx < len(row) and row[fidx]:
                     entry[field] = row[fidx].strip()
+            if role == "student":
+                gidx = colmap.get("group_code", -1)
+                if gidx >= 0 and gidx < len(row) and row[gidx]:
+                    entry["group_code"] = row[gidx].strip()
             if role == "teacher":
                 entry["authorized"] = False
             people.append(entry)
@@ -251,6 +258,10 @@ def _normalize_people(raw_people: list, role: str, default_class: str | None) ->
         }
         if role == "teacher":
             entry["authorized"] = bool(row.get("authorized"))
+        if role == "student":
+            gc = str(row.get("group_code") or "").strip()
+            if gc:
+                entry["group_code"] = gc
         for field in ("email", "office_number", "office_phone", "mobile_phone"):
             val = str(row.get(field) or "").strip()
             if val:
@@ -291,13 +302,28 @@ def _assign_teacher(conn, class_id: int, teacher_user_id: int) -> None:
     )
 
 
-def _assign_student(conn, class_id: int, student_user_id: int) -> None:
+def _normalize_group_code(raw) -> str:
+    s = str(raw or "").strip()
+    if not s:
+        return "G1"
+    s = re.sub(r"(?i)^group\s*", "", s).strip()
+    if re.match(r"^\d+$", s):
+        return f"G{s}"
+    up = s.upper()
+    if up.startswith("G") and len(up) > 1:
+        return up
+    return up
+
+
+def _assign_student(conn, class_id: int, student_user_id: int, group_code: str | None = None) -> None:
+    gc = _normalize_group_code(group_code)
     conn.execute(
         """
-        INSERT OR IGNORE INTO class_enrollments (class_id, student_id, enrolled_at)
-        VALUES (?, ?, ?)
+        INSERT INTO class_enrollments (class_id, student_id, enrolled_at, group_code)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(class_id, student_id) DO UPDATE SET group_code = excluded.group_code
         """,
-        (class_id, student_user_id, _now_iso()),
+        (class_id, student_user_id, _now_iso(), gc),
     )
 
 
@@ -410,6 +436,8 @@ def _import_people(
             user_id = int(cur.lastrowid)
             created += 1
 
+        group_code = str(row.get("group_code") or "").strip() or None
+
         for code in row.get("class_codes") or []:
             cid = _class_id_for_code(conn, code)
             if cid is None:
@@ -418,7 +446,7 @@ def _import_people(
             if role == "teacher":
                 _assign_teacher(conn, cid, user_id)
             else:
-                _assign_student(conn, cid, user_id)
+                _assign_student(conn, cid, user_id, group_code)
 
     conn.commit()
     return {

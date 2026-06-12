@@ -28,6 +28,7 @@ Teaching materials use backend/uploads/; student homework uses backend/submissio
 """
 import json
 import os
+import re
 import sqlite3
 import uuid
 from calendar import monthrange
@@ -528,6 +529,35 @@ def migrate_users_add_external_ids(conn):
         conn.execute("ALTER TABLE users ADD COLUMN employee_id TEXT")
 
 
+def normalize_group_code(raw) -> str:
+    """Teaching group within a module, e.g. G1, G12 (default G1)."""
+    s = str(raw or "").strip()
+    if not s:
+        return "G1"
+    s = re.sub(r"(?i)^group\s*", "", s).strip()
+    if re.match(r"^\d+$", s):
+        return f"G{s}"
+    up = s.upper()
+    if up.startswith("G") and len(up) > 1:
+        return up
+    return up
+
+
+def migrate_class_enrollments_add_group_code(conn):
+    """Module/group architecture: group within a class (module) enrollment."""
+    rows = conn.execute("PRAGMA table_info(class_enrollments)").fetchall()
+    column_names = [r[1] for r in rows]
+    if "group_code" not in column_names:
+        conn.execute("ALTER TABLE class_enrollments ADD COLUMN group_code TEXT")
+    conn.execute(
+        """
+        UPDATE class_enrollments
+        SET group_code = 'G1'
+        WHERE group_code IS NULL OR TRIM(group_code) = ''
+        """
+    )
+
+
 def migrate_users_add_contact_fields(conn):
     """Manager roster import: email, office, and phone fields."""
     rows = conn.execute("PRAGMA table_info(users)").fetchall()
@@ -698,9 +728,12 @@ def init_database():
             class_id INTEGER NOT NULL REFERENCES classes(id),
             student_id INTEGER NOT NULL REFERENCES users(id),
             enrolled_at TEXT,
+            group_code TEXT,
             UNIQUE(class_id, student_id)
         )
     """)
+
+    migrate_class_enrollments_add_group_code(conn)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS teacher_classes (
@@ -6651,17 +6684,41 @@ def admin_user_assigned_class_codes(conn, user_id, role):
     return [str(r["class_code"]) for r in rows]
 
 
+def admin_student_enrollments(conn, user_id):
+    """Class (module) + group for each student enrollment."""
+    rows = conn.execute(
+        """
+        SELECT c.class_code, ce.group_code
+        FROM class_enrollments ce
+        INNER JOIN classes c ON c.id = ce.class_id
+        WHERE ce.student_id = ?
+        ORDER BY c.class_code ASC
+        """,
+        (user_id,),
+    ).fetchall()
+    out = []
+    for r in rows:
+        gc = str(r["group_code"] or "").strip() or "G1"
+        out.append({"class_code": str(r["class_code"]), "group_code": gc})
+    return out
+
+
 def admin_user_dict(conn, row):
     """Admin list user with assigned class codes from membership tables."""
     payload = user_public_dict(row)
     payload["assigned_classes"] = admin_user_assigned_class_codes(
         conn, row["id"], row["role"]
     )
+    if str(row["role"] or "").strip().lower() == "student":
+        payload["enrollments"] = admin_student_enrollments(conn, row["id"])
     return payload
 
 
 def admin_class_member_user_dict(row):
     keys = row.keys() if hasattr(row, "keys") else ()
+    group_code = None
+    if "group_code" in keys and row["group_code"]:
+        group_code = str(row["group_code"]).strip() or "G1"
     return {
         "id": row["id"],
         "username": row["username"],
@@ -6672,6 +6729,7 @@ def admin_class_member_user_dict(row):
         "office_number": row["office_number"] if "office_number" in keys else None,
         "office_phone": row["office_phone"] if "office_phone" in keys else None,
         "mobile_phone": row["mobile_phone"] if "mobile_phone" in keys else None,
+        "group_code": group_code,
     }
 
 
@@ -6716,11 +6774,12 @@ def admin_class_detail_payload(conn, class_id):
     ).fetchall()
     students = conn.execute(
         """
-        SELECT u.id, u.username, u.full_name, u.student_id, u.email, u.mobile_phone
+        SELECT u.id, u.username, u.full_name, u.student_id, u.email, u.mobile_phone,
+               ce.group_code
         FROM class_enrollments ce
         INNER JOIN users u ON u.id = ce.student_id
         WHERE ce.class_id = ?
-        ORDER BY u.username ASC
+        ORDER BY ce.group_code ASC, u.username ASC
         """,
         (class_id,),
     ).fetchall()
@@ -6986,12 +7045,15 @@ def admin_class_enroll_student(class_id):
         conn.close()
         return jsonify({"error": "Student not found"}), 404
 
+    group_code = normalize_group_code(data.get("group_code"))
+
     conn.execute(
         """
-        INSERT OR IGNORE INTO class_enrollments (class_id, student_id, enrolled_at)
-        VALUES (?, ?, ?)
+        INSERT INTO class_enrollments (class_id, student_id, enrolled_at, group_code)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(class_id, student_id) DO UPDATE SET group_code = excluded.group_code
         """,
-        (class_id, student_id, utc_now_iso()),
+        (class_id, student_id, utc_now_iso(), group_code),
     )
     conn.commit()
     payload = admin_class_detail_payload(conn, class_id)
@@ -7052,7 +7114,8 @@ def admin_list_students():
         return guard
     rows = conn.execute(
         """
-        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
         FROM users
         WHERE TRIM(COALESCE(role, '')) = 'student'
         ORDER BY username ASC

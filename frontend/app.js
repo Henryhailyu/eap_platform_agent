@@ -3570,17 +3570,83 @@ function renderAdminTeachersTable(teachers, tbody, emptyEl, noMatchEl, onToggle,
   });
 }
 
-function renderAdminStudentsTable(students, tbody, emptyEl, onDelete, onPerformance) {
+function studentEnrollments(student) {
+  if (Array.isArray(student.enrollments) && student.enrollments.length) {
+    return student.enrollments;
+  }
+  const codes = Array.isArray(student.assigned_classes) ? student.assigned_classes : [];
+  return codes.map((class_code) => ({ class_code, group_code: "G1" }));
+}
+
+function studentGroupForModule(student, moduleCode) {
+  if (!moduleCode) return "—";
+  const enr = studentEnrollments(student).find(
+    (e) => String(e.class_code || "").toUpperCase() === String(moduleCode).toUpperCase(),
+  );
+  return enr && enr.group_code ? enr.group_code : "—";
+}
+
+function studentModuleGroupLabel(student, moduleCode, groupCode) {
+  const enrs = studentEnrollments(student);
+  if (moduleCode && groupCode) {
+    return studentGroupForModule(student, moduleCode);
+  }
+  if (moduleCode) {
+    return studentGroupForModule(student, moduleCode);
+  }
+  if (!enrs.length) return student.class_name || "—";
+  return enrs.map((e) => `${e.class_code}/${e.group_code || "G1"}`).join(", ");
+}
+
+function adminStudentSearchHaystack(student) {
+  return [
+    student.full_name,
+    student.student_id,
+    student.email,
+    student.mobile_phone,
+    student.username,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function filterAdminStudents(students, { query, moduleCode, groupCode }) {
+  let list = Array.isArray(students) ? students : [];
+  const mod = moduleCode ? String(moduleCode).trim().toUpperCase() : "";
+  const grp = groupCode ? String(groupCode).trim().toUpperCase() : "";
+  if (mod) {
+    list = list.filter((student) =>
+      studentEnrollments(student).some(
+        (e) => String(e.class_code || "").toUpperCase() === mod,
+      ),
+    );
+  }
+  if (mod && grp && grp !== "__ALL__") {
+    list = list.filter((student) => {
+      const g = studentGroupForModule(student, mod);
+      return String(g).toUpperCase() === grp;
+    });
+  }
+  const q = String(query || "").trim().toLowerCase();
+  if (q) {
+    list = list.filter((student) => adminStudentSearchHaystack(student).includes(q));
+  }
+  return list;
+}
+
+function renderAdminStudentsTable(students, tbody, onDelete, onPerformance, viewModule) {
   if (!tbody) return;
   tbody.innerHTML = "";
   const list = Array.isArray(students) ? students : [];
-  if (emptyEl) emptyEl.classList.toggle("hidden", list.length > 0);
   list.forEach((student) => {
     const tr = document.createElement("tr");
-    const classLabel =
-      Array.isArray(student.assigned_classes) && student.assigned_classes.length
+    const moduleLabel =
+      viewModule ||
+      (Array.isArray(student.assigned_classes) && student.assigned_classes.length
         ? student.assigned_classes.join(", ")
-        : student.class_name || "—";
+        : student.class_name || "—");
+    const groupLabel = studentModuleGroupLabel(student, viewModule, null);
 
     const nameTd = document.createElement("td");
     nameTd.className = "admin-roster-sheet__name";
@@ -3597,16 +3663,20 @@ function renderAdminStudentsTable(students, tbody, emptyEl, onDelete, onPerforma
       nameTd.appendChild(perfBtn);
     }
 
-    const usernameTd = document.createElement("td");
-    usernameTd.textContent = student.username || "—";
-    const idTd = document.createElement("td");
-    idTd.textContent = student.student_id || "—";
-    const classTd = document.createElement("td");
-    classTd.textContent = classLabel;
+    const cellValues = [
+      student.student_id,
+      groupLabel,
+      student.email,
+      student.mobile_phone,
+      student.username,
+      moduleLabel,
+    ];
     tr.appendChild(nameTd);
-    tr.appendChild(usernameTd);
-    tr.appendChild(idTd);
-    tr.appendChild(classTd);
+    cellValues.forEach((val) => {
+      const td = document.createElement("td");
+      td.textContent = val && String(val).trim() ? String(val).trim() : "—";
+      tr.appendChild(td);
+    });
 
     const actionTd = document.createElement("td");
     actionTd.className = "admin-class-actions";
@@ -3643,10 +3713,18 @@ function initAdminPage() {
     const teachersNoMatch = document.getElementById("admin-teachers-no-match");
     const teachersSearchEl = document.getElementById("admin-teachers-search");
     const studentsEmpty = document.getElementById("admin-students-empty");
+    const studentsNoMatch = document.getElementById("admin-students-no-match");
+    const studentsSearchEl = document.getElementById("admin-students-search");
+    const studentsModuleFilters = document.getElementById("admin-students-module-filters");
+    const studentsGroupFiltersWrap = document.getElementById("admin-students-group-filters-wrap");
+    const studentsGroupFilters = document.getElementById("admin-students-group-filters");
 
     let teachersCache = [];
     let teachersSearchQuery = "";
     let studentsCache = [];
+    let studentsSearchQuery = "";
+    let studentsModuleFilter = "";
+    let studentsGroupFilter = "";
     let classesCache = [];
     let activeClassId = null;
 
@@ -3674,6 +3752,9 @@ function initAdminPage() {
       }
       if (role === "student" && member.student_id) {
         lines.push(`${t("admin_col_student_id")}: ${member.student_id}`);
+      }
+      if (role === "student" && member.group_code) {
+        lines.push(`${t("admin_col_group")}: ${member.group_code}`);
       }
       if (member.office_number) lines.push(`${t("admin_col_office_number")}: ${member.office_number}`);
       if (member.email) {
@@ -3867,6 +3948,116 @@ function initAdminPage() {
       }
     }
 
+    function distinctGroupsForModule(moduleCode) {
+      const mod = String(moduleCode || "").toUpperCase();
+      const groups = new Set();
+      studentsCache.forEach((student) => {
+        studentEnrollments(student).forEach((e) => {
+          if (String(e.class_code || "").toUpperCase() === mod && e.group_code) {
+            groups.add(String(e.group_code).toUpperCase());
+          }
+        });
+      });
+      return Array.from(groups).sort((a, b) => {
+        const na = parseInt(a.replace(/\D/g, ""), 10);
+        const nb = parseInt(b.replace(/\D/g, ""), 10);
+        if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return na - nb;
+        return a.localeCompare(b);
+      });
+    }
+
+    function renderStudentFilterPills() {
+      if (!studentsModuleFilters) return;
+      const modules = classesCache
+        .map((c) => c.class_code)
+        .filter(Boolean)
+        .sort();
+      studentsModuleFilters.innerHTML = "";
+      const allModBtn = document.createElement("button");
+      allModBtn.type = "button";
+      allModBtn.className = `admin-roster-filters__pill${!studentsModuleFilter ? " admin-roster-filters__pill--active" : ""}`;
+      allModBtn.textContent = t("admin_students_filter_all_modules");
+      allModBtn.addEventListener("click", () => {
+        studentsModuleFilter = "";
+        studentsGroupFilter = "";
+        paintStudentsTable();
+      });
+      studentsModuleFilters.appendChild(allModBtn);
+      modules.forEach((code) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        const active = studentsModuleFilter === code;
+        btn.className = `admin-roster-filters__pill${active ? " admin-roster-filters__pill--active" : ""}`;
+        btn.textContent = code;
+        btn.addEventListener("click", () => {
+          studentsModuleFilter = code;
+          studentsGroupFilter = "";
+          paintStudentsTable();
+        });
+        studentsModuleFilters.appendChild(btn);
+      });
+
+      if (!studentsGroupFilters || !studentsGroupFiltersWrap) return;
+      if (!studentsModuleFilter) {
+        studentsGroupFiltersWrap.classList.add("hidden");
+        studentsGroupFilters.innerHTML = "";
+        return;
+      }
+      studentsGroupFiltersWrap.classList.remove("hidden");
+      studentsGroupFilters.innerHTML = "";
+      const allGrpBtn = document.createElement("button");
+      allGrpBtn.type = "button";
+      allGrpBtn.className = `admin-roster-filters__pill${!studentsGroupFilter ? " admin-roster-filters__pill--active" : ""}`;
+      allGrpBtn.textContent = t("admin_students_filter_all_groups");
+      allGrpBtn.addEventListener("click", () => {
+        studentsGroupFilter = "";
+        paintStudentsTable();
+      });
+      studentsGroupFilters.appendChild(allGrpBtn);
+      distinctGroupsForModule(studentsModuleFilter).forEach((grp) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        const active = studentsGroupFilter === grp;
+        btn.className = `admin-roster-filters__pill${active ? " admin-roster-filters__pill--active" : ""}`;
+        btn.textContent = grp;
+        btn.addEventListener("click", () => {
+          studentsGroupFilter = grp;
+          paintStudentsTable();
+        });
+        studentsGroupFilters.appendChild(btn);
+      });
+    }
+
+    function paintStudentsTable() {
+      renderStudentFilterPills();
+      const filtered = filterAdminStudents(studentsCache, {
+        query: studentsSearchQuery,
+        moduleCode: studentsModuleFilter,
+        groupCode: studentsGroupFilter,
+      });
+      const hasStudents = studentsCache.length > 0;
+      const q = String(studentsSearchQuery || "").trim();
+      const hasFilter = Boolean(studentsModuleFilter || studentsGroupFilter || q);
+      if (studentsEmpty) studentsEmpty.classList.toggle("hidden", hasStudents);
+      if (studentsNoMatch) {
+        studentsNoMatch.classList.toggle("hidden", !hasStudents || filtered.length > 0 || !hasFilter);
+      }
+      renderAdminStudentsTable(
+        filtered,
+        studentsTbody,
+        handleStudentDelete,
+        handleStudentPerformance,
+        studentsModuleFilter || "",
+      );
+    }
+
+    if (studentsSearchEl) {
+      studentsSearchEl.addEventListener("input", () => {
+        studentsSearchQuery = studentsSearchEl.value || "";
+        paintStudentsTable();
+      });
+    }
+
     async function reloadAdminLists() {
       setAdminPageMessage(errorEl, "", false);
       try {
@@ -3879,13 +4070,7 @@ function initAdminPage() {
         studentsCache = Array.isArray(students) ? students : [];
         classesCache = Array.isArray(classes) ? classes : [];
         paintTeachersTable();
-        renderAdminStudentsTable(
-          studentsCache,
-          studentsTbody,
-          studentsEmpty,
-          handleStudentDelete,
-          handleStudentPerformance,
-        );
+        paintStudentsTable();
         renderAdminClassesTable(classesCache);
         if (activeClassId) {
           try {
@@ -3960,7 +4145,7 @@ function initAdminPage() {
       try {
         await apiDelete(`/api/admin/students/${student.id}`);
         studentsCache = studentsCache.filter((row) => row.id !== student.id);
-        renderAdminStudentsTable(studentsCache, studentsTbody, studentsEmpty, handleStudentDelete);
+        paintStudentsTable();
         if (activeClassId) {
           try {
             const detail = await apiGet(`/api/admin/classes/${activeClassId}`);
@@ -4129,13 +4314,7 @@ function initAdminPage() {
 
     window.__eapAdminLangRefresh = () => {
       paintTeachersTable();
-      renderAdminStudentsTable(
-        studentsCache,
-        studentsTbody,
-        studentsEmpty,
-        handleStudentDelete,
-        handleStudentPerformance,
-      );
+      paintStudentsTable();
       renderAdminClassesTable(classesCache);
       void reloadAdminLists();
       void loadAdminCalendarForm();
