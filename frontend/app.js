@@ -3636,17 +3636,62 @@ function filterAdminStudents(students, { query, moduleCode, groupCode }) {
       ),
     );
   }
-  if (mod && grp && grp !== "__ALL__") {
-    list = list.filter((student) => {
-      const g = studentGroupForModule(student, mod);
-      return String(g).toUpperCase() === grp;
-    });
+  if (grp && grp !== "__ALL__") {
+    if (mod) {
+      list = list.filter((student) => {
+        const g = studentGroupForModule(student, mod);
+        return String(g).toUpperCase() === grp;
+      });
+    } else {
+      list = list.filter((student) =>
+        studentEnrollments(student).some(
+          (e) => String(e.group_code || "G1").toUpperCase() === grp,
+        ),
+      );
+    }
   }
   const q = String(query || "").trim().toLowerCase();
   if (q) {
     list = list.filter((student) => adminStudentSearchHaystack(student).includes(q));
   }
   return list;
+}
+
+function adminStudentsInClassCount(students, classCode) {
+  const mod = String(classCode || "").toUpperCase();
+  if (!mod) return 0;
+  return (Array.isArray(students) ? students : []).filter((student) =>
+    studentEnrollments(student).some(
+      (e) => String(e.class_code || "").toUpperCase() === mod,
+    ),
+  ).length;
+}
+
+function adminStudentsWithGroupCount(students, groupCode) {
+  const grp = String(groupCode || "").toUpperCase();
+  if (!grp) return 0;
+  return (Array.isArray(students) ? students : []).filter((student) =>
+    studentEnrollments(student).some(
+      (e) => String(e.group_code || "G1").toUpperCase() === grp,
+    ),
+  ).length;
+}
+
+function distinctGroupsFromStudents(students, moduleCode) {
+  const mod = moduleCode ? String(moduleCode).toUpperCase() : "";
+  const groups = new Set();
+  (Array.isArray(students) ? students : []).forEach((student) => {
+    studentEnrollments(student).forEach((e) => {
+      if (mod && String(e.class_code || "").toUpperCase() !== mod) return;
+      if (e.group_code) groups.add(String(e.group_code).toUpperCase());
+    });
+  });
+  return Array.from(groups).sort((a, b) => {
+    const na = parseInt(a.replace(/\D/g, ""), 10);
+    const nb = parseInt(b.replace(/\D/g, ""), 10);
+    if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return na - nb;
+    return a.localeCompare(b);
+  });
 }
 
 function renderAdminStudentsTable(students, tbody, onDelete, onPerformance, viewModule) {
@@ -3962,24 +4007,6 @@ function initAdminPage() {
       }
     }
 
-    function distinctGroupsForModule(moduleCode) {
-      const mod = String(moduleCode || "").toUpperCase();
-      const groups = new Set();
-      studentsCache.forEach((student) => {
-        studentEnrollments(student).forEach((e) => {
-          if (String(e.class_code || "").toUpperCase() === mod && e.group_code) {
-            groups.add(String(e.group_code).toUpperCase());
-          }
-        });
-      });
-      return Array.from(groups).sort((a, b) => {
-        const na = parseInt(a.replace(/\D/g, ""), 10);
-        const nb = parseInt(b.replace(/\D/g, ""), 10);
-        if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return na - nb;
-        return a.localeCompare(b);
-      });
-    }
-
     function renderStudentFilterPills() {
       if (!studentsModuleFilters) return;
       const modules = classesCache
@@ -3993,7 +4020,6 @@ function initAdminPage() {
       allModBtn.textContent = t("admin_students_filter_all_modules");
       allModBtn.addEventListener("click", () => {
         studentsModuleFilter = "";
-        studentsGroupFilter = "";
         paintStudentsTable();
       });
       studentsModuleFilters.appendChild(allModBtn);
@@ -4002,23 +4028,26 @@ function initAdminPage() {
         btn.type = "button";
         const active = studentsModuleFilter === code;
         btn.className = `admin-roster-filters__pill${active ? " admin-roster-filters__pill--active" : ""}`;
-        btn.textContent = code;
+        const enrolled = adminStudentsInClassCount(studentsCache, code);
+        btn.textContent = enrolled > 0 ? `${code} (${enrolled})` : code;
         btn.addEventListener("click", () => {
           studentsModuleFilter = code;
-          studentsGroupFilter = "";
+          if (
+            studentsGroupFilter &&
+            !distinctGroupsFromStudents(studentsCache, code).includes(studentsGroupFilter)
+          ) {
+            studentsGroupFilter = "";
+          }
           paintStudentsTable();
         });
         studentsModuleFilters.appendChild(btn);
       });
 
       if (!studentsGroupFilters || !studentsGroupFiltersWrap) return;
-      if (!studentsModuleFilter) {
-        studentsGroupFiltersWrap.classList.add("hidden");
-        studentsGroupFilters.innerHTML = "";
-        return;
-      }
-      studentsGroupFiltersWrap.classList.remove("hidden");
+      const groups = distinctGroupsFromStudents(studentsCache, studentsModuleFilter);
+      studentsGroupFiltersWrap.classList.toggle("hidden", groups.length === 0);
       studentsGroupFilters.innerHTML = "";
+      if (!groups.length) return;
       const allGrpBtn = document.createElement("button");
       allGrpBtn.type = "button";
       allGrpBtn.className = `admin-roster-filters__pill${!studentsGroupFilter ? " admin-roster-filters__pill--active" : ""}`;
@@ -4028,12 +4057,13 @@ function initAdminPage() {
         paintStudentsTable();
       });
       studentsGroupFilters.appendChild(allGrpBtn);
-      distinctGroupsForModule(studentsModuleFilter).forEach((grp) => {
+      groups.forEach((grp) => {
         const btn = document.createElement("button");
         btn.type = "button";
         const active = studentsGroupFilter === grp;
         btn.className = `admin-roster-filters__pill${active ? " admin-roster-filters__pill--active" : ""}`;
-        btn.textContent = grp;
+        const inGrp = adminStudentsWithGroupCount(studentsCache, grp);
+        btn.textContent = inGrp > 0 ? `${grp} (${inGrp})` : grp;
         btn.addEventListener("click", () => {
           studentsGroupFilter = grp;
           paintStudentsTable();
@@ -4055,6 +4085,24 @@ function initAdminPage() {
       if (studentsEmpty) studentsEmpty.classList.toggle("hidden", hasStudents);
       if (studentsNoMatch) {
         studentsNoMatch.classList.toggle("hidden", !hasStudents || filtered.length > 0 || !hasFilter);
+        if (hasStudents && filtered.length === 0 && hasFilter) {
+          const classOnly =
+            studentsModuleFilter &&
+            !studentsGroupFilter &&
+            adminStudentsInClassCount(studentsCache, studentsModuleFilter) === 0;
+          const groupElsewhere = classOnly
+            ? adminStudentsWithGroupCount(studentsCache, studentsModuleFilter)
+            : 0;
+          studentsNoMatch.textContent =
+            groupElsewhere > 0
+              ? t("admin_students_no_match_group_hint", {
+                  code: studentsModuleFilter,
+                  n: groupElsewhere,
+                })
+              : t("admin_students_no_match");
+        } else {
+          studentsNoMatch.textContent = t("admin_students_no_match");
+        }
       }
       renderAdminStudentsTable(
         filtered,

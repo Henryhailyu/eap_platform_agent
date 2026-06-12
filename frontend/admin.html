@@ -193,7 +193,7 @@
                   <h4 data-i18n="admin_class_teachers">Teachers in class</h4>
                   <ul id="admin-class-teachers-list" class="admin-member-list"></ul>
                   <div class="admin-roster-upload admin-class-roster-upload">
-                    <h5 class="admin-roster-upload__title" data-i18n="admin_class_roster_teachers">Upload teachers for this class</h5>
+                    <h5 class="admin-roster-upload__title" data-i18n="admin_class_roster_teachers">Upload teacher list</h5>
                     <p class="admin-panel__hint" data-i18n="admin_class_roster_teachers_hint">
                       Word, Excel, PDF, or TXT — include name, staff ID, office number, email, office phone, and mobile.
                     </p>
@@ -212,7 +212,7 @@
                   <h4 data-i18n="admin_class_students">Students in class</h4>
                   <ul id="admin-class-students-list" class="admin-member-list"></ul>
                   <div class="admin-roster-upload admin-class-roster-upload">
-                    <h5 class="admin-roster-upload__title" data-i18n="admin_class_roster_students">Upload students for this class</h5>
+                    <h5 class="admin-roster-upload__title" data-i18n="admin_class_roster_students">Upload student list</h5>
                     <p class="admin-panel__hint" data-i18n="admin_class_roster_students_hint">
                       Word, Excel, PDF, or TXT — include student name, student ID, official school email, and registered phone number.
                     </p>
@@ -576,7 +576,7 @@
               Students
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_students_hint">
-              Roster details are pushed from Classes. Pick a module and group, or search by name, student ID, email, or mobile.
+              Roster details are pushed from Classes. Filter by class and/or teaching group, or search by name, student ID, email, or mobile.
             </p>
             <div class="admin-roster-search">
               <label class="visually-hidden" for="admin-students-search" data-i18n="admin_students_search_label">Search students</label>
@@ -590,10 +590,10 @@
               />
             </div>
             <div class="admin-roster-filters">
-              <p class="admin-roster-filters__label" data-i18n="admin_students_module_label">Module</p>
-              <div id="admin-students-module-filters" class="admin-roster-filters__pills" role="group" aria-label="Module filter"></div>
+              <p class="admin-roster-filters__label" data-i18n="admin_students_module_label">Class</p>
+              <div id="admin-students-module-filters" class="admin-roster-filters__pills" role="group" aria-label="Class filter"></div>
             </div>
-            <div id="admin-students-group-filters-wrap" class="admin-roster-filters hidden">
+            <div id="admin-students-group-filters-wrap" class="admin-roster-filters">
               <p class="admin-roster-filters__label" data-i18n="admin_students_group_label">Group</p>
               <div id="admin-students-group-filters" class="admin-roster-filters__pills" role="group" aria-label="Group filter"></div>
             </div>
@@ -607,7 +607,7 @@
                     <th scope="col" data-i18n="admin_col_school_email">School email</th>
                     <th scope="col" data-i18n="admin_col_registered_phone">Mobile</th>
                     <th scope="col" data-i18n="username">Username</th>
-                    <th scope="col" data-i18n="class_label">Module</th>
+                    <th scope="col" data-i18n="class_label">Class</th>
                     <th scope="col" data-i18n="admin_col_action">Action</th>
                   </tr>
                 </thead>
@@ -643,7 +643,7 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js?v=20260612-cal-roster"></script>
+    <script src="app.js?v=20260612-students-filter"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-vocabulary.js?v=20260611-v1"></script>
     <script src="js/admin-self-study-reading.js?v=20260611-r6c"></script>
