@@ -1339,8 +1339,12 @@ def register_homework_marking_routes(
             feedback = f"{existing}\n\n---\n\n{feedback}"
         now = _now_iso()
         conn.execute(
-            "UPDATE submissions SET teacher_feedback = ?, status = ? WHERE id = ?",
-            (feedback, "Feedback Given", submission_id),
+            """
+            UPDATE submissions
+            SET teacher_feedback = ?, status = ?, feedback_by_username = ?, feedback_at = ?
+            WHERE id = ?
+            """,
+            (feedback, "Feedback Given", teacher, now, submission_id),
         )
         conn.execute(
             """

@@ -486,6 +486,16 @@ def migrate_submissions_add_feedback_file_columns(conn):
             column_names = [r[1] for r in rows]
 
 
+def migrate_submissions_add_feedback_attribution(conn):
+    """Track which teacher gave homework feedback (manager performance option B)."""
+    rows = conn.execute("PRAGMA table_info(submissions)").fetchall()
+    column_names = [r[1] for r in rows]
+    if "feedback_by_username" not in column_names:
+        conn.execute("ALTER TABLE submissions ADD COLUMN feedback_by_username TEXT")
+    if "feedback_at" not in column_names:
+        conn.execute("ALTER TABLE submissions ADD COLUMN feedback_at TEXT")
+
+
 def migrate_users_add_password_hash(conn):
     """
     Older databases may lack password_hash on users.
@@ -722,6 +732,7 @@ def init_database():
 
     migrate_submissions_add_revision_columns(conn)
     migrate_submissions_add_feedback_file_columns(conn)
+    migrate_submissions_add_feedback_attribution(conn)
     init_submission_attachments_table(conn)
 
     conn.execute("""
@@ -2096,7 +2107,27 @@ def submission_to_dict(row):
         "feedback_file_path": row["feedback_file_path"],
         "feedback_file_name": row["feedback_file_name"],
         "feedback_file_uploaded_at": row["feedback_file_uploaded_at"],
+        "feedback_by_username": row["feedback_by_username"]
+        if "feedback_by_username" in row.keys()
+        else None,
+        "feedback_at": row["feedback_at"] if "feedback_at" in row.keys() else None,
     }
+
+
+def stamp_submission_feedback_attribution(conn, submission_id, teacher_username, feedback_at=None):
+    """Record which teacher gave feedback on a submission row."""
+    username = str(teacher_username or "").strip()
+    if not username:
+        return
+    at = feedback_at or utc_now_iso()
+    conn.execute(
+        """
+        UPDATE submissions
+        SET feedback_by_username = ?, feedback_at = ?
+        WHERE id = ?
+        """,
+        (username, at, submission_id),
+    )
 
 
 # ---- submission_attachments (e.g. multiple teacher feedback files per submission) ------------
@@ -3962,7 +3993,7 @@ def update_submission_feedback(submission_id):
         conn.close()
         return jsonify({"error": "Submission not found"}), 404
 
-    _, d15_guard_err = resolve_teacher_with_optional_enforcement(
+    teacher_username, d15_guard_err = resolve_teacher_with_optional_enforcement(
         conn,
         request.args.get("teacher_username"),
         row["class_name"],
@@ -4051,6 +4082,9 @@ def update_submission_feedback(submission_id):
                 """,
                 (teacher_feedback, status, submission_id),
             )
+        stamp_submission_feedback_attribution(
+            conn, submission_id, teacher_username, feedback_at=feedback_at
+        )
         conn.commit()
 
         row = conn.execute(
@@ -4079,6 +4113,7 @@ def update_submission_feedback(submission_id):
         """,
         (teacher_feedback, status, submission_id),
     )
+    stamp_submission_feedback_attribution(conn, submission_id, teacher_username)
     conn.commit()
 
     row = conn.execute(
@@ -4115,7 +4150,7 @@ def post_submission_feedback_files(submission_id):
         conn.close()
         return jsonify({"error": "Submission not found"}), 404
 
-    _, d15_guard_err = resolve_teacher_with_optional_enforcement(
+    teacher_username, d15_guard_err = resolve_teacher_with_optional_enforcement(
         conn,
         request.args.get("teacher_username"),
         row["class_name"],
@@ -4166,6 +4201,8 @@ def post_submission_feedback_files(submission_id):
             ), 400
 
     uploaded_by_username = (request.form.get("uploaded_by_username") or "").strip() or None
+    if not uploaded_by_username and teacher_username:
+        uploaded_by_username = teacher_username
     uploaded_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     saved_paths = []
 
@@ -4195,6 +4232,16 @@ def post_submission_feedback_files(submission_id):
                     uploaded_by_username,
                 ),
             )
+        conn.execute(
+            """
+            UPDATE submissions SET status = ?
+            WHERE id = ? AND TRIM(COALESCE(status, '')) != 'Feedback Given'
+            """,
+            ("Feedback Given", submission_id),
+        )
+        stamp_submission_feedback_attribution(
+            conn, submission_id, uploaded_by_username or teacher_username, feedback_at=uploaded_at
+        )
         conn.commit()
     except (OSError, sqlite3.Error):
         conn.rollback()
@@ -6566,6 +6613,11 @@ def user_public_dict(row):
         payload["employee_id"] = row["employee_id"]
     except (KeyError, IndexError):
         payload["employee_id"] = None
+    for col in ("email", "office_number", "office_phone", "mobile_phone"):
+        try:
+            payload[col] = row[col]
+        except (KeyError, IndexError):
+            payload[col] = None
     return payload
 
 
@@ -6978,7 +7030,8 @@ def admin_list_teachers():
         return guard
     rows = conn.execute(
         """
-        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
         FROM users
         WHERE TRIM(COALESCE(role, '')) = 'teacher'
         ORDER BY username ASC

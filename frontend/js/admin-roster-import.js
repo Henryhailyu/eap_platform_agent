@@ -329,7 +329,6 @@
 
   function init() {
     if (document.body.getAttribute("data-page") !== "admin") return;
-    bindPanel("teacher");
     bindPanel("student");
     initClassRosterPanels();
   }

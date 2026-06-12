@@ -1,5 +1,5 @@
 """
-Manager performance lookup — student profile + homework + self-study aggregates.
+Manager performance lookup — student and teacher profiles + homework aggregates.
 """
 from __future__ import annotations
 
@@ -7,6 +7,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from flask import jsonify, request
+
+ATTACHMENT_TYPE_TEACHER_FEEDBACK = "teacher_feedback"
+FEEDBACK_LAG_DAYS = 3
 
 
 def register_admin_performance_routes(
@@ -70,6 +73,307 @@ def register_admin_performance_routes(
         payload["risk_flags"] = _risk_flags(payload)
         conn.close()
         return jsonify({"performance": payload})
+
+    @app.route("/api/admin/performance/teacher", methods=["GET"])
+    def admin_teacher_performance():
+        conn = get_db_connection()
+        guard = require_admin_session(conn)
+        if guard is not None:
+            conn.close()
+            return guard
+
+        teacher_id_raw = request.args.get("teacher_id")
+        if not teacher_id_raw:
+            conn.close()
+            return jsonify({"error": "teacher_id is required"}), 400
+        try:
+            teacher_id = int(teacher_id_raw)
+        except (TypeError, ValueError):
+            conn.close()
+            return jsonify({"error": "teacher_id must be an integer"}), 400
+
+        row = conn.execute(
+            """
+            SELECT id, username, role, full_name, class_name, is_authorized, employee_id,
+                   email, office_number, office_phone, mobile_phone
+            FROM users
+            WHERE id = ? AND TRIM(COALESCE(role, '')) = 'teacher'
+            LIMIT 1
+            """,
+            (teacher_id,),
+        ).fetchone()
+        if row is None:
+            conn.close()
+            return jsonify({"error": "Teacher not found"}), 404
+
+        teacher_username = str(row["username"] or "").strip()
+        assigned = admin_user_assigned_class_codes(conn, row["id"], row["role"])
+        homework = _teacher_homework_summary(
+            conn, teacher_username, assigned, normalize_class_name
+        )
+        activity = _teacher_activity_summary(conn, teacher_username)
+        payload = {
+            "profile": {
+                "id": row["id"],
+                "username": teacher_username,
+                "full_name": row["full_name"],
+                "employee_id": row["employee_id"],
+                "email": row["email"],
+                "office_number": row["office_number"],
+                "office_phone": row["office_phone"],
+                "mobile_phone": row["mobile_phone"],
+                "is_authorized": bool(int(row["is_authorized"] or 0)),
+                "assigned_classes": assigned,
+            },
+            "homework": homework,
+            "teaching_activity": activity,
+            "risk_flags": _teacher_risk_flags(homework, activity),
+        }
+        conn.close()
+        return jsonify({"performance": payload})
+
+
+def _submission_has_feedback_sql(alias: str = "s") -> str:
+    a = alias
+    return f"""(
+        TRIM(COALESCE({a}.teacher_feedback, '')) != ''
+        OR TRIM(COALESCE({a}.feedback_file_path, '')) != ''
+        OR EXISTS (
+            SELECT 1 FROM submission_attachments att
+            WHERE att.submission_id = {a}.id AND att.attachment_type = ?
+        )
+    )"""
+
+
+def _teacher_homework_summary(
+    conn, teacher_username: str, class_codes: list[str], normalize_class_name
+) -> dict[str, Any]:
+    if not class_codes:
+        return {
+            "total_submissions": 0,
+            "feedback_given_by_teacher": 0,
+            "feedback_rate": 0.0,
+            "pending_feedback_count": 0,
+            "lag_3d_count": 0,
+            "avg_feedback_hours": None,
+            "per_class": [],
+        }
+
+    normalized = [normalize_class_name(c) for c in class_codes]
+    placeholders = ",".join("?" * len(normalized))
+    has_fb = _submission_has_feedback_sql("s")
+    params_base = (*normalized, ATTACHMENT_TYPE_TEACHER_FEEDBACK)
+
+    total_submissions = conn.execute(
+        f"""
+        SELECT COUNT(*) AS c FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) IN ({placeholders})
+        """,
+        normalized,
+    ).fetchone()
+    total = int(total_submissions["c"] if total_submissions else 0)
+
+    feedback_by_teacher = conn.execute(
+        f"""
+        SELECT COUNT(*) AS c FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) IN ({placeholders})
+          AND TRIM(COALESCE(s.feedback_by_username, '')) = ?
+          AND {has_fb}
+        """,
+        (*normalized, teacher_username, ATTACHMENT_TYPE_TEACHER_FEEDBACK),
+    ).fetchone()
+    given = int(feedback_by_teacher["c"] if feedback_by_teacher else 0)
+
+    pending = conn.execute(
+        f"""
+        SELECT COUNT(*) AS c FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) IN ({placeholders})
+          AND NOT {has_fb}
+        """,
+        params_base,
+    ).fetchone()
+    pending_count = int(pending["c"] if pending else 0)
+
+    lag_cutoff = (datetime.now(timezone.utc) - timedelta(days=FEEDBACK_LAG_DAYS)).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+    lag = conn.execute(
+        f"""
+        SELECT COUNT(*) AS c FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) IN ({placeholders})
+          AND NOT {has_fb}
+          AND TRIM(COALESCE(s.submitted_at, '')) != ''
+          AND s.submitted_at <= ?
+        """,
+        (*normalized, ATTACHMENT_TYPE_TEACHER_FEEDBACK, lag_cutoff),
+    ).fetchone()
+    lag_count = int(lag["c"] if lag else 0)
+
+    avg_hours = _teacher_avg_feedback_hours(conn, teacher_username, normalized)
+
+    per_class = []
+    for code in normalized:
+        per_class.append(
+            _teacher_class_homework_row(conn, teacher_username, code, lag_cutoff)
+        )
+
+    rate = 0.0 if total == 0 else round((given / total) * 100, 1)
+    return {
+        "total_submissions": total,
+        "feedback_given_by_teacher": given,
+        "feedback_rate": rate,
+        "pending_feedback_count": pending_count,
+        "lag_3d_count": lag_count,
+        "avg_feedback_hours": avg_hours,
+        "per_class": per_class,
+    }
+
+
+def _teacher_class_homework_row(
+    conn, teacher_username: str, class_code: str, lag_cutoff: str
+) -> dict[str, Any]:
+    has_fb = _submission_has_feedback_sql("s")
+    att = ATTACHMENT_TYPE_TEACHER_FEEDBACK
+
+    total = conn.execute(
+        f"""
+        SELECT COUNT(*) AS c FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) = ?
+        """,
+        (class_code,),
+    ).fetchone()
+
+    given = conn.execute(
+        f"""
+        SELECT COUNT(*) AS c FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) = ?
+          AND TRIM(COALESCE(s.feedback_by_username, '')) = ?
+          AND {has_fb}
+        """,
+        (class_code, teacher_username, att),
+    ).fetchone()
+
+    pending = conn.execute(
+        f"""
+        SELECT COUNT(*) AS c FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) = ?
+          AND NOT {has_fb}
+        """,
+        (class_code, att),
+    ).fetchone()
+
+    lag = conn.execute(
+        f"""
+        SELECT COUNT(*) AS c FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) = ?
+          AND NOT {has_fb}
+          AND TRIM(COALESCE(s.submitted_at, '')) != ''
+          AND s.submitted_at <= ?
+        """,
+        (class_code, att, lag_cutoff),
+    ).fetchone()
+
+    return {
+        "class_name": class_code,
+        "total_submissions": int(total["c"] if total else 0),
+        "feedback_given_by_teacher": int(given["c"] if given else 0),
+        "pending_feedback_count": int(pending["c"] if pending else 0),
+        "lag_3d_count": int(lag["c"] if lag else 0),
+    }
+
+
+def _teacher_avg_feedback_hours(
+    conn, teacher_username: str, class_codes: list[str]
+) -> float | None:
+    if not class_codes:
+        return None
+    placeholders = ",".join("?" * len(class_codes))
+    rows = conn.execute(
+        f"""
+        SELECT s.submitted_at, s.feedback_at
+        FROM submissions s
+        WHERE TRIM(COALESCE(s.class_name, '')) IN ({placeholders})
+          AND TRIM(COALESCE(s.feedback_by_username, '')) = ?
+          AND TRIM(COALESCE(s.submitted_at, '')) != ''
+          AND TRIM(COALESCE(s.feedback_at, '')) != ''
+        """,
+        (*class_codes, teacher_username),
+    ).fetchall()
+    deltas: list[float] = []
+    for row in rows:
+        submitted = _parse_iso_dt(row["submitted_at"])
+        feedback = _parse_iso_dt(row["feedback_at"])
+        if submitted and feedback and feedback >= submitted:
+            deltas.append((feedback - submitted).total_seconds() / 3600.0)
+    if not deltas:
+        return None
+    return round(sum(deltas) / len(deltas), 1)
+
+
+def _teacher_activity_summary(conn, teacher_username: str) -> dict[str, Any]:
+    pages = conn.execute(
+        """
+        SELECT COUNT(*) AS c FROM teacher_teaching_pages
+        WHERE teacher_username = ? AND COALESCE(published, 0) = 1
+        """,
+        (teacher_username,),
+    ).fetchone()
+    live = conn.execute(
+        "SELECT COUNT(*) AS c FROM live_sessions WHERE teacher_username = ?",
+        (teacher_username,),
+    ).fetchone()
+    recorded = None
+    try:
+        recorded = conn.execute(
+            "SELECT COUNT(*) AS c FROM recorded_lessons WHERE teacher_username = ?",
+            (teacher_username,),
+        ).fetchone()
+    except Exception:
+        recorded = None
+    study_suggestions = conn.execute(
+        """
+        SELECT COUNT(*) AS c FROM student_study_plans
+        WHERE TRIM(COALESCE(teacher_suggestion, '')) != ''
+        """,
+    ).fetchone()
+    return {
+        "published_teaching_pages": int(pages["c"] if pages else 0),
+        "live_sessions": int(live["c"] if live else 0),
+        "recorded_lessons": int(recorded["c"] if recorded else 0),
+        "study_plan_suggestions": int(study_suggestions["c"] if study_suggestions else 0),
+    }
+
+
+def _teacher_risk_flags(homework: dict[str, Any], activity: dict[str, Any]) -> list[dict[str, str]]:
+    flags: list[dict[str, str]] = []
+    if homework.get("lag_3d_count", 0) > 0:
+        flags.append({"code": "feedback_lag_3d", "level": "warning"})
+    if homework.get("pending_feedback_count", 0) > 0:
+        flags.append({"code": "pending_homework_feedback", "level": "info"})
+    if (
+        homework.get("total_submissions", 0) > 0
+        and homework.get("feedback_given_by_teacher", 0) == 0
+    ):
+        flags.append({"code": "no_attributed_feedback", "level": "warning"})
+    if (
+        activity.get("published_teaching_pages", 0) == 0
+        and activity.get("live_sessions", 0) == 0
+        and homework.get("feedback_given_by_teacher", 0) == 0
+    ):
+        flags.append({"code": "low_teaching_activity", "level": "info"})
+    return flags
+
+
+def _parse_iso_dt(value) -> datetime | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, TypeError):
+        return None
 
 
 def _homework_summary(conn, username: str, class_name: str | None, normalize_class_name) -> dict[str, Any]:

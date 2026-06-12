@@ -4,7 +4,7 @@
 (function (global) {
   const MODULES = ["school", "self-study", "teaching", "homework"];
   const SKILLS = ["vocabulary", "reading", "ai"];
-  const SCHOOL_AREAS = ["calendar", "classes", "teachers", "students", "performance"];
+  const SCHOOL_AREAS = ["calendar", "classes", "teachers", "students"];
   const MODULE_I18N = {
     school: "admin_hub_module_school",
     "self-study": "admin_hub_module_self_study",
@@ -16,7 +16,6 @@
     classes: "admin_school_tab_classes",
     teachers: "admin_school_tab_teachers",
     students: "admin_school_tab_students",
-    performance: "admin_school_tab_performance",
   };
 
   let pendingClassId = null;

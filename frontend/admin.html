@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-mgr" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-teachers" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -47,7 +47,7 @@
               <span class="admin-hub-card__icon" aria-hidden="true">🏫</span>
               <span class="admin-hub-card__title" data-i18n="admin_hub_module_school">School &amp; accounts</span>
               <span class="admin-hub-card__desc" data-i18n="admin_hub_module_school_desc">Calendar, classes, teachers, and students.</span>
-              <span class="admin-hub-card__meta" data-i18n="admin_hub_module_school_meta">5 areas</span>
+              <span class="admin-hub-card__meta" data-i18n="admin_hub_module_school_meta">4 areas</span>
             </button>
             <button type="button" class="admin-hub-card" data-hub-module="self-study">
               <span class="admin-hub-card__icon" aria-hidden="true">📚</span>
@@ -74,7 +74,6 @@
             <button type="button" class="admin-module-tabs__btn" data-school-area="classes" data-i18n="admin_school_tab_classes">Classes</button>
             <button type="button" class="admin-module-tabs__btn" data-school-area="teachers" data-i18n="admin_school_tab_teachers">Teachers</button>
             <button type="button" class="admin-module-tabs__btn" data-school-area="students" data-i18n="admin_school_tab_students">Students</button>
-            <button type="button" class="admin-module-tabs__btn" data-school-area="performance" data-i18n="admin_school_tab_performance">Performance</button>
           </nav>
 
           <nav id="admin-ss-tabs" class="admin-module-tabs" hidden aria-label="Self-study sections">
@@ -221,35 +220,31 @@
               Teachers
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_teachers_hint">
-              Uploaded teachers start as Pending. Authorize here to grant calendar access; Revoke returns them to Pending. Delete removes the account.
+              Roster details are pushed from Classes. Authorize here to grant calendar access; Revoke returns them to Pending. Delete removes the account.
             </p>
-            <div class="admin-roster-upload">
-              <h3 class="admin-roster-upload__title" data-i18n="admin_roster_upload_teachers">Upload teacher roster</h3>
-              <p class="admin-panel__hint" data-i18n="admin_roster_upload_hint">
-                Word, Excel, PDF, or TXT — AI reads the layout and lists teachers for you to confirm.
-              </p>
-              <form id="admin-roster-form-teacher" class="admin-inline-form admin-roster-form" novalidate>
-                <div class="field">
-                  <label for="admin-roster-file-teacher" data-i18n="admin_roster_file">Roster file</label>
-                  <input id="admin-roster-file-teacher" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required />
-                </div>
-                <div class="field">
-                  <label for="admin-roster-class-teacher" data-i18n="admin_roster_default_class">Default class (optional)</label>
-                  <input id="admin-roster-class-teacher" type="text" placeholder="EAP047" maxlength="40" />
-                </div>
-                <button type="submit" class="btn-primary" data-i18n="admin_roster_parse_btn">Parse with AI</button>
-              </form>
-              <p id="admin-roster-status-teacher" class="form-message hidden" role="status" aria-live="polite"></p>
-              <div id="admin-roster-preview-teacher" class="admin-roster-preview hidden" aria-live="polite"></div>
+            <div class="admin-roster-search">
+              <label class="visually-hidden" for="admin-teachers-search" data-i18n="admin_teachers_search_label">Search teachers</label>
+              <input
+                id="admin-teachers-search"
+                type="search"
+                class="admin-roster-search__input"
+                autocomplete="off"
+                data-i18n-placeholder="admin_teachers_search_placeholder"
+                placeholder="Search by name, staff ID, office number, or mobile"
+              />
             </div>
-            <div class="admin-table-wrap">
-              <table class="admin-table" id="admin-teachers-table">
+            <div class="admin-table-wrap admin-roster-sheet-wrap">
+              <table class="admin-table admin-roster-sheet" id="admin-teachers-table">
                 <thead>
                   <tr>
-                    <th scope="col" data-i18n="username">Username</th>
                     <th scope="col" data-i18n="admin_col_name">Name</th>
-                    <th scope="col" data-i18n="admin_col_employee_id">Employee ID</th>
-                    <th scope="col" data-i18n="class_label">Class</th>
+                    <th scope="col" data-i18n="admin_col_employee_id">Staff ID</th>
+                    <th scope="col" data-i18n="admin_col_office_number">Office</th>
+                    <th scope="col" data-i18n="admin_col_email">Email</th>
+                    <th scope="col" data-i18n="admin_col_office_phone">Office phone</th>
+                    <th scope="col" data-i18n="admin_col_mobile_phone">Mobile</th>
+                    <th scope="col" data-i18n="username">Username</th>
+                    <th scope="col" data-i18n="class_label">Classes</th>
                     <th scope="col" data-i18n="admin_col_status">Access</th>
                     <th scope="col" data-i18n="admin_col_action">Action</th>
                   </tr>
@@ -259,6 +254,9 @@
             </div>
             <p id="admin-teachers-empty" class="admin-empty hidden" data-i18n="admin_no_teachers">
               No teacher accounts found.
+            </p>
+            <p id="admin-teachers-no-match" class="admin-empty hidden" data-i18n="admin_teachers_no_match">
+              No teachers match your search.
             </p>
           </section>
 
@@ -562,7 +560,7 @@
               Students
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_students_hint">
-              Registered accounts. Delete removes a student from all classes and deletes their login. Use Performance for individual progress.
+              Registered accounts. Open Performance under a student&apos;s name for homework and self-study progress. Delete removes them from all classes.
             </p>
             <div class="admin-roster-upload">
               <h3 class="admin-roster-upload__title" data-i18n="admin_roster_upload_students">Upload student roster</h3>
@@ -587,8 +585,8 @@
               <table class="admin-table" id="admin-students-table">
                 <thead>
                   <tr>
-                    <th scope="col" data-i18n="username">Username</th>
                     <th scope="col" data-i18n="admin_col_name">Name</th>
+                    <th scope="col" data-i18n="username">Username</th>
                     <th scope="col" data-i18n="admin_col_student_id">Student ID</th>
                     <th scope="col" data-i18n="class_label">Class</th>
                     <th scope="col" data-i18n="admin_col_action">Action</th>
@@ -602,28 +600,19 @@
             </p>
           </section>
 
-          <section class="content-section admin-panel" id="admin-performance-section" data-admin-module="school" data-admin-school-area="performance" hidden aria-labelledby="admin-performance-heading">
-            <h2 id="admin-performance-heading" class="section-heading" data-i18n="admin_perf_heading">
-              Student performance lookup
-            </h2>
-            <p class="admin-panel__hint" data-i18n="admin_perf_hint">
-              Enter the student&apos;s registered name and student ID to view homework and self-study progress.
-            </p>
-            <form id="admin-perf-form" class="admin-perf-lookup" novalidate>
-              <div class="field">
-                <label for="admin-perf-name" data-i18n="admin_col_name">Name</label>
-                <input id="admin-perf-name" type="text" required autocomplete="off" />
-              </div>
-              <div class="field">
-                <label for="admin-perf-student-id" data-i18n="admin_col_student_id">Student ID</label>
-                <input id="admin-perf-student-id" type="text" required autocomplete="off" />
-              </div>
-              <button type="submit" class="btn-primary" data-i18n="admin_perf_lookup_btn">View performance</button>
-            </form>
-            <p id="admin-perf-status" class="form-message hidden" role="status" aria-live="polite"></p>
-            <div id="admin-perf-result" class="admin-perf-result hidden" aria-live="polite"></div>
-          </section>
         </main>
+
+        <div id="admin-perf-modal" class="admin-perf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="admin-perf-modal-title" hidden>
+          <div class="admin-perf-modal__backdrop" data-admin-perf-close></div>
+          <div class="admin-perf-modal__card">
+            <header class="admin-perf-modal__head">
+              <h2 id="admin-perf-modal-title" class="admin-perf-modal__title"></h2>
+              <button type="button" class="btn-secondary admin-perf-modal__close" data-admin-perf-close data-i18n="close">Close</button>
+            </header>
+            <p id="admin-perf-modal-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            <div id="admin-perf-modal-body" class="admin-perf-modal__body" aria-live="polite"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -632,7 +621,7 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js?v=20260612-mgr"></script>
+    <script src="app.js?v=20260612-teachers"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-vocabulary.js?v=20260611-v1"></script>
     <script src="js/admin-self-study-reading.js?v=20260611-r6c"></script>
@@ -641,8 +630,8 @@
     <script src="js/admin-teaching-page-templates.js"></script>
     <script src="js/eap-button-state.js"></script>
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
-    <script src="js/admin-performance.js?v=20260610-perf"></script>
+    <script src="js/admin-performance.js?v=20260612-teachers"></script>
     <script src="js/admin-roster-import.js?v=20260612-edit"></script>
-    <script src="js/admin-hub.js?v=20260611-mgr3"></script>
+    <script src="js/admin-hub.js?v=20260612-teachers"></script>
   </body>
 </html>
