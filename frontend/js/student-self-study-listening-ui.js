@@ -1,5 +1,6 @@
 /**
  * SS-L3 — server-backed listening: listen (script hidden) → single-page exam → coach.
+ * Channel B — sealed (see docs/CHANNEL_B_SEALED.md). Re-sealed 2026-06-11 after playlist play fix.
  */
 (function (global) {
   const SERVER = () => global.EAP_SELF_STUDY_SERVER;
@@ -186,10 +187,14 @@
       stopBrowserSpeech();
       speechCtl.playing = true;
       speechCtl.voice = pickSpeechVoice(speechCtl.segments[speechCtl.idx]?.gender);
+      global.speechSynthesis.getVoices();
       if (playBtn) playBtn.disabled = false;
       if (pauseBtn) pauseBtn.disabled = false;
       if (stopBtn) stopBtn.disabled = false;
-      speakSegmentAt(root, speechCtl.idx);
+      // Defer after cancel() — Chrome/Safari may ignore immediate speak().
+      global.setTimeout(() => {
+        if (speechCtl.playing) speakSegmentAt(root, speechCtl.idx);
+      }, 0);
     });
 
     pauseBtn?.addEventListener("click", () => {
@@ -226,16 +231,17 @@
 
   function renderServerAudioPlayer(audio) {
     if (audio.playlist && audio.segments && audio.segments.length) {
+      const firstUrl = audio.segments[0] && audio.segments[0].url ? String(audio.segments[0].url) : "";
       const list = audio.segments
         .map(
           (_, i) =>
-            `<li><button type="button" class="ssc-audio-seg-btn" data-seg="${i}" aria-label="${escapeHtml(segmentPartLabel(i))}">${escapeHtml(segmentPartLabel(i))}</button></li>`,
+            `<li><button type="button" class="ssc-audio-seg-btn${i === 0 ? " ssc-audio-seg-btn--active" : ""}" data-seg="${i}" aria-label="${escapeHtml(segmentPartLabel(i))}">${escapeHtml(segmentPartLabel(i))}</button></li>`,
         )
         .join("");
       return `
         <div class="ssc-audio-player" id="ssc-listening-audio-wrap">
           <p class="ssc-audio-player__label">${t("self_study_listening_audio_play")}</p>
-          <audio id="ssc-listening-audio" controls preload="metadata" class="ssc-audio-player__el"></audio>
+          <audio id="ssc-listening-audio" controls preload="metadata" class="ssc-audio-player__el"${firstUrl ? ` src="${escapeHtml(firstUrl)}"` : ""}></audio>
           <p class="ssc-audio-playlist__heading">${t("self_study_listening_segments_heading")}</p>
           <ol class="ssc-audio-playlist">${list}</ol>
           ${audio.truncated ? `<p class="ssc-disclaimer">${t("self_study_listening_audio_truncated")}</p>` : ""}
@@ -300,17 +306,48 @@
     const el = root.querySelector("#ssc-listening-audio");
     if (!el) return;
     let idx = 0;
-    const playSeg = (i) => {
-      idx = i;
+    let loadedSeg = el.src && audio.segments[0] && audio.segments[0].url ? 0 : -1;
+    const segButtons = () => root.querySelectorAll("#ssc-listening-audio-wrap .ssc-audio-seg-btn");
+    const setActiveSeg = (i) => {
+      segButtons().forEach((btn) => {
+        btn.classList.toggle("ssc-audio-seg-btn--active", parseInt(btn.getAttribute("data-seg"), 10) === i);
+      });
+    };
+    const tryPlay = () => {
+      const p = el.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(() => {
+          /* user gesture or empty buffer — native controls still work */
+        });
+      }
+    };
+    const playSeg = (i, autoplay) => {
       const seg = audio.segments[i];
       if (!seg || !seg.url) return;
-      el.src = seg.url;
-      void el.play();
+      idx = i;
+      setActiveSeg(i);
+      const start = () => {
+        if (autoplay !== false) tryPlay();
+      };
+      if (loadedSeg !== i) {
+        loadedSeg = i;
+        el.src = seg.url;
+        el.addEventListener("loadeddata", start, { once: true });
+        el.load();
+      } else {
+        start();
+      }
     };
+    if (loadedSeg === 0) setActiveSeg(0);
+    el.addEventListener("play", () => {
+      if (!el.src && audio.segments[0] && audio.segments[0].url) {
+        playSeg(0);
+      }
+    });
     el.addEventListener("ended", () => {
       if (idx + 1 < audio.segments.length) playSeg(idx + 1);
     });
-    root.querySelectorAll("#ssc-listening-audio-wrap .ssc-audio-seg-btn").forEach((btn) => {
+    segButtons().forEach((btn) => {
       btn.addEventListener("click", () => playSeg(parseInt(btn.getAttribute("data-seg"), 10)));
     });
   }

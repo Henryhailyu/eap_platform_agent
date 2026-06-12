@@ -42,14 +42,32 @@ def _parse_roster_ai(text: str, role: str) -> dict[str, Any]:
         raise RuntimeError("AI is not configured on the server")
 
     id_field = "employee_id" if role == "teacher" else "student_id"
+    if role == "teacher":
+        shape = (
+            '{"people":[{"full_name":"","employee_id":"","office_number":"","email":"",'
+            '"office_phone":"","mobile_phone":"","username":"","class_codes":["EAP047"],"authorized":false}],'
+            '"warnings":[]}'
+        )
+        field_rules = (
+            "employee_id = staff ID number; office_number = office/room number; "
+            "office_phone = desk phone; mobile_phone = registered mobile; "
+        )
+    else:
+        shape = (
+            '{"people":[{"full_name":"","student_id":"","email":"","mobile_phone":"",'
+            '"username":"","class_codes":["EAP047"]}],"warnings":[]}'
+        )
+        field_rules = (
+            "student_id = official student ID number; "
+            "email = official school email address; "
+            "mobile_phone = registered phone number; "
+        )
     system = (
         "You extract structured roster rows from school documents for an EAP platform. "
-        "Return ONLY valid JSON with this shape: "
-        '{"people":[{"full_name":"","'
-        + id_field
-        + '":"","username":"","class_codes":["EAP047"],"authorized":false}],"warnings":[]}. '
+        f"Return ONLY valid JSON with this shape: {shape}. "
         "Rules: include every person in the document; "
-        f"{id_field} is the school staff/student number when present; "
+        f"{field_rules}"
+        f"{id_field} is required when present in the document; "
         "username is a short login id (often the number or pinyin) when obvious, else empty; "
         "class_codes is a list of class codes like EAP047; "
         "for teachers authorized is true only when the document clearly says approved/active. "
@@ -97,6 +115,16 @@ def _header_map(headers: list[str]) -> dict[str, int]:
             mapping["class"] = i
         elif "username" in key or "账号" in key or "登录" in key:
             mapping["username"] = i
+        elif any(x in key for x in ("邮箱", "email", "e-mail")):
+            mapping["email"] = i
+        elif any(x in key for x in ("办公室", "office no", "office number", "办公室号", "办公号")):
+            mapping["office_number"] = i
+        elif any(x in key for x in ("办公电话", "office phone", "座机", "分机")):
+            mapping["office_phone"] = i
+        elif any(x in key for x in ("手机", "mobile", "cell", "电话", "phone")) and "office" not in key and "办公" not in key:
+            mapping["mobile_phone"] = i
+        elif any(x in key for x in ("学校邮箱", "school email", "official email")):
+            mapping["email"] = i
     return mapping
 
 
@@ -144,6 +172,10 @@ def _parse_roster_rule_based(text: str, role: str) -> dict[str, Any]:
                 "username": username,
                 "class_codes": class_codes,
             }
+            for field in ("email", "office_number", "office_phone", "mobile_phone"):
+                fidx = colmap.get(field, -1)
+                if fidx >= 0 and fidx < len(row) and row[fidx]:
+                    entry[field] = row[fidx].strip()
             if role == "teacher":
                 entry["authorized"] = False
             people.append(entry)
@@ -219,6 +251,10 @@ def _normalize_people(raw_people: list, role: str, default_class: str | None) ->
         }
         if role == "teacher":
             entry["authorized"] = bool(row.get("authorized"))
+        for field in ("email", "office_number", "office_phone", "mobile_phone"):
+            val = str(row.get(field) or "").strip()
+            if val:
+                entry[field] = val
         out.append(entry)
 
     return out, warnings
@@ -308,25 +344,34 @@ def _import_people(
             ).fetchone()
 
         user_id: int | None = None
+        email = str(row.get("email") or "").strip() or None
+        office_number = str(row.get("office_number") or "").strip() or None
+        office_phone = str(row.get("office_phone") or "").strip() or None
+        mobile_phone = str(row.get("mobile_phone") or "").strip() or None
+
         if existing:
             user_id = int(existing["id"])
             conn.execute(
                 f"""
-                UPDATE users SET full_name = ?, {id_key} = ?, class_name = COALESCE(class_name, ?)
+                UPDATE users SET full_name = ?, {id_key} = ?, class_name = COALESCE(class_name, ?),
+                    email = COALESCE(?, email),
+                    office_number = COALESCE(?, office_number),
+                    office_phone = COALESCE(?, office_phone),
+                    mobile_phone = COALESCE(?, mobile_phone)
                 WHERE id = ?
                 """,
                 (
                     full_name or None,
                     ext_id or None,
                     normalize_class_name(row["class_codes"][0]) if row.get("class_codes") else None,
+                    email,
+                    office_number,
+                    office_phone,
+                    mobile_phone,
                     user_id,
                 ),
             )
-            if role == "teacher" and "authorized" in row:
-                conn.execute(
-                    "UPDATE users SET is_authorized = ? WHERE id = ?",
-                    (1 if row.get("authorized") else 0, user_id),
-                )
+            # Authorization is managed on the Teachers tab — roster import never changes it.
             updated += 1
         else:
             clash = conn.execute(
@@ -336,14 +381,16 @@ def _import_people(
             if clash:
                 suffix = ext_id[-4:] if ext_id else uuid.uuid4().hex[:4]
                 username = f"{username[:32]}_{suffix}"[:40]
-            is_auth = 1 if (role != "teacher" or row.get("authorized")) else 0
+            # New teachers stay pending until the manager authorizes them on the Teachers tab.
+            is_auth = 0 if role == "teacher" else 1
             cur = conn.execute(
                 f"""
                 INSERT INTO users (
                     username, password, password_hash, role, full_name, class_name,
-                    is_authorized, student_id, employee_id
+                    is_authorized, student_id, employee_id,
+                    email, office_number, office_phone, mobile_phone
                 )
-                VALUES (?, '', ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     username,
@@ -354,6 +401,10 @@ def _import_people(
                     is_auth,
                     ext_id if role == "student" else None,
                     ext_id if role == "teacher" else None,
+                    email,
+                    office_number,
+                    office_phone,
+                    mobile_phone,
                 ),
             )
             user_id = int(cur.lastrowid)

@@ -1,6 +1,6 @@
 # Channel B (AI self-study) — TOTALLY SEALED
 
-**Status:** `TOTALLY SEALED` — verified by owner testing **2026-06-11**  
+**Status:** `TOTALLY SEALED` — re-verified by owner **2026-06-11** (listening play fix confirmed)  
 **Next work:** Channel A fixes only — **do not touch Channel B** unless the owner explicitly unseals.
 
 ## Owner directive (2026-06-11)
@@ -95,5 +95,14 @@ Before **any** edit, plan, or suggestion that could affect Channel B, the agent 
 ```
 STATUS: TOTALLY SEALED
 VERIFIED: 2026-06-11 (owner testing — Channel B OK)
-UNSEAL: (none — Channel A fixes only until owner approves)
+UNSEAL: 2026-06-11 — listening only (student play button on multi-segment TTS playlist)
+RE-SEALED: 2026-06-11 — owner confirmed listening play fix; Channel B sealed again
 ```
+
+### Seal history (2026-06-11)
+
+| Event | Scope | Reason |
+|-------|-------|--------|
+| Initial seal | All five skills | Owner testing — Channel B OK |
+| Brief unseal | Listening UI (`student-self-study-listening-ui.js`) | Native audio Play did nothing until a segment button was clicked (playlist had no initial `src`) |
+| Re-seal | All five skills | Owner confirmed fix — **do not touch Channel B** unless explicitly unsealed |

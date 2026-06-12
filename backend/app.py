@@ -516,6 +516,15 @@ def migrate_users_add_external_ids(conn):
         conn.execute("ALTER TABLE users ADD COLUMN student_id TEXT")
     if "employee_id" not in column_names:
         conn.execute("ALTER TABLE users ADD COLUMN employee_id TEXT")
+
+
+def migrate_users_add_contact_fields(conn):
+    """Manager roster import: email, office, and phone fields."""
+    rows = conn.execute("PRAGMA table_info(users)").fetchall()
+    column_names = [r[1] for r in rows]
+    for col in ("email", "office_number", "office_phone", "mobile_phone"):
+        if col not in column_names:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
     conn.execute(
         """
         UPDATE users SET student_id = '20260001'
@@ -644,6 +653,7 @@ def init_database():
     migrate_users_add_password_hash(conn)
     migrate_users_add_is_authorized(conn)
     migrate_users_add_external_ids(conn)
+    migrate_users_add_contact_fields(conn)
 
     from live_teaching import init_live_teaching_tables
 
@@ -6599,10 +6609,17 @@ def admin_user_dict(conn, row):
 
 
 def admin_class_member_user_dict(row):
+    keys = row.keys() if hasattr(row, "keys") else ()
     return {
         "id": row["id"],
         "username": row["username"],
         "full_name": row["full_name"],
+        "employee_id": row["employee_id"] if "employee_id" in keys else None,
+        "student_id": row["student_id"] if "student_id" in keys else None,
+        "email": row["email"] if "email" in keys else None,
+        "office_number": row["office_number"] if "office_number" in keys else None,
+        "office_phone": row["office_phone"] if "office_phone" in keys else None,
+        "mobile_phone": row["mobile_phone"] if "mobile_phone" in keys else None,
     }
 
 
@@ -6636,7 +6653,8 @@ def admin_class_detail_payload(conn, class_id):
 
     teachers = conn.execute(
         """
-        SELECT u.id, u.username, u.full_name
+        SELECT u.id, u.username, u.full_name, u.employee_id, u.email,
+               u.office_number, u.office_phone, u.mobile_phone
         FROM teacher_classes tc
         INNER JOIN users u ON u.id = tc.teacher_id
         WHERE tc.class_id = ?
@@ -6646,7 +6664,7 @@ def admin_class_detail_payload(conn, class_id):
     ).fetchall()
     students = conn.execute(
         """
-        SELECT u.id, u.username, u.full_name
+        SELECT u.id, u.username, u.full_name, u.student_id, u.email, u.mobile_phone
         FROM class_enrollments ce
         INNER JOIN users u ON u.id = ce.student_id
         WHERE ce.class_id = ?
@@ -6753,9 +6771,9 @@ def admin_classes():
     return jsonify(payload), 201
 
 
-@app.route("/api/admin/classes/<int:class_id>", methods=["GET", "PUT"])
+@app.route("/api/admin/classes/<int:class_id>", methods=["GET", "PUT", "DELETE"])
 def admin_class_detail(class_id):
-    """Phase E3: class detail or update (admin only)."""
+    """Phase E3: class detail, update, or delete (admin only)."""
     conn = get_db_connection()
     guard = require_admin_session(conn)
     if guard is not None:
@@ -6768,6 +6786,21 @@ def admin_class_detail(class_id):
         if payload is None:
             return jsonify({"error": "Class not found"}), 404
         return jsonify(payload)
+
+    if request.method == "DELETE":
+        row = conn.execute(
+            "SELECT id, class_code FROM classes WHERE id = ?",
+            (class_id,),
+        ).fetchone()
+        if row is None:
+            conn.close()
+            return jsonify({"error": "Class not found"}), 404
+        conn.execute("DELETE FROM teacher_classes WHERE class_id = ?", (class_id,))
+        conn.execute("DELETE FROM class_enrollments WHERE class_id = ?", (class_id,))
+        conn.execute("DELETE FROM classes WHERE id = ?", (class_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"deleted": True, "id": class_id, "class_code": row["class_code"]})
 
     data = request.get_json(silent=True) or {}
     row = conn.execute(
@@ -7096,6 +7129,68 @@ def admin_set_teacher_authorized(user_id):
     ).fetchone()
     conn.close()
     return jsonify(user_public_dict(updated))
+
+
+@app.route("/api/admin/teachers/<int:user_id>", methods=["DELETE"])
+def admin_delete_teacher(user_id):
+    """Remove a teacher account and unlink all class assignments (admin only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    row = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    if str(row["role"] or "").strip().lower() != "teacher":
+        conn.close()
+        return jsonify({"error": "User is not a teacher"}), 400
+
+    username = row["username"]
+    conn.execute("DELETE FROM teacher_classes WHERE teacher_id = ?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"deleted": True, "id": user_id, "username": username})
+
+
+@app.route("/api/admin/students/<int:user_id>", methods=["DELETE"])
+def admin_delete_student(user_id):
+    """Remove a student account and unlink all class enrollments (admin only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    row = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    if str(row["role"] or "").strip().lower() != "student":
+        conn.close()
+        return jsonify({"error": "User is not a student"}), 400
+
+    username = row["username"]
+    conn.execute("DELETE FROM class_enrollments WHERE student_id = ?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"deleted": True, "id": user_id, "username": username})
 
 
 SELF_STUDY_MODULES = frozenset({"vocabulary", "reading", "listening", "speaking", "writing"})

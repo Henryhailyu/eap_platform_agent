@@ -239,6 +239,90 @@ body.admin-module-active .content-section.admin-panel {
   align-items: flex-end;
 }
 
+.admin-class-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.btn-danger {
+  border-color: rgba(200, 60, 50, 0.45);
+  color: #b42318;
+}
+
+.btn-danger:hover {
+  border-color: rgba(200, 60, 50, 0.65);
+  background: rgba(200, 60, 50, 0.06);
+}
+
+.admin-class-roster-upload {
+  margin-top: 0.75rem;
+}
+
+.admin-member-list__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-member-list__name {
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.admin-member-list__meta {
+  display: block;
+  font-size: 0.82rem;
+  color: #5c5c62;
+  line-height: 1.35;
+}
+
+.admin-roster-extract-box {
+  margin-top: 0.75rem;
+  padding: 1rem 1.1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(10, 126, 164, 0.18);
+  border-radius: 12px;
+}
+
+.admin-roster-extract-box__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.admin-roster-extract-box__table {
+  margin-top: 0.65rem;
+}
+
+.admin-roster-preview-table .admin-roster-field {
+  width: 100%;
+  min-width: 5.5rem;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.82rem;
+  border: 1px solid rgba(10, 126, 164, 0.2);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.admin-roster-preview-table .admin-roster-field--wide {
+  min-width: 9rem;
+}
+
+.admin-roster-preview-table .admin-roster-field:focus {
+  outline: 2px solid rgba(0, 113, 227, 0.35);
+  border-color: rgba(0, 113, 227, 0.45);
+}
+
+.admin-roster-preview-table td {
+  vertical-align: middle;
+  padding: 0.35rem 0.4rem;
+}
+
 @media (max-width: 640px) {
   .admin-module-tabs {
     gap: 0.35rem;

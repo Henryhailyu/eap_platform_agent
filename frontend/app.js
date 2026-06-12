@@ -2526,23 +2526,23 @@ function startAcademicCalendarLiveSync(getRepaintFn) {
   if (window.__eapAcademicCalendarLiveSync) return;
   window.__eapAcademicCalendarLiveSync = true;
 
-  const pullAndRepaint = async (force) => {
-    const changed = await syncAcademicCalendarFromServer({ force: !!force });
+  const pullAndRepaint = async () => {
+    const changed = await syncAcademicCalendarFromServer();
     if (changed) {
       const repaint = typeof getRepaintFn === "function" ? getRepaintFn() : null;
       if (repaint) await repaint();
     }
   };
 
-  setInterval(() => void pullAndRepaint(true), ACADEMIC_CALENDAR_SYNC_MS);
+  setInterval(() => void pullAndRepaint(), ACADEMIC_CALENDAR_SYNC_MS);
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void pullAndRepaint(true);
+    if (document.visibilityState === "visible") void pullAndRepaint();
   });
   try {
     if (typeof BroadcastChannel !== "undefined") {
       const ch = new BroadcastChannel(ACADEMIC_CALENDAR_BC);
       ch.onmessage = (ev) => {
-        if (ev && ev.data && ev.data.type === "updated") void pullAndRepaint(true);
+        if (ev && ev.data && ev.data.type === "updated") void pullAndRepaint();
       };
     }
   } catch {
@@ -3478,7 +3478,7 @@ function setAdminPageMessage(el, text, isError) {
   el.classList.toggle("form-message--success", !isError);
 }
 
-function renderAdminTeachersTable(teachers, tbody, emptyEl, onToggle) {
+function renderAdminTeachersTable(teachers, tbody, emptyEl, onToggle, onDelete) {
   if (!tbody) return;
   tbody.innerHTML = "";
   const list = Array.isArray(teachers) ? teachers : [];
@@ -3493,12 +3493,21 @@ function renderAdminTeachersTable(teachers, tbody, emptyEl, onToggle) {
     statusTd.appendChild(badge);
 
     const actionTd = document.createElement("td");
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = authorized ? "btn-secondary" : "btn-primary";
-    btn.textContent = authorized ? t("admin_revoke_btn") : t("admin_authorize_btn");
-    btn.addEventListener("click", () => onToggle(teacher, !authorized, btn));
-    actionTd.appendChild(btn);
+    actionTd.className = "admin-class-actions";
+    const authBtn = document.createElement("button");
+    authBtn.type = "button";
+    authBtn.className = authorized ? "btn-secondary" : "btn-primary";
+    authBtn.textContent = authorized ? t("admin_revoke_btn") : t("admin_authorize_btn");
+    authBtn.addEventListener("click", () => onToggle(teacher, !authorized, authBtn));
+    actionTd.appendChild(authBtn);
+    if (typeof onDelete === "function") {
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "btn-secondary btn-danger";
+      delBtn.textContent = t("admin_teacher_delete_btn");
+      delBtn.addEventListener("click", () => onDelete(teacher, delBtn));
+      actionTd.appendChild(delBtn);
+    }
 
     const classLabel =
       Array.isArray(teacher.assigned_classes) && teacher.assigned_classes.length
@@ -3516,7 +3525,7 @@ function renderAdminTeachersTable(teachers, tbody, emptyEl, onToggle) {
   });
 }
 
-function renderAdminStudentsTable(students, tbody, emptyEl) {
+function renderAdminStudentsTable(students, tbody, emptyEl, onDelete) {
   if (!tbody) return;
   tbody.innerHTML = "";
   const list = Array.isArray(students) ? students : [];
@@ -3532,6 +3541,17 @@ function renderAdminStudentsTable(students, tbody, emptyEl) {
       td.textContent = val;
       tr.appendChild(td);
     });
+    const actionTd = document.createElement("td");
+    actionTd.className = "admin-class-actions";
+    if (typeof onDelete === "function") {
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "btn-secondary btn-danger";
+      delBtn.textContent = t("admin_student_delete_btn");
+      delBtn.addEventListener("click", () => onDelete(student, delBtn));
+      actionTd.appendChild(delBtn);
+    }
+    tr.appendChild(actionTd);
     tbody.appendChild(tr);
   });
 }
@@ -3567,10 +3587,6 @@ function initAdminPage() {
     const classDetailTitle = document.getElementById("admin-class-detail-title");
     const classTeachersList = document.getElementById("admin-class-teachers-list");
     const classStudentsList = document.getElementById("admin-class-students-list");
-    const classAddTeacherSel = document.getElementById("admin-class-add-teacher");
-    const classAddStudentSel = document.getElementById("admin-class-add-student");
-    const classAddTeacherBtn = document.getElementById("admin-class-add-teacher-btn");
-    const classAddStudentBtn = document.getElementById("admin-class-add-student-btn");
 
     function formatAssignedClasses(user) {
       if (Array.isArray(user.assigned_classes) && user.assigned_classes.length) {
@@ -3579,38 +3595,32 @@ function initAdminPage() {
       return user.class_name || "—";
     }
 
-    function populateClassMemberSelects(classDetail, allTeachers, allStudents) {
-      if (!classAddTeacherSel || !classAddStudentSel) return;
-      const inClassTeacherIds = new Set((classDetail.teachers || []).map((t) => t.id));
-      const inClassStudentIds = new Set((classDetail.students || []).map((s) => s.id));
-
-      classAddTeacherSel.innerHTML = "";
-      const teacherPlaceholder = document.createElement("option");
-      teacherPlaceholder.value = "";
-      teacherPlaceholder.textContent = t("admin_add_teacher_btn");
-      classAddTeacherSel.appendChild(teacherPlaceholder);
-      allTeachers
-        .filter((row) => !inClassTeacherIds.has(row.id))
-        .forEach((row) => {
-          const opt = document.createElement("option");
-          opt.value = String(row.id);
-          opt.textContent = `${row.username} (${row.full_name || row.username})`;
-          classAddTeacherSel.appendChild(opt);
-        });
-
-      classAddStudentSel.innerHTML = "";
-      const studentPlaceholder = document.createElement("option");
-      studentPlaceholder.value = "";
-      studentPlaceholder.textContent = t("admin_add_student_btn");
-      classAddStudentSel.appendChild(studentPlaceholder);
-      allStudents
-        .filter((row) => !inClassStudentIds.has(row.id))
-        .forEach((row) => {
-          const opt = document.createElement("option");
-          opt.value = String(row.id);
-          opt.textContent = `${row.username} (${row.full_name || row.username})`;
-          classAddStudentSel.appendChild(opt);
-        });
+    function memberDetailLines(member, role) {
+      const lines = [];
+      const name = member.full_name || member.username || "—";
+      lines.push(name);
+      if (role === "teacher" && member.employee_id) {
+        lines.push(`${t("admin_col_employee_id")}: ${member.employee_id}`);
+      }
+      if (role === "student" && member.student_id) {
+        lines.push(`${t("admin_col_student_id")}: ${member.student_id}`);
+      }
+      if (member.office_number) lines.push(`${t("admin_col_office_number")}: ${member.office_number}`);
+      if (member.email) {
+        lines.push(
+          `${role === "student" ? t("admin_col_school_email") : t("admin_col_email")}: ${member.email}`,
+        );
+      }
+      if (member.office_phone) lines.push(`${t("admin_col_office_phone")}: ${member.office_phone}`);
+      if (member.mobile_phone) {
+        lines.push(
+          `${role === "student" ? t("admin_col_registered_phone") : t("admin_col_mobile_phone")}: ${member.mobile_phone}`,
+        );
+      }
+      if (member.username && member.username !== name) {
+        lines.push(`${t("username")}: ${member.username}`);
+      }
+      return lines;
     }
 
     function renderClassMemberList(listEl, members, classId, role) {
@@ -3625,8 +3635,14 @@ function initAdminPage() {
       }
       list.forEach((member) => {
         const li = document.createElement("li");
-        const label = document.createElement("span");
-        label.textContent = `${member.username}${member.full_name ? ` · ${member.full_name}` : ""}`;
+        const label = document.createElement("div");
+        label.className = "admin-member-list__body";
+        memberDetailLines(member, role).forEach((line, idx) => {
+          const p = document.createElement("span");
+          p.className = idx === 0 ? "admin-member-list__name" : "admin-member-list__meta";
+          p.textContent = line;
+          label.appendChild(p);
+        });
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn-secondary";
@@ -3660,7 +3676,36 @@ function initAdminPage() {
       }
       renderClassMemberList(classTeachersList, classDetail.teachers, classDetail.id, "teacher");
       renderClassMemberList(classStudentsList, classDetail.students, classDetail.id, "student");
-      populateClassMemberSelects(classDetail, teachersCache, studentsCache);
+      if (window.EAP_ADMIN_ROSTER && typeof window.EAP_ADMIN_ROSTER.setClassRosterContext === "function") {
+        window.EAP_ADMIN_ROSTER.setClassRosterContext(classDetail.class_code, async () => {
+          await reloadAdminLists();
+        });
+      }
+    }
+
+    async function deleteClass(cls) {
+      if (!cls || cls.id == null) return;
+      const code = cls.class_code || cls.display_name || String(cls.id);
+      const ok = window.confirm(t("admin_class_delete_confirm", { code }));
+      if (!ok) return;
+      setAdminPageMessage(errorEl, "", false);
+      try {
+        await apiDelete(`/api/admin/classes/${cls.id}`);
+        if (activeClassId === cls.id) {
+          activeClassId = null;
+          if (classDetailEl) classDetailEl.classList.add("hidden");
+          if (window.EAP_ADMIN_ROSTER && typeof window.EAP_ADMIN_ROSTER.setClassRosterContext === "function") {
+            window.EAP_ADMIN_ROSTER.setClassRosterContext(null);
+          }
+        }
+        setAdminPageMessage(statusEl, t("admin_class_deleted", { code }), false);
+        await reloadAdminLists();
+        if (window.EAP_ADMIN_HUB && typeof window.EAP_ADMIN_HUB.setRoute === "function") {
+          window.EAP_ADMIN_HUB.setRoute("school", { area: "classes" });
+        }
+      } catch (err) {
+        setAdminPageMessage(errorEl, err.message, true);
+      }
     }
 
     function renderAdminClassesTable(classes) {
@@ -3678,12 +3723,13 @@ function initAdminPage() {
           },
         );
         const actionTd = document.createElement("td");
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "btn-secondary";
-        btn.textContent = t("admin_class_manage_btn");
-        btn.setAttribute("data-class-id", String(cls.id));
-        btn.addEventListener("click", async () => {
+        actionTd.className = "admin-class-actions";
+        const manageBtn = document.createElement("button");
+        manageBtn.type = "button";
+        manageBtn.className = "btn-secondary";
+        manageBtn.textContent = t("admin_class_manage_btn");
+        manageBtn.setAttribute("data-class-id", String(cls.id));
+        manageBtn.addEventListener("click", async () => {
           if (window.EAP_ADMIN_HUB && typeof window.EAP_ADMIN_HUB.openClassManage === "function") {
             window.EAP_ADMIN_HUB.openClassManage(cls.id);
           }
@@ -3697,7 +3743,15 @@ function initAdminPage() {
             setAdminPageMessage(errorEl, err.message, true);
           }
         });
-        actionTd.appendChild(btn);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "btn-secondary btn-danger";
+        deleteBtn.textContent = t("admin_class_delete_btn");
+        deleteBtn.addEventListener("click", () => {
+          void deleteClass(cls);
+        });
+        actionTd.appendChild(manageBtn);
+        actionTd.appendChild(deleteBtn);
         tr.appendChild(actionTd);
         classesTbody.appendChild(tr);
       });
@@ -3714,8 +3768,8 @@ function initAdminPage() {
         teachersCache = Array.isArray(teachers) ? teachers : [];
         studentsCache = Array.isArray(students) ? students : [];
         classesCache = Array.isArray(classes) ? classes : [];
-        renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle);
-        renderAdminStudentsTable(studentsCache, studentsTbody, studentsEmpty);
+        renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle, handleTeacherDelete);
+        renderAdminStudentsTable(studentsCache, studentsTbody, studentsEmpty, handleStudentDelete);
         renderAdminClassesTable(classesCache);
         if (activeClassId) {
           try {
@@ -3742,8 +3796,64 @@ function initAdminPage() {
         const idx = teachersCache.findIndex((row) => row.id === teacher.id);
         if (idx >= 0) teachersCache[idx] = updated;
         else teachersCache.push(updated);
-        renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle);
-        setAdminPageMessage(statusEl, t("admin_updated"), false);
+        renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle, handleTeacherDelete);
+        setAdminPageMessage(
+          statusEl,
+          authorized ? t("admin_teacher_authorized_msg") : t("admin_teacher_revoked_msg"),
+          false,
+        );
+      } catch (err) {
+        setAdminPageMessage(errorEl, err.message, true);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function handleTeacherDelete(teacher, btn) {
+      if (!teacher || teacher.id == null) return;
+      const label = teacher.full_name || teacher.username || String(teacher.id);
+      if (!window.confirm(t("admin_teacher_delete_confirm", { name: label }))) return;
+      if (btn) btn.disabled = true;
+      setAdminPageMessage(statusEl, "", false);
+      try {
+        await apiDelete(`/api/admin/teachers/${teacher.id}`);
+        teachersCache = teachersCache.filter((row) => row.id !== teacher.id);
+        renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle, handleTeacherDelete);
+        if (activeClassId) {
+          try {
+            const detail = await apiGet(`/api/admin/classes/${activeClassId}`);
+            showClassDetail(detail);
+          } catch {
+            /* class panel optional */
+          }
+        }
+        setAdminPageMessage(statusEl, t("admin_teacher_deleted_msg", { name: label }), false);
+      } catch (err) {
+        setAdminPageMessage(errorEl, err.message, true);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function handleStudentDelete(student, btn) {
+      if (!student || student.id == null) return;
+      const label = student.full_name || student.username || String(student.id);
+      if (!window.confirm(t("admin_student_delete_confirm", { name: label }))) return;
+      if (btn) btn.disabled = true;
+      setAdminPageMessage(statusEl, "", false);
+      try {
+        await apiDelete(`/api/admin/students/${student.id}`);
+        studentsCache = studentsCache.filter((row) => row.id !== student.id);
+        renderAdminStudentsTable(studentsCache, studentsTbody, studentsEmpty, handleStudentDelete);
+        if (activeClassId) {
+          try {
+            const detail = await apiGet(`/api/admin/classes/${activeClassId}`);
+            showClassDetail(detail);
+          } catch {
+            /* class panel optional */
+          }
+        }
+        setAdminPageMessage(statusEl, t("admin_student_deleted_msg", { name: label }), false);
       } catch (err) {
         setAdminPageMessage(errorEl, err.message, true);
       } finally {
@@ -3901,41 +4011,9 @@ function initAdminPage() {
       });
     }
 
-    if (classAddTeacherBtn) {
-      classAddTeacherBtn.addEventListener("click", async () => {
-        if (!activeClassId || !classAddTeacherSel || !classAddTeacherSel.value) return;
-        try {
-          const updated = await apiPost(`/api/admin/classes/${activeClassId}/teachers`, {
-            teacher_id: Number(classAddTeacherSel.value, 10),
-          });
-          showClassDetail(updated);
-          setAdminPageMessage(statusEl, t("admin_class_members_updated"), false);
-          await reloadAdminLists();
-        } catch (err) {
-          setAdminPageMessage(errorEl, err.message, true);
-        }
-      });
-    }
-
-    if (classAddStudentBtn) {
-      classAddStudentBtn.addEventListener("click", async () => {
-        if (!activeClassId || !classAddStudentSel || !classAddStudentSel.value) return;
-        try {
-          const updated = await apiPost(`/api/admin/classes/${activeClassId}/students`, {
-            student_id: Number(classAddStudentSel.value, 10),
-          });
-          showClassDetail(updated);
-          setAdminPageMessage(statusEl, t("admin_class_members_updated"), false);
-          await reloadAdminLists();
-        } catch (err) {
-          setAdminPageMessage(errorEl, err.message, true);
-        }
-      });
-    }
-
     window.__eapAdminLangRefresh = () => {
-      renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle);
-      renderAdminStudentsTable(studentsCache, studentsTbody, studentsEmpty);
+      renderAdminTeachersTable(teachersCache, teachersTbody, teachersEmpty, handleTeacherToggle, handleTeacherDelete);
+      renderAdminStudentsTable(studentsCache, studentsTbody, studentsEmpty, handleStudentDelete);
       renderAdminClassesTable(classesCache);
       void reloadAdminLists();
       void loadAdminCalendarForm();

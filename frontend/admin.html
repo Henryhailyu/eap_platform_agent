@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260611-cal1" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-mgr" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -142,7 +142,7 @@
               Classes
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_classes_hint">
-              Create classes and assign teachers and students. Membership controls which calendars they can use.
+              Create classes, then upload teacher and student rosters per class. Membership controls which calendars they can use.
             </p>
             <form id="admin-class-create-form" class="admin-inline-form" novalidate>
               <div class="field">
@@ -177,21 +177,39 @@
                 <div>
                   <h4 data-i18n="admin_class_teachers">Teachers in class</h4>
                   <ul id="admin-class-teachers-list" class="admin-member-list"></ul>
-                  <div class="admin-inline-form">
-                    <select id="admin-class-add-teacher" aria-label="Add teacher"></select>
-                    <button type="button" class="btn-secondary" id="admin-class-add-teacher-btn" data-i18n="admin_add_teacher_btn">
-                      Add teacher
-                    </button>
+                  <div class="admin-roster-upload admin-class-roster-upload">
+                    <h5 class="admin-roster-upload__title" data-i18n="admin_class_roster_teachers">Upload teachers for this class</h5>
+                    <p class="admin-panel__hint" data-i18n="admin_class_roster_teachers_hint">
+                      Word, Excel, PDF, or TXT — include name, staff ID, office number, email, office phone, and mobile.
+                    </p>
+                    <form id="admin-class-roster-form-teacher" class="admin-inline-form admin-roster-form" novalidate>
+                      <div class="field">
+                        <label for="admin-class-roster-file-teacher" data-i18n="admin_roster_file">Roster file</label>
+                        <input id="admin-class-roster-file-teacher" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required />
+                      </div>
+                      <button type="submit" class="btn-primary" data-i18n="admin_roster_parse_btn">Parse with AI</button>
+                    </form>
+                    <p id="admin-class-roster-status-teacher" class="form-message hidden" role="status" aria-live="polite"></p>
+                    <div id="admin-class-roster-preview-teacher" class="admin-roster-preview hidden" aria-live="polite"></div>
                   </div>
                 </div>
                 <div>
                   <h4 data-i18n="admin_class_students">Students in class</h4>
                   <ul id="admin-class-students-list" class="admin-member-list"></ul>
-                  <div class="admin-inline-form">
-                    <select id="admin-class-add-student" aria-label="Add student"></select>
-                    <button type="button" class="btn-secondary" id="admin-class-add-student-btn" data-i18n="admin_add_student_btn">
-                      Add student
-                    </button>
+                  <div class="admin-roster-upload admin-class-roster-upload">
+                    <h5 class="admin-roster-upload__title" data-i18n="admin_class_roster_students">Upload students for this class</h5>
+                    <p class="admin-panel__hint" data-i18n="admin_class_roster_students_hint">
+                      Word, Excel, PDF, or TXT — include student name, student ID, official school email, and registered phone number.
+                    </p>
+                    <form id="admin-class-roster-form-student" class="admin-inline-form admin-roster-form" novalidate>
+                      <div class="field">
+                        <label for="admin-class-roster-file-student" data-i18n="admin_roster_file">Roster file</label>
+                        <input id="admin-class-roster-file-student" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required />
+                      </div>
+                      <button type="submit" class="btn-primary" data-i18n="admin_roster_parse_btn">Parse with AI</button>
+                    </form>
+                    <p id="admin-class-roster-status-student" class="form-message hidden" role="status" aria-live="polite"></p>
+                    <div id="admin-class-roster-preview-student" class="admin-roster-preview hidden" aria-live="polite"></div>
                   </div>
                 </div>
               </div>
@@ -203,7 +221,7 @@
               Teachers
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_teachers_hint">
-              Only authorized teachers can sign in to the teaching calendar.
+              Uploaded teachers start as Pending. Authorize here to grant calendar access; Revoke returns them to Pending. Delete removes the account.
             </p>
             <div class="admin-roster-upload">
               <h3 class="admin-roster-upload__title" data-i18n="admin_roster_upload_teachers">Upload teacher roster</h3>
@@ -544,7 +562,7 @@
               Students
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_students_hint">
-              Registered accounts. Use Performance lookup for individual progress.
+              Registered accounts. Delete removes a student from all classes and deletes their login. Use Performance for individual progress.
             </p>
             <div class="admin-roster-upload">
               <h3 class="admin-roster-upload__title" data-i18n="admin_roster_upload_students">Upload student roster</h3>
@@ -573,6 +591,7 @@
                     <th scope="col" data-i18n="admin_col_name">Name</th>
                     <th scope="col" data-i18n="admin_col_student_id">Student ID</th>
                     <th scope="col" data-i18n="class_label">Class</th>
+                    <th scope="col" data-i18n="admin_col_action">Action</th>
                   </tr>
                 </thead>
                 <tbody id="admin-students-tbody"></tbody>
@@ -613,7 +632,7 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=20260612-mgr"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-vocabulary.js?v=20260611-v1"></script>
     <script src="js/admin-self-study-reading.js?v=20260611-r6c"></script>
@@ -623,7 +642,7 @@
     <script src="js/eap-button-state.js"></script>
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
     <script src="js/admin-performance.js?v=20260610-perf"></script>
-    <script src="js/admin-roster-import.js?v=20260610-roster"></script>
+    <script src="js/admin-roster-import.js?v=20260612-edit"></script>
     <script src="js/admin-hub.js?v=20260611-mgr3"></script>
   </body>
 </html>
