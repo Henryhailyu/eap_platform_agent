@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-bulk-roster" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-bulk-fix" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -190,12 +190,19 @@
               <h3 id="admin-class-detail-title" class="admin-class-detail__title"></h3>
               <div class="admin-class-detail__grid">
                 <div>
-                  <h4 data-i18n="admin_class_teachers">Teachers in class</h4>
+                  <div class="admin-class-section-head">
+                    <h4 data-i18n="admin_class_teachers">Teachers in class</h4>
+                    <button type="button" id="admin-class-teachers-toggle-list" class="btn-link admin-class-toggle-list hidden" data-i18n="admin_class_hide_member_list">Hide list</button>
+                  </div>
                   <div id="admin-class-teachers-bulk-bar" class="admin-bulk-bar admin-bulk-bar--compact hidden">
-                    <button type="button" id="admin-class-teachers-bulk-remove" class="btn-secondary btn-danger" data-i18n="admin_bulk_remove_from_class">
+                    <label class="admin-bulk-bar__select-all">
+                      <input type="checkbox" id="admin-class-teachers-check-all" aria-label="Select all teachers in class" />
+                      <span data-i18n="admin_bulk_select_all">Select all</span>
+                    </label>
+                    <button type="button" id="admin-class-teachers-bulk-remove" class="btn-secondary btn-danger" data-i18n="admin_bulk_remove_from_class" disabled>
                       Remove selected from class
                     </button>
-                    <span id="admin-class-teachers-bulk-count" class="admin-bulk-bar__count"></span>
+                    <span id="admin-class-teachers-bulk-count" class="admin-bulk-bar__count" data-i18n="admin_bulk_select_hint">Tick rows below, then use the button.</span>
                   </div>
                   <ul id="admin-class-teachers-list" class="admin-member-list"></ul>
                   <div class="admin-roster-upload admin-class-roster-upload">
@@ -215,12 +222,19 @@
                   </div>
                 </div>
                 <div>
-                  <h4 data-i18n="admin_class_students">Students in class</h4>
+                  <div class="admin-class-section-head">
+                    <h4 data-i18n="admin_class_students">Students in class</h4>
+                    <button type="button" id="admin-class-students-toggle-list" class="btn-link admin-class-toggle-list hidden" data-i18n="admin_class_hide_member_list">Hide list</button>
+                  </div>
                   <div id="admin-class-students-bulk-bar" class="admin-bulk-bar admin-bulk-bar--compact hidden">
-                    <button type="button" id="admin-class-students-bulk-remove" class="btn-secondary btn-danger" data-i18n="admin_bulk_remove_from_class">
+                    <label class="admin-bulk-bar__select-all">
+                      <input type="checkbox" id="admin-class-students-check-all" aria-label="Select all students in class" />
+                      <span data-i18n="admin_bulk_select_all">Select all</span>
+                    </label>
+                    <button type="button" id="admin-class-students-bulk-remove" class="btn-secondary btn-danger" data-i18n="admin_bulk_remove_from_class" disabled>
                       Remove selected from class
                     </button>
-                    <span id="admin-class-students-bulk-count" class="admin-bulk-bar__count"></span>
+                    <span id="admin-class-students-bulk-count" class="admin-bulk-bar__count" data-i18n="admin_bulk_select_hint">Tick rows below, then use the button.</span>
                   </div>
                   <ul id="admin-class-students-list" class="admin-member-list"></ul>
                   <div class="admin-roster-upload admin-class-roster-upload">
@@ -262,10 +276,10 @@
               />
             </div>
             <div id="admin-teachers-bulk-bar" class="admin-bulk-bar hidden">
-              <button type="button" id="admin-teachers-bulk-delete" class="btn-secondary btn-danger" data-i18n="admin_bulk_delete_selected">
+              <button type="button" id="admin-teachers-bulk-delete" class="btn-secondary btn-danger" data-i18n="admin_bulk_delete_selected" disabled>
                 Delete selected
               </button>
-              <span id="admin-teachers-bulk-count" class="admin-bulk-bar__count"></span>
+              <span id="admin-teachers-bulk-count" class="admin-bulk-bar__count" data-i18n="admin_bulk_select_hint">Tick rows below, then use the button.</span>
             </div>
             <div class="admin-table-wrap admin-roster-sheet-wrap">
               <table class="admin-table admin-roster-sheet" id="admin-teachers-table">
@@ -619,10 +633,10 @@
               <div id="admin-students-group-filters" class="admin-roster-filters__pills" role="group" aria-label="Group filter"></div>
             </div>
             <div id="admin-students-bulk-bar" class="admin-bulk-bar hidden">
-              <button type="button" id="admin-students-bulk-delete" class="btn-secondary btn-danger" data-i18n="admin_bulk_delete_selected">
+              <button type="button" id="admin-students-bulk-delete" class="btn-secondary btn-danger" data-i18n="admin_bulk_delete_selected" disabled>
                 Delete selected
               </button>
-              <span id="admin-students-bulk-count" class="admin-bulk-bar__count"></span>
+              <span id="admin-students-bulk-count" class="admin-bulk-bar__count" data-i18n="admin_bulk_select_hint">Tick rows below, then use the button.</span>
             </div>
             <div class="admin-table-wrap admin-roster-sheet-wrap">
               <table class="admin-table admin-roster-sheet" id="admin-students-table">
@@ -673,7 +687,7 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js?v=20260612-bulk-roster"></script>
+    <script src="app.js?v=20260612-bulk-fix"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-vocabulary.js?v=20260611-v1"></script>
     <script src="js/admin-self-study-reading.js?v=20260611-r6c"></script>
@@ -683,7 +697,7 @@
     <script src="js/eap-button-state.js"></script>
     <script src="js/admin-homework-marking.js?v=20260601-hm4"></script>
     <script src="js/admin-performance.js?v=20260612-students"></script>
-    <script src="js/admin-roster-import.js?v=20260612-bulk-roster"></script>
+    <script src="js/admin-roster-import.js?v=20260612-bulk-fix"></script>
     <script src="js/admin-hub.js?v=20260612-hubguide"></script>
   </body>
 </html>

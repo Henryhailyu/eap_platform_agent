@@ -3520,17 +3520,23 @@ function getAdminBulkCheckedUserIds(container) {
     .filter((id) => Number.isFinite(id) && id > 0);
 }
 
-function syncAdminBulkSelectionBar(barEl, countEl, container, checkAllEl) {
+function syncAdminBulkSelectionBar(barEl, countEl, container, checkAllEl, actionBtn) {
   const ids = getAdminBulkCheckedUserIds(container);
-  if (barEl) barEl.classList.toggle("hidden", ids.length === 0);
+  const rowChecks = container ? container.querySelectorAll(".admin-bulk-row-check") : [];
+  const hasRows = rowChecks.length > 0;
+  if (barEl) barEl.classList.toggle("hidden", !hasRows);
   if (countEl) {
-    countEl.textContent = ids.length ? t("admin_bulk_selected_count", { n: ids.length }) : "";
+    countEl.textContent = ids.length
+      ? t("admin_bulk_selected_count", { n: ids.length })
+      : hasRows
+        ? t("admin_bulk_select_hint")
+        : "";
   }
+  if (actionBtn) actionBtn.disabled = ids.length === 0;
   if (checkAllEl && container) {
-    const all = container.querySelectorAll(".admin-bulk-row-check");
     const checked = container.querySelectorAll(".admin-bulk-row-check:checked");
-    checkAllEl.checked = all.length > 0 && all.length === checked.length;
-    checkAllEl.indeterminate = checked.length > 0 && checked.length < all.length;
+    checkAllEl.checked = hasRows && rowChecks.length === checked.length;
+    checkAllEl.indeterminate = checked.length > 0 && checked.length < rowChecks.length;
   }
   return ids;
 }
@@ -3881,24 +3887,61 @@ function initAdminPage() {
     const teachersCheckAll = document.getElementById("admin-teachers-check-all");
     const studentsCheckAll = document.getElementById("admin-students-check-all");
 
+    const classTeachersBulkRemoveBtn = document.getElementById("admin-class-teachers-bulk-remove");
+    const classStudentsBulkRemoveBtn = document.getElementById("admin-class-students-bulk-remove");
+    const classTeachersCheckAll = document.getElementById("admin-class-teachers-check-all");
+    const classStudentsCheckAll = document.getElementById("admin-class-students-check-all");
+    const classTeachersToggleList = document.getElementById("admin-class-teachers-toggle-list");
+    const classStudentsToggleList = document.getElementById("admin-class-students-toggle-list");
+    const teachersBulkDeleteBtn = document.getElementById("admin-teachers-bulk-delete");
+    const studentsBulkDeleteBtn = document.getElementById("admin-students-bulk-delete");
+    const classMemberListCollapsed = { teacher: false, student: false };
+
     function classMemberBulkConfig(role) {
       if (role === "teacher") {
         return {
           listEl: classTeachersList,
           barEl: classTeachersBulkBar,
           countEl: classTeachersBulkCount,
+          actionBtn: classTeachersBulkRemoveBtn,
+          checkAllEl: classTeachersCheckAll,
+          toggleBtn: classTeachersToggleList,
         };
       }
       return {
         listEl: classStudentsList,
         barEl: classStudentsBulkBar,
         countEl: classStudentsBulkCount,
+        actionBtn: classStudentsBulkRemoveBtn,
+        checkAllEl: classStudentsCheckAll,
+        toggleBtn: classStudentsToggleList,
       };
     }
 
     function syncClassMemberBulkBar(role) {
       const cfg = classMemberBulkConfig(role);
-      syncAdminBulkSelectionBar(cfg.barEl, cfg.countEl, cfg.listEl, null);
+      syncAdminBulkSelectionBar(
+        cfg.barEl,
+        cfg.countEl,
+        cfg.listEl,
+        cfg.checkAllEl,
+        cfg.actionBtn,
+      );
+    }
+
+    function setClassMemberListCollapsed(role, collapsed, memberCount) {
+      classMemberListCollapsed[role] = Boolean(collapsed);
+      const cfg = classMemberBulkConfig(role);
+      if (cfg.listEl) {
+        cfg.listEl.classList.toggle("admin-member-list--collapsed", classMemberListCollapsed[role]);
+      }
+      if (cfg.toggleBtn) {
+        const n = memberCount != null ? memberCount : cfg.listEl?.querySelectorAll(".admin-bulk-row-check").length || 0;
+        cfg.toggleBtn.textContent = classMemberListCollapsed[role]
+          ? t("admin_class_show_member_list", { n, role: role === "teacher" ? t("admin_class_teachers_short") : t("admin_class_students_short") })
+          : t("admin_class_hide_member_list");
+        cfg.toggleBtn.classList.toggle("hidden", n === 0);
+      }
     }
 
     function renderClassMemberList(listEl, members, classId, role) {
@@ -3909,6 +3952,7 @@ function initAdminPage() {
         const li = document.createElement("li");
         li.textContent = "—";
         listEl.appendChild(li);
+        setClassMemberListCollapsed(role, false, 0);
         syncClassMemberBulkBar(role);
         return;
       }
@@ -3952,12 +3996,18 @@ function initAdminPage() {
         li.appendChild(btn);
         listEl.appendChild(li);
       });
+      setClassMemberListCollapsed(role, classMemberListCollapsed[role], list.length);
       syncClassMemberBulkBar(role);
     }
 
     function showClassDetail(classDetail) {
       if (!classDetailEl || !classDetail) return;
+      const classChanged = activeClassId !== classDetail.id;
       activeClassId = classDetail.id;
+      if (classChanged) {
+        classMemberListCollapsed.teacher = false;
+        classMemberListCollapsed.student = false;
+      }
       classDetailEl.classList.remove("hidden");
       if (classDetailTitle) {
         classDetailTitle.textContent = `${classDetail.class_code} — ${classDetail.display_name || classDetail.class_code}`;
@@ -3965,8 +4015,11 @@ function initAdminPage() {
       renderClassMemberList(classTeachersList, classDetail.teachers, classDetail.id, "teacher");
       renderClassMemberList(classStudentsList, classDetail.students, classDetail.id, "student");
       if (window.EAP_ADMIN_ROSTER && typeof window.EAP_ADMIN_ROSTER.setClassRosterContext === "function") {
-        window.EAP_ADMIN_ROSTER.setClassRosterContext(classDetail.class_code, async () => {
+        window.EAP_ADMIN_ROSTER.setClassRosterContext(classDetail.class_code, async (pushedRole) => {
           await reloadAdminLists();
+          if (pushedRole === "teacher" || pushedRole === "student") {
+            setClassMemberListCollapsed(pushedRole, true);
+          }
         });
       }
     }
@@ -4062,7 +4115,13 @@ function initAdminPage() {
         handleTeacherDelete,
         handleTeacherPerformance,
       );
-      syncAdminBulkSelectionBar(teachersBulkBar, teachersBulkCount, teachersTbody, teachersCheckAll);
+      syncAdminBulkSelectionBar(
+        teachersBulkBar,
+        teachersBulkCount,
+        teachersTbody,
+        teachersCheckAll,
+        teachersBulkDeleteBtn,
+      );
     }
 
     if (teachersSearchEl) {
@@ -4190,7 +4249,13 @@ function initAdminPage() {
         handleStudentPerformance,
         studentsModuleFilter || "",
       );
-      syncAdminBulkSelectionBar(studentsBulkBar, studentsBulkCount, studentsTbody, studentsCheckAll);
+      syncAdminBulkSelectionBar(
+        studentsBulkBar,
+        studentsBulkCount,
+        studentsTbody,
+        studentsCheckAll,
+        studentsBulkDeleteBtn,
+      );
     }
 
     if (studentsSearchEl) {
@@ -4284,6 +4349,7 @@ function initAdminPage() {
         teachersBulkCount,
         teachersTbody,
         teachersCheckAll,
+        teachersBulkDeleteBtn,
       );
       if (!ids.length) return;
       if (!window.confirm(t("admin_teachers_bulk_delete_confirm", { n: ids.length }))) return;
@@ -4316,6 +4382,7 @@ function initAdminPage() {
         studentsBulkCount,
         studentsTbody,
         studentsCheckAll,
+        studentsBulkDeleteBtn,
       );
       if (!ids.length) return;
       if (!window.confirm(t("admin_students_bulk_delete_confirm", { n: ids.length }))) return;
@@ -4345,7 +4412,13 @@ function initAdminPage() {
     async function handleClassMembersBulkRemove(role) {
       if (!activeClassId) return;
       const cfg = classMemberBulkConfig(role);
-      const ids = syncAdminBulkSelectionBar(cfg.barEl, cfg.countEl, cfg.listEl, null);
+      const ids = syncAdminBulkSelectionBar(
+        cfg.barEl,
+        cfg.countEl,
+        cfg.listEl,
+        cfg.checkAllEl,
+        cfg.actionBtn,
+      );
       if (!ids.length) return;
       if (!window.confirm(t("admin_class_bulk_remove_confirm", { n: ids.length }))) return;
       setAdminPageMessage(statusEl, "", false);
@@ -4367,12 +4440,24 @@ function initAdminPage() {
 
     teachersTbody?.addEventListener("change", (ev) => {
       if (ev.target && ev.target.classList.contains("admin-bulk-row-check")) {
-        syncAdminBulkSelectionBar(teachersBulkBar, teachersBulkCount, teachersTbody, teachersCheckAll);
+        syncAdminBulkSelectionBar(
+          teachersBulkBar,
+          teachersBulkCount,
+          teachersTbody,
+          teachersCheckAll,
+          teachersBulkDeleteBtn,
+        );
       }
     });
     studentsTbody?.addEventListener("change", (ev) => {
       if (ev.target && ev.target.classList.contains("admin-bulk-row-check")) {
-        syncAdminBulkSelectionBar(studentsBulkBar, studentsBulkCount, studentsTbody, studentsCheckAll);
+        syncAdminBulkSelectionBar(
+          studentsBulkBar,
+          studentsBulkCount,
+          studentsTbody,
+          studentsCheckAll,
+          studentsBulkDeleteBtn,
+        );
       }
     });
     teachersCheckAll?.addEventListener("change", () => {
@@ -4380,20 +4465,46 @@ function initAdminPage() {
       teachersTbody?.querySelectorAll(".admin-bulk-row-check").forEach((cb) => {
         cb.checked = on;
       });
-      syncAdminBulkSelectionBar(teachersBulkBar, teachersBulkCount, teachersTbody, teachersCheckAll);
+      syncAdminBulkSelectionBar(
+        teachersBulkBar,
+        teachersBulkCount,
+        teachersTbody,
+        teachersCheckAll,
+        teachersBulkDeleteBtn,
+      );
     });
     studentsCheckAll?.addEventListener("change", () => {
       const on = Boolean(studentsCheckAll.checked);
       studentsTbody?.querySelectorAll(".admin-bulk-row-check").forEach((cb) => {
         cb.checked = on;
       });
-      syncAdminBulkSelectionBar(studentsBulkBar, studentsBulkCount, studentsTbody, studentsCheckAll);
+      syncAdminBulkSelectionBar(
+        studentsBulkBar,
+        studentsBulkCount,
+        studentsTbody,
+        studentsCheckAll,
+        studentsBulkDeleteBtn,
+      );
     });
     document.getElementById("admin-teachers-bulk-delete")?.addEventListener("click", () => {
       void handleTeachersBulkDelete();
     });
     document.getElementById("admin-students-bulk-delete")?.addEventListener("click", () => {
       void handleStudentsBulkDelete();
+    });
+    classTeachersCheckAll?.addEventListener("change", () => {
+      const on = Boolean(classTeachersCheckAll.checked);
+      classTeachersList?.querySelectorAll(".admin-bulk-row-check").forEach((cb) => {
+        cb.checked = on;
+      });
+      syncClassMemberBulkBar("teacher");
+    });
+    classStudentsCheckAll?.addEventListener("change", () => {
+      const on = Boolean(classStudentsCheckAll.checked);
+      classStudentsList?.querySelectorAll(".admin-bulk-row-check").forEach((cb) => {
+        cb.checked = on;
+      });
+      syncClassMemberBulkBar("student");
     });
     classTeachersList?.addEventListener("change", (ev) => {
       if (ev.target && ev.target.classList.contains("admin-bulk-row-check")) {
@@ -4404,6 +4515,14 @@ function initAdminPage() {
       if (ev.target && ev.target.classList.contains("admin-bulk-row-check")) {
         syncClassMemberBulkBar("student");
       }
+    });
+    classTeachersToggleList?.addEventListener("click", () => {
+      const n = classTeachersList?.querySelectorAll(".admin-bulk-row-check").length || 0;
+      setClassMemberListCollapsed("teacher", !classMemberListCollapsed.teacher, n);
+    });
+    classStudentsToggleList?.addEventListener("click", () => {
+      const n = classStudentsList?.querySelectorAll(".admin-bulk-row-check").length || 0;
+      setClassMemberListCollapsed("student", !classMemberListCollapsed.student, n);
     });
     document.getElementById("admin-class-teachers-bulk-remove")?.addEventListener("click", () => {
       void handleClassMembersBulkRemove("teacher");

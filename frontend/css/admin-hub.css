@@ -270,6 +270,40 @@ body.admin-module-active .content-section.admin-panel {
   margin-top: 1rem;
 }
 
+.admin-roster-preview[hidden],
+.admin-roster-preview.hidden {
+  display: none !important;
+}
+
+.admin-class-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.admin-class-section-head h4 {
+  margin: 0;
+}
+
+.admin-class-toggle-list {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.admin-member-list--collapsed {
+  display: none !important;
+}
+
+.admin-bulk-bar__select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  margin-right: 0.25rem;
+}
+
 .form-message--warning {
   color: #8a5a00;
   background: rgba(255, 193, 7, 0.12);

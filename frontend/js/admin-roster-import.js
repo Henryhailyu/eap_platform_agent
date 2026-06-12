@@ -71,11 +71,37 @@
     if (previewEl) {
       previewEl._eapRosterCache = null;
       previewEl.classList.add("hidden");
+      previewEl.setAttribute("hidden", "");
       previewEl.innerHTML = "";
     }
     if (fileEl) fileEl.value = "";
     if (statusEl) {
-      setMsg(statusEl, t("admin_roster_pushed_preview_cleared"), false);
+      setMsg(statusEl, "", false);
+    }
+  }
+
+  function dismissAllClassRosterPreviews(activeRole, activeStatusEl) {
+    [
+      {
+        role: "teacher",
+        previewId: "admin-class-roster-preview-teacher",
+        fileId: "admin-class-roster-file-teacher",
+        statusId: "admin-class-roster-status-teacher",
+      },
+      {
+        role: "student",
+        previewId: "admin-class-roster-preview-student",
+        fileId: "admin-class-roster-file-student",
+        statusId: "admin-class-roster-status-student",
+      },
+    ].forEach(({ role, previewId, fileId, statusId }) => {
+      const previewEl = document.getElementById(previewId);
+      const fileEl = document.getElementById(fileId);
+      const statusEl = document.getElementById(statusId);
+      dismissRosterPreview(previewEl, fileEl, statusEl);
+    });
+    if (activeStatusEl) {
+      setMsg(activeStatusEl, t("admin_roster_pushed_preview_cleared"), false);
     }
   }
 
@@ -153,9 +179,10 @@
 
     if (!people.length) {
       container.innerHTML = `<p class="admin-panel__hint">${escapeHtml(t("admin_roster_empty"))}</p>`;
-      container.classList.remove("hidden");
-      return;
-    }
+    container.classList.remove("hidden");
+    container.removeAttribute("hidden");
+    return;
+  }
 
     const cols = previewColumns(role, hideClass);
     const head = cols.map((c) => `<th scope="col">${escapeHtml(c.label)}</th>`).join("");
@@ -204,6 +231,7 @@
       </div>
     `;
     container.classList.remove("hidden");
+    container.removeAttribute("hidden");
 
     const checkAll = container.querySelector(`#${checkAllId}`);
     checkAll?.addEventListener("change", () => {
@@ -271,17 +299,18 @@
       });
       const errors = Array.isArray(r.errors) ? r.errors : [];
       const hasPartialSuccess = (r.created || 0) + (r.updated || 0) > 0;
-      const pushed = hasPartialSuccess || errors.length === 0;
-      if (pushed) {
-        dismissRosterPreview(previewEl, fileEl, statusEl);
-        if (errors.length) {
-          setImportStatus(statusEl, summary, errors, hasPartialSuccess);
-        }
-      } else {
-        setImportStatus(statusEl, summary, errors, false);
+      dismissAllClassRosterPreviews(role, statusEl);
+      if (errors.length) {
+        setImportStatus(statusEl, summary, errors, hasPartialSuccess);
+      } else if (hasPartialSuccess) {
+        setMsg(
+          statusEl,
+          `${t("admin_roster_pushed_preview_cleared")} ${summary}`,
+          false,
+        );
       }
       if (typeof opts?.onImportSuccess === "function") {
-        await opts.onImportSuccess();
+        await opts.onImportSuccess(role);
       } else if (typeof global.__eapAdminLangRefresh === "function") {
         global.__eapAdminLangRefresh();
       }
@@ -333,6 +362,7 @@
       setMsg(statusEl, t("admin_roster_parsing"), false);
       if (previewEl) {
         previewEl.classList.add("hidden");
+        previewEl.setAttribute("hidden", "");
         previewEl.innerHTML = "";
       }
       const parseBtn = form.querySelector('button[type="submit"]');
@@ -375,7 +405,8 @@
   }
 
   function initClassRosterPanels() {
-    const onSuccess = () => classRosterContext.onImportSuccess && classRosterContext.onImportSuccess();
+    const onSuccess = (pushedRole) =>
+      classRosterContext.onImportSuccess && classRosterContext.onImportSuccess(pushedRole);
     bindPanel("teacher", {
       formId: "admin-class-roster-form-teacher",
       fileId: "admin-class-roster-file-teacher",
@@ -411,7 +442,11 @@
     initClassRosterPanels();
   }
 
-  global.EAP_ADMIN_ROSTER = { setClassRosterContext, initClassRosterPanels };
+  global.EAP_ADMIN_ROSTER = {
+    setClassRosterContext,
+    initClassRosterPanels,
+    dismissAllClassRosterPreviews,
+  };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
