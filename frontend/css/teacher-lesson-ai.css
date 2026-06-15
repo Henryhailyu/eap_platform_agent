@@ -124,6 +124,14 @@
   color: #555;
 }
 
+.tlp-pack-hint {
+  margin: -0.35rem 0 1rem;
+  font-size: 0.8125rem;
+  color: #6e6e73;
+  line-height: 1.45;
+  max-width: 52rem;
+}
+
 .tlp-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

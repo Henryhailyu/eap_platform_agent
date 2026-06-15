@@ -115,6 +115,47 @@
     throw new Error(t("tlp_no_plan_for_html"));
   }
 
+  function clearForm() {
+    const title = document.getElementById("tlp-title");
+    const date = document.getElementById("tlp-date");
+    const dur = document.getElementById("tlp-duration");
+    const style = document.getElementById("tlp-style");
+    const obj = document.getElementById("tlp-objectives");
+    const ielts = document.getElementById("tlp-ielts");
+    if (title) title.value = "";
+    if (date) date.value = "";
+    if (dur) dur.value = String(meta?.default_duration_minutes || 100);
+    if (style) style.value = "interactive";
+    if (obj) obj.value = "";
+    if (ielts) ielts.value = "";
+  }
+
+  function updatePackToolbar() {
+    const delBtn = document.getElementById("tlp-delete-pack-btn");
+    const saveBtn = document.getElementById("tlp-save-pack-btn");
+    if (delBtn) delBtn.disabled = !packId;
+    if (saveBtn) {
+      saveBtn.textContent = packId ? t("tlp_update_pack_btn") : t("tlp_create_pack_btn");
+    }
+  }
+
+  function startNewPack() {
+    packId = null;
+    planFlash = null;
+    currentPlan = null;
+    teachingPageId = null;
+    document.getElementById("tlp-pack-id-label").textContent = "—";
+    const sel = document.getElementById("tlp-pack-select");
+    if (sel) sel.value = "";
+    clearForm();
+    clearPlanPreview();
+    renderPackFiles([]);
+    updateLiveLink(null);
+    updatePackToolbar();
+    const statusEl = document.getElementById("tlp-status");
+    setStatus(statusEl, t("tlp_new_pack_started"), false);
+  }
+
   function readForm() {
     return {
       title: (document.getElementById("tlp-title")?.value || "").trim(),
@@ -301,10 +342,15 @@
       fillForm(pack);
       renderPackFiles(pack.files || []);
       planFlash = null;
-      currentPlan = null;
-      renderPlan(null);
+      currentPlan = pack.plan || null;
+      renderPlan(currentPlan);
+      if (pack.plan) {
+        const jsonEl = document.getElementById("tlp-plan-json");
+        if (jsonEl) jsonEl.value = JSON.stringify(pack.plan, null, 2);
+      }
       document.getElementById("tlp-pack-id-label").textContent = `#${pack.id}`;
       await refreshPackSelect(pack.id);
+      updatePackToolbar();
       setStatus(statusEl, "", false);
     } catch (err) {
       setStatus(statusEl, (err && err.message) || t("tlp_load_failed"), true);
@@ -319,12 +365,18 @@
     if (packId) {
       const pack = await prepApi.updatePack(packId, form);
       fillForm(pack);
+      if (pack.plan) {
+        currentPlan = pack.plan;
+        renderPlan(pack.plan);
+      }
+      updatePackToolbar();
       return packId;
     }
     const pack = await prepApi.createPack(form);
     packId = pack.id;
     document.getElementById("tlp-pack-id-label").textContent = `#${pack.id}`;
     await refreshPackSelect(pack.id);
+    updatePackToolbar();
     return packId;
   }
 
@@ -336,16 +388,33 @@
     document.getElementById("tlp-pack-select")?.addEventListener("change", (ev) => {
       const val = ev.target.value;
       if (!val) {
-        packId = null;
-        planFlash = null;
-        currentPlan = null;
-        teachingPageId = null;
-        document.getElementById("tlp-pack-id-label").textContent = "—";
-        clearPlanPreview();
-        renderPackFiles([]);
+        startNewPack();
+        setStatus(document.getElementById("tlp-status"), "", false);
         return;
       }
       void loadPack(parseInt(val, 10));
+    });
+
+    document.getElementById("tlp-new-pack-btn")?.addEventListener("click", () => {
+      startNewPack();
+    });
+
+    document.getElementById("tlp-delete-pack-btn")?.addEventListener("click", () => {
+      if (!packId) return;
+      const title = (document.getElementById("tlp-title")?.value || "").trim();
+      const msg = t("tlp_delete_pack_confirm", { id: packId, title: title || "—" });
+      if (typeof global.confirm === "function" && !global.confirm(msg)) return;
+      void (async () => {
+        setStatus(statusEl, t("tlp_deleting_pack"), false);
+        try {
+          await prepApi.deletePack(packId);
+          setStatus(statusEl, t("tlp_delete_pack_ok"), false);
+          startNewPack();
+          await refreshPackSelect(null);
+        } catch (err) {
+          setStatus(statusEl, (err && err.message) || t("tlp_delete_pack_failed"), true);
+        }
+      })();
     });
 
     const savePackBtn = document.getElementById("tlp-save-pack-btn");
@@ -370,8 +439,10 @@
       void runSave(savePackBtn, async () => {
         setStatus(statusEl, "", false);
         try {
+          const wasNew = !packId;
           await ensurePack(statusEl);
-          setStatus(statusEl, t("tlp_saved_pack"), false);
+          updatePackToolbar();
+          setStatus(statusEl, wasNew ? t("tlp_saved_pack") : t("tlp_updated_pack"), false);
         } catch (err) {
           if (typeof global.EAP_resetSaveButton === "function") global.EAP_resetSaveButton(savePackBtn);
           setStatus(statusEl, (err && err.message) || t("tlp_save_failed"), true);
@@ -570,6 +641,7 @@
     }
 
     await refreshPackSelect(null);
+    updatePackToolbar();
     bind();
 
     section?.addEventListener("toggle", () => {
@@ -579,6 +651,8 @@
       }
       if (planFlash && planFlash.packId === packId) {
         renderPlan(planFlash.plan, { ephemeral: true });
+      } else if (currentPlan) {
+        renderPlan(currentPlan);
       } else {
         renderPlan(null);
       }

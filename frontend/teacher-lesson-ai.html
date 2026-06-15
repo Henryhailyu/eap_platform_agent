@@ -60,12 +60,27 @@
               below (plan → HTML publishing comes in LP-M2).
             </p>
             <div class="tlp-toolbar">
-              <label class="tlp-toolbar__label" for="tlp-pack-select" data-i18n="tlp_pack_label">Open pack</label>
-              <select id="tlp-pack-select" class="tlp-pack-select"></select>
+              <label class="tlp-toolbar__label" for="tlp-pack-select" data-i18n="tlp_pack_label">Your packs</label>
+              <select id="tlp-pack-select" class="tlp-pack-select" aria-describedby="tlp-pack-hint"></select>
+              <button type="button" class="btn-primary btn-small" id="tlp-new-pack-btn" data-i18n="tlp_new_pack_btn">
+                New pack
+              </button>
+              <button
+                type="button"
+                class="btn-secondary btn-small btn-danger"
+                id="tlp-delete-pack-btn"
+                data-i18n="tlp_delete_pack_btn"
+                disabled
+              >
+                Delete pack
+              </button>
               <span class="tlp-pack-id"
                 ><span data-i18n="tlp_pack_id">Pack</span> <strong id="tlp-pack-id-label">—</strong></span
               >
             </div>
+            <p id="tlp-pack-hint" class="tlp-pack-hint" data-i18n="tlp_pack_hint">
+              Choose a saved pack to edit, or click New pack, enter a title, and Save pack. Colleagues each manage their own packs on this account.
+            </p>
             <div class="tlp-grid">
               <div class="tlp-col">
                 <div class="tla-field">
@@ -314,8 +329,8 @@
     <script src="js/eap-button-state.js?v=20260602-ux4"></script>
     <script src="js/teacher-teaching-pages-api.js?v=20260613-lp-opt"></script>
     <script src="js/eap-live-lesson-slots.js?v=20260613-lp-opt"></script>
-    <script src="js/teacher-lesson-prep-api.js?v=20260602-uat2"></script>
-    <script src="js/teacher-lesson-prep.js?v=20260613-lp-opt"></script>
+    <script src="js/teacher-lesson-prep-api.js?v=20260615-packs"></script>
+    <script src="js/teacher-lesson-prep.js?v=20260615-packs"></script>
     <script src="js/live-teaching-api.js"></script>
     <script src="js/eap-html-bridge.js"></script>
     <script src="js/eap-file-viewer.js"></script>

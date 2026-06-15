@@ -750,7 +750,7 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
         conn.close()
         return jsonify({"pack": pack_row_to_dict(row)}), 201
 
-    @app.route("/api/teacher/lesson-prep/packs/<int:pack_id>", methods=["GET", "PUT"])
+    @app.route("/api/teacher/lesson-prep/packs/<int:pack_id>", methods=["GET", "PUT", "DELETE"])
     def lesson_prep_pack_detail(pack_id: int):
         pair, err = _teacher_conn()
         if err:
@@ -770,6 +770,22 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
             payload = pack_row_to_dict(row, include_plan=True)
             payload["files"] = [file_row_to_dict(f) for f in files]
             return jsonify({"pack": payload})
+
+        if request.method == "DELETE":
+            upload_dir_path = lesson_prep_upload_dir(upload_dir, pack_id)
+            file_rows = conn.execute(
+                "SELECT stored_name FROM lesson_prep_pack_files WHERE pack_id = ?",
+                (pack_id,),
+            ).fetchall()
+            for f in file_rows:
+                delete_stored_file(upload_dir_path, f["stored_name"])
+            conn.execute(
+                "DELETE FROM lesson_prep_packs WHERE id = ? AND teacher_username = ?",
+                (pack_id, teacher),
+            )
+            conn.commit()
+            conn.close()
+            return jsonify({"ok": True, "deleted_id": pack_id})
 
         data = request.get_json(silent=True) or {}
         title = str(data.get("title") or row["title"]).strip()

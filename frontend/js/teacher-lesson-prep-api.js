@@ -154,6 +154,18 @@
     return data.pack;
   }
 
+  async function deletePack(packId) {
+    const response = await fetchFn()(
+      `${API_BASE}/api/teacher/lesson-prep/packs/${encodeURIComponent(packId)}`,
+      {
+        method: "DELETE",
+        credentials: "include",
+        headers: authHeaders(),
+      },
+    );
+    return readJson(response);
+  }
+
   async function generatePlan(packId) {
     const response = await fetchFn()(
       `${API_BASE}/api/teacher/lesson-prep/packs/${encodeURIComponent(packId)}/plan`,
@@ -173,6 +185,7 @@
     getPack,
     createPack,
     updatePack,
+    deletePack,
     uploadPackFiles,
     deletePackFile,
     generatePlan,
