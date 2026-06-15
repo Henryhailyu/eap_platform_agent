@@ -110,6 +110,7 @@
       optionsEn,
       optionsZh,
       correctIndex,
+      source: "html",
     };
   }
 
@@ -179,6 +180,10 @@
     });
 
     const meta = parseLessonMetaFromHtml(text);
+    const hasHtmlLiveTools = slots.some((s) => s.source !== "plan-meta");
+    if (hasHtmlLiveTools) {
+      return slots;
+    }
     (meta.interaction_slots || []).forEach((row, i) => {
       const tool = normalizeTool(row.live_tool || row.activity_type);
       if (tool !== "poll" && tool !== "quiz") return;

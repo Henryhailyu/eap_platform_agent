@@ -1281,6 +1281,8 @@ window.EAP_STRINGS_ZH = {
   "tlp_open_live": "打开现场教学",
   "tlp_generating_html": "正在生成互动 HTML… 可能需要约两分钟。",
   "tlp_html_generated_ok": "HTML 已就绪 — 请查看下方 Preview。可推送到课堂或发布。",
+  "tlp_html_warnings_prefix": "提示：",
+  "tla_html_warnings_prefix": "提示：",
   "tlp_file_delete_confirm": "确定从备课包中删除该文件？",
   "tlp_file_deleting": "正在删除文件…",
   "tlp_file_deleted": "已从备课包移除该文件。",

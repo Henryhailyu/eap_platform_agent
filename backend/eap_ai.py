@@ -447,7 +447,7 @@ def vocabulary_explain(
     return result
 
 
-_MAX_TEACHING_SOURCE = 6000
+_MAX_TEACHING_SOURCE = 12_000
 
 
 def generate_teaching_page_html(
@@ -501,8 +501,8 @@ def generate_teaching_page_html(
             {"role": "system", "content": prompt},
             {"role": "user", "content": user_prompt},
         ],
-        max_tokens=4096,
-        temperature=0.45,
+        max_tokens=8192,
+        temperature=0.4,
     )
     raw = ""
     if response.choices:
@@ -511,10 +511,14 @@ def generate_teaching_page_html(
         raise RuntimeError("Empty AI response")
 
     html = sanitize_teaching_html(raw)
+    from lesson_html_postprocess import postprocess_lesson_html
+
+    html, warnings = postprocess_lesson_html(html, plan=None)
     return {
         "html": html,
         "title": cleaned_topic,
         "level": lvl,
         "provider": profile["id"],
         "model": profile["model"],
+        "warnings": warnings,
     }

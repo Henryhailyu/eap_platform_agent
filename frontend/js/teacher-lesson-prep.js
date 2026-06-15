@@ -72,6 +72,14 @@
     return fn();
   }
 
+  function formatLessonWarnings(warnings) {
+    if (!Array.isArray(warnings) || !warnings.length) return "";
+    return warnings
+      .map((w) => (w && typeof w === "object" ? w.message : String(w || "")))
+      .filter(Boolean)
+      .join(" ");
+  }
+
   function setPlanEphemeralNote(show) {
     const note = document.getElementById("tlp-plan-ephemeral-note");
     if (note) note.classList.toggle("hidden", !show);
@@ -459,7 +467,12 @@
           document.getElementById("tla-preview-frame")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
         if (result.pack) updateLiveLink(result.pack);
-        setStatus(statusEl, t("tlp_html_generated_ok"), false);
+        const warn = formatLessonWarnings(result.warnings);
+        setStatus(
+          statusEl,
+          warn ? `${t("tlp_html_generated_ok")} ${t("tlp_html_warnings_prefix")} ${warn}` : t("tlp_html_generated_ok"),
+          false,
+        );
         await refreshPackSelect(id);
         } catch (err) {
           setStatus(statusEl, (err && err.message) || t("tlp_html_failed"), true);

@@ -53,6 +53,50 @@
     return MOCK.MOCK_QUESTIONS[i % MOCK.MOCK_QUESTIONS.length];
   }
 
+  function hidePollQuizPanel() {
+    const panel = document.getElementById("tlive-tool-panel");
+    const wrap = document.getElementById("tlive-canvas-wrap");
+    if (panel) {
+      panel.classList.add("hidden");
+      panel.hidden = true;
+      panel.innerHTML = "";
+    }
+    if (wrap) wrap.classList.remove("tlive-canvas-wrap--split");
+  }
+
+  function getPollQuizMountTarget() {
+    if (window.__tliveLessonOnStage) {
+      const panel = document.getElementById("tlive-tool-panel");
+      const wrap = document.getElementById("tlive-canvas-wrap");
+      if (panel) {
+        panel.classList.remove("hidden");
+        panel.hidden = false;
+        if (wrap) wrap.classList.add("tlive-canvas-wrap--split");
+        return { el: panel, sidePanel: true };
+      }
+    }
+    hidePollQuizPanel();
+    const canvas = document.getElementById("tlive-canvas-inner");
+    return { el: canvas, sidePanel: false };
+  }
+
+  function mountPollQuizForTool(tool, MOCK) {
+    const target = getPollQuizMountTarget();
+    if (!target.el || !window.EAP_LIVE_POLL_QUIZ) return;
+    window.EAP_LIVE_POLL_QUIZ.mountPollQuizTool({
+      tool,
+      mock: MOCK,
+      canvas: target.el,
+      mountEl: target.el,
+      sidePanel: target.sidePanel,
+      onLaunch: (q, toolId) => {
+        launchToStudents(q, null, liveLaunchMeta(toolId === "quiz" ? "quiz" : "poll"));
+      },
+      onViewResponses: (q) => openResponsesModal(q, null),
+      onStatus: updateLaunchStatus,
+    });
+  }
+
   function handleLivePickMessage(data) {
     if (!data || data.type !== "eap-live-pick") return;
     const tool = String(data.tool || "").toLowerCase();
@@ -61,20 +105,8 @@
     if (tool === "poll" || tool === "quiz") {
       setActiveTool(tool);
       if (window.EAP_LIVE_POLL_QUIZ && MOCK) {
+        mountPollQuizForTool(tool, MOCK);
         window.EAP_LIVE_POLL_QUIZ.applySlotPick(tool, slotId, MOCK);
-        const canvas = document.getElementById("tlive-canvas-inner");
-        if (canvas) {
-          window.EAP_LIVE_POLL_QUIZ.mountPollQuizTool({
-            tool,
-            mock: MOCK,
-            canvas,
-            onLaunch: (q, toolId) => {
-              launchToStudents(q, null, liveLaunchMeta(toolId === "quiz" ? "quiz" : "poll"));
-            },
-            onViewResponses: (q) => openResponsesModal(q, null),
-            onStatus: updateLaunchStatus,
-          });
-        }
       }
       updateLaunchStatus(t("tlive_pq_loaded_from_lesson"), false);
       return;
@@ -169,6 +201,8 @@
   }
 
   function renderWelcome(ctx) {
+    window.__tliveLessonOnStage = false;
+    hidePollQuizPanel();
     const MOCK = getMock();
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas || !MOCK) return;
@@ -611,6 +645,7 @@
   }
 
   function renderHtmlLessonOnCanvas(html, title, pageId) {
+    window.__tliveLessonOnStage = true;
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas || !html) return;
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
@@ -720,6 +755,8 @@
   }
 
   async function pushSlidesDisplay() {
+    window.__tliveLessonOnStage = false;
+    hidePollQuizPanel();
     stopActivityStatsPoll();
     return pushDisplayToClass({ mode: "slides", title: t("tlive_welcome_title") });
   }
@@ -3075,19 +3112,8 @@
           renderWelcome(ctx);
         }
         else if (tool === "poll" || tool === "quiz") {
-          const canvas = document.getElementById("tlive-canvas-inner");
-          if (canvas && window.EAP_LIVE_POLL_QUIZ) {
-            window.EAP_LIVE_POLL_QUIZ.mountPollQuizTool({
-              tool,
-              mock: MOCK,
-              canvas,
-              onLaunch: (q, toolId) => {
-                launchToStudents(q, null, liveLaunchMeta(toolId === "quiz" ? "quiz" : "poll"));
-              },
-              onViewResponses: (q) => openResponsesModal(q, null),
-              onStatus: updateLaunchStatus,
-            });
-          }
+          const MOCK = getMock();
+          if (MOCK) mountPollQuizForTool(tool, MOCK);
         } else if (tool === "upload") {
           const canvas = document.getElementById("tlive-canvas-inner");
           const lessonAi = window.EAP_TEACHER_LESSON_AI;

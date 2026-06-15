@@ -27,7 +27,9 @@ PILOT_CATEGORY = "writing"
 DEFAULT_DURATION_MINUTES = 100
 MAX_PACK_FILES = 12
 MAX_PACK_FILE_BYTES = 10 * 1024 * 1024
-MAX_MATERIALS_FOR_AI = 14_000
+MAX_MATERIALS_FOR_AI = 24_000
+MAX_MATERIALS_FOR_HTML = 18_000
+MAX_PLAN_JSON_FOR_HTML = 14_000
 
 TEACHING_STYLES = frozenset(
     {
@@ -73,6 +75,9 @@ WRITING_HTML_FROM_PLAN_EXTRA = (
     "- Keep tables responsive (simple borders, readable on mobile); do not paste raw TSV only.\n"
     "- When materials include ready-made <table class=\"eap-excel-table\"> blocks, place them in the "
     "relevant segment (do not discard).\n"
+    "- Wrap each lesson segment in <section class=\"eap-segment\" data-eap-live-segment=\"N\"> "
+    "where N is the 0-based segment index.\n"
+    "- Include substantive teaching content from EVERY uploaded file excerpt (vocabulary, readings, tasks).\n"
 )
 
 
@@ -260,7 +265,9 @@ def collect_materials_text(conn, pack_id: int) -> str:
                     f"=== Embed these HTML tables from {name} in the lesson (class eap-excel-table) ===\n"
                     f"{table_html}"
                 )
-    return merge_source_text("", blocks, MAX_MATERIALS_FOR_AI)
+    from lesson_html_postprocess import merge_source_text_fair
+
+    return merge_source_text_fair("", blocks, MAX_MATERIALS_FOR_AI)
 
 
 def build_plan_user_prompt(
@@ -361,19 +368,28 @@ def _summarize_plan_for_html(plan: dict) -> str:
 
 
 def build_html_from_plan_prompt(pack: dict, plan: dict, materials: str) -> str:
-    from teacher_teaching_pages import MAX_SOURCE_TEXT
+    plan_json = json.dumps(plan, ensure_ascii=False)
+    if len(plan_json) > MAX_PLAN_JSON_FOR_HTML:
+        plan_json = plan_json[:MAX_PLAN_JSON_FOR_HTML] + "…}"
 
-    summary = _summarize_plan_for_html(plan)
+    style = pack.get("teaching_style") or "interactive"
     body = (
-        f"Approved lesson plan (summary):\n{summary}\n\n"
+        f"Approved lesson plan (full JSON — follow exactly):\n{plan_json}\n\n"
         f"Pack title: {pack.get('title')}\n"
         f"Class: {pack.get('class_name')} · Duration: {pack.get('duration_minutes')} min · "
-        f"Style: {pack.get('teaching_style')}\n"
+        f"Style: {style}\n"
         f"Teacher objectives: {pack.get('objectives') or '(none)'}\n"
         f"IELTS target: {pack.get('ielts_band_target') or '(none)'}\n"
-        + (f"\nMaterial excerpts:\n{materials}\n" if materials else "")
-        + "\nGenerate the full HTML lesson now. Build every interaction_slot as a live "
-        "poll/quiz/game block with data-eap-live-tool and 3–4 options."
+    )
+    if materials:
+        from lesson_html_postprocess import merge_source_text_fair
+
+        mats = merge_source_text_fair("", [materials], MAX_MATERIALS_FOR_HTML)
+        body += f"\nUploaded material excerpts (use ALL files — tables, vocabulary, readings):\n{mats}\n"
+    body += (
+        "\nGenerate the complete HTML lesson now. Build every interaction_slots entry as a live "
+        "poll/quiz/game block with data-eap-live-tool, data-eap-live-segment, 3–4 options, and "
+        "Launch to class. Cover content from every material file."
     )
     if str(pack.get("teaching_style") or "") == "support_bilingual":
         body += (
@@ -381,8 +397,8 @@ def build_html_from_plan_prompt(pack: dict, plan: dict, materials: str) -> str:
             "elements with class data-bilingual-hint or data-zh-hint alongside English "
             "main content — especially instructions and key vocabulary."
         )
-    if len(body) > MAX_SOURCE_TEXT:
-        body = body[:MAX_SOURCE_TEXT]
+    if len(body) > MAX_MATERIALS_FOR_HTML + MAX_PLAN_JSON_FOR_HTML:
+        body = body[: MAX_MATERIALS_FOR_HTML + MAX_PLAN_JSON_FOR_HTML]
     return body
 
 
@@ -411,7 +427,7 @@ def generate_writing_lesson_html(pack: dict, plan: dict, materials: str, system_
             },
         ],
         max_tokens=8192,
-        temperature=0.45,
+        temperature=0.4,
     )
     raw = ""
     if response.choices:
@@ -1053,11 +1069,12 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
 
             from teaching_page_templates import get_prompt as get_teaching_template_prompt
             from teaching_page_templates import normalize_template_key
-            from teacher_teaching_pages import polish_teaching_html
+            from lesson_html_postprocess import postprocess_lesson_html
 
             pack_dict = pack_row_to_dict(row, include_plan=True)
             materials = collect_materials_text(conn, pack_id)
-            tkey = normalize_template_key("standard")
+            body = request.get_json(silent=True) or {}
+            tkey = normalize_template_key(str(body.get("template_key") or "standard"))
             prompt_row = get_teaching_template_prompt(conn, tkey)
 
             result = generate_writing_lesson_html(
@@ -1067,7 +1084,8 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
                 prompt_row["system_prompt"],
             )
 
-            html_content = polish_teaching_html(result.get("html") or "")
+            html_content = result.get("html") or ""
+            html_content, html_warnings = postprocess_lesson_html(html_content, plan)
             if not html_content:
                 return jsonify({"error": "AI returned empty HTML"}), 502
 
@@ -1116,6 +1134,7 @@ def register_lesson_prep_routes(app, *, get_db_connection, require_session_role_
                         "view_path": f"/api/teacher/teaching-pages/{page_row['id']}/view",
                     },
                     "html": html_content,
+                    "warnings": html_warnings,
                     "ai": {"provider": result.get("provider"), "model": result.get("model")},
                 }
             )

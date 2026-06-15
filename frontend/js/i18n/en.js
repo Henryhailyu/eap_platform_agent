@@ -1280,6 +1280,8 @@ window.EAP_STRINGS_EN = {
   "tlp_open_live": "Open Live Teaching",
   "tlp_generating_html": "Generating interactive HTML… this may take up to two minutes.",
   "tlp_html_generated_ok": "HTML ready — see Preview below. Push to class or publish when ready.",
+  "tlp_html_warnings_prefix": "Note:",
+  "tla_html_warnings_prefix": "Note:",
   "tlp_file_delete_confirm": "Remove this file from the pack?",
   "tlp_file_deleting": "Removing file…",
   "tlp_file_deleted": "File removed from pack.",

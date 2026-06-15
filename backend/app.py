@@ -8390,7 +8390,9 @@ def _resolve_teaching_source_text(conn, teacher: str, paste_text: str, file_ids:
         (teacher, *ids),
     ).fetchall()
     file_texts = [r["extracted_text"] or "" for r in rows]
-    return merge_source_text(paste_text, file_texts, MAX_SOURCE_TEXT)
+    from lesson_html_postprocess import merge_source_text_fair
+
+    return merge_source_text_fair(paste_text, file_texts, MAX_SOURCE_TEXT)
 
 
 @app.route("/api/teacher/teaching-pages/source-files", methods=["GET", "POST"])
@@ -8774,7 +8776,7 @@ def teacher_teaching_pages_generate():
         )
         result["template_key"] = tkey
         result["source_text_used"] = source_text
-        return jsonify({"page": result})
+        return jsonify({"page": result, "warnings": result.get("warnings") or []})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:  # noqa: BLE001

@@ -282,6 +282,14 @@
     return (el?.value || draftTemplateKey || "standard").trim();
   }
 
+  function formatLessonWarnings(warnings) {
+    if (!Array.isArray(warnings) || !warnings.length) return "";
+    return warnings
+      .map((w) => (w && typeof w === "object" ? w.message : String(w || "")))
+      .filter(Boolean)
+      .join(" ");
+  }
+
   function setStatus(el, text, isError) {
     if (!el) return;
     el.textContent = text || "";
@@ -493,11 +501,10 @@
         typeof global.EAP_countLessonActivities === "function"
           ? global.EAP_countLessonActivities(draftHtml)
           : 0;
-      setStatus(
-        statusEl,
-        activityCount ? t("tla_generated_ok") : `${t("tla_generated_ok")} ${t("tla_no_interactive_warn")}`,
-        !activityCount,
-      );
+      const warn = formatLessonWarnings(page.warnings);
+      let msg = activityCount ? t("tla_generated_ok") : `${t("tla_generated_ok")} ${t("tla_no_interactive_warn")}`;
+      if (warn) msg = `${msg} ${t("tla_html_warnings_prefix")} ${warn}`;
+      setStatus(statusEl, msg, !activityCount && !warn);
       if (compact) presentHtmlInCanvas(draftHtml, page.title || topic);
     };
     try {

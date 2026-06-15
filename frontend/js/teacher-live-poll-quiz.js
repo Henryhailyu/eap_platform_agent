@@ -166,7 +166,7 @@
   function mountPollQuizTool(opts) {
     const tool = opts.tool === "quiz" ? "quiz" : "poll";
     const MOCK = opts.mock;
-    const canvas = opts.canvas;
+    const canvas = opts.mountEl || opts.canvas;
     const onLaunch = opts.onLaunch;
     const onViewResponses = opts.onViewResponses;
     if (!canvas || !MOCK) return;
@@ -189,7 +189,7 @@
         ? t("tlive_pq_lesson_hint", { count: toolSlots.length })
         : t("tlive_pq_no_lesson_html");
 
-    canvas.className = "tlive-canvas__inner tlive-canvas__inner--left";
+    canvas.className = opts.sidePanel ? "tlive-tool-panel__inner" : "tlive-canvas__inner tlive-canvas__inner--left";
     canvas.innerHTML = `
       <div class="tlive-pq-panel">
         <h2 class="tlive-pq-title">${escapeHtml(t(titleKey))}</h2>

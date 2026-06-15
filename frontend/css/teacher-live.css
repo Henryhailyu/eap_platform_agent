@@ -154,6 +154,31 @@
   min-width: 0;
   padding: 0.5rem;
   min-height: 0;
+  gap: 0.5rem;
+}
+
+.tlive-canvas-wrap--split .tlive-canvas {
+  flex: 1.35;
+  min-width: 0;
+}
+
+.tlive-tool-panel {
+  flex: 0 0 min(380px, 38vw);
+  max-width: 420px;
+  background: #fafbfc;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  overflow: auto;
+  padding: 0.65rem 0.75rem;
+  min-height: 0;
+}
+
+.tlive-tool-panel.hidden {
+  display: none;
+}
+
+.tlive-tool-panel__inner {
+  min-height: 100%;
 }
 
 .tlive-display-library {
@@ -266,6 +291,16 @@
 @media (max-width: 900px) {
   .tlive-body {
     flex-direction: column;
+  }
+
+  .tlive-canvas-wrap--split {
+    flex-direction: column;
+  }
+
+  .tlive-tool-panel {
+    flex: 0 0 auto;
+    max-width: none;
+    max-height: 42vh;
   }
 
   .tlive-display-library {

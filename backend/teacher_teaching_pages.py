@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-MAX_SOURCE_TEXT = 6000
+MAX_SOURCE_TEXT = 12_000
 MAX_HTML_BYTES = 120_000
 MAX_TITLE = 200
 

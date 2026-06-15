@@ -47,7 +47,11 @@
       body: JSON.stringify(payload || {}),
     });
     const data = await readJson(response);
-    return data.page;
+    const page = data.page;
+    if (page && Array.isArray(data.warnings)) {
+      page.warnings = data.warnings;
+    }
+    return page;
   }
 
   async function listPages() {
