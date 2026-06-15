@@ -932,6 +932,54 @@ def init_database():
     conn.close()
 
 
+PILOT_DEMO_USERNAMES = ("teacher1", "student1", "manager1", "teacher2")
+
+
+def restore_demo_pilot_accounts(conn) -> dict:
+    """Re-create pilot demo logins and class links when managers delete them by mistake."""
+    placeholders = ",".join("?" * len(PILOT_DEMO_USERNAMES))
+    before = {
+        str(r["username"])
+        for r in conn.execute(
+            f"SELECT username FROM users WHERE username IN ({placeholders})",
+            PILOT_DEMO_USERNAMES,
+        ).fetchall()
+    }
+    seed_default_users(conn)
+    ensure_e1_demo_users(conn)
+    conn.execute(
+        """
+        UPDATE users SET is_authorized = 1
+        WHERE username = 'teacher1' AND TRIM(COALESCE(role, '')) = 'teacher'
+        """
+    )
+    seed_default_class_memberships(conn)
+    conn.commit()
+    created = [u for u in PILOT_DEMO_USERNAMES if u not in before]
+    accounts = []
+    for r in conn.execute(
+        f"""
+        SELECT username, role, is_authorized
+        FROM users WHERE username IN ({placeholders})
+        ORDER BY username ASC
+        """,
+        PILOT_DEMO_USERNAMES,
+    ).fetchall():
+        accounts.append(
+            {
+                "username": str(r["username"]),
+                "role": str(r["role"] or ""),
+                "authorized": bool(r["is_authorized"]),
+            }
+        )
+    password_hint = (os.environ.get("EAP_PILOT_DEFAULT_PASSWORD") or "").strip() or "123456"
+    return {
+        "created": created,
+        "accounts": accounts,
+        "password_hint": password_hint,
+    }
+
+
 def seed_default_users(conn):
     """
     Insert demo teacher + student if those usernames are not in the database yet.
@@ -7080,6 +7128,84 @@ def admin_class_unenroll_student(class_id, student_id):
     return jsonify(payload)
 
 
+_USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.@-]{1,39}$")
+
+
+def _admin_normalize_username(raw) -> str:
+    return str(raw or "").strip().lower()
+
+
+def _admin_validate_password(password) -> str | None:
+    p = str(password or "").strip()
+    if len(p) < 6:
+        return "password must be at least 6 characters"
+    if len(p) > 64:
+        return "password must be at most 64 characters"
+    return None
+
+
+def _admin_validate_username(username) -> str | None:
+    un = _admin_normalize_username(username)
+    if not un:
+        return "username is required"
+    if not _USERNAME_RE.match(un):
+        return "username must be 2–40 characters (letters, numbers, . _ @ -)"
+    return None
+
+
+def _admin_set_user_credentials(conn, user_id: int, *, username=None, password=None) -> str | None:
+    """Update login username and/or password. Returns error message or None."""
+    updates: list[str] = []
+    params: list = []
+    if username is not None:
+        err = _admin_validate_username(username)
+        if err:
+            return err
+        un = _admin_normalize_username(username)
+        clash = conn.execute(
+            "SELECT id FROM users WHERE username = ? AND id != ?",
+            (un, user_id),
+        ).fetchone()
+        if clash:
+            return "username already taken"
+        updates.append("username = ?")
+        params.append(un)
+    if password is not None:
+        err = _admin_validate_password(password)
+        if err:
+            return err
+        updates.append("password_hash = ?")
+        params.append(generate_password_hash(str(password).strip()))
+        updates.append("password = ?")
+        params.append("")
+    if not updates:
+        return "username or password is required"
+    params.append(user_id)
+    conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", params)
+    return None
+
+
+def _admin_assign_user_classes(conn, user_id: int, role: str, class_codes, *, group_code=None) -> list[str]:
+    """Assign teacher or student to class codes. Returns list of error strings."""
+    from admin_roster_import import _assign_student, _assign_teacher, _class_id_for_code
+
+    errors: list[str] = []
+    codes = class_codes if isinstance(class_codes, list) else []
+    for raw in codes:
+        code = normalize_class_name(str(raw or "").strip())
+        if not code:
+            continue
+        cid = _class_id_for_code(conn, code)
+        if cid is None:
+            errors.append(f"class {code} not found — create it first")
+            continue
+        if role == "teacher":
+            _assign_teacher(conn, cid, user_id)
+        else:
+            _assign_student(conn, cid, user_id, group_code)
+    return errors
+
+
 @app.route("/api/admin/teachers", methods=["GET"])
 def admin_list_teachers():
     """List teacher accounts and authorization status (admin only)."""
@@ -7102,6 +7228,113 @@ def admin_list_teachers():
     return jsonify(payload)
 
 
+@app.route("/api/admin/teachers", methods=["POST"])
+def admin_create_teacher():
+    """Create a single teacher account with username and password (admin only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    data = request.get_json(silent=True) or {}
+    username_err = _admin_validate_username(data.get("username"))
+    if username_err:
+        conn.close()
+        return jsonify({"error": username_err}), 400
+    username = _admin_normalize_username(data.get("username"))
+    pwd_err = _admin_validate_password(data.get("password"))
+    if pwd_err:
+        conn.close()
+        return jsonify({"error": pwd_err}), 400
+
+    if conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
+        conn.close()
+        return jsonify({"error": "username already taken"}), 409
+
+    full_name = str(data.get("full_name") or "").strip() or username
+    employee_id = str(data.get("employee_id") or "").strip() or None
+    authorized = bool(data.get("authorized", True))
+    class_codes = data.get("class_codes")
+    pwd_hash = generate_password_hash(str(data.get("password")).strip())
+
+    cur = conn.execute(
+        """
+        INSERT INTO users (
+            username, password, password_hash, role, full_name, class_name,
+            is_authorized, student_id, employee_id
+        )
+        VALUES (?, '', ?, 'teacher', ?, ?, ?, NULL, ?)
+        """,
+        (
+            username,
+            pwd_hash,
+            full_name,
+            normalize_class_name(class_codes[0]) if isinstance(class_codes, list) and class_codes else None,
+            1 if authorized else 0,
+            employee_id,
+        ),
+    )
+    user_id = int(cur.lastrowid)
+    assign_errors = _admin_assign_user_classes(conn, user_id, "teacher", class_codes)
+    conn.commit()
+    row = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    payload = admin_user_dict(conn, row)
+    if assign_errors:
+        payload["warnings"] = assign_errors
+    conn.close()
+    return jsonify(payload), 201
+
+
+@app.route("/api/admin/teachers/<int:user_id>/credentials", methods=["PUT"])
+def admin_update_teacher_credentials(user_id):
+    """Set or change a teacher's login username and/or password."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    row = conn.execute(
+        "SELECT id, role FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    if str(row["role"] or "").strip().lower() != "teacher":
+        conn.close()
+        return jsonify({"error": "User is not a teacher"}), 400
+
+    data = request.get_json(silent=True) or {}
+    username = data.get("username") if "username" in data else None
+    password = data.get("password") if "password" in data else None
+    err = _admin_set_user_credentials(conn, user_id, username=username, password=password)
+    if err:
+        conn.close()
+        return jsonify({"error": err}), 400
+
+    conn.commit()
+    updated = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    payload = admin_user_dict(conn, updated)
+    conn.close()
+    return jsonify(payload)
+
+
 @app.route("/api/admin/students", methods=["GET"])
 def admin_list_students():
     """List student accounts (admin only, read-only for now)."""
@@ -7120,6 +7353,117 @@ def admin_list_students():
         """
     ).fetchall()
     payload = [admin_user_dict(conn, r) for r in rows]
+    conn.close()
+    return jsonify(payload)
+
+
+@app.route("/api/admin/students", methods=["POST"])
+def admin_create_student():
+    """Create a single student account with username and password (admin only)."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    data = request.get_json(silent=True) or {}
+    username_err = _admin_validate_username(data.get("username"))
+    if username_err:
+        conn.close()
+        return jsonify({"error": username_err}), 400
+    username = _admin_normalize_username(data.get("username"))
+    pwd_err = _admin_validate_password(data.get("password"))
+    if pwd_err:
+        conn.close()
+        return jsonify({"error": pwd_err}), 400
+
+    if conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
+        conn.close()
+        return jsonify({"error": "username already taken"}), 409
+
+    full_name = str(data.get("full_name") or "").strip() or username
+    student_id = str(data.get("student_id") or "").strip() or None
+    class_codes = data.get("class_codes")
+    class_code = str(data.get("class_code") or "").strip()
+    if class_code and (not isinstance(class_codes, list) or not class_codes):
+        class_codes = [class_code]
+    group_code = str(data.get("group_code") or "").strip() or None
+    pwd_hash = generate_password_hash(str(data.get("password")).strip())
+
+    cur = conn.execute(
+        """
+        INSERT INTO users (
+            username, password, password_hash, role, full_name, class_name,
+            is_authorized, student_id, employee_id
+        )
+        VALUES (?, '', ?, 'student', ?, ?, 1, ?, NULL)
+        """,
+        (
+            username,
+            pwd_hash,
+            full_name,
+            normalize_class_name(class_codes[0]) if isinstance(class_codes, list) and class_codes else None,
+            student_id,
+        ),
+    )
+    user_id = int(cur.lastrowid)
+    assign_errors = _admin_assign_user_classes(
+        conn, user_id, "student", class_codes, group_code=group_code
+    )
+    conn.commit()
+    row = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    payload = admin_user_dict(conn, row)
+    if assign_errors:
+        payload["warnings"] = assign_errors
+    conn.close()
+    return jsonify(payload), 201
+
+
+@app.route("/api/admin/students/<int:user_id>/credentials", methods=["PUT"])
+def admin_update_student_credentials(user_id):
+    """Set or change a student's login username and/or password."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    row = conn.execute(
+        "SELECT id, role FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    if str(row["role"] or "").strip().lower() != "student":
+        conn.close()
+        return jsonify({"error": "User is not a student"}), 400
+
+    data = request.get_json(silent=True) or {}
+    username = data.get("username") if "username" in data else None
+    password = data.get("password") if "password" in data else None
+    err = _admin_set_user_credentials(conn, user_id, username=username, password=password)
+    if err:
+        conn.close()
+        return jsonify({"error": err}), 400
+
+    conn.commit()
+    updated = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    payload = admin_user_dict(conn, updated)
     conn.close()
     return jsonify(payload)
 
@@ -7243,6 +7587,24 @@ def admin_set_teacher_authorized(user_id):
     ).fetchone()
     conn.close()
     return jsonify(user_public_dict(updated))
+
+
+@app.route("/api/admin/restore-demo-accounts", methods=["POST"])
+def admin_restore_demo_accounts():
+    """Re-create pilot demo logins (teacher1, student1, manager1) after accidental bulk delete."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+    try:
+        payload = restore_demo_pilot_accounts(conn)
+    except Exception as exc:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": str(exc)}), 500
+    conn.close()
+    return jsonify(payload)
 
 
 @app.route("/api/admin/teachers/bulk-delete", methods=["POST"])

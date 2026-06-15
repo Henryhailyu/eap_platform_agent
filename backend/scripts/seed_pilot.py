@@ -55,6 +55,14 @@ def main() -> int:
             )
             print(f"Created class {PILOT_CLASS}")
 
+        from app import restore_demo_pilot_accounts  # noqa: E402
+
+        result = restore_demo_pilot_accounts(conn)
+        if result.get("created"):
+            print(f"Created demo accounts: {', '.join(result['created'])}")
+        else:
+            print("Demo accounts already present — refreshed class links.")
+
         if PILOT_PASSWORD:
             h = generate_password_hash(PILOT_PASSWORD)
             for uname in DEMO_USERNAMES:
@@ -65,10 +73,12 @@ def main() -> int:
                     """,
                     (h, uname),
                 )
+            conn.commit()
             print(f"Updated passwords for: {', '.join(DEMO_USERNAMES)}")
 
         conn.commit()
         print(f"Pilot ready — class {PILOT_CLASS}, DB {DATABASE_PATH}")
+        print(f"Logins: teacher1 / student1 / manager1 — password {result.get('password_hint', '123456')}")
         print("UI: /ui/index.html  |  Manager: /ui/admin.html")
         return 0
     finally:

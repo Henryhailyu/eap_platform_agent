@@ -492,7 +492,8 @@ def _import_people(
                     email = COALESCE(?, email),
                     office_number = COALESCE(?, office_number),
                     office_phone = COALESCE(?, office_phone),
-                    mobile_phone = COALESCE(?, mobile_phone)
+                    mobile_phone = COALESCE(?, mobile_phone),
+                    password_hash = ?, password = ''
                 WHERE id = ?
                 """,
                 (
@@ -503,6 +504,7 @@ def _import_people(
                     office_number,
                     office_phone,
                     mobile_phone,
+                    pwd_hash,
                     user_id,
                 ),
             )

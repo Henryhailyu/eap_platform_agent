@@ -362,6 +362,67 @@ body.admin-module-active .content-section.admin-panel {
   margin-top: 0.75rem;
 }
 
+.admin-restore-demo {
+  margin: 1rem 0 1.5rem;
+  padding: 1rem 1.15rem;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 126, 164, 0.2);
+  background: rgba(10, 126, 164, 0.06);
+}
+
+.admin-restore-demo.hidden {
+  display: none;
+}
+
+.admin-account-create {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.15rem;
+  border-radius: 10px;
+  border: 1px solid rgba(10, 126, 164, 0.15);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.admin-account-create__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.admin-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.92rem;
+}
+
+.admin-credentials-dialog {
+  border: none;
+  border-radius: 12px;
+  padding: 0;
+  max-width: min(420px, 92vw);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.admin-credentials-dialog::backdrop {
+  background: rgba(20, 24, 28, 0.45);
+}
+
+.admin-credentials-dialog__form {
+  padding: 1.25rem 1.35rem 1.1rem;
+}
+
+.admin-credentials-dialog__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.admin-credentials-dialog__actions {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
 .admin-bulk-bar {
   display: flex;
   align-items: center;

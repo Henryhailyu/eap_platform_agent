@@ -3552,7 +3552,7 @@ function appendAdminBulkCheckboxCell(tr, userId) {
   tr.appendChild(td);
 }
 
-function renderAdminTeachersTable(teachers, tbody, emptyEl, noMatchEl, onToggle, onDelete, onPerformance) {
+function renderAdminTeachersTable(teachers, tbody, emptyEl, noMatchEl, onToggle, onDelete, onPerformance, onSetLogin) {
   if (!tbody) return;
   tbody.innerHTML = "";
   const list = Array.isArray(teachers) ? teachers : [];
@@ -3612,6 +3612,14 @@ function renderAdminTeachersTable(teachers, tbody, emptyEl, noMatchEl, onToggle,
     authBtn.textContent = authorized ? t("admin_revoke_btn") : t("admin_authorize_btn");
     authBtn.addEventListener("click", () => onToggle(teacher, !authorized, authBtn));
     actionTd.appendChild(authBtn);
+    if (typeof onSetLogin === "function") {
+      const loginBtn = document.createElement("button");
+      loginBtn.type = "button";
+      loginBtn.className = "btn-secondary";
+      loginBtn.textContent = t("admin_set_login_btn");
+      loginBtn.addEventListener("click", () => onSetLogin(teacher, loginBtn));
+      actionTd.appendChild(loginBtn);
+    }
     if (typeof onDelete === "function") {
       const delBtn = document.createElement("button");
       delBtn.type = "button";
@@ -3735,7 +3743,7 @@ function distinctGroupsFromStudents(students, moduleCode) {
   });
 }
 
-function renderAdminStudentsTable(students, tbody, onDelete, onPerformance, viewModule) {
+function renderAdminStudentsTable(students, tbody, onDelete, onPerformance, viewModule, onSetLogin) {
   if (!tbody) return;
   tbody.innerHTML = "";
   const list = Array.isArray(students) ? students : [];
@@ -3782,6 +3790,14 @@ function renderAdminStudentsTable(students, tbody, onDelete, onPerformance, view
 
     const actionTd = document.createElement("td");
     actionTd.className = "admin-class-actions";
+    if (typeof onSetLogin === "function") {
+      const loginBtn = document.createElement("button");
+      loginBtn.type = "button";
+      loginBtn.className = "btn-secondary";
+      loginBtn.textContent = t("admin_set_login_btn");
+      loginBtn.addEventListener("click", () => onSetLogin(student, loginBtn));
+      actionTd.appendChild(loginBtn);
+    }
     if (typeof onDelete === "function") {
       const delBtn = document.createElement("button");
       delBtn.type = "button";
@@ -3820,6 +3836,21 @@ function initAdminPage() {
     const studentsModuleFilters = document.getElementById("admin-students-module-filters");
     const studentsGroupFiltersWrap = document.getElementById("admin-students-group-filters-wrap");
     const studentsGroupFilters = document.getElementById("admin-students-group-filters");
+    const restoreDemoPanel = document.getElementById("admin-restore-demo-panel");
+    const restoreDemoBtn = document.getElementById("admin-restore-demo-btn");
+    const credentialsDialog = document.getElementById("admin-credentials-dialog");
+    const credentialsForm = document.getElementById("admin-credentials-form");
+    const credentialsUsernameEl = document.getElementById("admin-credentials-username");
+    const credentialsPasswordEl = document.getElementById("admin-credentials-password");
+    const credentialsSubtitleEl = document.getElementById("admin-credentials-subtitle");
+    const credentialsCancelBtn = document.getElementById("admin-credentials-cancel");
+    const teacherCreateForm = document.getElementById("admin-teacher-create-form");
+    const teacherCreateStatus = document.getElementById("admin-teacher-create-status");
+    const studentCreateForm = document.getElementById("admin-student-create-form");
+    const studentCreateStatus = document.getElementById("admin-student-create-status");
+    const studentCreateClassSel = document.getElementById("admin-student-create-class");
+
+    let credentialsTarget = null;
 
     let teachersCache = [];
     let teachersSearchQuery = "";
@@ -3837,6 +3868,46 @@ function initAdminPage() {
     const classDetailTitle = document.getElementById("admin-class-detail-title");
     const classTeachersList = document.getElementById("admin-class-teachers-list");
     const classStudentsList = document.getElementById("admin-class-students-list");
+
+    function pilotLoginsMissing() {
+      const teacherNames = new Set(
+        teachersCache.map((row) => String(row.username || "").toLowerCase()).filter(Boolean),
+      );
+      const studentNames = new Set(
+        studentsCache.map((row) => String(row.username || "").toLowerCase()).filter(Boolean),
+      );
+      return !teacherNames.has("teacher1") || !studentNames.has("student1");
+    }
+
+    function paintRestoreDemoPanel() {
+      if (!restoreDemoPanel) return;
+      restoreDemoPanel.classList.toggle("hidden", !pilotLoginsMissing());
+    }
+
+    async function handleRestoreDemoAccounts() {
+      if (!restoreDemoBtn) return;
+      restoreDemoBtn.disabled = true;
+      setAdminPageMessage(statusEl, "", false);
+      try {
+        const out = await apiPost("/api/admin/restore-demo-accounts", {});
+        const names = Array.isArray(out.accounts)
+          ? out.accounts.map((a) => a.username).join(", ")
+          : "teacher1, student1";
+        setAdminPageMessage(
+          statusEl,
+          t("admin_restore_demo_done", {
+            accounts: names,
+            pass: out.password_hint || "123456",
+          }),
+          false,
+        );
+        await reloadAdminLists();
+      } catch (err) {
+        setAdminPageMessage(errorEl, err.message || t("admin_restore_demo_failed"), true);
+      } finally {
+        restoreDemoBtn.disabled = false;
+      }
+    }
 
     function formatAssignedClasses(user) {
       if (Array.isArray(user.assigned_classes) && user.assigned_classes.length) {
@@ -4114,6 +4185,7 @@ function initAdminPage() {
         handleTeacherToggle,
         handleTeacherDelete,
         handleTeacherPerformance,
+        handleTeacherSetLogin,
       );
       syncAdminBulkSelectionBar(
         teachersBulkBar,
@@ -4143,6 +4215,160 @@ function initAdminPage() {
       if (window.EAP_ADMIN_PERF && typeof window.EAP_ADMIN_PERF.openStudentModal === "function") {
         await window.EAP_ADMIN_PERF.openStudentModal(student, btn);
       }
+    }
+
+    function paintStudentCreateClassSelect() {
+      if (!studentCreateClassSel) return;
+      const keep = studentCreateClassSel.value;
+      studentCreateClassSel.innerHTML = "";
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = t("admin_create_student_no_class");
+      studentCreateClassSel.appendChild(blank);
+      classesCache.forEach((cls) => {
+        const code = cls.class_code || "";
+        if (!code) return;
+        const opt = document.createElement("option");
+        opt.value = code;
+        opt.textContent = cls.display_name && cls.display_name !== code
+          ? `${code} — ${cls.display_name}`
+          : code;
+        studentCreateClassSel.appendChild(opt);
+      });
+      if (keep && Array.from(studentCreateClassSel.options).some((o) => o.value === keep)) {
+        studentCreateClassSel.value = keep;
+      }
+    }
+
+    function openCredentialsDialog(user, role) {
+      if (!credentialsDialog || !user || user.id == null) return;
+      credentialsTarget = { user, role };
+      if (credentialsSubtitleEl) {
+        credentialsSubtitleEl.textContent = t("admin_credentials_subtitle", {
+          name: user.full_name || user.username || "—",
+        });
+      }
+      if (credentialsUsernameEl) credentialsUsernameEl.value = user.username || "";
+      if (credentialsPasswordEl) credentialsPasswordEl.value = "123456";
+      credentialsDialog.showModal();
+    }
+
+    function handleTeacherSetLogin(teacher) {
+      openCredentialsDialog(teacher, "teacher");
+    }
+
+    function handleStudentSetLogin(student) {
+      openCredentialsDialog(student, "student");
+    }
+
+    if (credentialsCancelBtn && credentialsDialog) {
+      credentialsCancelBtn.addEventListener("click", () => credentialsDialog.close());
+    }
+
+    if (credentialsForm && credentialsDialog) {
+      credentialsForm.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        if (!credentialsTarget || credentialsTarget.user.id == null) return;
+        const username = credentialsUsernameEl ? credentialsUsernameEl.value.trim() : "";
+        const password = credentialsPasswordEl ? credentialsPasswordEl.value : "";
+        if (!username || !password) return;
+        setAdminPageMessage(errorEl, "", false);
+        try {
+          const path =
+            credentialsTarget.role === "teacher"
+              ? `/api/admin/teachers/${credentialsTarget.user.id}/credentials`
+              : `/api/admin/students/${credentialsTarget.user.id}/credentials`;
+          await apiPutJson(path, { username, password });
+          credentialsDialog.close();
+          credentialsTarget = null;
+          await reloadAdminLists();
+          setAdminPageMessage(
+            statusEl,
+            t("admin_credentials_done", { username }),
+            false,
+          );
+        } catch (err) {
+          setAdminPageMessage(errorEl, err.message || t("admin_load_error"), true);
+        }
+      });
+    }
+
+    if (teacherCreateForm) {
+      teacherCreateForm.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const nameEl = document.getElementById("admin-teacher-create-name");
+        const userEl = document.getElementById("admin-teacher-create-username");
+        const pwdEl = document.getElementById("admin-teacher-create-password");
+        const staffEl = document.getElementById("admin-teacher-create-staff-id");
+        const authEl = document.getElementById("admin-teacher-create-authorized");
+        const username = userEl ? userEl.value.trim() : "";
+        const password = pwdEl ? pwdEl.value : "";
+        if (!username || !password) return;
+        setAdminPageMessage(teacherCreateStatus, "", false);
+        setAdminPageMessage(errorEl, "", false);
+        try {
+          const body = {
+            full_name: nameEl ? nameEl.value.trim() : "",
+            username,
+            password,
+            employee_id: staffEl ? staffEl.value.trim() : "",
+            authorized: authEl ? authEl.checked : true,
+          };
+          const created = await apiPost("/api/admin/teachers", body);
+          if (nameEl) nameEl.value = "";
+          if (userEl) userEl.value = "";
+          if (pwdEl) pwdEl.value = "123456";
+          if (staffEl) staffEl.value = "";
+          await reloadAdminLists();
+          setAdminPageMessage(
+            teacherCreateStatus,
+            t("admin_create_teacher_done", { username: created.username || username }),
+            false,
+          );
+        } catch (err) {
+          setAdminPageMessage(teacherCreateStatus, err.message || t("admin_load_error"), true);
+        }
+      });
+    }
+
+    if (studentCreateForm) {
+      studentCreateForm.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const nameEl = document.getElementById("admin-student-create-name");
+        const userEl = document.getElementById("admin-student-create-username");
+        const pwdEl = document.getElementById("admin-student-create-password");
+        const sidEl = document.getElementById("admin-student-create-student-id");
+        const groupEl = document.getElementById("admin-student-create-group");
+        const username = userEl ? userEl.value.trim() : "";
+        const password = pwdEl ? pwdEl.value : "";
+        if (!username || !password) return;
+        setAdminPageMessage(studentCreateStatus, "", false);
+        setAdminPageMessage(errorEl, "", false);
+        const classCode = studentCreateClassSel ? studentCreateClassSel.value.trim() : "";
+        try {
+          const body = {
+            full_name: nameEl ? nameEl.value.trim() : "",
+            username,
+            password,
+            student_id: sidEl ? sidEl.value.trim() : "",
+            group_code: groupEl ? groupEl.value.trim() : "G1",
+          };
+          if (classCode) body.class_code = classCode;
+          const created = await apiPost("/api/admin/students", body);
+          if (nameEl) nameEl.value = "";
+          if (userEl) userEl.value = "";
+          if (pwdEl) pwdEl.value = "123456";
+          if (sidEl) sidEl.value = "";
+          await reloadAdminLists();
+          setAdminPageMessage(
+            studentCreateStatus,
+            t("admin_create_student_done", { username: created.username || username }),
+            false,
+          );
+        } catch (err) {
+          setAdminPageMessage(studentCreateStatus, err.message || t("admin_load_error"), true);
+        }
+      });
     }
 
     function renderStudentFilterPills() {
@@ -4248,6 +4474,7 @@ function initAdminPage() {
         handleStudentDelete,
         handleStudentPerformance,
         studentsModuleFilter || "",
+        handleStudentSetLogin,
       );
       syncAdminBulkSelectionBar(
         studentsBulkBar,
@@ -4276,8 +4503,10 @@ function initAdminPage() {
         teachersCache = Array.isArray(teachers) ? teachers : [];
         studentsCache = Array.isArray(students) ? students : [];
         classesCache = Array.isArray(classes) ? classes : [];
+        paintStudentCreateClassSelect();
         paintTeachersTable();
         paintStudentsTable();
+        paintRestoreDemoPanel();
         renderAdminClassesTable(classesCache);
         if (activeClassId) {
           try {
@@ -4491,6 +4720,9 @@ function initAdminPage() {
     });
     document.getElementById("admin-students-bulk-delete")?.addEventListener("click", () => {
       void handleStudentsBulkDelete();
+    });
+    restoreDemoBtn?.addEventListener("click", () => {
+      void handleRestoreDemoAccounts();
     });
     classTeachersCheckAll?.addEventListener("change", () => {
       const on = Boolean(classTeachersCheckAll.checked);

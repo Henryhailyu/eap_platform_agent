@@ -6,7 +6,7 @@
     <meta name="description" content="EAP Platform — Manager administration" />
     <title>Manager Centre — EAP Platform</title>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-bulk-fix" />
+    <link rel="stylesheet" href="css/admin-hub.css?v=20260612-manual-accounts" />
   </head>
   <body class="page-app eap-shell-active" data-page="admin">
     <div id="page-shell" class="page-shell">
@@ -262,8 +262,35 @@
               Teachers
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_teachers_hint">
-              Roster details are pushed from Classes. Authorize here to grant calendar access; Revoke returns them to Pending. Delete removes the account.
+              Add accounts here or bulk-upload from Classes. Teachers must be Authorized before they can sign in. Use Set login to change username or password.
             </p>
+            <div class="admin-account-create">
+              <h3 class="admin-account-create__title" data-i18n="admin_create_teacher_heading">Add teacher account</h3>
+              <form id="admin-teacher-create-form" class="admin-inline-form" novalidate>
+                <div class="field">
+                  <label for="admin-teacher-create-name" data-i18n="admin_col_name">Name</label>
+                  <input id="admin-teacher-create-name" type="text" maxlength="120" autocomplete="name" />
+                </div>
+                <div class="field">
+                  <label for="admin-teacher-create-username" data-i18n="username">Username</label>
+                  <input id="admin-teacher-create-username" type="text" required maxlength="40" autocomplete="off" />
+                </div>
+                <div class="field">
+                  <label for="admin-teacher-create-password" data-i18n="password">Password</label>
+                  <input id="admin-teacher-create-password" type="text" value="123456" minlength="6" maxlength="64" required autocomplete="new-password" />
+                </div>
+                <div class="field">
+                  <label for="admin-teacher-create-staff-id" data-i18n="admin_col_employee_id">Staff ID</label>
+                  <input id="admin-teacher-create-staff-id" type="text" maxlength="64" />
+                </div>
+                <label class="admin-checkbox-field">
+                  <input id="admin-teacher-create-authorized" type="checkbox" checked />
+                  <span data-i18n="admin_create_teacher_authorize">Authorize immediately (can sign in)</span>
+                </label>
+                <button type="submit" class="btn-primary" data-i18n="admin_create_teacher_btn">Add teacher</button>
+              </form>
+              <p id="admin-teacher-create-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            </div>
             <div class="admin-roster-search">
               <label class="visually-hidden" for="admin-teachers-search" data-i18n="admin_teachers_search_label">Search teachers</label>
               <input
@@ -306,6 +333,14 @@
             <p id="admin-teachers-empty" class="admin-empty hidden" data-i18n="admin_no_teachers">
               No teacher accounts found.
             </p>
+            <div id="admin-restore-demo-panel" class="admin-restore-demo hidden">
+              <p class="admin-panel__hint" data-i18n="admin_restore_demo_hint">
+                Pilot logins (teacher1, student1) were removed. Restore them to sign in on the teacher and student pages again.
+              </p>
+              <button type="button" id="admin-restore-demo-btn" class="btn-primary" data-i18n="admin_restore_demo_btn">
+                Restore pilot logins
+              </button>
+            </div>
             <p id="admin-teachers-no-match" class="admin-empty hidden" data-i18n="admin_teachers_no_match">
               No teachers match your search.
             </p>
@@ -611,8 +646,41 @@
               Students
             </h2>
             <p class="admin-panel__hint" data-i18n="admin_students_hint">
-              Roster details are pushed from Classes. Filter by class and/or teaching group, or search by name, student ID, email, or mobile.
+              Add accounts here or bulk-upload from Classes. Use Set login to change username or password. Filter by class and/or teaching group, or search by name, student ID, email, or mobile.
             </p>
+            <div class="admin-account-create">
+              <h3 class="admin-account-create__title" data-i18n="admin_create_student_heading">Add student account</h3>
+              <form id="admin-student-create-form" class="admin-inline-form" novalidate>
+                <div class="field">
+                  <label for="admin-student-create-name" data-i18n="admin_col_name">Name</label>
+                  <input id="admin-student-create-name" type="text" maxlength="120" autocomplete="name" />
+                </div>
+                <div class="field">
+                  <label for="admin-student-create-username" data-i18n="username">Username</label>
+                  <input id="admin-student-create-username" type="text" required maxlength="40" autocomplete="off" />
+                </div>
+                <div class="field">
+                  <label for="admin-student-create-password" data-i18n="password">Password</label>
+                  <input id="admin-student-create-password" type="text" value="123456" minlength="6" maxlength="64" required autocomplete="new-password" />
+                </div>
+                <div class="field">
+                  <label for="admin-student-create-student-id" data-i18n="admin_col_student_id">Student ID</label>
+                  <input id="admin-student-create-student-id" type="text" maxlength="64" />
+                </div>
+                <div class="field">
+                  <label for="admin-student-create-class" data-i18n="class_label">Class</label>
+                  <select id="admin-student-create-class">
+                    <option value="" data-i18n="admin_create_student_no_class">— No class yet —</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="admin-student-create-group" data-i18n="admin_col_group">Group</label>
+                  <input id="admin-student-create-group" type="text" value="G1" maxlength="16" />
+                </div>
+                <button type="submit" class="btn-primary" data-i18n="admin_create_student_btn">Add student</button>
+              </form>
+              <p id="admin-student-create-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            </div>
             <div class="admin-roster-search">
               <label class="visually-hidden" for="admin-students-search" data-i18n="admin_students_search_label">Search students</label>
               <input
@@ -668,6 +736,25 @@
 
         </main>
 
+        <dialog id="admin-credentials-dialog" class="admin-credentials-dialog">
+          <form id="admin-credentials-form" method="dialog" class="admin-credentials-dialog__form" novalidate>
+            <h3 class="admin-credentials-dialog__title" data-i18n="admin_credentials_title">Set login</h3>
+            <p id="admin-credentials-subtitle" class="admin-panel__hint"></p>
+            <div class="field">
+              <label for="admin-credentials-username" data-i18n="username">Username</label>
+              <input id="admin-credentials-username" type="text" required maxlength="40" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="admin-credentials-password" data-i18n="password">Password</label>
+              <input id="admin-credentials-password" type="text" minlength="6" maxlength="64" required autocomplete="new-password" />
+            </div>
+            <div class="admin-credentials-dialog__actions">
+              <button type="submit" class="btn-primary" data-i18n="admin_credentials_save">Save login</button>
+              <button type="button" class="btn-secondary" id="admin-credentials-cancel" data-i18n="cancel">Cancel</button>
+            </div>
+          </form>
+        </dialog>
+
         <div id="admin-perf-modal" class="admin-perf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="admin-perf-modal-title" hidden>
           <div class="admin-perf-modal__backdrop" data-admin-perf-close></div>
           <div class="admin-perf-modal__card">
@@ -687,7 +774,7 @@
     <script src="js/i18n-core.js"></script>
     <script src="js/pilot-wake.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js?v=20260612-bulk-fix"></script>
+    <script src="app.js?v=20260612-manual-accounts"></script>
     <script src="js/self-study-ai-api.js"></script>
     <script src="js/admin-self-study-vocabulary.js?v=20260611-v1"></script>
     <script src="js/admin-self-study-reading.js?v=20260611-r6c"></script>
