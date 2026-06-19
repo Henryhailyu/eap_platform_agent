@@ -1,0 +1,29 @@
+/* ICP 备案号悬挂 — 页面最底部，江苏省要求含版权所有 */
+.site-icp-footer {
+  margin: 0;
+  padding: 0.85rem 1rem 1.1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #6e6e73;
+  background: rgba(248, 246, 242, 0.95);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.site-icp-footer p {
+  margin: 0.15rem 0;
+}
+
+.site-icp-footer a {
+  color: #5c6670;
+  text-decoration: none;
+}
+
+.site-icp-footer a:hover {
+  text-decoration: underline;
+  color: #0a4d68;
+}
+
+body.page-app .site-icp-footer {
+  flex-shrink: 0;
+}

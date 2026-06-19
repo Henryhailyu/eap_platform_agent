@@ -327,6 +327,43 @@ def validate_lesson_html(html: str, plan: dict | None = None) -> list[dict[str, 
     return warnings
 
 
+ICP_SERVICE_NUMBER = "苏ICP备2026033339号-2"
+ICP_MIIT_URL = "https://beian.miit.gov.cn/"
+ICP_COPYRIGHT_OWNER = "吕海"
+
+ICP_FOOTER_HTML = (
+    '<footer class="eap-site-icp site-icp-footer" role="contentinfo">'
+    f'<p class="site-icp-footer__copy">版权所有 © {ICP_COPYRIGHT_OWNER}</p>'
+    f'<p class="site-icp-footer__icp">'
+    f'<a href="{ICP_MIIT_URL}" target="_blank" rel="noopener noreferrer">{ICP_SERVICE_NUMBER}</a>'
+    f"</p></footer>"
+)
+
+ICP_FOOTER_STYLE = """
+.eap-site-icp,.site-icp-footer{margin:2rem 0 0;padding:.85rem 1rem;text-align:center;
+font-size:.75rem;line-height:1.5;color:#6e6e73;border-top:1px solid rgba(0,0,0,.06)}
+.eap-site-icp a{color:#5c6670;text-decoration:none}
+.eap-site-icp a:hover{text-decoration:underline;color:#0a4d68}
+"""
+
+
+def inject_icp_footer_html(html: str) -> str:
+    """Append MIIT ICP footer per Tencent 备案号悬挂说明 (non-Guangdong: 服务备案号)."""
+    text = str(html or "")
+    if not text.strip():
+        return text
+    if ICP_SERVICE_NUMBER in text and ICP_MIIT_URL in text:
+        return text
+    snippet = ICP_FOOTER_HTML
+    if "site-icp-footer__icp" not in text and "<style" in text.lower():
+        snippet = f"<style>{ICP_FOOTER_STYLE}</style>" + snippet
+    lower = text.lower()
+    if "</body>" in lower:
+        idx = lower.rindex("</body>")
+        return text[:idx] + snippet + text[idx:]
+    return text + snippet
+
+
 def postprocess_lesson_html(html: str, plan: dict | None = None) -> tuple[str, list[dict[str, str]]]:
     """Polish design, repair live markup, return (html, warnings)."""
     text = str(html or "")
@@ -339,5 +376,6 @@ def postprocess_lesson_html(html: str, plan: dict | None = None) -> tuple[str, l
     text = _ensure_launch_buttons(text)
     text = _inject_missing_plan_slots(text, plan)
     text = _ensure_launch_buttons(text)
+    text = inject_icp_footer_html(text)
     warnings = validate_lesson_html(text, plan)
     return text, warnings

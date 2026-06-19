@@ -227,7 +227,14 @@ def polish_teaching_html(html: str) -> str:
     if not text:
         return text
     text = _strip_ai_preamble(text)
-    return _normalize_decorative_opacity(text)
+    text = _normalize_decorative_opacity(text)
+    try:
+        from lesson_html_postprocess import inject_icp_footer_html
+
+        text = inject_icp_footer_html(text)
+    except ImportError:
+        pass
+    return text
 
 
 def _now_iso() -> str:
