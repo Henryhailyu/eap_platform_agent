@@ -47,15 +47,21 @@ apt-get update -qq
 apt-get install -y nginx certbot python3-certbot-nginx
 
 mkdir -p /var/www/certbot
-sed "s/__DOMAIN__/${EAP_DOMAIN}/g" \
-  "${EAP_PROJECT_DIR}/ops/nginx/eap-platform.conf.template" \
-  > "${NGINX_SITE}"
 
+render_nginx() {
+  local template="$1"
+  sed "s/__DOMAIN__/${EAP_DOMAIN}/g" "${template}" > "${NGINX_SITE}"
+}
+
+# Phase 1: HTTP-only — SSL paths do not exist until certbot runs.
+echo "==> Phase 1: HTTP bootstrap (no SSL yet)..."
+render_nginx "${EAP_PROJECT_DIR}/ops/nginx/eap-platform-http-bootstrap.conf.template"
 ln -sf "${NGINX_SITE}" "${NGINX_ENABLED}"
 rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+dpkg --configure -a 2>/dev/null || true
 nginx -t
 systemctl enable nginx
-systemctl reload nginx
+systemctl restart nginx
 
 echo "==> Requesting Let's Encrypt certificate..."
 if [[ -n "${CERTBOT_EMAIL:-}" ]]; then
@@ -64,6 +70,9 @@ else
   certbot --nginx -d "${EAP_DOMAIN}" --non-interactive --agree-tos --redirect --register-unsafely-without-email
 fi
 
+# Phase 2: full reverse-proxy config (certs + options-ssl-nginx.conf now exist).
+echo "==> Phase 2: applying full HTTPS proxy config..."
+render_nginx "${EAP_PROJECT_DIR}/ops/nginx/eap-platform.conf.template"
 nginx -t
 systemctl reload nginx
 
