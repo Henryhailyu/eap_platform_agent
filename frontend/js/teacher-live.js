@@ -53,7 +53,10 @@
     return MOCK.MOCK_QUESTIONS[i % MOCK.MOCK_QUESTIONS.length];
   }
 
-  function hidePollQuizPanel() {
+  const SIDE_PANEL_TOOLS = new Set(["poll", "quiz"]);
+  const CANVAS_OVERLAY_TOOLS = new Set(["games", "timer", "wheel", "upload"]);
+
+  function destroyPollQuizPanel() {
     const panel = document.getElementById("tlive-tool-panel");
     const wrap = document.getElementById("tlive-canvas-wrap");
     if (panel) {
@@ -62,6 +65,95 @@
       panel.innerHTML = "";
     }
     if (wrap) wrap.classList.remove("tlive-canvas-wrap--split");
+    window.__tliveSidePanelVisible = false;
+    window.__tliveSidePanelTool = null;
+  }
+
+  function collapseSideToolPanel() {
+    const panel = document.getElementById("tlive-tool-panel");
+    const wrap = document.getElementById("tlive-canvas-wrap");
+    if (panel) {
+      panel.classList.add("hidden");
+      panel.hidden = true;
+    }
+    if (wrap) wrap.classList.remove("tlive-canvas-wrap--split");
+    window.__tliveSidePanelVisible = false;
+  }
+
+  function expandSideToolPanel(tool) {
+    const panel = document.getElementById("tlive-tool-panel");
+    const wrap = document.getElementById("tlive-canvas-wrap");
+    if (panel) {
+      panel.classList.remove("hidden");
+      panel.hidden = false;
+    }
+    if (wrap) wrap.classList.add("tlive-canvas-wrap--split");
+    window.__tliveSidePanelVisible = true;
+    window.__tliveSidePanelTool = tool || null;
+  }
+
+  function hidePollQuizPanel() {
+    destroyPollQuizPanel();
+  }
+
+  function persistPollQuizDraft(tool) {
+    const pq = window.EAP_LIVE_POLL_QUIZ;
+    if (pq && typeof pq.persistDraftFromDom === "function") {
+      pq.persistDraftFromDom(tool, getMock());
+    }
+  }
+
+  function getActiveToolbarTool() {
+    const active = document.querySelector(".tlive-tool--active");
+    return active ? active.getAttribute("data-tool") : null;
+  }
+
+  function clearActiveTool() {
+    document.querySelectorAll(".tlive-tool").forEach((btn) => {
+      btn.classList.remove("tlive-tool--active");
+    });
+  }
+
+  function restoreLessonFromCache() {
+    const cache = window.__tliveLessonCache;
+    if (!cache || !window.__tliveLessonOnStage) return false;
+    collapseSideToolPanel();
+    stopLiveTimerIfMounted();
+    window.__tliveWheelUnmount = null;
+    if (cache.type === "html" && cache.html) {
+      renderHtmlLessonOnCanvas(cache.html, cache.title, cache.pageId);
+      return true;
+    }
+    if (cache.type === "file" && cache.item) {
+      void renderFileOnCanvas(cache.item);
+      return true;
+    }
+    return false;
+  }
+
+  function shouldToggleOffOverlayTool(tool) {
+    return (
+      window.__tliveLessonOnStage &&
+      window.__tliveLessonCache &&
+      CANVAS_OVERLAY_TOOLS.has(tool) &&
+      getActiveToolbarTool() === tool
+    );
+  }
+
+  function dismissSidePanelIfOpen() {
+    if (window.__tliveSidePanelVisible && window.__tliveSidePanelTool) {
+      persistPollQuizDraft(window.__tliveSidePanelTool);
+      collapseSideToolPanel();
+    }
+  }
+
+  function shouldToggleOffSidePanelTool(tool) {
+    return (
+      window.__tliveLessonOnStage &&
+      SIDE_PANEL_TOOLS.has(tool) &&
+      window.__tliveSidePanelVisible &&
+      window.__tliveSidePanelTool === tool
+    );
   }
 
   function getPollQuizMountTarget() {
@@ -69,13 +161,11 @@
       const panel = document.getElementById("tlive-tool-panel");
       const wrap = document.getElementById("tlive-canvas-wrap");
       if (panel) {
-        panel.classList.remove("hidden");
-        panel.hidden = false;
-        if (wrap) wrap.classList.add("tlive-canvas-wrap--split");
+        expandSideToolPanel(window.__tliveSidePanelTool);
         return { el: panel, sidePanel: true };
       }
     }
-    hidePollQuizPanel();
+    destroyPollQuizPanel();
     const canvas = document.getElementById("tlive-canvas-inner");
     return { el: canvas, sidePanel: false };
   }
@@ -83,6 +173,19 @@
   function mountPollQuizForTool(tool, MOCK) {
     const target = getPollQuizMountTarget();
     if (!target.el || !window.EAP_LIVE_POLL_QUIZ) return;
+    const panel = document.getElementById("tlive-tool-panel");
+    const alreadyMounted =
+      target.sidePanel &&
+      window.__tliveSidePanelTool === tool &&
+      panel &&
+      panel.querySelector(`[data-pq-tool="${tool}"]`);
+    if (alreadyMounted) {
+      expandSideToolPanel(tool);
+      return;
+    }
+    if (target.sidePanel && window.__tliveSidePanelTool && window.__tliveSidePanelTool !== tool) {
+      persistPollQuizDraft(window.__tliveSidePanelTool);
+    }
     window.EAP_LIVE_POLL_QUIZ.mountPollQuizTool({
       tool,
       mock: MOCK,
@@ -95,6 +198,9 @@
       onViewResponses: (q) => openResponsesModal(q, null),
       onStatus: updateLaunchStatus,
     });
+    if (target.sidePanel) {
+      expandSideToolPanel(tool);
+    }
   }
 
   function handleLivePickMessage(data) {
@@ -202,6 +308,7 @@
 
   function renderWelcome(ctx) {
     window.__tliveLessonOnStage = false;
+    window.__tliveLessonCache = null;
     hidePollQuizPanel();
     const MOCK = getMock();
     const canvas = document.getElementById("tlive-canvas-inner");
@@ -646,6 +753,7 @@
 
   function renderHtmlLessonOnCanvas(html, title, pageId) {
     window.__tliveLessonOnStage = true;
+    window.__tliveLessonCache = { type: "html", html, title, pageId };
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas || !html) return;
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
@@ -877,6 +985,8 @@
   async function renderFileOnCanvas(item) {
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas) return;
+    window.__tliveLessonOnStage = true;
+    window.__tliveLessonCache = { type: "file", item };
     stopActivityStatsPoll();
     const base = (getLiveApi() && getLiveApi().API_BASE) || window.location.origin;
     const lib = getDisplayApi();
@@ -3103,18 +3213,40 @@
           return;
         }
         const tool = btn.getAttribute("data-tool");
+
+        if (shouldToggleOffSidePanelTool(tool)) {
+          persistPollQuizDraft(tool);
+          collapseSideToolPanel();
+          clearActiveTool();
+          return;
+        }
+
+        if (shouldToggleOffOverlayTool(tool)) {
+          if (restoreLessonFromCache()) {
+            clearActiveTool();
+            return;
+          }
+        }
+
         setActiveTool(tool);
-        if (tool === "games") showGamesTool();
-        else if (tool === "timer") renderTimerTool();
-        else if (tool === "wheel") renderNameWheelTool(ctx);
-        else if (tool === "slides") {
+        if (tool === "games") {
+          dismissSidePanelIfOpen();
+          showGamesTool();
+        } else if (tool === "timer") {
+          dismissSidePanelIfOpen();
+          renderTimerTool();
+        } else if (tool === "wheel") {
+          dismissSidePanelIfOpen();
+          renderNameWheelTool(ctx);
+        } else if (tool === "slides") {
+          dismissSidePanelIfOpen();
           void pushSlidesDisplay();
           renderWelcome(ctx);
         }
         else if (tool === "poll" || tool === "quiz") {
-          const MOCK = getMock();
           if (MOCK) mountPollQuizForTool(tool, MOCK);
         } else if (tool === "upload") {
+          dismissSidePanelIfOpen();
           const canvas = document.getElementById("tlive-canvas-inner");
           const lessonAi = window.EAP_TEACHER_LESSON_AI;
           if (canvas && lessonAi && typeof lessonAi.mountLivePanel === "function") {

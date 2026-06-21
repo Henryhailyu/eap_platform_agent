@@ -181,7 +181,9 @@
     }
 
     const toolSlots = global.EAP_slotsForTool ? global.EAP_slotsForTool(getSlots(), tool) : [];
-    setDraft(tool, defaultDraft(tool, MOCK));
+    if (!getDraft(tool)) {
+      setDraft(tool, defaultDraft(tool, MOCK));
+    }
 
     const titleKey = tool === "quiz" ? "tlive_quiz_title" : "tlive_poll_title";
     const lessonHint =
@@ -191,7 +193,7 @@
 
     canvas.className = opts.sidePanel ? "tlive-tool-panel__inner" : "tlive-canvas__inner tlive-canvas__inner--left";
     canvas.innerHTML = `
-      <div class="tlive-pq-panel">
+      <div class="tlive-pq-panel" data-pq-tool="${tool}">
         <h2 class="tlive-pq-title">${escapeHtml(t(titleKey))}</h2>
         <p class="tlive-pq-lead">${escapeHtml(lessonHint)}</p>
         ${renderSegmentFilter()}
@@ -322,9 +324,32 @@
     return true;
   }
 
+  function persistDraftFromDom(tool, MOCK) {
+    const panel = global.document && global.document.getElementById("tlive-tool-panel");
+    const root = panel && panel.querySelector(`[data-pq-tool="${tool}"]`);
+    if (!root) return;
+    const mock = MOCK || global.EAP_TEACHER_LIVE_MOCK;
+    if (!mock) return;
+    const q = resolveQuestion(tool, mock);
+    if (!q) return;
+    const draft = getDraft(tool) || defaultDraft(tool, mock);
+    const mode =
+      root.querySelector('input[name="tlive-pq-slot"]:checked') && draft.mode === "ai"
+        ? "ai"
+        : draft.mode === "manual" || questionFromManualForm()
+          ? "manual"
+          : draft.mode;
+    const slotId =
+      mode === "ai"
+        ? root.querySelector('input[name="tlive-pq-slot"]:checked')?.value || draft.slotId || ""
+        : "";
+    setDraft(tool, { mode, slotId, question: q });
+  }
+
   global.EAP_LIVE_POLL_QUIZ = {
     mountPollQuizTool,
     applySlotPick,
+    persistDraftFromDom,
     getDraft,
     setDraft,
     resolveQuestion,
