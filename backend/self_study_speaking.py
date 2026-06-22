@@ -19,6 +19,7 @@ from tencent_audio import (
     ensure_speaking_prompt_audio,
     evaluate_oral_sentence,
     merge_soe_into_feedback,
+    prepare_audio_for_tencent,
     recognize_speech,
     store_student_recording,
 )
@@ -997,6 +998,8 @@ def register_self_study_speaking_routes(
         audio_format = str(data.get("audioFormat") or "webm").lower().lstrip(".")
         audio_bytes: bytes | None = None
         audio_cos_key: str | None = None
+        tencent_audio: bytes | None = None
+        tencent_fmt: str = audio_format
 
         if not session_id or not question_id:
             conn.close()
@@ -1032,10 +1035,26 @@ def register_self_study_speaking_routes(
                 audio_cos_key = store_student_recording(
                     username, session_id, question_id, audio_bytes, audio_format
                 )
+                tencent_audio = audio_bytes
+                tencent_fmt = audio_format
+                if asr_ready() or soe_ready():
+                    tencent_audio, tencent_fmt = prepare_audio_for_tencent(
+                        audio_bytes, audio_format
+                    )
                 if asr_ready() and len(response_text) < 5:
-                    response_text = recognize_speech(audio_bytes, audio_format)
+                    response_text = recognize_speech(tencent_audio, tencent_fmt)
+            except ValueError as exc:
+                conn.close()
+                return jsonify({"error": str(exc)}), 400
             except Exception as exc:
                 conn.close()
+                log_msg = str(exc)
+                if "audio data empty" in log_msg.lower():
+                    return jsonify(
+                        {
+                            "error": "Could not recognise speech in your recording — speak louder, check the microphone, and try again."
+                        }
+                    ), 400
                 return jsonify({"error": f"Audio processing failed: {exc}"}), 400
 
         batch_mode = bool(content.get("batchFeedback"))
@@ -1055,8 +1074,8 @@ def register_self_study_speaking_routes(
                 part_type=item_part,
             )
             ref_text = _item_prompt_en(q_meta) or response_text
-            if audio_bytes:
-                soe = evaluate_oral_sentence(audio_bytes, ref_text, audio_format)
+            if audio_bytes and tencent_audio is not None:
+                soe = evaluate_oral_sentence(tencent_audio, ref_text, tencent_fmt)
                 feedback = merge_soe_into_feedback(feedback, soe)
                 if audio_cos_key:
                     feedback["audioCosKey"] = audio_cos_key

@@ -6,7 +6,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 import uuid
 from typing import Any
 
@@ -16,6 +20,10 @@ log = logging.getLogger("eap.tencent_audio")
 
 _TTS_MAX_CHARS = 580
 _TTS_REGION = "ap-guangzhou"
+_ASR_NATIVE_FORMATS = frozenset(
+    {"wav", "mp3", "m4a", "aac", "pcm", "amr", "speex", "silk", "ogg-opus"}
+)
+_MIN_ASR_BYTES = 512
 
 
 def _credentials_ready() -> bool:
@@ -272,6 +280,80 @@ def ensure_speaking_prompt_audio(session_id: int, question_id: str, prompt_en: s
         return None
 
 
+def _normalize_voice_format(voice_format: str) -> str:
+    fmt = (voice_format or "webm").lower().lstrip(".")
+    if fmt == "ogg":
+        return "ogg-opus"
+    return fmt
+
+
+def ffmpeg_available() -> bool:
+    return shutil.which("ffmpeg") is not None
+
+
+def _ffmpeg_transcode_to_wav(audio_bytes: bytes, input_suffix: str) -> bytes:
+    if not ffmpeg_available():
+        raise RuntimeError(
+            "Server cannot convert browser WebM audio — install ffmpeg or type your answer."
+        )
+    inp_path = ""
+    out_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=f".{input_suffix or 'webm'}", delete=False) as inp:
+            inp.write(audio_bytes)
+            inp_path = inp.name
+        out_path = f"{inp_path}.wav"
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                inp_path,
+                "-ar",
+                "16000",
+                "-ac",
+                "1",
+                "-f",
+                "wav",
+                out_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=45,
+            check=False,
+        )
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip()[-400:]
+            log.warning("ffmpeg transcode failed (%s): %s", proc.returncode, detail)
+            raise RuntimeError("Could not decode your recording — please try again.")
+        with open(out_path, "rb") as handle:
+            out = handle.read()
+        if len(out) < _MIN_ASR_BYTES:
+            raise ValueError("Recording too short — please speak for at least a few seconds.")
+        return out
+    finally:
+        for path in (inp_path, out_path):
+            if path:
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+
+
+def prepare_audio_for_tencent(audio_bytes: bytes, voice_format: str = "webm") -> tuple[bytes, str]:
+    """Return audio bytes + Tencent VoiceFormat (transcode WebM via ffmpeg when needed)."""
+    if not audio_bytes:
+        raise ValueError("Empty audio recording")
+    if len(audio_bytes) < _MIN_ASR_BYTES:
+        raise ValueError("Recording too short — please speak for at least a few seconds.")
+    fmt = _normalize_voice_format(voice_format)
+    if fmt in _ASR_NATIVE_FORMATS:
+        return audio_bytes, fmt
+    if fmt in ("webm", "mkv", "opus"):
+        return _ffmpeg_transcode_to_wav(audio_bytes, fmt), "wav"
+    return _ffmpeg_transcode_to_wav(audio_bytes, fmt), "wav"
+
+
 def recognize_speech(audio_bytes: bytes, voice_format: str = "mp3") -> str:
     from tencentcloud.asr.v20190614 import asr_client, models
     from tencentcloud.common import credential
@@ -280,9 +362,7 @@ def recognize_speech(audio_bytes: bytes, voice_format: str = "mp3") -> str:
 
     if not audio_bytes:
         raise ValueError("Empty audio")
-    fmt = (voice_format or "mp3").lower().lstrip(".")
-    if fmt == "webm":
-        fmt = "mp3"  # browser webm may fail; caller should prefer wav/mp3 when possible
+    fmt = _normalize_voice_format(voice_format)
 
     cred = credential.Credential(config.TENCENT_SECRET_ID, config.TENCENT_SECRET_KEY)
     http_profile = HttpProfile()
@@ -336,7 +416,7 @@ def evaluate_oral_sentence(audio_bytes: bytes, ref_text: str, voice_format: str 
         from tencentcloud.common.profile.http_profile import HttpProfile
         from tencentcloud.soe.v20180724 import models, soe_client
 
-        fmt = (voice_format or "mp3").lower().lstrip(".")
+        fmt = _normalize_voice_format(voice_format)
         cred = credential.Credential(config.TENCENT_SECRET_ID, config.TENCENT_SECRET_KEY)
         http_profile = HttpProfile()
         http_profile.endpoint = "soe.tencentcloudapi.com"

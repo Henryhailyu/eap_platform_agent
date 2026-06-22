@@ -102,6 +102,16 @@
     }
   }
 
+  function audioFormatFromBlob(blob) {
+    const type = String(blob?.type || "").toLowerCase();
+    if (type.includes("webm")) return "webm";
+    if (type.includes("ogg")) return "ogg-opus";
+    if (type.includes("mp4") || type.includes("m4a")) return "m4a";
+    if (type.includes("mpeg") || type.includes("mp3")) return "mp3";
+    if (type.includes("wav")) return "wav";
+    return "webm";
+  }
+
   function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -251,6 +261,7 @@
     stopMedia();
     state.recordChunks = [];
     state.recordedBlob = null;
+    state.recordStopPromise = null;
     const blocked = micAccessError();
     if (blocked) {
       throw new Error(blocked);
@@ -270,13 +281,16 @@
       state.mediaRecorder = new MediaRecorder(state.mediaStream);
     }
     const blobType = state.mediaRecorder.mimeType || mime || "audio/webm";
+    state.recordStopPromise = new Promise((resolve) => {
+      state.mediaRecorder.onstop = () => {
+        if (state.recordChunks.length) {
+          state.recordedBlob = new Blob(state.recordChunks, { type: blobType });
+        }
+        resolve();
+      };
+    });
     state.mediaRecorder.ondataavailable = (ev) => {
       if (ev.data?.size) state.recordChunks.push(ev.data);
-    };
-    state.mediaRecorder.onstop = () => {
-      if (state.recordChunks.length) {
-        state.recordedBlob = new Blob(state.recordChunks, { type: blobType });
-      }
     };
     state.mediaRecorder.start(250);
   }
@@ -334,13 +348,27 @@
 
   async function stopRecording() {
     if (state.mediaRecorder && state.mediaRecorder.state !== "inactive") {
-      state.mediaRecorder.stop();
+      try {
+        if (typeof state.mediaRecorder.requestData === "function") {
+          state.mediaRecorder.requestData();
+        }
+        state.mediaRecorder.stop();
+      } catch (_) {
+        /* ignore */
+      }
+      if (state.recordStopPromise) {
+        await Promise.race([
+          state.recordStopPromise,
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]);
+      }
     }
     if (state.mediaStream) {
       state.mediaStream.getTracks().forEach((tr) => tr.stop());
       state.mediaStream = null;
     }
-    await new Promise((r) => setTimeout(r, 120));
+    state.mediaRecorder = null;
+    state.recordStopPromise = null;
   }
 
   async function submitResponse(item, timedOut, limit) {
@@ -353,9 +381,11 @@
       timedOut: !!timedOut,
       elapsedSec: elapsed,
     };
-    if (state.recordedBlob) {
+    if (state.recordedBlob && state.recordedBlob.size > 400) {
       body.audioBase64 = await blobToBase64(state.recordedBlob);
-      body.audioFormat = state.recordedBlob.type.includes("webm") ? "webm" : "mp3";
+      body.audioFormat = audioFormatFromBlob(state.recordedBlob);
+    } else if (!state.recordedBlob || state.recordedBlob.size <= 400) {
+      throw new Error(t("self_study_speaking_recording_empty"));
     }
     return SERVER().submitSpeakingResponse(body);
   }

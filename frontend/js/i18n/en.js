@@ -1066,6 +1066,7 @@ window.EAP_STRINGS_EN = {
   "self_study_speaking_recording": "Recording…",
   "self_study_speaking_record_stopped": "Recording stopped",
   "self_study_speaking_record_saved": "Recording saved — submit when ready",
+  "self_study_speaking_recording_empty": "No audio was captured — allow microphone access and speak for a few seconds before the timer ends.",
   "self_study_speaking_mic_unavailable": "Microphone not available in this browser.",
   "self_study_speaking_mic_denied": "Microphone permission denied.",
   "self_study_listening_game_title": "Lecture Structure",

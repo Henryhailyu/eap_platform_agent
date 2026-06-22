@@ -14,9 +14,11 @@ RUN set -eux; \
     fi
 
 # LibreOffice (headless) converts PPT/DOC uploads to PDF for classroom display (K6d).
+# ffmpeg transcodes browser WebM speaking recordings for Tencent ASR/SOE.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
+        ffmpeg \
         libreoffice-writer \
         libreoffice-impress \
         libreoffice-common \

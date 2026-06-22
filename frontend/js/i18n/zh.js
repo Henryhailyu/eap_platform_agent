@@ -1068,6 +1068,7 @@ window.EAP_STRINGS_ZH = {
   "self_study_speaking_recording": "录音中…",
   "self_study_speaking_record_stopped": "已停止录音",
   "self_study_speaking_record_saved": "录音已保存 — 可提交",
+  "self_study_speaking_recording_empty": "未录到声音 — 请允许麦克风权限，并在倒计时结束前开口说几秒。",
   "self_study_speaking_mic_unavailable": "当前浏览器无法使用麦克风。",
   "self_study_speaking_mic_denied": "麦克风权限被拒绝。",
   "self_study_listening_game_title": "讲座结构",
