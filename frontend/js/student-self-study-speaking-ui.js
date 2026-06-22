@@ -391,6 +391,9 @@
   }
 
   async function finishBatch(root) {
+    if (!state.sessionId) return;
+    state.phase = "analysing";
+    showPanel("ssc-speaking-practice");
     renderLoading(root, "self_study_speaking_analysing_title");
     try {
       const res = await SERVER().completeSpeakingSession({ sessionId: state.sessionId });
@@ -399,8 +402,53 @@
       renderBatchResults(root, res);
       updateHeader(100, t("self_study_speaking_complete_short"));
     } catch (e) {
-      root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
+      state.phase = "analysing";
+      root.innerHTML = `
+        <div class="ssc-report">
+          <h2>${t("self_study_speaking_analysing_title")}</h2>
+          <p class="ssc-vocab-error" role="alert">${escapeHtml(e.message || t("self_study_ai_error"))}</p>
+          <div class="ssc-placement-actions">
+            <button type="button" class="btn-primary" id="ssc-analyse-retry">${t("self_study_speaking_analyse_retry")}</button>
+            <button type="button" class="btn-secondary" id="ssc-back-parts">${t("self_study_speaking_back_hub")}</button>
+          </div>
+        </div>
+      `;
+      document.getElementById("ssc-analyse-retry")?.addEventListener("click", () => {
+        void finishBatch(root);
+      });
+      document.getElementById("ssc-back-parts")?.addEventListener("click", backToHub);
     }
+  }
+
+  function renderAnswerSaved(root, current, total, onDone) {
+    state.phase = "exam";
+    showPanel("ssc-speaking-practice");
+    root.innerHTML = `
+      <div class="ssc-listening-loading" role="status" aria-live="polite">
+        <div class="ssc-listening-loading__spinner" aria-hidden="true"></div>
+        <h2 class="ssc-listening-loading__title">${t("self_study_speaking_answer_saved", { current: String(current), total: String(total) })}</h2>
+        <p class="ssc-listening-loading__body">${t("self_study_speaking_next_question_soon")}</p>
+      </div>
+    `;
+    updateHeader(
+      Math.round((current / total) * 100),
+      t("self_study_module_in_progress", { pct: String(Math.round((current / total) * 100)) }),
+    );
+    global.setTimeout(() => {
+      if (typeof onDone === "function") onDone();
+    }, 1400);
+  }
+
+  async function afterAnswerSubmitted(root, items) {
+    const total = items.length;
+    state.questionIndex += 1;
+    if (state.questionIndex >= total) {
+      await finishBatch(root);
+      return;
+    }
+    renderAnswerSaved(root, state.questionIndex, total, () => {
+      void renderPractice(root);
+    });
   }
 
   function renderBatchResults(root, res) {
@@ -499,12 +547,7 @@
         if (statusEl) statusEl.textContent = t("self_study_speaking_submitting");
         try {
           await submitResponse(item, true, limit);
-          state.questionIndex += 1;
-          if (state.questionIndex >= items.length) {
-            await finishBatch(root);
-          } else {
-            void renderPractice(root);
-          }
+          await afterAnswerSubmitted(root, items);
         } catch (err) {
           alert(err.message);
           const playBtn = root.querySelector("#ssc-play-question");
@@ -571,7 +614,7 @@
       await beginAnswerWindow(root, speak, async () => {
         try {
           await submitResponse(item, true, speak);
-          await finishBatch(root);
+          await afterAnswerSubmitted(root, getItems(detail));
         } catch (err) {
           alert(err.message);
         }
@@ -713,6 +756,25 @@
     `;
   }
 
+  function onLangChange() {
+    const root = document.getElementById("ssc-speaking-practice");
+    if (state.phase === "results" && state.batchResults && root) {
+      renderBatchResults(root, {
+        partType: state.sessionDetail?.session?.partType || "P1",
+        results: state.batchResults,
+      });
+      if (global.EAP_I18N) global.EAP_I18N.applyStatic();
+      return;
+    }
+    if (state.sessionId && root && !["hub", "loading"].includes(state.phase)) {
+      showPanel("ssc-speaking-practice");
+      void renderPractice(root);
+      if (global.EAP_I18N) global.EAP_I18N.applyStatic();
+      return;
+    }
+    void init();
+  }
+
   async function init() {
     const shell = document.getElementById("ssc-module-root");
     const titleEl = document.getElementById("ssc-module-title");
@@ -754,5 +816,5 @@
     return true;
   }
 
-  global.EAP_SPEAKING_UI = { init };
+  global.EAP_SPEAKING_UI = { init, onLangChange };
 })(typeof window !== "undefined" ? window : globalThis);

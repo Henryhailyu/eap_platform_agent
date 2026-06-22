@@ -618,7 +618,11 @@
         const ok = await speakingUi.init();
         if (ok) {
           window.addEventListener("eap:langchange", () => {
-            void speakingUi.init();
+            if (typeof speakingUi.onLangChange === "function") {
+              speakingUi.onLangChange();
+            } else {
+              void speakingUi.init();
+            }
             if (window.EAP_I18N) window.EAP_I18N.applyStatic();
           });
           return;

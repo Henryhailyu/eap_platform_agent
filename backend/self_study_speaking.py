@@ -1028,6 +1028,7 @@ def register_self_study_speaking_routes(
             "MOCK": PART1_MIN_WORDS,
         }.get(item_part, PART1_MIN_WORDS)
         min_words = int(q_meta.get("minWords") or default_min)
+        batch_mode = bool(content.get("batchFeedback"))
 
         if audio_b64:
             try:
@@ -1042,26 +1043,38 @@ def register_self_study_speaking_routes(
                         audio_bytes, audio_format
                     )
                 if asr_ready() and len(response_text) < 5:
-                    response_text = recognize_speech(tencent_audio, tencent_fmt)
+                    try:
+                        response_text = recognize_speech(tencent_audio, tencent_fmt)
+                    except Exception:
+                        if batch_mode:
+                            response_text = "(speech not recognised)"
+                        else:
+                            raise
             except ValueError as exc:
-                conn.close()
-                return jsonify({"error": str(exc)}), 400
+                if batch_mode:
+                    response_text = response_text or "(recording too short)"
+                else:
+                    conn.close()
+                    return jsonify({"error": str(exc)}), 400
             except Exception as exc:
-                conn.close()
                 log_msg = str(exc)
-                if "audio data empty" in log_msg.lower():
+                if batch_mode:
+                    response_text = response_text or "(speech not recognised)"
+                elif "audio data empty" in log_msg.lower():
+                    conn.close()
                     return jsonify(
                         {
                             "error": "Could not recognise speech in your recording — speak louder, check the microphone, and try again."
                         }
                     ), 400
-                return jsonify({"error": f"Audio processing failed: {exc}"}), 400
+                else:
+                    conn.close()
+                    return jsonify({"error": f"Audio processing failed: {exc}"}), 400
 
-        batch_mode = bool(content.get("batchFeedback"))
         if not batch_mode and len(response_text) < 5:
             conn.close()
             return jsonify({"error": "Response too short — type or record your answer"}), 400
-        if batch_mode and len(response_text) < 1 and not audio_bytes:
+        if batch_mode and len(response_text) < 1:
             response_text = "(no speech detected)"
 
         feedback: dict[str, Any] = {"pending": True} if batch_mode else {}
