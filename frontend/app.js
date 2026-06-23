@@ -92,6 +92,15 @@ function translateStatus(status) {
   return raw;
 }
 
+function formatFeedbackFilesSlotsHint(existingCount, max) {
+  const slotsLeft = max - existingCount;
+  const hint =
+    slotsLeft <= 0
+      ? t("feedback_slots_max_reached")
+      : t("feedback_slots_can_add", { n: slotsLeft });
+  return t("feedback_slots_summary", { count: existingCount, max, hint });
+}
+
 /** Map backend progress action_needed strings to i18n. */
 function translateActionNeeded(action) {
   const a = action != null ? String(action).trim() : "";
@@ -5310,11 +5319,11 @@ function renderTeacherSubmissionsInto(container, submissions, taskId) {
     const dl = document.createElement("dl");
     dl.className = "task-submission-facts";
 
-    fact(dl, "Student name", s.student_name);
-    fact(dl, "Username", s.student_username);
-    fact(dl, "Class", s.class_name);
-    fact(dl, "Submitted", s.submitted_at);
-    fact(dl, "Status", s.status);
+    fact(dl, t("student_name_label"), s.student_name);
+    fact(dl, t("username"), s.student_username);
+    fact(dl, t("class_label"), s.class_name);
+    fact(dl, t("submitted_label"), s.submitted_at);
+    fact(dl, t("status_label"), translateStatus(s.status));
 
     /* --- Original Submission (first homework) --- */
     const originalSection = document.createElement("div");
@@ -5346,8 +5355,8 @@ function renderTeacherSubmissionsInto(container, submissions, taskId) {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.textContent = s.file_name
-        ? `Original attachment: ${s.file_name}`
-        : "Download original attachment";
+        ? t("original_attachment_named", { name: s.file_name })
+        : t("download_original_attachment");
       fileRow.appendChild(link);
       originalSection.appendChild(fileRow);
     }
@@ -5489,12 +5498,12 @@ function renderTeacherSubmissionsInto(container, submissions, taskId) {
           dl.href = `${API_BASE}/submission-files/${encodeURIComponent(String(att.file_path).trim())}`;
           dl.target = "_blank";
           dl.rel = "noopener noreferrer";
-          dl.textContent = "Download";
+          dl.textContent = t("download_link");
         }
         const del = document.createElement("button");
         del.type = "button";
         del.className = "btn-secondary task-submission-feedback-attach-delete";
-        del.textContent = "Remove";
+        del.textContent = t("remove_btn");
         del.setAttribute("data-attachment-id", String(att.id));
         del.setAttribute("data-submission-id", submissionId);
         del.setAttribute("data-task-id", String(taskId));
@@ -5524,7 +5533,10 @@ function renderTeacherSubmissionsInto(container, submissions, taskId) {
     const slotsHint = document.createElement("p");
     slotsHint.className = "task-submission-feedback-files-hint";
     const slotsLeft = MAX_TEACHER_FEEDBACK_FILES - feedbackAttachments.length;
-    slotsHint.textContent = `${feedbackAttachments.length} of ${MAX_TEACHER_FEEDBACK_FILES} additional file(s). ${slotsLeft <= 0 ? "Maximum reached." : `You can add up to ${slotsLeft} more.`}`;
+    slotsHint.textContent = formatFeedbackFilesSlotsHint(
+      feedbackAttachments.length,
+      MAX_TEACHER_FEEDBACK_FILES,
+    );
 
     const uploadBtn = document.createElement("button");
     uploadBtn.type = "button";
@@ -5597,14 +5609,14 @@ function renderTeacherSubmissionsInto(container, submissions, taskId) {
         rlink.target = "_blank";
         rlink.rel = "noopener noreferrer";
         rlink.textContent = s.revision_file_name
-          ? `Revision attachment: ${s.revision_file_name}`
-          : "Download revision attachment";
+          ? t("revision_attachment_named", { name: s.revision_file_name })
+          : t("download_revision_attachment");
         revFileRow.appendChild(rlink);
         revisionSection.appendChild(revFileRow);
       }
 
-      factLine(revisionSection, "Revision submitted", s.revision_submitted_at);
-      factLine(revisionSection, "Revision status", s.revision_status);
+      factLine(revisionSection, t("revision_submitted_at"), s.revision_submitted_at);
+      factLine(revisionSection, t("revision_status_label"), translateStatus(s.revision_status));
     } else {
       const emptyRev = document.createElement("p");
       emptyRev.className = "task-submission-revision__empty";
@@ -5689,18 +5701,18 @@ function renderTeacherTaskMasterList(masterEl, tasks, statsMap, completionByTask
     titleEl.className = "teacher-task-master-item__title";
     titleEl.textContent = taskDisplayTitle(task);
 
-    const done = isCompleted(task);
     const line2 = document.createElement("span");
     line2.className = "teacher-task-master-item__meta";
-    const cat = task.category || task.type || "—";
-    line2.textContent = `${cat} · ${done ? "Completed" : "Pending"}`;
+    const cat = translateCategory(task.category || task.type || "—");
+    const done = isCompleted(task);
+    line2.textContent = `${cat} · ${done ? t("status_completed") : t("status_pending")}`;
 
     const counts = document.createElement("span");
     counts.className = "teacher-task-master-item__counts";
     const sc = Number(stats.submission_count) || 0;
     const fg = Number(stats.feedback_given_count) || 0;
     const rv = Number(stats.revision_count) || 0;
-    counts.textContent = `${sc} submission(s) · ${fg} feedback · ${rv} revision`;
+    counts.textContent = t("teacher_task_counts_line", { sub: sc, fb: fg, rev: rv });
 
     const cm =
       completionByTaskId instanceof Map ? completionByTaskId.get(Number(id)) : null;
@@ -5712,7 +5724,7 @@ function renderTeacherTaskMasterList(masterEl, tasks, statsMap, completionByTask
       const totN = Number(cm.total_students);
       const dOk = Number.isFinite(doneN) ? doneN : 0;
       const tOk = Number.isFinite(totN) ? totN : 0;
-      lineMarked.textContent = `Students marked complete: ${dOk}/${tOk}`;
+      lineMarked.textContent = t("teacher_students_marked_complete", { done: dOk, total: tOk });
     }
 
     const badges = document.createElement("div");
@@ -6628,12 +6640,10 @@ function initTeacherPage() {
       text.textContent = t("pick_teaching_day_hint");
     } else if (kind === "no-tasks") {
       title.textContent = t("no_tasks_date");
-      text.textContent =
-        "Use “Create New Task” below to add one, or choose another day on the calendar.";
+      text.textContent = t("no_tasks_date_hint");
     } else {
       title.textContent = t("no_task_selected");
-      text.textContent =
-        "Choose a day from the calendar, then pick a task from the list on the left.";
+      text.textContent = t("no_task_selected_hint");
     }
   }
 
@@ -8191,7 +8201,7 @@ function initTeacherPage() {
 
       if (files.length === 0) {
         if (uploadStatus) {
-          uploadStatus.textContent = "Choose one or more files first.";
+          uploadStatus.textContent = t("choose_files_first");
           uploadStatus.classList.add("task-submission-feedback-files-upload-status--error");
         }
         return;
@@ -8199,7 +8209,7 @@ function initTeacherPage() {
 
       if (existingCount + files.length > 3) {
         if (uploadStatus) {
-          uploadStatus.textContent = `You can store at most 3 additional files (${existingCount} already saved).`;
+          uploadStatus.textContent = t("feedback_files_max_store", { count: existingCount });
           uploadStatus.classList.add("task-submission-feedback-files-upload-status--error");
         }
         return;
@@ -8207,7 +8217,7 @@ function initTeacherPage() {
 
       multiUploadBtn.disabled = true;
       if (uploadStatus) {
-        uploadStatus.textContent = "Uploading…";
+        uploadStatus.textContent = t("uploading");
         uploadStatus.classList.remove(
           "task-submission-feedback-files-upload-status--error",
           "task-submission-feedback-files-upload-status--ok",
@@ -8225,7 +8235,7 @@ function initTeacherPage() {
         await apiPostFeedbackFiles(submissionId, formData);
         if (multiInput) multiInput.value = "";
         if (uploadStatus) {
-          uploadStatus.textContent = "Files uploaded.";
+          uploadStatus.textContent = t("uploaded");
           uploadStatus.classList.add("task-submission-feedback-files-upload-status--ok");
         }
         if (listContainer) {
@@ -8233,7 +8243,7 @@ function initTeacherPage() {
           renderTeacherSubmissionsInto(listContainer, rows, taskId);
         }
         if (fetchStatus) {
-          fetchStatus.textContent = "Feedback files updated.";
+          fetchStatus.textContent = t("feedback_files_updated");
           fetchStatus.classList.remove("task-submissions-fetch-status--error");
         }
         await refreshDashboard();
@@ -8275,7 +8285,7 @@ function initTeacherPage() {
           renderTeacherSubmissionsInto(listContainer, rows, taskId);
         }
         if (fetchStatus) {
-          fetchStatus.textContent = "Attachment removed.";
+          fetchStatus.textContent = t("attachment_removed");
           fetchStatus.classList.remove("task-submissions-fetch-status--error");
         }
         await refreshDashboard();
@@ -8346,7 +8356,7 @@ function initTeacherPage() {
         }
 
         if (rowStatus) {
-          rowStatus.textContent = "Feedback saved successfully.";
+          rowStatus.textContent = t("feedback_saved");
           rowStatus.classList.add("task-submission-feedback__status-msg--ok");
         }
 
@@ -8356,7 +8366,7 @@ function initTeacherPage() {
         }
 
         if (fetchStatus) {
-          fetchStatus.textContent = "Feedback saved successfully.";
+          fetchStatus.textContent = t("feedback_saved");
           fetchStatus.classList.remove("task-submissions-fetch-status--error");
         }
         await refreshDashboard();
@@ -8648,6 +8658,14 @@ function initTeacherPage() {
   }
 
   window.__eapTeacherLangRefresh = () => {
+    const subsOpenBtn = taskDetailInner.querySelector('.task-view-submissions[aria-expanded="true"]');
+    if (subsOpenBtn) {
+      const openId = subsOpenBtn.getAttribute("data-task-id");
+      if (openId) {
+        teacherPendingAttentionTaskId = Number(openId, 10);
+        teacherPendingAttentionOpenSubmissions = true;
+      }
+    }
     const langPrevCat = String(typeSelect.value || "").trim();
     if (langPrevCat) saveFormToCategoryDraft(langPrevCat);
     populateCategorySelect(typeSelect, false);
@@ -8666,7 +8684,6 @@ function initTeacherPage() {
     populateTeacherTemplateCategoryFilterSelect(templateCategoryFilterEl);
     populateTeacherTemplateCategoryChips(templateCategoryChipsEl, templateCategoryFilterEl);
     syncTeacherCreateTaskContext();
-    setTeacherTaskDetailEmpty("no-selection");
     void reloadPlannerTasksFromApi();
     void refreshDashboard();
     void refreshTeacherClassOverview();
@@ -9052,8 +9069,8 @@ function buildStudentTaskCardElement(task, mySub) {
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.textContent = mySub.file_name
-        ? `Original file: ${String(mySub.file_name).trim()}`
-        : "Download your original submitted file";
+        ? t("original_file_named", { name: String(mySub.file_name).trim() })
+        : t("download_original_submitted_file");
       fileRow.appendChild(link);
       originalSection.appendChild(fileRow);
     }
@@ -9069,7 +9086,7 @@ function buildStudentTaskCardElement(task, mySub) {
     statusRow.appendChild(
       document.createTextNode(
         mySub.status != null && String(mySub.status).trim()
-          ? String(mySub.status).trim()
+          ? translateStatus(mySub.status)
           : "—"
       )
     );
@@ -9114,7 +9131,7 @@ function buildStudentTaskCardElement(task, mySub) {
       fblink.href = `${API_BASE}/submission-files/${encodeURIComponent(String(mySub.feedback_file_path).trim())}`;
       fblink.target = "_blank";
       fblink.rel = "noopener noreferrer";
-      fblink.textContent = "Download teacher commented file";
+      fblink.textContent = t("download_teacher_commented_file");
       fbFileRow.appendChild(fblink);
       fbSection.appendChild(fbFileLabel);
       fbSection.appendChild(fbFileRow);
@@ -9152,7 +9169,7 @@ function buildStudentTaskCardElement(task, mySub) {
           a.href = `${API_BASE}/submission-files/${encodeURIComponent(fp)}`;
           a.target = "_blank";
           a.rel = "noopener noreferrer";
-          a.textContent = "Download";
+          a.textContent = t("download_link");
           line.appendChild(a);
         } else {
           const noDl = document.createElement("span");
@@ -9206,8 +9223,8 @@ function buildStudentTaskCardElement(task, mySub) {
           rlink.target = "_blank";
           rlink.rel = "noopener noreferrer";
           rlink.textContent = mySub.revision_file_name
-            ? `Revision file: ${String(mySub.revision_file_name).trim()}`
-            : "Download revision file";
+            ? t("revision_file_named", { name: String(mySub.revision_file_name).trim() })
+            : t("download_revision_file");
           revFileRow.appendChild(rlink);
           revReadSection.appendChild(revFileRow);
         }
@@ -11456,5 +11473,6 @@ window.addEventListener("eap:langchange", () => {
   if (typeof window.__eapTeacherLangRefresh === "function") window.__eapTeacherLangRefresh();
   if (typeof window.__eapStudentLangRefresh === "function") window.__eapStudentLangRefresh();
   if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+  if (typeof initAppPageHeader === "function") initAppPageHeader();
   syncTeacherTaskZhFieldsPanel();
 });

@@ -266,26 +266,27 @@
                   class="teacher-daily-chips"
                   role="group"
                   aria-label="Summary for this class and day"
+                  data-i18n-aria-label="teacher_daily_chips_aria"
                 >
                   <span class="teacher-daily-chip"
                     ><span class="teacher-daily-chip__value" id="teacher-chip-tasks">—</span>
-                    <span class="teacher-daily-chip__label">tasks</span></span
+                    <span class="teacher-daily-chip__label" data-i18n="chip_tasks">tasks</span></span
                   >
                   <span class="teacher-daily-chip"
                     ><span class="teacher-daily-chip__value" id="teacher-chip-submissions">—</span>
-                    <span class="teacher-daily-chip__label">submissions</span></span
+                    <span class="teacher-daily-chip__label" data-i18n="chip_submissions">submissions</span></span
                   >
                   <span class="teacher-daily-chip"
                     ><span class="teacher-daily-chip__value" id="teacher-chip-feedback">—</span>
-                    <span class="teacher-daily-chip__label">feedback</span></span
+                    <span class="teacher-daily-chip__label" data-i18n="chip_feedback">feedback</span></span
                   >
                   <span class="teacher-daily-chip"
                     ><span class="teacher-daily-chip__value" id="teacher-chip-revisions">—</span>
-                    <span class="teacher-daily-chip__label">revisions</span></span
+                    <span class="teacher-daily-chip__label" data-i18n="chip_revisions">revisions</span></span
                   >
                   <span class="teacher-daily-chip"
                     ><span class="teacher-daily-chip__value" id="teacher-chip-waiting">—</span>
-                    <span class="teacher-daily-chip__label">waiting</span></span
+                    <span class="teacher-daily-chip__label" data-i18n="chip_waiting">waiting</span></span
                   >
                 </div>
               </div>
@@ -306,7 +307,7 @@
               <!-- Master–detail: compact list (left) + one full task card (right). Same APIs as before. -->
               <div class="teacher-daily-workspace">
                 <aside class="teacher-daily-master" aria-labelledby="teacher-master-heading">
-                  <h3 id="teacher-master-heading" class="teacher-daily-master__heading">Tasks</h3>
+                  <h3 id="teacher-master-heading" class="teacher-daily-master__heading" data-i18n="teacher_master_tasks">Tasks</h3>
                   <ul id="teacher-task-master-list" class="teacher-task-master-list"></ul>
                 </aside>
                 <section

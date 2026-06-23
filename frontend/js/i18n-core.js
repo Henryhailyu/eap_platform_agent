@@ -96,6 +96,12 @@
       if (value != null && el.tagName === "LABEL") el.textContent = value;
     });
 
+    document.querySelectorAll("[data-i18n-aria-label]").forEach((el) => {
+      const key = el.getAttribute("data-i18n-aria-label");
+      const value = dict[key];
+      if (value != null) el.setAttribute("aria-label", value);
+    });
+
     const toggle = document.getElementById("lang-toggle");
     if (toggle) {
       toggle.textContent =
