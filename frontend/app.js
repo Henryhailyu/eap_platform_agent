@@ -3633,6 +3633,85 @@ function renderAdminTeachersTable(teachers, tbody, emptyEl, noMatchEl, onToggle,
   });
 }
 
+function filterAdminManagersBySearch(managers, query) {
+  const list = Array.isArray(managers) ? managers : [];
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return list;
+  return list.filter((manager) => adminTeacherSearchHaystack(manager).includes(q));
+}
+
+function renderAdminManagersTable(managers, tbody, canManage, onDelete, onSetLogin) {
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  const list = Array.isArray(managers) ? managers : [];
+  list.forEach((manager) => {
+    const tr = document.createElement("tr");
+    const isProtected = Boolean(manager.is_protected);
+    const nameTd = document.createElement("td");
+    nameTd.className = "admin-roster-sheet__name";
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "admin-roster-sheet__name-text";
+    nameSpan.textContent = manager.full_name || manager.username || "—";
+    nameTd.appendChild(nameSpan);
+    if (isProtected) {
+      const badge = document.createElement("span");
+      badge.className = "admin-badge admin-badge--ok";
+      badge.textContent = t("admin_manager_protected_badge");
+      nameTd.appendChild(badge);
+    }
+
+    if (canManage && manager.id != null) {
+      if (isProtected) {
+        const bulkTd = document.createElement("td");
+        bulkTd.className = "admin-bulk-check-col admin-managers-bulk-col";
+        tr.appendChild(bulkTd);
+      } else {
+        appendAdminBulkCheckboxCell(tr, manager.id);
+      }
+    }
+    tr.appendChild(nameTd);
+
+    const cellValues = [
+      manager.employee_id,
+      manager.office_number,
+      manager.email,
+      manager.office_phone,
+      manager.mobile_phone,
+      manager.username,
+    ];
+    cellValues.forEach((val) => {
+      const td = document.createElement("td");
+      td.textContent = val && String(val).trim() ? String(val).trim() : "—";
+      tr.appendChild(td);
+    });
+
+    const actionTd = document.createElement("td");
+    actionTd.className = "admin-class-actions admin-managers-action-col";
+    if (canManage) {
+      if (typeof onSetLogin === "function") {
+        const loginBtn = document.createElement("button");
+        loginBtn.type = "button";
+        loginBtn.className = "btn-secondary";
+        loginBtn.textContent = t("admin_set_login_btn");
+        loginBtn.addEventListener("click", () => onSetLogin(manager, loginBtn));
+        actionTd.appendChild(loginBtn);
+      }
+      if (typeof onDelete === "function" && !isProtected) {
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "btn-secondary btn-danger";
+        delBtn.textContent = t("admin_manager_delete_btn");
+        delBtn.addEventListener("click", () => onDelete(manager, delBtn));
+        actionTd.appendChild(delBtn);
+      }
+    } else {
+      actionTd.textContent = "—";
+    }
+    tr.appendChild(actionTd);
+    tbody.appendChild(tr);
+  });
+}
+
 function studentEnrollments(student) {
   if (Array.isArray(student.enrollments) && student.enrollments.length) {
     return student.enrollments;
@@ -3826,10 +3905,14 @@ function initAdminPage() {
     const errorEl = document.getElementById("admin-page-error");
     const statusEl = document.getElementById("admin-page-status");
     const teachersTbody = document.getElementById("admin-teachers-tbody");
+    const managersTbody = document.getElementById("admin-managers-tbody");
     const studentsTbody = document.getElementById("admin-students-tbody");
     const teachersEmpty = document.getElementById("admin-teachers-empty");
     const teachersNoMatch = document.getElementById("admin-teachers-no-match");
     const teachersSearchEl = document.getElementById("admin-teachers-search");
+    const managersEmpty = document.getElementById("admin-managers-empty");
+    const managersNoMatch = document.getElementById("admin-managers-no-match");
+    const managersSearchEl = document.getElementById("admin-managers-search");
     const studentsEmpty = document.getElementById("admin-students-empty");
     const studentsNoMatch = document.getElementById("admin-students-no-match");
     const studentsSearchEl = document.getElementById("admin-students-search");
@@ -3846,6 +3929,11 @@ function initAdminPage() {
     const credentialsCancelBtn = document.getElementById("admin-credentials-cancel");
     const teacherCreateForm = document.getElementById("admin-teacher-create-form");
     const teacherCreateStatus = document.getElementById("admin-teacher-create-status");
+    const managerCreateWrap = document.getElementById("admin-manager-create-wrap");
+    const managerCreateForm = document.getElementById("admin-manager-create-form");
+    const managerCreateStatus = document.getElementById("admin-manager-create-status");
+    const managersHintEl = document.getElementById("admin-managers-hint");
+    const managersHintReadonlyEl = document.getElementById("admin-managers-hint-readonly");
     const studentCreateForm = document.getElementById("admin-student-create-form");
     const studentCreateStatus = document.getElementById("admin-student-create-status");
     const studentCreateClassSel = document.getElementById("admin-student-create-class");
@@ -3854,6 +3942,9 @@ function initAdminPage() {
 
     let teachersCache = [];
     let teachersSearchQuery = "";
+    let managersCache = [];
+    let managersSearchQuery = "";
+    let canManageManagers = false;
     let studentsCache = [];
     let studentsSearchQuery = "";
     let studentsModuleFilter = "";
@@ -3952,10 +4043,13 @@ function initAdminPage() {
     const classTeachersBulkCount = document.getElementById("admin-class-teachers-bulk-count");
     const classStudentsBulkCount = document.getElementById("admin-class-students-bulk-count");
     const teachersBulkBar = document.getElementById("admin-teachers-bulk-bar");
+    const managersBulkBar = document.getElementById("admin-managers-bulk-bar");
     const studentsBulkBar = document.getElementById("admin-students-bulk-bar");
     const teachersBulkCount = document.getElementById("admin-teachers-bulk-count");
+    const managersBulkCount = document.getElementById("admin-managers-bulk-count");
     const studentsBulkCount = document.getElementById("admin-students-bulk-count");
     const teachersCheckAll = document.getElementById("admin-teachers-check-all");
+    const managersCheckAll = document.getElementById("admin-managers-check-all");
     const studentsCheckAll = document.getElementById("admin-students-check-all");
 
     const classTeachersBulkRemoveBtn = document.getElementById("admin-class-teachers-bulk-remove");
@@ -3965,6 +4059,7 @@ function initAdminPage() {
     const classTeachersToggleList = document.getElementById("admin-class-teachers-toggle-list");
     const classStudentsToggleList = document.getElementById("admin-class-students-toggle-list");
     const teachersBulkDeleteBtn = document.getElementById("admin-teachers-bulk-delete");
+    const managersBulkDeleteBtn = document.getElementById("admin-managers-bulk-delete");
     const studentsBulkDeleteBtn = document.getElementById("admin-students-bulk-delete");
     const classMemberListCollapsed = { teacher: false, student: false };
 
@@ -4169,6 +4264,51 @@ function initAdminPage() {
       });
     }
 
+    function paintManagersTable() {
+      if (managerCreateWrap) {
+        managerCreateWrap.classList.toggle("hidden", !canManageManagers);
+      }
+      if (managersHintEl) {
+        managersHintEl.classList.toggle("hidden", !canManageManagers);
+      }
+      if (managersHintReadonlyEl) {
+        managersHintReadonlyEl.classList.toggle("hidden", canManageManagers);
+      }
+      document.querySelectorAll(".admin-managers-bulk-col").forEach((el) => {
+        el.classList.toggle("hidden", !canManageManagers);
+      });
+      document.querySelectorAll(".admin-managers-action-col").forEach((el) => {
+        if (!canManageManagers && el.tagName === "TH") {
+          el.classList.remove("hidden");
+        }
+      });
+
+      const filtered = filterAdminManagersBySearch(managersCache, managersSearchQuery);
+      const hasManagers = managersCache.length > 0;
+      const q = String(managersSearchQuery || "").trim();
+      if (managersEmpty) managersEmpty.classList.toggle("hidden", hasManagers);
+      if (managersNoMatch) {
+        managersNoMatch.classList.toggle("hidden", !hasManagers || filtered.length > 0 || !q);
+      }
+      renderAdminManagersTable(
+        filtered,
+        managersTbody,
+        canManageManagers,
+        canManageManagers ? handleManagerDelete : null,
+        canManageManagers ? handleManagerSetLogin : null,
+      );
+      syncAdminBulkSelectionBar(
+        managersBulkBar,
+        managersBulkCount,
+        managersTbody,
+        managersCheckAll,
+        managersBulkDeleteBtn,
+      );
+      if (managersBulkBar && !canManageManagers) {
+        managersBulkBar.classList.add("hidden");
+      }
+    }
+
     function paintTeachersTable() {
       const filtered = filterAdminTeachersBySearch(teachersCache, teachersSearchQuery);
       const hasTeachers = teachersCache.length > 0;
@@ -4200,6 +4340,13 @@ function initAdminPage() {
       teachersSearchEl.addEventListener("input", () => {
         teachersSearchQuery = teachersSearchEl.value || "";
         paintTeachersTable();
+      });
+    }
+
+    if (managersSearchEl) {
+      managersSearchEl.addEventListener("input", () => {
+        managersSearchQuery = managersSearchEl.value || "";
+        paintManagersTable();
       });
     }
 
@@ -4257,6 +4404,10 @@ function initAdminPage() {
       openCredentialsDialog(teacher, "teacher");
     }
 
+    function handleManagerSetLogin(manager) {
+      openCredentialsDialog(manager, "manager");
+    }
+
     function handleStudentSetLogin(student) {
       openCredentialsDialog(student, "student");
     }
@@ -4277,7 +4428,9 @@ function initAdminPage() {
           const path =
             credentialsTarget.role === "teacher"
               ? `/api/admin/teachers/${credentialsTarget.user.id}/credentials`
-              : `/api/admin/students/${credentialsTarget.user.id}/credentials`;
+              : credentialsTarget.role === "manager"
+                ? `/api/admin/managers/${credentialsTarget.user.id}/credentials`
+                : `/api/admin/students/${credentialsTarget.user.id}/credentials`;
           await apiPutJson(path, { username, password });
           credentialsDialog.close();
           credentialsTarget = null;
@@ -4327,6 +4480,43 @@ function initAdminPage() {
           );
         } catch (err) {
           setAdminPageMessage(teacherCreateStatus, err.message || t("admin_load_error"), true);
+        }
+      });
+    }
+
+    if (managerCreateForm) {
+      managerCreateForm.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        if (!canManageManagers) return;
+        const nameEl = document.getElementById("admin-manager-create-name");
+        const userEl = document.getElementById("admin-manager-create-username");
+        const pwdEl = document.getElementById("admin-manager-create-password");
+        const staffEl = document.getElementById("admin-manager-create-staff-id");
+        const username = userEl ? userEl.value.trim() : "";
+        const password = pwdEl ? pwdEl.value : "";
+        if (!username || !password) return;
+        setAdminPageMessage(managerCreateStatus, "", false);
+        setAdminPageMessage(errorEl, "", false);
+        try {
+          const body = {
+            full_name: nameEl ? nameEl.value.trim() : "",
+            username,
+            password,
+            employee_id: staffEl ? staffEl.value.trim() : "",
+          };
+          const created = await apiPost("/api/admin/managers", body);
+          if (nameEl) nameEl.value = "";
+          if (userEl) userEl.value = "";
+          if (pwdEl) pwdEl.value = "123456";
+          if (staffEl) staffEl.value = "";
+          await reloadAdminLists();
+          setAdminPageMessage(
+            managerCreateStatus,
+            t("admin_create_manager_done", { username: created.username || username }),
+            false,
+          );
+        } catch (err) {
+          setAdminPageMessage(managerCreateStatus, err.message || t("admin_load_error"), true);
         }
       });
     }
@@ -4495,16 +4685,20 @@ function initAdminPage() {
     async function reloadAdminLists() {
       setAdminPageMessage(errorEl, "", false);
       try {
-        const [teachers, students, classes] = await Promise.all([
+        const [teachers, managersRes, students, classes] = await Promise.all([
           apiGet("/api/admin/teachers"),
+          apiGet("/api/admin/managers"),
           apiGet("/api/admin/students"),
           apiGet("/api/admin/classes"),
         ]);
         teachersCache = Array.isArray(teachers) ? teachers : [];
+        managersCache = Array.isArray(managersRes?.managers) ? managersRes.managers : [];
+        canManageManagers = Boolean(managersRes?.can_manage_managers);
         studentsCache = Array.isArray(students) ? students : [];
         classesCache = Array.isArray(classes) ? classes : [];
         paintStudentCreateClassSelect();
         paintTeachersTable();
+        paintManagersTable();
         paintStudentsTable();
         paintRestoreDemoPanel();
         renderAdminClassesTable(classesCache);
@@ -4569,6 +4763,49 @@ function initAdminPage() {
         setAdminPageMessage(errorEl, err.message, true);
       } finally {
         if (btn) btn.disabled = false;
+      }
+    }
+
+    async function handleManagerDelete(manager, btn) {
+      if (!manager || manager.id == null || !canManageManagers) return;
+      const label = manager.full_name || manager.username || String(manager.id);
+      if (!window.confirm(t("admin_manager_delete_confirm", { name: label }))) return;
+      if (btn) btn.disabled = true;
+      setAdminPageMessage(statusEl, "", false);
+      try {
+        await apiDelete(`/api/admin/managers/${manager.id}`);
+        managersCache = managersCache.filter((row) => row.id !== manager.id);
+        paintManagersTable();
+        setAdminPageMessage(statusEl, t("admin_manager_deleted_msg", { name: label }), false);
+      } catch (err) {
+        setAdminPageMessage(errorEl, err.message, true);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function handleManagersBulkDelete() {
+      const ids = syncAdminBulkSelectionBar(
+        managersBulkBar,
+        managersBulkCount,
+        managersTbody,
+        managersCheckAll,
+        managersBulkDeleteBtn,
+      );
+      if (!ids.length || !canManageManagers) return;
+      if (!window.confirm(t("admin_managers_bulk_delete_confirm", { n: ids.length }))) return;
+      setAdminPageMessage(statusEl, "", false);
+      try {
+        const out = await apiPost("/api/admin/managers/bulk-delete", { ids });
+        const deleted = out.deleted || 0;
+        managersCache = managersCache.filter((row) => !ids.includes(row.id));
+        paintManagersTable();
+        setAdminPageMessage(statusEl, t("admin_bulk_deleted_msg", { n: deleted }), false);
+        if (Array.isArray(out.errors) && out.errors.length) {
+          setAdminPageMessage(errorEl, out.errors.join("; "), true);
+        }
+      } catch (err) {
+        setAdminPageMessage(errorEl, err.message, true);
       }
     }
 
@@ -4678,6 +4915,17 @@ function initAdminPage() {
         );
       }
     });
+    managersTbody?.addEventListener("change", (ev) => {
+      if (ev.target && ev.target.classList.contains("admin-bulk-row-check")) {
+        syncAdminBulkSelectionBar(
+          managersBulkBar,
+          managersBulkCount,
+          managersTbody,
+          managersCheckAll,
+          managersBulkDeleteBtn,
+        );
+      }
+    });
     studentsTbody?.addEventListener("change", (ev) => {
       if (ev.target && ev.target.classList.contains("admin-bulk-row-check")) {
         syncAdminBulkSelectionBar(
@@ -4702,6 +4950,19 @@ function initAdminPage() {
         teachersBulkDeleteBtn,
       );
     });
+    managersCheckAll?.addEventListener("change", () => {
+      const on = Boolean(managersCheckAll.checked);
+      managersTbody?.querySelectorAll(".admin-bulk-row-check").forEach((cb) => {
+        cb.checked = on;
+      });
+      syncAdminBulkSelectionBar(
+        managersBulkBar,
+        managersBulkCount,
+        managersTbody,
+        managersCheckAll,
+        managersBulkDeleteBtn,
+      );
+    });
     studentsCheckAll?.addEventListener("change", () => {
       const on = Boolean(studentsCheckAll.checked);
       studentsTbody?.querySelectorAll(".admin-bulk-row-check").forEach((cb) => {
@@ -4717,6 +4978,9 @@ function initAdminPage() {
     });
     document.getElementById("admin-teachers-bulk-delete")?.addEventListener("click", () => {
       void handleTeachersBulkDelete();
+    });
+    document.getElementById("admin-managers-bulk-delete")?.addEventListener("click", () => {
+      void handleManagersBulkDelete();
     });
     document.getElementById("admin-students-bulk-delete")?.addEventListener("click", () => {
       void handleStudentsBulkDelete();

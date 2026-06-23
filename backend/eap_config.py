@@ -137,6 +137,20 @@ class EapConfig:
     # Phase I2a: Bearer access_token lifetime for /api/v1/auth/* (seconds).
     TOKEN_TTL_SECONDS: int = int(os.environ.get("EAP_TOKEN_TTL_SECONDS", str(7 * 24 * 3600)))
 
+    # Comma-separated manager usernames allowed to create/delete other manager accounts.
+    MANAGER_SUPER_USERNAMES: frozenset[str] = frozenset(
+        u.strip().lower()
+        for u in (os.environ.get("EAP_MANAGER_SUPER_USERNAMES") or "manager1").split(",")
+        if u.strip()
+    )
+
+    # Manager accounts that can never be deleted (anchor super-manager; default manager1).
+    MANAGER_PROTECTED_USERNAMES: frozenset[str] = frozenset(
+        u.strip().lower()
+        for u in (os.environ.get("EAP_MANAGER_PROTECTED_USERNAMES") or "manager1").split(",")
+        if u.strip()
+    )
+
     # Phase K2 — AI (OpenAI-compatible; keys never stored in source code).
     AI_ENABLED: bool = _env_bool("EAP_AI_ENABLED")
     AI_PROVIDER: str = (os.environ.get("EAP_AI_PROVIDER") or "deepseek").strip().lower()

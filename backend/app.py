@@ -6674,6 +6674,82 @@ def require_admin_session(conn):
     return require_session_role_if_enabled(conn, "admin")
 
 
+def _session_username(conn) -> str | None:
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    row = conn.execute(
+        "SELECT username FROM users WHERE id = ?",
+        (int(user_id),),
+    ).fetchone()
+    if row is None:
+        return None
+    return str(row["username"] or "").strip() or None
+
+
+def can_manage_manager_accounts(conn) -> bool:
+    """Only designated super-manager usernames may add/remove manager accounts."""
+    username = _session_username(conn)
+    if not username:
+        return False
+    return username.lower() in config.MANAGER_SUPER_USERNAMES
+
+
+def require_super_manager_session(conn):
+    """Admin session plus permission to manage manager accounts."""
+    guard = require_admin_session(conn)
+    if guard is not None:
+        return guard
+    if not can_manage_manager_accounts(conn):
+        return jsonify({"error": "Only designated super managers can manage manager accounts"}), 403
+    return None
+
+
+def count_admin_users(conn) -> int:
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS c FROM users
+        WHERE TRIM(COALESCE(role, '')) = 'admin'
+        """
+    ).fetchone()
+    return int(row["c"]) if row else 0
+
+
+def is_protected_manager_username(username: str | None) -> bool:
+    return str(username or "").strip().lower() in config.MANAGER_PROTECTED_USERNAMES
+
+
+def admin_manager_row_dict(conn, row) -> dict:
+    """Manager list entry with protected-account flag."""
+    payload = admin_user_dict(conn, row)
+    payload["is_protected"] = is_protected_manager_username(row["username"])
+    return payload
+
+
+def admin_manager_delete_guard(conn, user_ids: list[int]) -> str | None:
+    """Block protected managers and ensure at least one manager remains."""
+    admin_ids: list[int] = []
+    for user_id in user_ids:
+        row = conn.execute(
+            "SELECT id, role, username FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            continue
+        if str(row["role"] or "").strip().lower() != "admin":
+            continue
+        if is_protected_manager_username(row["username"]):
+            uname = str(row["username"] or "manager").strip()
+            return f'The manager account "{uname}" cannot be deleted'
+        admin_ids.append(int(row["id"]))
+    if not admin_ids:
+        return None
+    remaining = count_admin_users(conn) - len(set(admin_ids))
+    if remaining < 1:
+        return "At least one manager account must remain"
+    return None
+
+
 def user_public_dict(row):
     """Safe user fields for admin API (no password)."""
     payload = {
@@ -7821,6 +7897,220 @@ def admin_delete_student(user_id):
     conn.commit()
     conn.close()
     return jsonify({"deleted": True, "id": user_id, "username": username})
+
+
+@app.route("/api/admin/managers", methods=["GET"])
+def admin_list_managers():
+    """List manager (admin role) accounts. All managers can view; super managers can mutate."""
+    conn = get_db_connection()
+    guard = require_admin_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+    rows = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
+        FROM users
+        WHERE TRIM(COALESCE(role, '')) = 'admin'
+        ORDER BY username ASC
+        """
+    ).fetchall()
+    payload = [admin_manager_row_dict(conn, r) for r in rows]
+    can_manage = can_manage_manager_accounts(conn)
+    conn.close()
+    return jsonify({"managers": payload, "can_manage_managers": can_manage})
+
+
+@app.route("/api/admin/managers", methods=["POST"])
+def admin_create_manager():
+    """Create a single manager account (super manager only)."""
+    conn = get_db_connection()
+    guard = require_super_manager_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    data = request.get_json(silent=True) or {}
+    username_err = _admin_validate_username(data.get("username"))
+    if username_err:
+        conn.close()
+        return jsonify({"error": username_err}), 400
+    username = _admin_normalize_username(data.get("username"))
+    pwd_err = _admin_validate_password(data.get("password"))
+    if pwd_err:
+        conn.close()
+        return jsonify({"error": pwd_err}), 400
+
+    if conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone():
+        conn.close()
+        return jsonify({"error": "username already taken"}), 409
+
+    full_name = str(data.get("full_name") or "").strip() or username
+    employee_id = str(data.get("employee_id") or "").strip() or None
+    pwd_hash = generate_password_hash(str(data.get("password")).strip())
+
+    cur = conn.execute(
+        """
+        INSERT INTO users (
+            username, password, password_hash, role, full_name, class_name,
+            is_authorized, student_id, employee_id
+        )
+        VALUES (?, '', ?, 'admin', ?, NULL, 1, NULL, ?)
+        """,
+        (username, pwd_hash, full_name, employee_id),
+    )
+    user_id = int(cur.lastrowid)
+    conn.commit()
+    row = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    payload = admin_manager_row_dict(conn, row)
+    conn.close()
+    return jsonify(payload), 201
+
+
+@app.route("/api/admin/managers/<int:user_id>/credentials", methods=["PUT"])
+def admin_update_manager_credentials(user_id):
+    """Set or change a manager's login username and/or password (super manager only)."""
+    conn = get_db_connection()
+    guard = require_super_manager_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    row = conn.execute(
+        "SELECT id, role, username FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    if str(row["role"] or "").strip().lower() != "admin":
+        conn.close()
+        return jsonify({"error": "User is not a manager"}), 400
+
+    data = request.get_json(silent=True) or {}
+    username = data.get("username") if "username" in data else None
+    password = data.get("password") if "password" in data else None
+    if username is not None and is_protected_manager_username(row["username"]):
+        new_un = _admin_normalize_username(username)
+        if new_un != str(row["username"] or "").strip().lower():
+            conn.close()
+            return jsonify({"error": f'The manager account "{row["username"]}" username cannot be changed'}), 400
+    err = _admin_set_user_credentials(conn, user_id, username=username, password=password)
+    if err:
+        conn.close()
+        return jsonify({"error": err}), 400
+
+    conn.commit()
+    updated = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized, student_id, employee_id,
+               email, office_number, office_phone, mobile_phone
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    payload = admin_manager_row_dict(conn, updated)
+    conn.close()
+    return jsonify(payload)
+
+
+@app.route("/api/admin/managers/<int:user_id>", methods=["DELETE"])
+def admin_delete_manager(user_id):
+    """Remove a manager account (super manager only; at least one must remain)."""
+    conn = get_db_connection()
+    guard = require_super_manager_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    row = conn.execute(
+        """
+        SELECT id, username, role, full_name, class_name, is_authorized
+        FROM users WHERE id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    if str(row["role"] or "").strip().lower() != "admin":
+        conn.close()
+        return jsonify({"error": "User is not a manager"}), 400
+
+    guard_msg = admin_manager_delete_guard(conn, [user_id])
+    if guard_msg:
+        conn.close()
+        return jsonify({"error": guard_msg}), 400
+
+    username = row["username"]
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"deleted": True, "id": user_id, "username": username})
+
+
+@app.route("/api/admin/managers/bulk-delete", methods=["POST"])
+def admin_bulk_delete_managers():
+    """Delete multiple manager accounts (super manager only)."""
+    conn = get_db_connection()
+    guard = require_super_manager_session(conn)
+    if guard is not None:
+        conn.close()
+        return guard
+
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get("ids")
+    if not isinstance(raw_ids, list) or not raw_ids:
+        conn.close()
+        return jsonify({"error": "ids array is required"}), 400
+
+    ids: list[int] = []
+    seen: set[int] = set()
+    for raw_id in raw_ids:
+        try:
+            user_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if user_id in seen:
+            continue
+        seen.add(user_id)
+        ids.append(user_id)
+
+    guard_msg = admin_manager_delete_guard(conn, ids)
+    if guard_msg:
+        conn.close()
+        return jsonify({"error": guard_msg}), 400
+
+    deleted = 0
+    errors: list[str] = []
+    for user_id in ids:
+        row = conn.execute(
+            "SELECT id, username, role FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if row is None:
+            errors.append(f"User {user_id} not found")
+            continue
+        if str(row["role"] or "").strip().lower() != "admin":
+            errors.append(f"{row['username'] or user_id}: not a manager")
+            continue
+        if is_protected_manager_username(row["username"]):
+            errors.append(f"{row['username']}: cannot be deleted")
+            continue
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        deleted += 1
+
+    conn.commit()
+    conn.close()
+    return jsonify({"deleted": deleted, "errors": errors})
 
 
 SELF_STUDY_MODULES = frozenset({"vocabulary", "reading", "listening", "speaking", "writing"})

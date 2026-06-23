@@ -89,6 +89,7 @@
             <button type="button" class="admin-module-tabs__btn" data-school-area="calendar" data-i18n="admin_school_tab_calendar">Calendar</button>
             <button type="button" class="admin-module-tabs__btn" data-school-area="classes" data-i18n="admin_school_tab_classes">Classes</button>
             <button type="button" class="admin-module-tabs__btn" data-school-area="teachers" data-i18n="admin_school_tab_teachers">Teachers</button>
+            <button type="button" class="admin-module-tabs__btn" data-school-area="managers" data-i18n="admin_school_tab_managers">Managers</button>
             <button type="button" class="admin-module-tabs__btn" data-school-area="students" data-i18n="admin_school_tab_students">Students</button>
           </nav>
 
@@ -343,6 +344,84 @@
             </div>
             <p id="admin-teachers-no-match" class="admin-empty hidden" data-i18n="admin_teachers_no_match">
               No teachers match your search.
+            </p>
+          </section>
+
+          <section class="content-section admin-panel" data-admin-module="school" data-admin-school-area="managers" hidden aria-labelledby="admin-managers-heading">
+            <h2 id="admin-managers-heading" class="section-heading" data-i18n="admin_managers_heading">
+              Managers
+            </h2>
+            <p id="admin-managers-hint" class="admin-panel__hint" data-i18n="admin_managers_hint">
+              Add manager accounts one at a time. Only designated super managers can add or remove accounts. Use Set login to change username or password.
+            </p>
+            <p id="admin-managers-hint-readonly" class="admin-panel__hint hidden" data-i18n="admin_managers_hint_readonly">
+              View-only list. Contact a super manager to add accounts or change logins.
+            </p>
+            <div id="admin-manager-create-wrap" class="admin-account-create">
+              <h3 class="admin-account-create__title" data-i18n="admin_create_manager_heading">Add manager account</h3>
+              <form id="admin-manager-create-form" class="admin-inline-form" novalidate>
+                <div class="field">
+                  <label for="admin-manager-create-name" data-i18n="admin_col_name">Name</label>
+                  <input id="admin-manager-create-name" type="text" maxlength="120" autocomplete="name" />
+                </div>
+                <div class="field">
+                  <label for="admin-manager-create-username" data-i18n="username">Username</label>
+                  <input id="admin-manager-create-username" type="text" required maxlength="40" autocomplete="off" />
+                </div>
+                <div class="field">
+                  <label for="admin-manager-create-password" data-i18n="password">Password</label>
+                  <input id="admin-manager-create-password" type="text" value="123456" minlength="6" maxlength="64" required autocomplete="new-password" />
+                </div>
+                <div class="field">
+                  <label for="admin-manager-create-staff-id" data-i18n="admin_col_employee_id">Staff ID</label>
+                  <input id="admin-manager-create-staff-id" type="text" maxlength="64" />
+                </div>
+                <button type="submit" class="btn-primary" data-i18n="admin_create_manager_btn">Add manager</button>
+              </form>
+              <p id="admin-manager-create-status" class="form-message hidden" role="status" aria-live="polite"></p>
+            </div>
+            <div class="admin-roster-search">
+              <label class="visually-hidden" for="admin-managers-search" data-i18n="admin_managers_search_label">Search managers</label>
+              <input
+                id="admin-managers-search"
+                type="search"
+                class="admin-roster-search__input"
+                autocomplete="off"
+                data-i18n-placeholder="admin_managers_search_placeholder"
+                placeholder="Search by name, staff ID, office number, or mobile"
+              />
+            </div>
+            <div id="admin-managers-bulk-bar" class="admin-bulk-bar hidden">
+              <button type="button" id="admin-managers-bulk-delete" class="btn-secondary btn-danger" data-i18n="admin_bulk_delete_selected" disabled>
+                Delete selected
+              </button>
+              <span id="admin-managers-bulk-count" class="admin-bulk-bar__count" data-i18n="admin_bulk_select_hint">Tick rows below, then use the button.</span>
+            </div>
+            <div class="admin-table-wrap admin-roster-sheet-wrap">
+              <table class="admin-table admin-roster-sheet" id="admin-managers-table">
+                <thead>
+                  <tr>
+                    <th scope="col" class="admin-bulk-check-col admin-managers-bulk-col">
+                      <input type="checkbox" id="admin-managers-check-all" aria-label="Select all managers" />
+                    </th>
+                    <th scope="col" data-i18n="admin_col_name">Name</th>
+                    <th scope="col" data-i18n="admin_col_employee_id">Staff ID</th>
+                    <th scope="col" data-i18n="admin_col_office_number">Office</th>
+                    <th scope="col" data-i18n="admin_col_email">Email</th>
+                    <th scope="col" data-i18n="admin_col_office_phone">Office phone</th>
+                    <th scope="col" data-i18n="admin_col_mobile_phone">Mobile</th>
+                    <th scope="col" data-i18n="username">Username</th>
+                    <th scope="col" class="admin-managers-action-col" data-i18n="admin_col_action">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-managers-tbody"></tbody>
+              </table>
+            </div>
+            <p id="admin-managers-empty" class="admin-empty hidden" data-i18n="admin_no_managers">
+              No manager accounts found.
+            </p>
+            <p id="admin-managers-no-match" class="admin-empty hidden" data-i18n="admin_managers_no_match">
+              No managers match your search.
             </p>
           </section>
 

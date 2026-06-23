@@ -4,7 +4,7 @@
 (function (global) {
   const MODULES = ["school", "self-study", "teaching", "homework"];
   const SKILLS = ["vocabulary", "reading", "ai"];
-  const SCHOOL_AREAS = ["calendar", "classes", "teachers", "students"];
+  const SCHOOL_AREAS = ["calendar", "classes", "teachers", "managers", "students"];
   let pendingClassId = null;
 
   function t(key, params) {
