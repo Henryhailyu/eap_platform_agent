@@ -1,5 +1,34 @@
 /* Landing page promotion sections (index.html only) */
 
+/* Stronger frosted overlay so hero copy stays readable on photo backgrounds */
+body.eap-wix.page-landing #page-shell > .page-overlay {
+  background: rgba(255, 255, 255, 0.58) !important;
+}
+
+/* Hero + section intros: deep navy (not grey) with a soft light halo */
+body.eap-wix.page-landing .wix-hero__title {
+  color: #0a1f2e;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 16px rgba(255, 255, 255, 0.75);
+}
+
+body.eap-wix.page-landing .wix-hero__subtitle,
+body.eap-wix.page-landing .wix-hero__lead {
+  color: #1a3347;
+  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.85);
+}
+
+body.eap-wix.page-landing .landing-section-head p {
+  color: #1a3347;
+  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.8);
+}
+
+body.eap-wix.page-landing .landing-hero__scroll {
+  color: #2a4558;
+  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.8);
+}
+
 body.eap-wix.page-landing .landing-content {
   max-width: 1200px;
   padding-bottom: 4rem;
@@ -51,7 +80,7 @@ body.eap-wix .landing-hero {
 .landing-hero__scroll {
   margin: 0;
   font-size: 0.8125rem;
-  color: var(--wix-muted);
+  color: #2a4558;
   display: flex;
   flex-direction: column;
   align-items: center;

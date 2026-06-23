@@ -2,7 +2,7 @@
  * EAP Agent shell — random background per navigation + EN/中文 i18n toggle.
  */
 (function () {
-  const BG_COUNT = 12;
+  const BG_POOL = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12];
   const LANG_KEY = "eap_lang";
   const DEFAULT_LANG = "en";
 
@@ -10,7 +10,7 @@
   let currentLang = DEFAULT_LANG;
 
   function pickBackground() {
-    const n = Math.floor(Math.random() * BG_COUNT) + 1;
+    const n = BG_POOL[Math.floor(Math.random() * BG_POOL.length)];
     const shell = document.getElementById("page-shell");
     if (shell) {
       shell.style.setProperty(

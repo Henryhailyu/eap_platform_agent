@@ -3,7 +3,8 @@
  * Loads dictionaries from js/i18n/en.js and zh.js (sync globals).
  */
 (function () {
-  const BG_COUNT = 12;
+  /** Background pool — image-7 and image-8 removed (too dark for hero text). */
+  const BG_POOL = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12];
   const LANG_KEY = "eap_lang";
   const DEFAULT_LANG = "en";
 
@@ -27,7 +28,7 @@
   }
 
   function pickBackground() {
-    const n = Math.floor(Math.random() * BG_COUNT) + 1;
+    const n = BG_POOL[Math.floor(Math.random() * BG_POOL.length)];
     const shell = document.getElementById("page-shell");
     const url = assetUrl(`assets/backgrounds/image-${n}.jpg`);
     if (shell) {
