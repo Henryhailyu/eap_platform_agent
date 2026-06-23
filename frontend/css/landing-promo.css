@@ -1,0 +1,472 @@
+/* Landing page promotion sections (index.html only) */
+
+body.eap-wix.page-landing .landing-content {
+  max-width: 1200px;
+  padding-bottom: 4rem;
+}
+
+.wix-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.wix-nav__link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--wix-blue);
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: var(--wix-pill);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.wix-nav__link:hover {
+  background: rgba(17, 109, 255, 0.08);
+}
+
+/* Hero */
+body.eap-wix .landing-hero {
+  margin-bottom: 2.5rem;
+  padding-top: 0.5rem;
+}
+
+.landing-hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.landing-hero__btn {
+  width: auto;
+  min-width: 10.5rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-hero__scroll {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.landing-hero__chevron {
+  animation: landing-bounce 2s ease-in-out infinite;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+@keyframes landing-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+/* Reveal animations */
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: landing-fade-up 0.7s ease forwards;
+}
+
+.landing-reveal--d1 {
+  animation-delay: 0.1s;
+}
+.landing-reveal--d2 {
+  animation-delay: 0.2s;
+}
+.landing-reveal--d3 {
+  animation-delay: 0.3s;
+}
+.landing-reveal--d4 {
+  animation-delay: 0.45s;
+}
+
+@keyframes landing-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+
+.landing-reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stats */
+.landing-stats {
+  margin-bottom: 3.5rem;
+}
+
+.landing-stats__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.landing-stats__item {
+  text-align: center;
+  padding: 1.25rem 0.75rem;
+  border-radius: var(--wix-radius);
+  background: var(--wix-card);
+  border: 1px solid var(--wix-card-border);
+  box-shadow: var(--wix-shadow);
+}
+
+.landing-stats__n {
+  display: block;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 700;
+  color: var(--wix-blue);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.landing-stats__n--text {
+  font-size: clamp(1.1rem, 3vw, 1.5rem);
+}
+
+.landing-stats__label {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+  line-height: 1.4;
+}
+
+/* Section headers */
+.landing-section-head {
+  margin-bottom: 1.75rem;
+}
+
+.landing-section-head--center {
+  text-align: center;
+}
+
+.landing-section-head h2 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--wix-text);
+}
+
+.landing-section-head p {
+  margin: 0;
+  color: var(--wix-muted);
+  max-width: 40rem;
+  line-height: 1.55;
+}
+
+.landing-section-head--center p {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Feature cards with promo images */
+.landing-features {
+  margin-bottom: 3.5rem;
+  scroll-margin-top: 5rem;
+}
+
+.landing-features__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.landing-feature-card {
+  border-radius: var(--wix-radius);
+  background: var(--wix-card);
+  border: 1px solid var(--wix-card-border);
+  box-shadow: var(--wix-shadow);
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.landing-feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 48px rgba(17, 109, 255, 0.12);
+}
+
+.landing-feature-card__media {
+  aspect-ratio: 341 / 338;
+  overflow: hidden;
+  background: #e8eef5;
+}
+
+.landing-feature-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.landing-feature-card:hover .landing-feature-card__media img {
+  transform: scale(1.03);
+}
+
+.landing-feature-card__body {
+  padding: 1rem 1.15rem 1.25rem;
+}
+
+.landing-feature-card__body h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--wix-text);
+}
+
+.landing-feature-card__body p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--wix-muted);
+  line-height: 1.5;
+}
+
+/* Flow */
+.landing-flow {
+  margin-bottom: 3.5rem;
+}
+
+.landing-flow__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  counter-reset: flow;
+}
+
+.landing-flow__step {
+  position: relative;
+  padding: 1.25rem 1rem 1.25rem 1.15rem;
+  border-radius: var(--wix-radius);
+  background: var(--wix-card);
+  border: 1px solid var(--wix-card-border);
+  box-shadow: var(--wix-shadow);
+}
+
+.landing-flow__step:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  right: -0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--wix-blue);
+  font-weight: 600;
+  opacity: 0.5;
+  z-index: 1;
+}
+
+.landing-flow__n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: rgba(17, 109, 255, 0.12);
+  color: var(--wix-blue);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.landing-flow__step h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.landing-flow__step p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--wix-muted);
+  line-height: 1.45;
+}
+
+/* Role tabs */
+.landing-roles {
+  margin-bottom: 3.5rem;
+}
+
+.landing-roles__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  justify-content: center;
+}
+
+.landing-roles__tab {
+  font-family: var(--wix-font);
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--wix-pill);
+  border: 1px solid var(--wix-card-border);
+  background: #fff;
+  color: var(--wix-muted);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-roles__tab:hover {
+  color: var(--wix-blue);
+}
+
+.landing-roles__tab--active {
+  background: var(--wix-blue);
+  border-color: var(--wix-blue);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(17, 109, 255, 0.25);
+}
+
+.landing-roles__panel {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.75rem;
+  border-radius: var(--wix-radius);
+  background: var(--wix-card);
+  border: 1px solid var(--wix-card-border);
+  box-shadow: var(--wix-shadow);
+  animation: landing-panel-in 0.35s ease;
+}
+
+.landing-roles__panel[hidden] {
+  display: none;
+}
+
+@keyframes landing-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-roles__panel ul {
+  margin: 0;
+  padding: 0 0 0 1.15rem;
+  color: var(--wix-text);
+}
+
+.landing-roles__panel li {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+  font-size: 0.9375rem;
+}
+
+.landing-roles__panel li:last-child {
+  margin-bottom: 0;
+}
+
+/* Sign in block */
+.landing-signin {
+  margin-bottom: 2rem;
+  scroll-margin-top: 5rem;
+}
+
+body.eap-wix .landing-signin .wix-login-grid {
+  margin-bottom: 0;
+}
+
+/* School CTA */
+.landing-school-cta {
+  text-align: center;
+  font-size: 0.9375rem;
+  color: var(--wix-muted);
+  max-width: 32rem;
+  margin: 0 auto;
+  line-height: 1.55;
+  padding: 1rem 1.5rem;
+  border-radius: var(--wix-radius);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--wix-card-border);
+}
+
+/* Stagger feature cards */
+.landing-features__grid .landing-feature-card:nth-child(1) { transition-delay: 0ms; }
+.landing-features__grid .landing-feature-card:nth-child(2) { transition-delay: 60ms; }
+.landing-features__grid .landing-feature-card:nth-child(3) { transition-delay: 120ms; }
+.landing-features__grid .landing-feature-card:nth-child(4) { transition-delay: 180ms; }
+.landing-features__grid .landing-feature-card:nth-child(5) { transition-delay: 240ms; }
+.landing-features__grid .landing-feature-card:nth-child(6) { transition-delay: 300ms; }
+
+/* Responsive */
+@media (max-width: 960px) {
+  .landing-features__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .landing-flow__steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .landing-flow__step:nth-child(2)::after,
+  .landing-flow__step:nth-child(4)::after {
+    display: none;
+  }
+
+  .landing-stats__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .landing-features__grid,
+  .landing-flow__steps {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-flow__step::after {
+    display: none !important;
+  }
+
+  .wix-nav__link {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-reveal,
+  .landing-reveal-on-scroll,
+  .landing-hero__chevron,
+  .landing-feature-card,
+  .landing-feature-card__media img,
+  .landing-roles__panel {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
