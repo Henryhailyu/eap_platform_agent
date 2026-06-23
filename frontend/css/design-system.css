@@ -40,19 +40,12 @@ body.eap-shell-active {
 .page-shell {
   min-height: 100vh;
   position: relative;
-  background-color: #e8eaed;
-  background-image: var(--eap-bg-image);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-color: transparent;
 }
 
 .page-overlay {
   min-height: 100vh;
-  background: var(--eap-overlay);
-  backdrop-filter: blur(var(--eap-backdrop-blur));
-  -webkit-backdrop-filter: blur(var(--eap-backdrop-blur));
+  position: relative;
 }
 
 /* Language toggle */

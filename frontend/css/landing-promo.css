@@ -1,7 +1,7 @@
 /* Landing page promotion sections (index.html only) */
 
 /* Stronger frosted overlay so hero copy stays readable on photo backgrounds */
-body.eap-wix.page-landing #page-shell > .page-overlay {
+body.eap-wix.page-landing #page-shell::after {
   background: rgba(255, 255, 255, 0.58) !important;
 }
 

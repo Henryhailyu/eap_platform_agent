@@ -23,7 +23,8 @@
       '" target="_blank" rel="noopener noreferrer">' +
       ICP_NUMBER +
       "</a></p>";
-    document.body.appendChild(footer);
+    var shell = document.querySelector("#page-shell > .page-overlay") || document.getElementById("page-shell");
+    (shell || document.body).appendChild(footer);
   }
 
   if (document.readyState === "loading") {

@@ -5,9 +5,11 @@
   text-align: center;
   font-size: 0.75rem;
   line-height: 1.5;
-  color: #6e6e73;
-  background: rgba(248, 246, 242, 0.95);
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  color: #3d4f5c;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .site-icp-footer p {
