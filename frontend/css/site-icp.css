@@ -26,6 +26,32 @@
   color: #0a4d68;
 }
 
+/* 公安备案：图标在左，备案号在右（联网备案平台要求格式） */
+.site-icp-footer__ps-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.site-icp-footer__ps-link:hover {
+  text-decoration: none;
+}
+
+.site-icp-footer__ps-link:hover .site-icp-footer__ps-text {
+  text-decoration: underline;
+}
+
+.site-icp-footer__ps-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+}
+
 body.page-app .site-icp-footer {
   flex-shrink: 0;
 }

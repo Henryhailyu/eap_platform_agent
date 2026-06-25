@@ -11,6 +11,12 @@
     "https://beian.mps.gov.cn/#/query/webSearch?code=32059002008173";
   var COPYRIGHT_OWNER = "吕海";
 
+  function assetUrl(relative) {
+    var p = window.location.pathname || "";
+    var base = p.indexOf("/ui/") >= 0 ? p.slice(0, p.lastIndexOf("/") + 1) : "";
+    return base + String(relative || "").replace(/^\//, "");
+  }
+
   function mount() {
     if (document.getElementById("site-icp-footer")) return;
     var footer = document.createElement("footer");
@@ -28,11 +34,15 @@
       ICP_NUMBER +
       "</a></p>" +
       '<p class="site-icp-footer__ps">' +
-      '<a href="' +
+      '<a class="site-icp-footer__ps-link" href="' +
       PS_URL +
       '" rel="noreferrer" target="_blank">' +
+      '<img class="site-icp-footer__ps-icon" src="' +
+      assetUrl("assets/beian-mps-icon.png") +
+      '" width="20" height="20" alt="" decoding="async" />' +
+      '<span class="site-icp-footer__ps-text">' +
       PS_NUMBER +
-      "</a></p>";
+      "</span></a></p>";
     var shell = document.querySelector("#page-shell > .page-overlay") || document.getElementById("page-shell");
     (shell || document.body).appendChild(footer);
   }
