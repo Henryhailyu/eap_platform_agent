@@ -507,6 +507,52 @@ def _teacher_activity_stats_payload(conn, sess, page_id=None):
 def register_live_teaching_routes(app):
     from flask import jsonify, request
 
+    @app.route("/api/teacher/live/generate-question", methods=["POST"])
+    def teacher_live_generate_question():
+        """LT-M3 — AI poll/quiz question from the HTML lesson currently on screen."""
+        from app import (
+            get_db_connection,
+            require_session_role_if_enabled,
+        )
+
+        try:
+            from eap_ai import format_ai_error, generate_live_question_from_html
+        except ImportError:
+            return jsonify({"error": "AI module not available"}), 503
+
+        try:
+            from eap_ai import ai_is_configured
+        except ImportError:
+            ai_is_configured = None  # type: ignore[assignment]
+
+        if not ai_is_configured or not ai_is_configured():
+            return jsonify({"error": "AI is not configured"}), 503
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+        finally:
+            conn.close()
+
+        body = request.get_json(silent=True) or {}
+        html = str(body.get("html") or body.get("lesson_html") or "").strip()
+        tool = str(body.get("tool") or "poll").strip().lower()
+        if not html:
+            return jsonify({"error": "html is required"}), 400
+        if len(html) > 200_000:
+            return jsonify({"error": "html too large"}), 400
+
+        try:
+            result = generate_live_question_from_html(html, tool=tool)
+            return jsonify(result)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            log.warning("live generate-question failed: %s", format_ai_error(exc))
+            return jsonify({"error": "AI request failed", "detail": format_ai_error(exc)}), 502
+
     @app.route("/api/teacher/live/sessions", methods=["POST"])
     def teacher_live_create_session():
         from app import (

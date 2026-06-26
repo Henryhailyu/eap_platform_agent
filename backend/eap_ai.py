@@ -522,3 +522,128 @@ def generate_teaching_page_html(
         "model": profile["model"],
         "warnings": warnings,
     }
+
+
+_MAX_LIVE_LESSON_TEXT = 9000
+
+_LIVE_POLL_SYSTEM = """You are an EAP classroom facilitator. Given lesson HTML text, write ONE live poll question.
+Return ONLY valid JSON:
+{
+  "textEn": "question in English",
+  "textZh": "same question in Chinese",
+  "optionsEn": ["option A", "option B", "option C", "option D"],
+  "optionsZh": ["Chinese A", "Chinese B", "Chinese C", "Chinese D"],
+  "correctIndex": 0
+}
+Rules:
+- Question MUST relate directly to the lesson topic and vocabulary (not generic academic-writing trivia).
+- Poll = quick check of understanding or opinion; still pick one best answer (correctIndex 0-3).
+- Exactly 3 or 4 options, distinct and plausible.
+- Academic English suited to university EAP students."""
+
+_LIVE_QUIZ_SYSTEM = """You are an EAP classroom teacher. Given lesson HTML text, write ONE multiple-choice quiz question.
+Return ONLY valid JSON:
+{
+  "textEn": "question in English",
+  "textZh": "same question in Chinese",
+  "optionsEn": ["option A", "option B", "option C", "option D"],
+  "optionsZh": ["Chinese A", "Chinese B", "Chinese C", "Chinese D"],
+  "correctIndex": 0
+}
+Rules:
+- Question MUST test content from the lesson (facts, vocabulary, skills taught).
+- Exactly one clearly correct answer (correctIndex 0-3).
+- Exactly 3 or 4 options. No trick questions."""
+
+
+def _lesson_plain_text_from_html(html: str, max_chars: int = _MAX_LIVE_LESSON_TEXT) -> str:
+    text = str(html or "")
+    text = re.sub(r"(?is)<script[\s\S]*?</script>", " ", text)
+    text = re.sub(r"(?is)<style[\s\S]*?</style>", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > max_chars:
+        return text[:max_chars]
+    return text
+
+
+def _normalize_live_question_payload(data: dict[str, Any], tool: str) -> dict[str, Any]:
+    text_en = str(data.get("textEn") or data.get("question") or "").strip()
+    if not text_en:
+        raise ValueError("AI question missing textEn")
+    text_zh = str(data.get("textZh") or text_en).strip()
+    opts_en = data.get("optionsEn") or data.get("options") or []
+    opts_zh = data.get("optionsZh") or opts_en
+    if not isinstance(opts_en, list):
+        opts_en = []
+    if not isinstance(opts_zh, list):
+        opts_zh = list(opts_en)
+    options_en = [str(o).strip() for o in opts_en if str(o).strip()][:4]
+    options_zh = [str(o).strip() for o in opts_zh if str(o).strip()][:4]
+    while len(options_zh) < len(options_en):
+        options_zh.append(options_en[len(options_zh)])
+    if len(options_en) < 2:
+        raise ValueError("AI question needs at least two options")
+    try:
+        correct = int(data.get("correctIndex", 0))
+    except (TypeError, ValueError):
+        correct = 0
+    correct = max(0, min(correct, len(options_en) - 1))
+    qid = f"ai-{tool}-generated"
+    return {
+        "id": qid,
+        "textEn": text_en,
+        "textZh": text_zh,
+        "optionsEn": options_en,
+        "optionsZh": options_zh[: len(options_en)],
+        "correctIndex": correct,
+        "source": "ai",
+    }
+
+
+def generate_live_question_from_html(
+    html: str,
+    *,
+    tool: str = "poll",
+    provider: str | None = None,
+) -> dict[str, Any]:
+    """Generate one poll/quiz MCQ from pushed lesson HTML (Live Teaching LT-M3)."""
+    lesson_text = _lesson_plain_text_from_html(html)
+    if len(lesson_text) < 80:
+        raise ValueError("Lesson HTML has too little text to generate a question")
+
+    kind = str(tool or "poll").strip().lower()
+    if kind not in ("poll", "quiz"):
+        kind = "poll"
+    system = _LIVE_POLL_SYSTEM if kind == "poll" else _LIVE_QUIZ_SYSTEM
+    user_prompt = (
+        f"Tool: {kind}\n"
+        f"Lesson text (from HTML on screen):\n{lesson_text}\n\n"
+        "Write one question students can answer in 30–60 seconds."
+    )
+
+    client, profile = get_openai_client(provider)
+    response = create_chat_completion(
+        client,
+        profile,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=900,
+        temperature=0.35,
+        response_format={"type": "json_object"},
+    )
+    raw = ""
+    if response.choices:
+        raw = (response.choices[0].message.content or "").strip()
+    if not raw:
+        raise RuntimeError("Empty AI response")
+    payload = parse_ai_json_object(raw)
+    question = _normalize_live_question_payload(payload, kind)
+    return {
+        "question": question,
+        "tool": kind,
+        "provider": profile["id"],
+        "model": profile["model"],
+    }

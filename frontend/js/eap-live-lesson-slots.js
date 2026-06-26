@@ -231,6 +231,12 @@
     } catch (_) {
       /* ignore */
     }
+    const fp = `${text.length}:${text.slice(0, 280)}`;
+    if (global.__tliveAiQuestionCache && global.__tliveAiQuestionCache.fingerprint !== fp) {
+      global.__tliveAiQuestionCache = null;
+      global.__tlivePollDraft = null;
+      global.__tliveQuizDraft = null;
+    }
   }
 
   function slotToQuestion(slot) {
@@ -273,12 +279,27 @@
     return base;
   }
 
+  function slotsForToolWithLessonFallback(slots, tool) {
+    const direct = slotsForTool(slots, tool);
+    if (direct.length) return direct;
+    const want = normalizeTool(tool);
+    if (want === "poll") {
+      const quizSlots = slotsForTool(slots, "quiz");
+      if (quizSlots.length) return quizSlots;
+    }
+    return (slots || []).filter((s) => {
+      const opts = s && s.optionsEn;
+      return Array.isArray(opts) && opts.filter(Boolean).length >= 2;
+    });
+  }
+
   global.EAP_LIVE_PHASE1_GAME_IDS = PHASE1_GAME_IDS;
   global.EAP_parseLiveLessonSlots = parseLiveLessonSlots;
   global.EAP_parseLessonMetaFromHtml = parseLessonMetaFromHtml;
   global.EAP_slotsForSegment = slotsForSegment;
   global.EAP_slotToLaunchQuestion = slotToQuestion;
   global.EAP_slotsForTool = slotsForTool;
+  global.EAP_slotsForToolWithLessonFallback = slotsForToolWithLessonFallback;
   global.EAP_gameSlotsPhase1 = gameSlotsPhase1;
   global.EAP_liveSlotLabel = slotLabel;
   global.EAP_syncLessonSlotsFromHtml = syncLessonSlotsFromHtml;

@@ -59,19 +59,51 @@
     global[getDraftKey(tool)] = draft;
   }
 
+  function getToolSlots(tool) {
+    const all = getSlots();
+    if (typeof global.EAP_slotsForToolWithLessonFallback === "function") {
+      return global.EAP_slotsForToolWithLessonFallback(all, tool);
+    }
+    return global.EAP_slotsForTool ? global.EAP_slotsForTool(all, tool) : [];
+  }
+
+  function getLessonHtmlCached() {
+    try {
+      return global.sessionStorage?.getItem("eap_last_lesson_html") || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function lessonHtmlFingerprint(html) {
+    const text = String(html || "");
+    return `${text.length}:${text.slice(0, 280)}`;
+  }
+
+  function getAiQuestionCache(tool) {
+    const cache = global.__tliveAiQuestionCache;
+    if (!cache || cache.fingerprint !== lessonHtmlFingerprint(getLessonHtmlCached())) return null;
+    return cache[tool] || null;
+  }
+
+  function setAiQuestionCache(tool, question) {
+    global.__tliveAiQuestionCache = {
+      fingerprint: lessonHtmlFingerprint(getLessonHtmlCached()),
+      [tool]: question,
+    };
+  }
+
   function defaultDraft(tool, MOCK) {
-    const slots = global.EAP_slotsForTool
-      ? global.EAP_slotsForTool(getSlots(), tool)
-      : [];
+    const slots = getToolSlots(tool);
     if (slots.length && global.EAP_slotToLaunchQuestion) {
       const q = global.EAP_slotToLaunchQuestion(slots[0]);
       if (q) {
         return { mode: "ai", slotId: slots[0].id, question: q };
       }
     }
-    const fallback = MOCK && MOCK.MOCK_QUESTIONS ? MOCK.MOCK_QUESTIONS[0] : null;
-    if (fallback) {
-      return { mode: "manual", slotId: "", question: { ...fallback, source: "mock" } };
+    const aiQ = getAiQuestionCache(tool);
+    if (aiQ) {
+      return { mode: "ai-generated", slotId: "", question: aiQ };
     }
     return { mode: "manual", slotId: "", question: null };
   }
@@ -115,7 +147,7 @@
       if (manual) return manual;
     }
     if (draft.question) return draft.question;
-    return MOCK && MOCK.MOCK_QUESTIONS ? MOCK.MOCK_QUESTIONS[0] : null;
+    return null;
   }
 
   function renderSlotOptionPreview(slot) {
@@ -129,12 +161,10 @@
   }
 
   function renderAiPicker(tool, MOCK) {
-    const slots = global.EAP_slotsForTool ? global.EAP_slotsForTool(getSlots(), tool) : [];
-    if (!slots.length) {
-      return `<p class="tlive-pq-empty">${escapeHtml(t("tlive_pq_no_ai_slots"))}</p>`;
-    }
-    const draft = getDraft(tool) || defaultDraft(tool, MOCK);
-    return `
+    const slots = getToolSlots(tool);
+    if (slots.length) {
+      const draft = getDraft(tool) || defaultDraft(tool, MOCK);
+      return `
       <ul class="tlive-pq-slot-list" role="list">
         ${slots
           .map((slot, idx) => {
@@ -153,6 +183,26 @@
           })
           .join("")}
       </ul>`;
+    }
+    const draft = getDraft(tool) || defaultDraft(tool, MOCK);
+    if (draft.mode === "ai-generated" && draft.question) {
+      return `
+        <p class="tlive-pq-ai-generated-note">${escapeHtml(t("tlive_pq_ai_generated_note"))}</p>
+        <div class="tlive-pq-slot-card tlive-pq-slot-card--generated">
+          ${renderSlotOptionPreview({
+            textEn: draft.question.textEn,
+            optionsEn: draft.question.optionsEn,
+          })}
+        </div>`;
+    }
+    if (global.__tliveAiQuestionLoading === tool) {
+      return `<p class="tlive-pq-empty tlive-pq-empty--loading">${escapeHtml(t("tlive_pq_ai_generating"))}</p>`;
+    }
+    const html = getLessonHtmlCached();
+    if (!html || html.length < 80) {
+      return `<p class="tlive-pq-empty">${escapeHtml(t("tlive_pq_no_lesson_html"))}</p>`;
+    }
+    return `<p class="tlive-pq-empty">${escapeHtml(t("tlive_pq_ai_generate_failed"))}</p>`;
   }
 
   function renderPreview(q, MOCK) {
@@ -180,7 +230,7 @@
       /* ignore */
     }
 
-    const toolSlots = global.EAP_slotsForTool ? global.EAP_slotsForTool(getSlots(), tool) : [];
+    const toolSlots = getToolSlots(tool);
     if (!getDraft(tool)) {
       setDraft(tool, defaultDraft(tool, MOCK));
     }
@@ -189,7 +239,9 @@
     const lessonHint =
       toolSlots.length > 0
         ? t("tlive_pq_lesson_hint", { count: toolSlots.length })
-        : t("tlive_pq_no_lesson_html");
+        : getLessonHtmlCached().length >= 80
+          ? t("tlive_pq_ai_from_lesson_lead")
+          : t("tlive_pq_no_lesson_html");
 
     canvas.className = opts.sidePanel ? "tlive-tool-panel__inner" : "tlive-canvas__inner tlive-canvas__inner--left";
     canvas.innerHTML = `
@@ -307,6 +359,10 @@
 
     document.getElementById("tlive-pq-launch")?.addEventListener("click", () => {
       const q = resolveQuestion(tool, MOCK);
+      if (!q) {
+        if (typeof opts.onStatus === "function") opts.onStatus(t("tlive_pq_preview_empty"), true);
+        return;
+      }
       if (onLaunch) onLaunch(q, tool);
     });
 
@@ -314,6 +370,51 @@
       const q = resolveQuestion(tool, MOCK);
       if (onViewResponses) onViewResponses(q);
     });
+
+    void ensureAiGeneratedQuestion(tool, MOCK, {
+      refreshAiList,
+      refreshPreview,
+      onStatus: opts.onStatus,
+    });
+  }
+
+  async function ensureAiGeneratedQuestion(tool, MOCK, ui) {
+    if (getToolSlots(tool).length) return;
+    const html = getLessonHtmlCached();
+    if (!html || html.length < 80) return;
+    if (getAiQuestionCache(tool)) {
+      const cached = getAiQuestionCache(tool);
+      setDraft(tool, { mode: "ai-generated", slotId: "", question: cached });
+      ui.refreshAiList();
+      ui.refreshPreview();
+      return;
+    }
+    const api = global.EAP_LIVE_TEACHING_API;
+    if (!api || typeof api.generateQuestion !== "function") return;
+    global.__tliveAiQuestionLoading = tool;
+    ui.refreshAiList();
+    try {
+      const data = await api.generateQuestion({ html, tool });
+      const q = data && data.question;
+      if (!q || !Array.isArray(q.optionsEn) || q.optionsEn.length < 2) {
+        throw new Error(t("tlive_pq_ai_generate_failed"));
+      }
+      setAiQuestionCache(tool, q);
+      setDraft(tool, { mode: "ai-generated", slotId: "", question: q });
+      syncManualFormFromQuestion(q);
+      ui.refreshAiList();
+      ui.refreshPreview();
+      if (typeof ui.onStatus === "function") {
+        ui.onStatus(t("tlive_pq_ai_generated_ready"), false);
+      }
+    } catch (err) {
+      if (typeof ui.onStatus === "function") {
+        ui.onStatus((err && err.message) || t("tlive_pq_ai_generate_failed"), true);
+      }
+      ui.refreshAiList();
+    } finally {
+      global.__tliveAiQuestionLoading = null;
+    }
   }
 
   function applySlotPick(tool, slotId, MOCK) {
