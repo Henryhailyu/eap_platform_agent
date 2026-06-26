@@ -21,7 +21,6 @@ from tencent_audio import (
     asr_ready,
     ensure_listening_audio,
     ensure_speaking_prompt_audio,
-    ensure_tts_audio,
     expand_playback_segments,
     prepare_audio_for_tencent,
     recognize_speech,
@@ -56,6 +55,44 @@ _FALLBACK_WRITING_PROMPT = (
     "Some people believe university students should be required to take courses outside their major. "
     "Others think students should focus only on subjects related to their degree. "
     "Discuss both views and give your own opinion."
+)
+
+_MALE_SPEAKER_HINTS = frozenset(
+    {
+        "john",
+        "mike",
+        "tom",
+        "james",
+        "david",
+        "mark",
+        "peter",
+        "paul",
+        "daniel",
+        "michael",
+        "robert",
+        "william",
+        "tutor",
+        "professor",
+        "lecturer",
+        "dr ",
+        "mr ",
+    }
+)
+_FEMALE_SPEAKER_HINTS = frozenset(
+    {
+        "sarah",
+        "emma",
+        "lisa",
+        "mary",
+        "anna",
+        "sophie",
+        "lucy",
+        "helen",
+        "jane",
+        "emily",
+        "ms ",
+        "mrs ",
+    }
 )
 
 
@@ -285,8 +322,9 @@ def _generate_exam_content_once() -> dict[str, Any]:
         "Return ONLY valid JSON with keys: vocabulary, listening, reading, speaking, writing. "
         "All student-facing text must be in English. "
         "Vocabulary: exactly 10 four-option MCQ items testing academic collocation/meaning. "
-        "Listening: script_en (~280-340 words, academic conversation between two speakers like IELTS Section 3), "
-        "segments array [{speaker,gender,text}] with gender male|female, and 8 MCQ questions referencing the script. "
+        "Listening: script_en (~280-340 words, academic conversation between exactly two speakers like IELTS Section 3), "
+        "segments array of turns [{speaker,gender,text}] with gender male|female — first speaker male, second female; "
+        "alternate turns between them, and 8 MCQ questions referencing the script. "
         "Reading: title, passage (~550-700 words, academic), 10 MCQ questions (IELTS reading style). "
         "Speaking: object with questions array of exactly 3 items, each {id, prompt} — IELTS Part 1 personal questions. "
         "Writing: task2_prompt (IELTS Writing Task 2 essay question). "
@@ -312,6 +350,9 @@ def _generate_exam_content_once() -> dict[str, Any]:
     )
     if not script_en:
         raise RuntimeError("AI listening script missing")
+
+    listening_preview = {"script_en": script_en, "segments": segments}
+    segment_rows = _listening_turns(listening_preview)
 
     reading_raw = data.get("reading") if isinstance(data.get("reading"), dict) else {}
     passage = str(reading_raw.get("passage") or "").strip()
@@ -345,7 +386,7 @@ def _generate_exam_content_once() -> dict[str, Any]:
         "vocabulary": {"questions": vocab},
         "listening": {
             "script_en": script_en,
-            "segments": segments,
+            "segments": segment_rows,
             "questions": listen_qs,
         },
         "reading": {
@@ -363,36 +404,126 @@ def _generate_exam_content_once() -> dict[str, Any]:
     }
 
 
-def _playback_segments_for_listening(listening: dict[str, Any]) -> list[dict[str, Any]]:
-    raw = listening.get("segments")
-    if isinstance(raw, list) and raw:
-        expanded = expand_playback_segments(raw)
-        if expanded:
-            return expanded
+def _infer_gender_from_speaker(speaker: str) -> str:
+    lower = f" {speaker.lower()} "
+    for hint in _MALE_SPEAKER_HINTS:
+        if hint in lower:
+            return "male"
+    for hint in _FEMALE_SPEAKER_HINTS:
+        if hint in lower:
+            return "female"
+    return ""
 
-    script = str(listening.get("script_en") or "").strip()
-    if not script:
+
+def _segment_rows_from_raw(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
         return []
+    rows: list[dict[str, Any]] = []
+    for seg in raw:
+        if not isinstance(seg, dict):
+            continue
+        text = str(seg.get("text") or seg.get("line") or "").strip()
+        if not text:
+            continue
+        gender = str(seg.get("gender") or "").lower()
+        rows.append(
+            {
+                "speaker": str(seg.get("speaker") or "Speaker").strip() or "Speaker",
+                "gender": gender if gender in {"male", "female"} else "",
+                "text": text,
+            }
+        )
+    return rows
 
+
+def _dialogue_segments_from_script(script: str) -> list[dict[str, Any]]:
     dialogue_segs: list[dict[str, Any]] = []
     for line in re.split(r"\n+", script):
         line = line.strip()
         if not line:
             continue
-        match = re.match(r"^([A-Za-z][A-Za-z\s]{0,30}):\s*(.+)$", line)
+        match = re.match(r"^([A-Za-z][A-Za-z\s.'0-9]{0,40}):\s*(.+)$", line)
         if match:
-            speaker = match.group(1).strip()
-            lower = speaker.lower()
-            gender = "male" if lower in {"john", "mike", "tom", "james", "david", "mark", "peter"} else "female"
             dialogue_segs.append(
-                {"speaker": speaker, "gender": gender, "text": match.group(2).strip()}
+                {
+                    "speaker": match.group(1).strip(),
+                    "gender": "",
+                    "text": match.group(2).strip(),
+                }
             )
         else:
             dialogue_segs.append({"speaker": "Narrator", "gender": "female", "text": line})
+    return dialogue_segs
 
-    if len(dialogue_segs) > 1:
-        return expand_playback_segments(dialogue_segs)
-    return expand_playback_segments([{"speaker": "Narrator", "gender": "female", "text": script}])
+
+def _assign_dialogue_genders(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Map distinct speakers to male/female voices (IELTS S3-style dialogue)."""
+    cleaned: list[dict[str, Any]] = []
+    for seg in segments:
+        text = str(seg.get("text") or "").strip()
+        if not text:
+            continue
+        speaker = str(seg.get("speaker") or "Speaker").strip() or "Speaker"
+        gender = str(seg.get("gender") or "").lower()
+        if gender not in {"male", "female"}:
+            gender = _infer_gender_from_speaker(speaker)
+        cleaned.append({"speaker": speaker, "gender": gender, "text": text})
+
+    speakers: list[str] = []
+    for row in cleaned:
+        if row["speaker"] not in speakers:
+            speakers.append(row["speaker"])
+
+    if len(speakers) >= 2:
+        mapping: dict[str, str] = {}
+        for sp in speakers[:2]:
+            inferred = next(
+                (str(r["gender"]) for r in cleaned if r["speaker"] == sp and r["gender"] in {"male", "female"}),
+                "",
+            )
+            if inferred in {"male", "female"}:
+                mapping[sp] = inferred
+        if speakers[0] not in mapping and speakers[1] not in mapping:
+            mapping[speakers[0]] = "male"
+            mapping[speakers[1]] = "female"
+        elif speakers[0] in mapping and speakers[1] not in mapping:
+            mapping[speakers[1]] = "female" if mapping[speakers[0]] == "male" else "male"
+        elif speakers[1] in mapping and speakers[0] not in mapping:
+            mapping[speakers[0]] = "female" if mapping[speakers[1]] == "male" else "male"
+        elif mapping.get(speakers[0]) == mapping.get(speakers[1]):
+            mapping[speakers[1]] = "female" if mapping.get(speakers[0]) == "male" else "male"
+        for i, sp in enumerate(speakers[2:], start=2):
+            if sp not in mapping:
+                mapping[sp] = "male" if i % 2 == 0 else "female"
+        for row in cleaned:
+            row["gender"] = mapping.get(row["speaker"], "female")
+    else:
+        for row in cleaned:
+            if row["gender"] not in {"male", "female"}:
+                row["gender"] = "female"
+    return cleaned
+
+
+def _listening_turns(listening: dict[str, Any]) -> list[dict[str, Any]]:
+    segment_rows = _segment_rows_from_raw(listening.get("segments"))
+    if _dialogue_speaker_count(segment_rows) < 2:
+        from_script = _dialogue_segments_from_script(str(listening.get("script_en") or ""))
+        if _dialogue_speaker_count(from_script) >= 2:
+            segment_rows = from_script
+    if not segment_rows:
+        segment_rows = _dialogue_segments_from_script(str(listening.get("script_en") or ""))
+    return _assign_dialogue_genders(segment_rows)
+
+
+def _playback_segments_for_listening(listening: dict[str, Any]) -> list[dict[str, Any]]:
+    segment_rows = _listening_turns(listening)
+    if not segment_rows:
+        return []
+    return expand_playback_segments(segment_rows)
+
+
+def _dialogue_speaker_count(segments: list[dict[str, Any]]) -> int:
+    return len({str(seg.get("speaker") or "Speaker").strip() or "Speaker" for seg in segments})
 
 
 def _audio_has_urls(audio: dict[str, Any] | None) -> bool:
@@ -413,23 +544,24 @@ def _placement_listening_slot(exam_id: str) -> int:
 def _attach_listening_audio(exam: dict[str, Any], exam_id: str) -> None:
     listening = exam.get("listening") or {}
     script = str(listening.get("script_en") or "").strip()
-    raw_segments = listening.get("segments") if isinstance(listening.get("segments"), list) else None
+    segment_rows = _listening_turns(listening)
+    if segment_rows:
+        listening["segments"] = segment_rows
+
     playback_segments = _playback_segments_for_listening(listening)
     listening["playbackSegments"] = playback_segments
     slot = _placement_listening_slot(exam_id)
 
     audio: dict[str, Any] | None = None
-    if tts_ready() and (script or playback_segments):
-        audio = ensure_listening_audio(slot, script, segments=raw_segments)
-        if not _audio_has_urls(audio):
-            audio = ensure_listening_audio(slot, script, segments=playback_segments)
-        if not _audio_has_urls(audio):
-            try:
-                merged = script or " ".join(str(seg.get("text") or "") for seg in playback_segments).strip()
-                if merged:
-                    audio = ensure_tts_audio(f"placement/listening-{slot}.mp3", merged)
-            except Exception as exc:
-                log.warning("Placement listening single-file TTS failed: %s", exc)
+    is_dialogue = _dialogue_speaker_count(segment_rows) >= 2
+    if tts_ready() and segment_rows:
+        audio = ensure_listening_audio(slot, script, segments=segment_rows)
+    if not _audio_has_urls(audio) and tts_ready() and script and not is_dialogue:
+        audio = ensure_listening_audio(
+            slot,
+            script,
+            segments=[{"speaker": "Narrator", "gender": "female", "text": script}],
+        )
 
     listening["audio"] = audio
     listening["audioPlayLimit"] = 1
