@@ -345,9 +345,10 @@
   function speakPlacementSegmentAt(root, index) {
     const seg = speechCtl.segments[index];
     if (!seg || !seg.text) return;
+    speechCtl.voice = pickSpeechVoice(seg.gender);
     const utter = new globalThis.SpeechSynthesisUtterance(seg.text);
     utter.lang = "en-GB";
-    utter.rate = 0.92;
+    utter.rate = 0.88;
     if (speechCtl.voice) utter.voice = speechCtl.voice;
     utter.onend = () => {
       if (!speechCtl.playing) return;

@@ -19,6 +19,7 @@ from flask import jsonify, request
 from eap_ai import ai_is_configured, create_chat_completion, format_ai_error, get_openai_client, parse_ai_json_object
 from tencent_audio import (
     asr_ready,
+    ensure_dialogue_playlist_audio,
     ensure_listening_audio,
     ensure_speaking_prompt_audio,
     expand_playback_segments,
@@ -322,9 +323,10 @@ def _generate_exam_content_once() -> dict[str, Any]:
         "Return ONLY valid JSON with keys: vocabulary, listening, reading, speaking, writing. "
         "All student-facing text must be in English. "
         "Vocabulary: exactly 10 four-option MCQ items testing academic collocation/meaning. "
-        "Listening: script_en (~280-340 words, academic conversation between exactly two speakers like IELTS Section 3), "
-        "segments array of turns [{speaker,gender,text}] with gender male|female — first speaker male, second female; "
-        "alternate turns between them, and 8 MCQ questions referencing the script. "
+        "Listening: script_en (~280-340 words) as an academic conversation between exactly two speakers "
+        "(Tom, male tutor and Sarah, female student) like IELTS Section 3. "
+        "segments must be 10-16 alternating dialogue turns [{speaker,gender,text}] with gender male|female on every turn; "
+        "do not put the whole script in one segment. Include 8 MCQ questions referencing the script. "
         "Reading: title, passage (~550-700 words, academic), 10 MCQ questions (IELTS reading style). "
         "Speaking: object with questions array of exactly 3 items, each {id, prompt} — IELTS Part 1 personal questions. "
         "Writing: task2_prompt (IELTS Writing Task 2 essay question). "
@@ -504,7 +506,23 @@ def _assign_dialogue_genders(segments: list[dict[str, Any]]) -> list[dict[str, A
     return cleaned
 
 
-def _listening_turns(listening: dict[str, Any]) -> list[dict[str, Any]]:
+def _alternating_sentence_turns(script: str) -> list[dict[str, Any]]:
+    """Split prose dialogue into alternating male/female turns when speaker labels are missing."""
+    compact = re.sub(r"\s+", " ", script).strip()
+    if not compact:
+        return []
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", compact) if s.strip()]
+    if len(sentences) < 2:
+        return [{"speaker": "Sarah", "gender": "female", "text": compact}]
+    turns: list[dict[str, Any]] = []
+    for i, sentence in enumerate(sentences):
+        gender = "male" if i % 2 == 0 else "female"
+        speaker = "Tom" if gender == "male" else "Sarah"
+        turns.append({"speaker": speaker, "gender": gender, "text": sentence})
+    return turns
+
+
+def _enforce_dialogue_turns(listening: dict[str, Any]) -> list[dict[str, Any]]:
     segment_rows = _segment_rows_from_raw(listening.get("segments"))
     if _dialogue_speaker_count(segment_rows) < 2:
         from_script = _dialogue_segments_from_script(str(listening.get("script_en") or ""))
@@ -512,7 +530,21 @@ def _listening_turns(listening: dict[str, Any]) -> list[dict[str, Any]]:
             segment_rows = from_script
     if not segment_rows:
         segment_rows = _dialogue_segments_from_script(str(listening.get("script_en") or ""))
-    return _assign_dialogue_genders(segment_rows)
+    segment_rows = _assign_dialogue_genders(segment_rows)
+
+    if _dialogue_speaker_count(segment_rows) >= 2 and len(segment_rows) >= 2:
+        return segment_rows
+
+    script = str(listening.get("script_en") or "").strip()
+    if script:
+        alt = _alternating_sentence_turns(script)
+        if len(alt) >= 2:
+            return alt
+    return segment_rows
+
+
+def _listening_turns(listening: dict[str, Any]) -> list[dict[str, Any]]:
+    return _enforce_dialogue_turns(listening)
 
 
 def _playback_segments_for_listening(listening: dict[str, Any]) -> list[dict[str, Any]]:
@@ -551,17 +583,17 @@ def _attach_listening_audio(exam: dict[str, Any], exam_id: str) -> None:
     playback_segments = _playback_segments_for_listening(listening)
     listening["playbackSegments"] = playback_segments
     slot = _placement_listening_slot(exam_id)
+    cache_key = f"{exam_id[:8]}-{slot}"
 
     audio: dict[str, Any] | None = None
-    is_dialogue = _dialogue_speaker_count(segment_rows) >= 2
     if tts_ready() and segment_rows:
-        audio = ensure_listening_audio(slot, script, segments=segment_rows)
-    if not _audio_has_urls(audio) and tts_ready() and script and not is_dialogue:
-        audio = ensure_listening_audio(
-            slot,
-            script,
-            segments=[{"speaker": "Narrator", "gender": "female", "text": script}],
+        audio = ensure_dialogue_playlist_audio(
+            cache_key,
+            segment_rows,
+            cos_namespace="placement-v3",
         )
+        if not _audio_has_urls(audio):
+            audio = ensure_listening_audio(slot, script, segments=segment_rows)
 
     listening["audio"] = audio
     listening["audioPlayLimit"] = 1

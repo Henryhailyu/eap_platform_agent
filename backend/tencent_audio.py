@@ -166,9 +166,67 @@ def _voice_id_for_gender(gender: str | None) -> int:
     g = str(gender or "female").lower()
     raw = config.TTS_VOICE_MALE if g == "male" else config.TTS_VOICE_FEMALE
     try:
-        return int(raw or config.TTS_VOICE_ID or "101051")
+        return int(raw or config.TTS_VOICE_ID or "101050")
     except (TypeError, ValueError):
-        return int(config.TTS_VOICE_ID or "101051")
+        return int(config.TTS_VOICE_ID or "101050")
+
+
+def ensure_dialogue_playlist_audio(
+    cache_id: int | str,
+    turns: list[dict[str, Any]],
+    *,
+    cos_namespace: str = "listening",
+) -> dict[str, Any] | None:
+    """Synthesize dialogue with one clip per turn/chunk and gender-specific voices."""
+    if not tts_ready():
+        return None
+    expanded = expand_playback_segments(turns)
+    if not expanded:
+        return None
+    try:
+        audio_segments: list[dict[str, Any]] = []
+        for i, seg in enumerate(expanded):
+            text = str(seg.get("text") or "").strip()
+            if not text:
+                continue
+            gender = str(seg.get("gender") or "female").lower()
+            if gender not in {"male", "female"}:
+                gender = "female"
+            voice = _voice_id_for_gender(gender)
+            speaker = str(seg.get("speaker") or f"Speaker {i + 1}")
+            sp_slug = re.sub(r"[^a-zA-Z0-9_-]", "_", speaker)[:24] or "speaker"
+            meta = ensure_tts_audio(
+                f"{cos_namespace}/dlg-{cache_id}-{sp_slug}-g{gender}-seg{i}",
+                text,
+                voice_type=voice,
+            )
+            audio_segments.append(
+                {
+                    "url": meta["url"],
+                    "speaker": speaker,
+                    "gender": gender,
+                    "truncated": meta.get("truncated"),
+                }
+            )
+        if not audio_segments:
+            return None
+        if len(audio_segments) == 1:
+            one = audio_segments[0]
+            return {
+                "url": one["url"],
+                "available": True,
+                "truncated": one.get("truncated"),
+                "gender": one.get("gender"),
+            }
+        return {
+            "playlist": True,
+            "segments": audio_segments,
+            "truncated": any(s.get("truncated") for s in audio_segments),
+            "available": True,
+        }
+    except Exception as exc:
+        log.warning("Dialogue playlist TTS failed for %s: %s", cache_id, exc)
+        return None
 
 
 def synthesize_tts_mp3(text: str, *, voice_type: int | None = None) -> bytes:
@@ -192,10 +250,18 @@ def synthesize_tts_mp3(text: str, *, voice_type: int | None = None) -> bytes:
     req.Text = snippet
     req.SessionId = str(uuid.uuid4())
     req.ModelType = 1
-    req.VoiceType = int(voice_type or config.TTS_VOICE_ID or "101051")
+    req.VoiceType = int(voice_type or config.TTS_VOICE_ID or "101050")
     req.Codec = config.TTS_CODEC
     req.SampleRate = config.TTS_SAMPLE_RATE
     req.PrimaryLanguage = 2  # English
+    try:
+        req.Speed = max(0.6, min(1.6, float(config.TTS_SPEED)))
+    except (TypeError, ValueError):
+        req.Speed = 0.92
+    try:
+        req.Volume = max(0.0, min(10.0, float(config.TTS_VOLUME)))
+    except (TypeError, ValueError):
+        req.Volume = 1.0
 
     resp = client.TextToVoice(req)
     if not resp.Audio:
@@ -228,6 +294,15 @@ def ensure_listening_audio(
 ) -> dict[str, Any] | None:
     if not tts_ready():
         return None
+    turns = [
+        seg
+        for seg in (segments or [])
+        if isinstance(seg, dict) and str(seg.get("text") or "").strip()
+    ]
+    if len(turns) >= 2:
+        playlist = ensure_dialogue_playlist_audio(item_id, turns, cos_namespace="listening")
+        if playlist:
+            return playlist
     try:
         part_segs = expand_playback_segments(segments or [])
         if len(part_segs) > 1:
