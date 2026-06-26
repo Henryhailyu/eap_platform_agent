@@ -21,6 +21,29 @@
       .replace(/"/g, "&quot;");
   }
 
+  function showAiGenerating(root, titleKey, hintKey) {
+    const loading = global.EAP_SSC_LOADING;
+    if (loading && typeof loading.renderGeneratingCard === "function") {
+      loading.renderGeneratingCard(root, titleKey, hintKey);
+      return;
+    }
+    root.innerHTML = `
+      <div class="ssc-generating-card" role="status" aria-live="polite" aria-busy="true">
+        <div class="ssc-generating-card__spinner" aria-hidden="true"></div>
+        <p class="ssc-generating-card__title">${escapeHtml(t(titleKey || "self_study_ai_generating"))}</p>
+        ${hintKey ? `<p class="ssc-generating-card__hint">${escapeHtml(t(hintKey))}</p>` : ""}
+      </div>
+    `;
+  }
+
+  function showChannelLoading(root, channel, titleKey, hintKey) {
+    if (channel === "B") {
+      showAiGenerating(root, titleKey || "self_study_vocab_generating", hintKey || "self_study_vocab_generating_hint");
+    } else {
+      root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
+    }
+  }
+
   function promptText(q) {
     if (!q) return "";
     return isZh() ? q.promptZh || q.promptEn : q.promptEn || q.promptZh;
@@ -347,17 +370,13 @@
   }
 
   async function renderLearnPanel(root) {
-    if (state.selectedDay) {
-      root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
+    const channel = state.activeChannel || "B";
+    if (state.selectedDay || !state.today) {
+      showChannelLoading(root, channel, "self_study_vocab_generating", "self_study_vocab_generating_hint");
       try {
-        state.today = await SERVER().getVocabDay(state.selectedDay, state.activeChannel);
-      } catch (e) {
-        root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
-        return;
-      }
-    } else if (!state.today) {
-      try {
-        state.today = await SERVER().getVocabToday(state.activeChannel);
+        state.today = state.selectedDay
+          ? await SERVER().getVocabDay(state.selectedDay, channel)
+          : await SERVER().getVocabToday(channel);
       } catch (e) {
         root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
         return;
@@ -661,11 +680,13 @@
   }
 
   async function renderPracticePanel(root) {
+    const channel = state.activeChannel || "B";
     if (!state.today) {
+      showChannelLoading(root, channel, "self_study_vocab_generating", "self_study_vocab_generating_hint");
       try {
         state.today = state.selectedDay
-          ? await SERVER().getVocabDay(state.selectedDay, state.activeChannel)
-          : await SERVER().getVocabToday(state.activeChannel);
+          ? await SERVER().getVocabDay(state.selectedDay, channel)
+          : await SERVER().getVocabToday(channel);
       } catch (e) {
         root.innerHTML = `<p class="ssc-vocab-error" role="alert">${escapeHtml(e.message)}</p>`;
         return;
@@ -681,7 +702,7 @@
       return;
     }
 
-    root.innerHTML = `<p class="ssc-vocab-hint">${t("self_study_ai_loading")}</p>`;
+    showChannelLoading(root, channel, "self_study_vocab_practice_generating", "self_study_ai_generating_hint");
     let exam;
     try {
       exam =
@@ -1103,6 +1124,8 @@
 
     if (titleEl) titleEl.textContent = t("self_study_mod_vocab");
     if (levelEl) levelEl.hidden = true;
+
+    showAiGenerating(shell, "self_study_vocab_generating", "self_study_vocab_generating_hint");
 
     try {
       state.overview = await SERVER().getVocabOverview();

@@ -311,8 +311,20 @@
     });
   }
 
+  function showHubLoading() {
+    const calRoot = document.getElementById("ssc-cal-root");
+    const loading = global.EAP_SSC_LOADING;
+    if (loading && typeof loading.renderHubCalendarLoading === "function") {
+      loading.renderHubCalendarLoading(calRoot);
+    } else if (calRoot) {
+      calRoot.innerHTML = `<p class="ssc-vocab-hint">${escapeHtml(t("self_study_hub_loading"))}</p>`;
+    }
+  }
+
   async function bootHub() {
     if (document.body.getAttribute("data-page") !== PAGE) return;
+
+    showHubLoading();
 
     const placement = await resolvePlacement();
     if (!placement) {
@@ -331,16 +343,12 @@
 
     const srv = SERVER();
     if (srv) {
-      try {
-        state.overview = await srv.getDailyOverview();
-      } catch (_) {
-        state.overview = null;
-      }
-      try {
-        state.calData = await srv.getVocabCalendar(state.activeChannel);
-      } catch (_) {
-        state.calData = { days: [] };
-      }
+      const [overview, calData] = await Promise.all([
+        srv.getDailyOverview().catch(() => null),
+        srv.getVocabCalendar(state.activeChannel).catch(() => ({ days: [] })),
+      ]);
+      state.overview = overview;
+      state.calData = calData;
     }
 
     const startIso = state.calData?.startDate || isoToday();

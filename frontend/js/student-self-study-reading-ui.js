@@ -205,8 +205,13 @@
   }
 
   function renderGenerating(root) {
+    const loading = global.EAP_SSC_LOADING;
+    if (loading && typeof loading.renderGeneratingCard === "function") {
+      loading.renderGeneratingCard(root, "self_study_reading_generating", "self_study_reading_generating_hint");
+      return;
+    }
     root.innerHTML = `
-      <div class="ssc-generating-card" role="status" aria-live="polite">
+      <div class="ssc-generating-card" role="status" aria-live="polite" aria-busy="true">
         <div class="ssc-generating-card__spinner" aria-hidden="true"></div>
         <p class="ssc-generating-card__title">${escapeHtml(t("self_study_reading_generating"))}</p>
         <p class="ssc-generating-card__hint">${escapeHtml(t("self_study_reading_generating_hint"))}</p>
@@ -356,6 +361,9 @@
     state.today = null;
     state.lastScoring = null;
     state.practiceRetake = false;
+
+    shell.innerHTML = `<div id="ssc-reading-panel" class="ssc-reading-panel"></div>`;
+    renderGenerating(document.getElementById("ssc-reading-panel"));
 
     let overview;
     try {
