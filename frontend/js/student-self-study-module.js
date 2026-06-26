@@ -40,6 +40,32 @@
     return (params.get("skill") || "").toLowerCase();
   }
 
+  const SKILL_TITLE_KEYS = {
+    vocabulary: "self_study_mod_vocab",
+    reading: "self_study_mod_reading",
+    listening: "self_study_mod_listening",
+    speaking: "self_study_mod_speaking",
+    writing: "self_study_mod_writing",
+  };
+
+  const SKILL_TITLE_FALLBACK = {
+    vocabulary: "Vocabulary",
+    reading: "Reading",
+    listening: "Listening",
+    speaking: "Speaking",
+    writing: "Writing",
+  };
+
+  function applyModuleDocumentTitle(skill) {
+    const s = skill || getSkill();
+    const key = SKILL_TITLE_KEYS[s];
+    const label =
+      key && typeof window.t === "function" ? window.t(key) : SKILL_TITLE_FALLBACK[s] || "Self-Study";
+    document.title = `${label} — EAP Platform`;
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute("content", `${label} — AI Self-Study Centre`);
+  }
+
   async function apiLooksReachable() {
     if (typeof window.isApiReachable === "function") {
       try {
@@ -543,10 +569,17 @@
     if (redirectIfDisabled()) return;
     if (typeof redirectFilePageToHostedUi === "function" && redirectFilePageToHostedUi()) return;
 
+    const skill = getSkill();
+    applyModuleDocumentTitle(skill);
+    if (!document.body.dataset.sscTitleLangBound) {
+      document.body.dataset.sscTitleLangBound = "1";
+      window.addEventListener("eap:langchange", () => applyModuleDocumentTitle(getSkill()));
+    }
+
     const ready = await bootStudentSatellitePage(PAGE, () => {});
     if (!ready) return;
 
-    const skill = getSkill();
+    applyModuleDocumentTitle(skill);
     if (!MOCK) return;
 
     const placement = await resolvePlacement();

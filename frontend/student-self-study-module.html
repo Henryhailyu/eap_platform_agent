@@ -3,8 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Vocabulary — AI Self-Study Centre" />
-    <title>Vocabulary — EAP Platform</title>
+    <meta name="description" content="Self-Study — AI Self-Study Centre" />
+    <link rel="icon" type="image/png" href="assets/eap-favicon.png" />
+    <link rel="apple-touch-icon" href="assets/eap-favicon.png" />
+    <title>Self-Study — EAP Platform</title>
+    <script>
+      (function () {
+        var labels = {
+          vocabulary: "Vocabulary",
+          reading: "Reading",
+          listening: "Listening",
+          speaking: "Speaking",
+          writing: "Writing",
+        };
+        var skill = (location.search.match(/[?&]skill=([^&]+)/) || [])[1];
+        if (skill && labels[String(skill).toLowerCase()]) {
+          document.title = labels[String(skill).toLowerCase()] + " — EAP Platform";
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -38,7 +55,7 @@
           </div>
 
           <div class="ssc-hero ssc-hero--module">
-            <h1 id="ssc-module-title">Vocabulary</h1>
+            <h1 id="ssc-module-title">Self-Study</h1>
             <p id="ssc-module-status" class="ssc-hero__lead">In progress</p>
             <div class="ssc-module-progress" aria-label="Module progress">
               <div class="ssc-placement-progress__bar">
@@ -95,6 +112,6 @@
     <script src="js/student-self-study-module-rw.js"></script>
     <script src="js/student-self-study-module-listening.js"></script>
     <script src="js/student-self-study-module-speaking.js"></script>
-    <script src="js/student-self-study-module.js?v=20260609-vocab2"></script>
+    <script src="js/student-self-study-module.js?v=20260626-page-meta"></script>
   </body>
 </html>
