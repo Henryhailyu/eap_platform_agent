@@ -389,14 +389,9 @@ def build_html_from_plan_prompt(pack: dict, plan: dict, materials: str) -> str:
     body += (
         "\nGenerate the complete HTML lesson now. Build every interaction_slots entry as a live "
         "poll/quiz/game block with data-eap-live-tool, data-eap-live-segment, 3–4 options, and "
-        "Launch to class. Cover content from every material file."
+        "Launch to class. Cover content from every material file. "
+        "All visible content must be English only — no Chinese characters or bilingual glosses."
     )
-    if str(pack.get("teaching_style") or "") == "support_bilingual":
-        body += (
-            "\n\nBilingual support: include short Chinese hints (简体) in "
-            "elements with class data-bilingual-hint or data-zh-hint alongside English "
-            "main content — especially instructions and key vocabulary."
-        )
     if len(body) > MAX_MATERIALS_FOR_HTML + MAX_PLAN_JSON_FOR_HTML:
         body = body[: MAX_MATERIALS_FOR_HTML + MAX_PLAN_JSON_FOR_HTML]
     return body

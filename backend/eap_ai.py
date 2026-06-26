@@ -476,16 +476,16 @@ def generate_teaching_page_html(
         source = source[:MAX_SOURCE_TEXT]
 
     lvl = normalize_level(level)
-    ui_lang = "zh" if str(lang or "en").strip().lower().startswith("zh") else "en"
     prompt = (system_prompt or DEFAULT_TEACHING_PAGE_SYSTEM_PROMPT).strip()
     extra = str(custom_instructions or "").strip()[:800]
 
     user_parts = [
-        f"Create an EAP teaching page.",
+        "Create an EAP teaching page.",
         f"Lesson topic: {cleaned_topic}",
         f"Student level: {lvl}",
-        f"Primary UI language for headings and instructions: {'Chinese' if ui_lang == 'zh' else 'English'}.",
-        "Teaching content body may mix EN with brief zh glosses if UI language is Chinese.",
+        "Language: English only for ALL visible text (titles, headings, body, vocabulary, "
+        "instructions, and activities). Do NOT include Chinese characters, bilingual headings, "
+        "or translations in parentheses.",
     ]
     if source:
         user_parts.append(f"Source material (adapt — do not copy verbatim if copyrighted):\n{source}")
@@ -530,12 +530,13 @@ _LIVE_POLL_SYSTEM = """You are an EAP classroom facilitator. Given lesson HTML t
 Return ONLY valid JSON:
 {
   "textEn": "question in English",
-  "textZh": "same question in Chinese",
+  "textZh": "same as textEn",
   "optionsEn": ["option A", "option B", "option C", "option D"],
-  "optionsZh": ["Chinese A", "Chinese B", "Chinese C", "Chinese D"],
+  "optionsZh": ["same as optionsEn"],
   "correctIndex": 0
 }
 Rules:
+- Question and ALL options MUST be English only (no Chinese characters or bilingual glosses).
 - Question MUST relate directly to the lesson topic and vocabulary (not generic academic-writing trivia).
 - Poll = quick check of understanding or opinion; still pick one best answer (correctIndex 0-3).
 - Exactly 3 or 4 options, distinct and plausible.
@@ -545,12 +546,13 @@ _LIVE_QUIZ_SYSTEM = """You are an EAP classroom teacher. Given lesson HTML text,
 Return ONLY valid JSON:
 {
   "textEn": "question in English",
-  "textZh": "same question in Chinese",
+  "textZh": "same as textEn",
   "optionsEn": ["option A", "option B", "option C", "option D"],
-  "optionsZh": ["Chinese A", "Chinese B", "Chinese C", "Chinese D"],
+  "optionsZh": ["same as optionsEn"],
   "correctIndex": 0
 }
 Rules:
+- Question and ALL options MUST be English only (no Chinese characters or bilingual glosses).
 - Question MUST test content from the lesson (facts, vocabulary, skills taught).
 - Exactly one clearly correct answer (correctIndex 0-3).
 - Exactly 3 or 4 options. No trick questions."""
@@ -559,12 +561,13 @@ _LIVE_GAME_SYSTEM = """You are an EAP classroom game designer. Given lesson HTML
 Return ONLY valid JSON:
 {
   "textEn": "question in English",
-  "textZh": "same question in Chinese",
+  "textZh": "same as textEn",
   "optionsEn": ["option A", "option B", "option C", "option D"],
-  "optionsZh": ["Chinese A", "Chinese B", "Chinese C", "Chinese D"],
+  "optionsZh": ["same as optionsEn"],
   "correctIndex": 0
 }
 Rules:
+- Question and ALL options MUST be English only (no Chinese characters or bilingual glosses).
 - Question MUST relate directly to the lesson topic, vocabulary, or skills (not generic academic-writing trivia).
 - Suitable for fast team competition (30–60 seconds).
 - Exactly one clearly correct answer (correctIndex 0-3).
@@ -584,20 +587,15 @@ def _lesson_plain_text_from_html(html: str, max_chars: int = _MAX_LIVE_LESSON_TE
 
 
 def _normalize_live_question_payload(data: dict[str, Any], tool: str) -> dict[str, Any]:
-    text_en = str(data.get("textEn") or data.get("question") or "").strip()
+    from lesson_html_postprocess import strip_chinese_from_plain
+
+    text_en = strip_chinese_from_plain(str(data.get("textEn") or data.get("question") or ""))
     if not text_en:
         raise ValueError("AI question missing textEn")
-    text_zh = str(data.get("textZh") or text_en).strip()
     opts_en = data.get("optionsEn") or data.get("options") or []
-    opts_zh = data.get("optionsZh") or opts_en
     if not isinstance(opts_en, list):
         opts_en = []
-    if not isinstance(opts_zh, list):
-        opts_zh = list(opts_en)
-    options_en = [str(o).strip() for o in opts_en if str(o).strip()][:4]
-    options_zh = [str(o).strip() for o in opts_zh if str(o).strip()][:4]
-    while len(options_zh) < len(options_en):
-        options_zh.append(options_en[len(options_zh)])
+    options_en = [strip_chinese_from_plain(str(o)) for o in opts_en if strip_chinese_from_plain(str(o))][:4]
     if len(options_en) < 2:
         raise ValueError("AI question needs at least two options")
     try:
@@ -609,9 +607,9 @@ def _normalize_live_question_payload(data: dict[str, Any], tool: str) -> dict[st
     return {
         "id": qid,
         "textEn": text_en,
-        "textZh": text_zh,
+        "textZh": text_en,
         "optionsEn": options_en,
-        "optionsZh": options_zh[: len(options_en)],
+        "optionsZh": options_en[:],
         "correctIndex": correct,
         "source": "ai",
     }
@@ -776,9 +774,11 @@ def _parse_vocab_pairs_from_html(html: str) -> list[dict[str, str]]:
     seen: set[str] = set()
 
     def add(term: str, def_en: str, def_zh: str = "") -> None:
-        term = re.sub(r"\s+", " ", term).strip()
-        def_en = re.sub(r"\s+", " ", def_en).strip()
-        def_zh = (def_zh or def_en).strip()
+        from lesson_html_postprocess import strip_chinese_from_plain
+
+        term = strip_chinese_from_plain(re.sub(r"\s+", " ", term).strip())
+        def_en = strip_chinese_from_plain(re.sub(r"\s+", " ", def_en).strip())
+        def_zh = strip_chinese_from_plain((def_zh or def_en).strip())
         if not _is_valid_game_vocab_term(term, def_en):
             return
         key = term.lower()
@@ -831,14 +831,18 @@ def _parse_vocab_pairs_from_html(html: str) -> list[dict[str, str]]:
 
 
 def _normalize_vocab_terms(items: list[Any]) -> list[dict[str, str]]:
+    from lesson_html_postprocess import strip_chinese_from_plain
+
     out: list[dict[str, str]] = []
     seen: set[str] = set()
     for raw in items or []:
         if not isinstance(raw, dict):
             continue
-        term = str(raw.get("term") or raw.get("word") or "").strip()
-        def_en = str(raw.get("defEn") or raw.get("definition") or raw.get("def") or "").strip()
-        def_zh = str(raw.get("defZh") or def_en).strip()
+        term = strip_chinese_from_plain(str(raw.get("term") or raw.get("word") or ""))
+        def_en = strip_chinese_from_plain(
+            str(raw.get("defEn") or raw.get("definition") or raw.get("def") or "")
+        )
+        def_zh = def_en
         if not term or not def_en:
             continue
         if not _is_valid_game_vocab_term(term, def_en):
@@ -867,12 +871,13 @@ _LIVE_VOCAB_SYSTEM = """You are an EAP vocabulary specialist. Given lesson HTML 
 Return ONLY valid JSON:
 {
   "terms": [
-    {"term": "word or phrase", "defEn": "short English definition", "defZh": "Chinese definition"}
+    {"term": "word or phrase", "defEn": "short English definition", "defZh": "same as defEn"}
   ]
 }
 Rules:
 - FIRST use vocabulary explicitly listed in the lesson (especially any vocabulary / key terms section).
 - If the lesson has fewer than 24 items, add important EAP terms or short collocations from the lesson until you have exactly 24.
+- Terms and definitions MUST be English only — no Chinese characters, no bilingual glosses, no translations in parentheses.
 - Terms MUST be English words or short phrases (1–4 words) made of letters, spaces, and hyphens only.
 - NEVER include numbers, units, measurements, dates, statistics, symbols, or placeholders (e.g. never "word", "term", "definition").
 - NEVER use table headers or template labels as terms or definitions.

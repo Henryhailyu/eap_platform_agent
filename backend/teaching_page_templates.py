@@ -28,6 +28,7 @@ _BASE_HTML_RULES = (
     "- Include interactive eap-activity blocks (data-eap-id, data-eap-type, data-eap-answer) "
     "with button options data-eap-option=\"A\" and .eap-reveal show-answer controls.\n"
     "- At least 2 MCQ activities are required per page.\n"
+    "- ALL visible content MUST be English only (no Chinese characters or bilingual glosses).\n"
 )
 
 

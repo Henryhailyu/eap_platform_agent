@@ -7,6 +7,40 @@ import json
 import re
 from typing import Any
 
+_CJK_CHAR = r"[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]"
+_PAREN_CJK_RE = re.compile(rf"\s*[\(（][^)\）]*{_CJK_CHAR}[^)\）]*[\)）]", re.UNICODE)
+_CJK_RUN_RE = re.compile(_CJK_CHAR, re.UNICODE)
+
+
+def strip_chinese_from_plain(text: str) -> str:
+    """Remove Chinese glosses and CJK characters from plain text."""
+    out = _PAREN_CJK_RE.sub("", str(text or ""))
+    out = _CJK_RUN_RE.sub("", out)
+    out = re.sub(r"\(\s*\)", "", out)
+    out = re.sub(r"（\s*）", "", out)
+    out = re.sub(r"\s{2,}", " ", out)
+    return out.strip()
+
+
+def strip_chinese_from_html(html: str) -> str:
+    """Remove Chinese glosses and CJK from generated lesson HTML."""
+    text = str(html or "")
+    if not text:
+        return text
+    text = _PAREN_CJK_RE.sub("", text)
+    text = _CJK_RUN_RE.sub("", text)
+    text = re.sub(r"\(\s*\)", "", text)
+    text = re.sub(r"（\s*）", "", text)
+    text = re.sub(
+        r'(<html[^>]*\slang\s*=\s*["\'])[^"\']*(["\'])',
+        r"\1en\2",
+        text,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    return text
+
+
 EAP_LESSON_DESIGN_CSS = """
 :root {
   --eap-lesson-bg: #eef2f6;
@@ -376,6 +410,7 @@ def postprocess_lesson_html(html: str, plan: dict | None = None) -> tuple[str, l
     text = _ensure_launch_buttons(text)
     text = _inject_missing_plan_slots(text, plan)
     text = _ensure_launch_buttons(text)
+    text = strip_chinese_from_html(text)
     text = inject_icp_footer_html(text)
     warnings = validate_lesson_html(text, plan)
     return text, warnings

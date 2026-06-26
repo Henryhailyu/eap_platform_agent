@@ -10,7 +10,7 @@
   const VOCAB_HEADING = /vocabulary|key\s+terms?|word\s+list|词汇|重点词|keyword|lexis|terminology|new\s+words?/i;
   const TARGET = 24;
   const MIN = 8;
-  const CACHE_VERSION = "v2";
+  const CACHE_VERSION = "v3";
 
   const BLOCKED_TERMS = new Set([
     "word",
@@ -61,6 +61,15 @@
     return true;
   }
 
+  function stripChinese(text) {
+    return String(text || "")
+      .replace(/\s*[\(（][^)\）]*[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff][^)\）]*[\)）]/gu, "")
+      .replace(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]+/gu, "")
+      .replace(/\(\s*\)/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
   function filterValidTerms(items) {
     return normalizeTerms(items).filter((item) => isValidGameVocab(item.term, item.defEn));
   }
@@ -90,9 +99,9 @@
     const seen = new Set();
     (items || []).forEach((raw) => {
       if (!raw || typeof raw !== "object") return;
-      const term = String(raw.term || raw.word || "").trim();
-      const defEn = String(raw.defEn || raw.definition || raw.def || "").trim();
-      const defZh = String(raw.defZh || defEn).trim();
+      const term = stripChinese(String(raw.term || raw.word || "").trim());
+      const defEn = stripChinese(String(raw.defEn || raw.definition || raw.def || "").trim());
+      const defZh = defEn;
       if (!isValidGameVocab(term, defEn)) return;
       const key = term.toLowerCase();
       if (seen.has(key)) return;
@@ -103,9 +112,9 @@
   }
 
   function addPair(pairs, seen, term, defEn, defZh) {
-    const t0 = String(term || "").replace(/\s+/g, " ").trim();
-    const d0 = String(defEn || "").replace(/\s+/g, " ").trim();
-    const z0 = String(defZh || d0).trim();
+    const t0 = stripChinese(String(term || "").replace(/\s+/g, " ").trim());
+    const d0 = stripChinese(String(defEn || "").replace(/\s+/g, " ").trim());
+    const z0 = d0;
     if (!isValidGameVocab(t0, d0)) return;
     const key = t0.toLowerCase();
     if (seen.has(key)) return;

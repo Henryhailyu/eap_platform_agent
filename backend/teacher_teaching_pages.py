@@ -73,7 +73,10 @@ DEFAULT_TEACHING_PAGE_SYSTEM_PROMPT = (
     "- Inline <script> is allowed for simple reveal/highlight only — no external script URLs.\n"
     "- Do NOT link to external CSS, JS, fonts, or images.\n"
     "- Do NOT use onclick/onload or javascript: URLs.\n"
-    "- Keep total HTML under ~8000 words."
+    "- Keep total HTML under ~8000 words.\n"
+    "- ALL visible content MUST be English only: no Chinese characters, no bilingual headings, "
+    "no translations in parentheses, and no 中文 glosses anywhere in the document.\n"
+    "- Set <html lang=\"en\">."
     + _CONTENT_RULES
     + _VISUAL_DESIGN_RULES
     + _INTERACTIVE_HTML_RULES
@@ -229,8 +232,9 @@ def polish_teaching_html(html: str) -> str:
     text = _strip_ai_preamble(text)
     text = _normalize_decorative_opacity(text)
     try:
-        from lesson_html_postprocess import inject_icp_footer_html
+        from lesson_html_postprocess import inject_icp_footer_html, strip_chinese_from_html
 
+        text = strip_chinese_from_html(text)
         text = inject_icp_footer_html(text)
     except ImportError:
         pass
@@ -262,6 +266,12 @@ def sanitize_teaching_html(raw: str) -> str:
         raise ValueError("AI response is not a valid HTML document")
     text = _strip_ai_preamble(text)
     text = _normalize_decorative_opacity(text)
+    try:
+        from lesson_html_postprocess import strip_chinese_from_html
+
+        text = strip_chinese_from_html(text)
+    except ImportError:
+        pass
     return text
 
 
