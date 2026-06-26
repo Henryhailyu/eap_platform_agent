@@ -46,11 +46,47 @@
     return all;
   }
 
-  /** LT-M1: question from AI HTML slot, else mock bank. */
+  /** LT-M1: question from lesson slot / AI cache, else mock when no lesson HTML. */
   function pickLaunchQuestion(MOCK, index) {
     if (window.__tliveOverrideQuestion) return window.__tliveOverrideQuestion;
+    const GQ = window.EAP_LIVE_GAME_QUESTIONS;
+    if (GQ && typeof GQ.resolveSync === "function") {
+      const q = GQ.resolveSync(MOCK, index);
+      if (q) return q;
+      const html =
+        typeof GQ.getLessonHtmlCached === "function" ? GQ.getLessonHtmlCached() : "";
+      if (html.length >= 80) return null;
+    }
     const i = Number.isInteger(index) ? index : 0;
     return MOCK.MOCK_QUESTIONS[i % MOCK.MOCK_QUESTIONS.length];
+  }
+
+  function maybeFetchGameQuestion(index, rerender) {
+    const GQ = window.EAP_LIVE_GAME_QUESTIONS;
+    if (!GQ || window.__tliveGameQuestionLoading === index) return true;
+    const html = typeof GQ.getLessonHtmlCached === "function" ? GQ.getLessonHtmlCached() : "";
+    if (html.length < 80) return false;
+    window.__tliveGameQuestionLoading = index;
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (canvas) {
+      canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
+      canvas.innerHTML = `<div class="tlive-pq-empty tlive-pq-empty--loading">${escapeHtml(t("tlive_game_ai_generating"))}</div>`;
+    }
+    GQ.ensure(index, getMock())
+      .catch(() => {})
+      .finally(() => {
+        window.__tliveGameQuestionLoading = null;
+        if (typeof rerender === "function") rerender();
+      });
+    return true;
+  }
+
+  function resolveGameQuestionForRender(MOCK, index, rerender) {
+    const q = pickLaunchQuestion(MOCK, index);
+    if (q) return { q, pending: false };
+    if (maybeFetchGameQuestion(index, rerender)) return { q: null, pending: true };
+    const i = Number.isInteger(index) ? index : 0;
+    return { q: MOCK.MOCK_QUESTIONS[i % MOCK.MOCK_QUESTIONS.length], pending: false };
   }
 
   const SIDE_PANEL_TOOLS = new Set(["poll", "quiz"]);
@@ -328,8 +364,12 @@
     const MOCK = getMock();
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!MOCK || !canvas) return;
-    const q = pickLaunchQuestion(MOCK, questionIndex);
-    if (!q) return;
+    const idx = Number.isInteger(questionIndex) ? questionIndex : 0;
+    const resolved = resolveGameQuestionForRender(MOCK, idx, () =>
+      renderBoardRace(boardState, idx),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
 
     const state = boardState || MOCK.createBoardState();
     const opts = MOCK.questionOptions(q);
@@ -410,7 +450,7 @@
     });
 
     document.getElementById("tlive-next-q")?.addEventListener("click", () => {
-      window.__tliveQuestionIndex = ((window.__tliveQuestionIndex || 0) + 1) % MOCK.MOCK_QUESTIONS.length;
+      window.__tliveQuestionIndex = (window.__tliveQuestionIndex || 0) + 1;
       renderBoardRace(window.__tliveBoard || state, window.__tliveQuestionIndex);
     });
 
@@ -1578,7 +1618,11 @@
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!MOCK || !canvas) return;
 
-    const q = pickLaunchQuestion(MOCK, state.questionIndex);
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderQuizBattle(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const challenge = MOCK.isChallengeRound(state.questionIndex);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
@@ -1661,7 +1705,7 @@
     document.getElementById("tlive-quiz-next")?.addEventListener("click", () => {
       window.__tliveQuiz = {
         ...window.__tliveQuiz,
-        questionIndex: (window.__tliveQuiz.questionIndex + 1) % MOCK.MOCK_QUESTIONS.length,
+        questionIndex: (window.__tliveQuiz.questionIndex + 1),
         round: window.__tliveQuiz.round + 1,
       };
       renderQuizBattle(window.__tliveQuiz);
@@ -1679,7 +1723,11 @@
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!MOCK || !canvas) return;
 
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderTreasureHunt(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatTreasureEvent(state, t);
@@ -1773,7 +1821,7 @@
     document.getElementById("tlive-treasure-next")?.addEventListener("click", () => {
       window.__tliveTreasure = {
         ...window.__tliveTreasure,
-        questionIndex: (window.__tliveTreasure.questionIndex + 1) % MOCK.MOCK_QUESTIONS.length,
+        questionIndex: (window.__tliveTreasure.questionIndex + 1),
         round: window.__tliveTreasure.round + 1,
       };
       renderTreasureHunt(window.__tliveTreasure);
@@ -1791,7 +1839,11 @@
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!MOCK || !canvas) return;
 
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderEscapeRoom(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatEscapeEvent(state, t);
@@ -1885,7 +1937,7 @@
     document.getElementById("tlive-escape-next")?.addEventListener("click", () => {
       window.__tliveEscape = {
         ...window.__tliveEscape,
-        questionIndex: (window.__tliveEscape.questionIndex + 1) % MOCK.MOCK_QUESTIONS.length,
+        questionIndex: (window.__tliveEscape.questionIndex + 1),
         round: window.__tliveEscape.round + 1,
       };
       renderEscapeRoom(window.__tliveEscape);
@@ -1905,7 +1957,11 @@
 
     const ladder = MOCK.getWordLadderSet(state);
     const steps = MOCK.ladderSteps(ladder);
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderWordLadder(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatWordLadderEvent(state, t);
@@ -2007,7 +2063,7 @@
     document.getElementById("tlive-ladder-next")?.addEventListener("click", () => {
       window.__tliveLadder = {
         ...window.__tliveLadder,
-        questionIndex: (window.__tliveLadder.questionIndex + 1) % MOCK.MOCK_QUESTIONS.length,
+        questionIndex: (window.__tliveLadder.questionIndex + 1),
         round: window.__tliveLadder.round + 1,
       };
       renderWordLadder(window.__tliveLadder);
@@ -2026,7 +2082,11 @@
     if (!MOCK || !canvas) return;
 
     const puzzle = MOCK.getSentencePuzzle(state);
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderSentenceBuilder(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatSentenceEvent(state, t);
@@ -2130,7 +2190,7 @@
     document.getElementById("tlive-sentence-next-q")?.addEventListener("click", () => {
       window.__tliveSentence = {
         ...window.__tliveSentence,
-        questionIndex: (window.__tliveSentence.questionIndex + 1) % MOCK.MOCK_QUESTIONS.length,
+        questionIndex: (window.__tliveSentence.questionIndex + 1),
       };
       renderSentenceBuilder(window.__tliveSentence);
     });
@@ -2148,7 +2208,11 @@
     if (!MOCK || !canvas) return;
 
     const argSet = MOCK.getArgumentSet(state);
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderArgumentSorting(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatArgumentEvent(state, t);
@@ -2244,7 +2308,7 @@
     document.getElementById("tlive-argument-next-q")?.addEventListener("click", () => {
       window.__tliveArgument = {
         ...window.__tliveArgument,
-        questionIndex: (window.__tliveArgument.questionIndex + 1) % MOCK.MOCK_QUESTIONS.length,
+        questionIndex: (window.__tliveArgument.questionIndex + 1),
       };
       renderArgumentSorting(window.__tliveArgument);
     });
@@ -2262,7 +2326,11 @@
     if (!MOCK || !canvas) return;
 
     const mission = MOCK.getSummaryMission(state);
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderSummaryMission(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatSummaryEvent(state, t);
@@ -2367,7 +2435,7 @@
     document.getElementById("tlive-summary-next-q")?.addEventListener("click", () => {
       window.__tliveSummary = {
         ...window.__tliveSummary,
-        questionIndex: (window.__tliveSummary.questionIndex + 1) % MOCK.MOCK_QUESTIONS.length,
+        questionIndex: (window.__tliveSummary.questionIndex + 1),
       };
       renderSummaryMission(window.__tliveSummary);
     });
@@ -2385,7 +2453,11 @@
     if (!MOCK || !canvas) return;
 
     const rankSet = MOCK.getRankingSet(state);
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderRankingChallenge(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatRankingEvent(state, t);
@@ -2487,7 +2559,11 @@
     if (!MOCK || !canvas) return;
 
     const topic = MOCK.getDebateTopic(state);
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderDebateCards(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatDebateEvent(state, t);
@@ -2598,7 +2674,11 @@
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!MOCK || !canvas) return;
 
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderHotSeat(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatHotSeatEvent(state, t);
@@ -2701,7 +2781,11 @@
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!MOCK || !canvas) return;
 
-    const q = MOCK.MOCK_QUESTIONS[state.questionIndex % MOCK.MOCK_QUESTIONS.length];
+    const resolved = resolveGameQuestionForRender(MOCK, state.questionIndex, () =>
+      renderMemoryCard(state),
+    );
+    if (resolved.pending || !resolved.q) return;
+    const q = resolved.q;
     const opts = MOCK.questionOptions(q);
     const winner = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const lastEvent = MOCK.formatMemoryEvent(state, t);
@@ -2965,42 +3049,25 @@
   function getSavedGamesList() {
     const MOCK = getMock();
     if (!MOCK) return [];
-    return MOCK.allSavedGames ? MOCK.allSavedGames() : MOCK.SAVED_GAMES;
+    return MOCK.SAVED_GAMES || [];
   }
 
   function gameListItemHtml(g, MOCK) {
-    const custom = typeof MOCK.isCustomGame === "function" && MOCK.isCustomGame(g);
-    const deleteBtn = custom
-      ? `<button type="button" class="btn-secondary tlive-game-delete" data-delete-game="${escapeHtml(g.id)}">${escapeHtml(t("tlive_delete_game"))}</button>`
-      : "";
     return `
       <li class="tlive-games-panel__row">
         <button type="button" class="tlive-game-item tlive-games-panel__item" data-game="${escapeHtml(g.id)}">
           <strong>${escapeHtml(MOCK.gameLabel(g, "name"))}</strong>
           <span>${escapeHtml(MOCK.gameLabel(g, "desc"))}</span>
         </button>
-        ${deleteBtn}
       </li>`;
   }
 
-  function bindGameListActions(root, onPick, onAfterDelete) {
+  function bindGameListActions(root, onPick) {
     if (!root) return;
     root.querySelectorAll("[data-game]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-game");
         if (id) onPick(id);
-      });
-    });
-    root.querySelectorAll("[data-delete-game]").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const MOCK = getMock();
-        const id = btn.getAttribute("data-delete-game");
-        if (!MOCK || !id || typeof MOCK.deleteCustomGame !== "function") return;
-        if (!window.confirm(t("tlive_delete_confirm"))) return;
-        MOCK.deleteCustomGame(id);
-        if (typeof onAfterDelete === "function") onAfterDelete();
       });
     });
   }
@@ -3010,7 +3077,6 @@
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas || !MOCK) return;
     const games = getSavedGamesList();
-    const builderHref = "teacher-game-builder.html" + (window.location.search || "");
     const gameSlots =
       typeof window.EAP_gameSlotsPhase1 === "function"
         ? window.EAP_gameSlotsPhase1(lessonSlotsForActiveSegment())
@@ -3048,21 +3114,11 @@
             ${games.map((g) => gameListItemHtml(g, MOCK)).join("")}
           </ul>
         </div>
-        <div class="tlive-games-panel__actions">
-          <a class="btn-primary" href="${escapeHtml(builderHref)}">${escapeHtml(t("tlive_open_builder"))}</a>
-        </div>
         <p class="tlive-disclaimer">${escapeHtml(t("tlive_saved_games_hint"))}</p>
       </div>
     `;
 
-    bindGameListActions(
-      canvas,
-      (id) => loadGame(id),
-      () => {
-        showGamesToast(t("tlive_game_deleted"));
-        renderGamesLibrary();
-      },
-    );
+    bindGameListActions(canvas, (id) => loadGame(id));
     canvas.querySelectorAll("[data-lesson-game]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const gameId = btn.getAttribute("data-lesson-game");
@@ -3093,6 +3149,14 @@
   function loadGame(gameId, opts) {
     const MOCK = getMock();
     if (!MOCK) return;
+    try {
+      const cached = window.sessionStorage?.getItem("eap_last_lesson_html");
+      if (cached && typeof window.EAP_syncLessonSlotsFromHtml === "function") {
+        window.EAP_syncLessonSlotsFromHtml(cached);
+      }
+    } catch (_) {
+      /* ignore */
+    }
     const games = getSavedGamesList();
     const game = games.find((g) => g.id === gameId);
     if (!game) return;
@@ -3347,6 +3411,11 @@
         if (active) await showDisplayLibraryItem(active, true);
       } else {
         renderWelcome(ctx);
+      }
+      const urlTool = new URLSearchParams(window.location.search).get("tool");
+      if (urlTool === "games") {
+        setActiveTool("games");
+        showGamesTool();
       }
     })();
   }

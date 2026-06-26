@@ -87,7 +87,9 @@
   }
 
   function setAiQuestionCache(tool, question) {
+    const prev = global.__tliveAiQuestionCache || {};
     global.__tliveAiQuestionCache = {
+      ...prev,
       fingerprint: lessonHtmlFingerprint(getLessonHtmlCached()),
       [tool]: question,
     };

@@ -555,6 +555,22 @@ Rules:
 - Exactly one clearly correct answer (correctIndex 0-3).
 - Exactly 3 or 4 options. No trick questions."""
 
+_LIVE_GAME_SYSTEM = """You are an EAP classroom game designer. Given lesson HTML text, write ONE multiple-choice question for a team classroom game (board race, quiz battle, etc.).
+Return ONLY valid JSON:
+{
+  "textEn": "question in English",
+  "textZh": "same question in Chinese",
+  "optionsEn": ["option A", "option B", "option C", "option D"],
+  "optionsZh": ["Chinese A", "Chinese B", "Chinese C", "Chinese D"],
+  "correctIndex": 0
+}
+Rules:
+- Question MUST relate directly to the lesson topic, vocabulary, or skills (not generic academic-writing trivia).
+- Suitable for fast team competition (30–60 seconds).
+- Exactly one clearly correct answer (correctIndex 0-3).
+- Exactly 3 or 4 options, distinct and plausible.
+- MUST NOT repeat or closely paraphrase any question listed under "Avoid these questions"."""
+
 
 def _lesson_plain_text_from_html(html: str, max_chars: int = _MAX_LIVE_LESSON_TEXT) -> str:
     text = str(html or "")
@@ -605,19 +621,48 @@ def generate_live_question_from_html(
     html: str,
     *,
     tool: str = "poll",
+    question_index: int = 0,
+    avoid_questions: list[str] | None = None,
     provider: str | None = None,
 ) -> dict[str, Any]:
-    """Generate one poll/quiz MCQ from pushed lesson HTML (Live Teaching LT-M3)."""
+    """Generate one poll/quiz/game MCQ from pushed lesson HTML (Live Teaching LT-M3)."""
     lesson_text = _lesson_plain_text_from_html(html)
     if len(lesson_text) < 80:
         raise ValueError("Lesson HTML has too little text to generate a question")
 
     kind = str(tool or "poll").strip().lower()
-    if kind not in ("poll", "quiz"):
+    if kind not in ("poll", "quiz", "game"):
         kind = "poll"
-    system = _LIVE_POLL_SYSTEM if kind == "poll" else _LIVE_QUIZ_SYSTEM
+    if kind == "game":
+        system = _LIVE_GAME_SYSTEM
+    elif kind == "quiz":
+        system = _LIVE_QUIZ_SYSTEM
+    else:
+        system = _LIVE_POLL_SYSTEM
+
+    try:
+        q_idx = int(question_index)
+    except (TypeError, ValueError):
+        q_idx = 0
+    q_idx = max(0, q_idx)
+
+    avoid_lines: list[str] = []
+    for raw in avoid_questions or []:
+        line = str(raw or "").strip()
+        if line and line not in avoid_lines:
+            avoid_lines.append(line)
+    avoid_block = ""
+    if avoid_lines:
+        avoid_block = (
+            "Avoid these questions (already used for poll, quiz, or other game rounds):\n"
+            + "\n".join(f"- {line}" for line in avoid_lines[:16])
+            + "\n\n"
+        )
+
     user_prompt = (
         f"Tool: {kind}\n"
+        f"Question number: {q_idx + 1}\n"
+        f"{avoid_block}"
         f"Lesson text (from HTML on screen):\n{lesson_text}\n\n"
         "Write one question students can answer in 30–60 seconds."
     )

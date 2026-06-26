@@ -539,13 +539,25 @@ def register_live_teaching_routes(app):
         body = request.get_json(silent=True) or {}
         html = str(body.get("html") or body.get("lesson_html") or "").strip()
         tool = str(body.get("tool") or "poll").strip().lower()
+        question_index = body.get("question_index", 0)
+        raw_avoid = body.get("avoid_questions") or []
+        avoid_questions = (
+            [str(x).strip() for x in raw_avoid if str(x).strip()]
+            if isinstance(raw_avoid, list)
+            else []
+        )
         if not html:
             return jsonify({"error": "html is required"}), 400
         if len(html) > 200_000:
             return jsonify({"error": "html too large"}), 400
 
         try:
-            result = generate_live_question_from_html(html, tool=tool)
+            result = generate_live_question_from_html(
+                html,
+                tool=tool,
+                question_index=question_index,
+                avoid_questions=avoid_questions,
+            )
             return jsonify(result)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400

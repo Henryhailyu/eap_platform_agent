@@ -2,97 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Game Builder — EAP Platform" />
-    <title>Game Builder — EAP Platform</title>
-    <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="css/teacher-live.css" />
+    <meta http-equiv="refresh" content="0;url=teacher-live.html" />
+    <title>Redirect — Live Teaching</title>
+    <script>
+      (function () {
+        var q = window.location.search || "";
+        var sep = q.indexOf("?") === 0 ? "&" : "?";
+        var target = "teacher-live.html" + q + (q ? sep : "?") + "tool=games";
+        window.location.replace(target);
+      })();
+    </script>
   </head>
-  <body class="page-app eap-shell-active" data-page="teacher-game-builder">
-    <div id="page-shell" class="page-shell">
-      <div class="page-overlay">
-        <header class="site-header">
-          <div class="site-header__inner">
-            <a class="site-logo" href="teacher.html"
-              ><span data-i18n="brand">EAP Platform</span
-              ><span class="eap-build-badge" data-i18n="build_badge">Agent build</span></a
-            >
-            <div class="site-header__actions">
-              <button type="button" id="lang-toggle" class="btn-lang" aria-label="Switch language">中文</button>
-              <p class="site-welcome" id="header-welcome" aria-live="polite"><span data-i18n="welcome">Welcome,</span></p>
-              <button type="button" class="btn-logout" id="logout-btn" data-i18n="logout">Logout</button>
-            </div>
-          </div>
-        </header>
-
-        <div class="tlive-page tgb-page">
-          <div class="tlive-topbar">
-            <div>
-              <a class="tlive-back" href="teacher-live.html" data-i18n="tgb_back_live">← Live teaching</a>
-              <h1 data-i18n="tgb_title">Game Builder</h1>
-              <p class="tlive-topbar__meta" data-i18n="tgb_subtitle">Choose a template, mock-generate, save to your class library</p>
-            </div>
-            <a id="tgb-open-live" class="btn-primary" href="teacher-live.html" data-i18n="tgb_open_live">Open Live Teaching</a>
-          </div>
-
-          <nav class="tgb-progress" aria-label="Steps">
-            <span id="tgb-progress-templates" class="tgb-progress__dot tgb-progress__dot--active" data-i18n="tgb_step_templates">1. Templates</span>
-            <span id="tgb-progress-design" class="tgb-progress__dot" data-i18n="tgb_step_design">2. Design</span>
-            <span id="tgb-progress-preview" class="tgb-progress__dot" data-i18n="tgb_step_preview">3. Preview & save</span>
-          </nav>
-
-          <main class="tgb-main">
-            <section id="tgb-step-templates" class="tgb-panel">
-              <h2 data-i18n="tgb_pick_template">Pick one of 15 game templates</h2>
-              <div id="tgb-template-grid" class="tgb-template-grid" role="list"></div>
-              <div class="tgb-actions">
-                <button type="button" id="tgb-to-design" class="btn-primary" disabled data-i18n="tgb_continue">Continue</button>
-              </div>
-            </section>
-
-            <section id="tgb-step-design" class="tgb-panel hidden">
-              <h2 data-i18n="tgb_design_title">Design your game</h2>
-              <p class="tgb-selected-label">
-                <span data-i18n="tgb_selected">Template:</span>
-                <strong id="tgb-selected-template">—</strong>
-              </p>
-              <label class="tgb-field">
-                <span data-i18n="tgb_topic_label">Lesson topic / material</span>
-                <input type="text" id="tgb-topic" maxlength="200" placeholder="e.g. Academic hedging language" data-i18n-placeholder="tgb_topic_ph" />
-              </label>
-              <label class="tgb-field">
-                <span data-i18n="tgb_class_label">Class code</span>
-                <input type="text" id="tgb-class" maxlength="32" value="EAP047" />
-              </label>
-              <p class="tlive-disclaimer" data-i18n="tgb_mock_note">Mock AI only — no API key. Real AI comes in Phase K.</p>
-              <div class="tgb-actions">
-                <button type="button" id="tgb-back-templates" class="btn-secondary" data-i18n="tgb_back">Back</button>
-                <button type="button" id="tgb-generate" class="btn-primary" data-i18n="tgb_generate">Generate (mock)</button>
-              </div>
-            </section>
-
-            <section id="tgb-step-preview" class="tgb-panel hidden">
-              <h2 data-i18n="tgb_preview_title">Preview & save</h2>
-              <div id="tgb-preview-box" class="tgb-preview-box"></div>
-              <p id="tgb-save-msg" class="tgb-save-msg hidden" role="status"></p>
-              <div class="tgb-actions">
-                <button type="button" id="tgb-back-design" class="btn-secondary" data-i18n="tgb_back">Back</button>
-                <button type="button" id="tgb-regenerate" class="btn-secondary" data-i18n="tgb_regenerate">Regenerate</button>
-                <button type="button" id="tgb-save" class="btn-primary" data-i18n="tgb_save">Save to library</button>
-              </div>
-            </section>
-          </main>
-        </div>
-      </div>
-    </div>
-    <script src="js/i18n/en.js"></script>
-    <script src="js/i18n/zh.js"></script>
-    <script src="js/i18n-core.js"></script>
-    <script src="js/pilot-wake.js"></script>
-    <script src="js/site-icp-footer.js"></script>
-    <script src="api-config.js"></script>
-    <script src="app.js"></script>
-    <script src="js/teacher-game-builder-mock.js"></script>
-    <script src="js/teacher-game-builder.js"></script>
+  <body>
+    <p><a href="teacher-live.html?tool=games">Open Live Teaching — Class activities</a></p>
   </body>
 </html>
