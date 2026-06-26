@@ -65,8 +65,18 @@
   }
 
   /** LT-M1: question from lesson slot / AI cache, else mock when no lesson HTML. */
-  function pickLaunchQuestion(MOCK, index) {
+  function pickLaunchQuestion(MOCK, index, gameId) {
     if (window.__tliveOverrideQuestion) return window.__tliveOverrideQuestion;
+    const gid = gameId || window.__tliveActiveGameId || "";
+    if (gid) {
+      const slots = lessonSlotsForActiveSegment().filter(
+        (s) => s.tool === "game" && String(s.gameId) === String(gid),
+      );
+      if (slots.length && typeof window.EAP_slotToLaunchQuestion === "function") {
+        const q = window.EAP_slotToLaunchQuestion(slots[0]);
+        if (q) return q;
+      }
+    }
     const GQ = window.EAP_LIVE_GAME_QUESTIONS;
     if (GQ && typeof GQ.resolveSync === "function") {
       const q = GQ.resolveSync(MOCK, index);
@@ -139,7 +149,7 @@
 
   function resolveGameQuestionForRender(MOCK, index, rerender) {
     syncLiveLessonFromActiveSource();
-    const q = pickLaunchQuestion(MOCK, index);
+    const q = pickLaunchQuestion(MOCK, index, window.__tliveActiveGameId);
     if (q) return { q, pending: false };
     if (lessonHtmlAvailable() && maybeFetchGameQuestion(index, rerender)) {
       return { q: null, pending: true };
@@ -319,6 +329,7 @@
   }
 
   async function mountPollQuizForTool(tool, MOCK) {
+    await ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 12000 });
     syncLiveLessonFromActiveSource();
     void ensureLiveLessonSynced({ timeoutMs: 12000 });
     const fp =
@@ -507,20 +518,45 @@
     const resolved = resolveGameQuestionForRender(MOCK, idx, () =>
       renderBoardRace(boardState, idx),
     );
-    if (guardGameQuestionCanvas(resolved, canvas)) return;
-    const q = resolved.q;
-
     const state = boardState || MOCK.createBoardState();
-    const opts = MOCK.questionOptions(q);
     const lastEvent = MOCK.formatLastEvent(state, t);
     const winnerTeam = state.winnerId ? state.teams.find((x) => x.id === state.winnerId) : null;
     const winnerBanner = winnerTeam
       ? `<div class="tlive-board-winner" role="status">${escapeHtml(t("tlive_board_winner", { team: MOCK.teamName(winnerTeam) }))}</div>`
       : "";
-
     const teamOptions = state.teams
       .map((team, i) => `<option value="${i}">${escapeHtml(MOCK.teamName(team))}</option>`)
       .join("");
+
+    if (resolved.pending && !resolved.q) {
+      canvas.className = "tlive-canvas__inner tlive-canvas__inner--board tlive-canvas__inner--stage";
+      canvas.innerHTML = `
+      <div class="tlive-board tlive-board--race">
+        <header class="tlive-board__head">
+          <h2 class="tlive-board__title">${escapeHtml(t("tlive_board_race_title"))}</h2>
+          <p class="tlive-board__round">${escapeHtml(t("tlive_board_round", { round: String(state.round) }))}</p>
+        </header>
+        ${winnerBanner}
+        <div class="tlive-board__track-wrap">
+          ${MOCK.renderTrackMarkup(state, escapeHtml)}
+        </div>
+        <div class="tlive-question-box">${gameQuestionLoadingHtml()}</div>
+        <div class="tlive-board__controls">
+          <button type="button" class="btn-secondary" id="tlive-reset-board">${escapeHtml(t("tlive_board_reset"))}</button>
+        </div>
+      </div>`;
+      document.getElementById("tlive-reset-board")?.addEventListener("click", () => {
+        if (!window.confirm(t("tlive_board_reset_confirm"))) return;
+        window.__tliveBoard = MOCK.createBoardState();
+        window.__tliveQuestionIndex = 0;
+        renderBoardRace(window.__tliveBoard, 0);
+      });
+      return;
+    }
+
+    if (guardGameQuestionCanvas(resolved, canvas)) return;
+    const q = resolved.q;
+    const opts = MOCK.questionOptions(q);
 
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--board tlive-canvas__inner--stage";
     canvas.innerHTML = `
@@ -1059,20 +1095,65 @@
   const displayLibrary = { items: [], activeId: null, className: "" };
 
   function resolveActiveLessonPageId() {
-    if (typeof window.EAP_getActiveLessonPageId === "function") {
-      const pid = window.EAP_getActiveLessonPageId();
-      if (pid) return String(pid);
-    }
     const activeId = displayLibrary.activeId;
     if (activeId && displayLibrary.items.length) {
-      const item = displayLibrary.items.find((i) => i.id === activeId);
+      const item = displayLibrary.items.find((i) => String(i.id) === String(activeId));
       if (item && item.item_type === "html" && item.page_id) {
         return String(item.page_id);
       }
     }
+    if (typeof window.EAP_getActiveLessonPageId === "function") {
+      const pid = window.EAP_getActiveLessonPageId();
+      if (pid) return String(pid);
+    }
     return window.__tliveLessonPageId != null && window.__tliveLessonPageId !== ""
       ? String(window.__tliveLessonPageId)
       : "";
+  }
+
+  async function ensureLessonHtmlForActiveDisplayItem(opts) {
+    const options = opts && typeof opts === "object" ? opts : {};
+    const activeId = displayLibrary.activeId;
+    if (!activeId) return syncLiveLessonFromActiveSource();
+    const item = displayLibrary.items.find((i) => String(i.id) === String(activeId));
+    if (!item || item.item_type !== "html" || !item.page_id) {
+      return syncLiveLessonFromActiveSource();
+    }
+    const pageId = String(item.page_id);
+    const cache = window.__tliveLessonCache;
+    if (
+      cache &&
+      cache.type === "html" &&
+      String(cache.pageId) === pageId &&
+      cache.html &&
+      cache.html.length >= 80
+    ) {
+      refreshLessonSlotsFromHtml(cache.html, pageId);
+      return true;
+    }
+    if (options.localOnly) return syncLiveLessonFromActiveSource();
+    const tapi = window.EAP_TEACHER_TEACHING_PAGES;
+    if (!tapi || typeof tapi.getPage !== "function") return syncLiveLessonFromActiveSource();
+    const waitMs = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0 ? options.timeoutMs : 12000;
+    try {
+      const pagePromise = tapi.getPage(pageId);
+      const page = await Promise.race([
+        pagePromise,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("lesson fetch timeout")), waitMs);
+        }),
+      ]);
+      const html = page && page.html_content ? String(page.html_content) : "";
+      if (html.length < 80) return syncLiveLessonFromActiveSource();
+      const title = (page && page.title ? String(page.title) : item.title || "").trim();
+      window.__tliveLessonOnStage = true;
+      window.__tliveLessonPageId = pageId;
+      window.__tliveLessonCache = { type: "html", html, title, pageId };
+      refreshLessonSlotsFromHtml(html, pageId);
+      return true;
+    } catch (_) {
+      return syncLiveLessonFromActiveSource();
+    }
   }
 
   window.EAP_resolveActiveLessonPageId = resolveActiveLessonPageId;
@@ -1784,6 +1865,7 @@
     window.__tliveRanking = null;
     window.__tliveQuestionIndex = 0;
     window.__tliveOverrideQuestion = null;
+    window.__tliveActiveGameId = null;
   }
 
   function renderQuizBattle(state) {
@@ -3259,6 +3341,7 @@
       opts && opts.question ? opts.question : window.__tliveOverrideQuestion || null;
     setActiveTool("games");
     clearLiveGameState();
+    window.__tliveActiveGameId = game.id;
     if (keepQuestion) window.__tliveOverrideQuestion = keepQuestion;
     if (game.type === "board_race" || game.id === "board-race") {
       window.__tliveBoard = MOCK.createBoardState();
@@ -3356,27 +3439,13 @@
       </li>`;
   }
 
-  function bindGameListActions(root, onPick) {
-    if (!root) return;
-    root.querySelectorAll("[data-game]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-game");
-        if (id) onPick(id);
-      });
-    });
-  }
-
-  function renderGamesLibrary() {
-    const MOCK = getMock();
-    const canvas = document.getElementById("tlive-canvas-inner");
-    if (!canvas || !MOCK) return;
-    const games = getSavedGamesList();
+  function buildSuggestedGamesBlockHtml(MOCK, games) {
     const gameSlots =
       typeof window.EAP_gameSlotsPhase1 === "function"
         ? window.EAP_gameSlotsPhase1(lessonSlotsForActiveSegment())
         : [];
-    const suggestedBlock = gameSlots.length
-      ? `<section class="tlive-lesson-games">
+    if (!gameSlots.length) return "";
+    return `<section class="tlive-lesson-games">
           <h3 class="tlive-lesson-games__title">${escapeHtml(t("tlive_lesson_games_heading"))}</h3>
           <p class="tlive-lesson-games__lead">${escapeHtml(t("tlive_lesson_games_lead"))}</p>
           <ul class="tlive-lesson-games__list">
@@ -3393,8 +3462,72 @@
               })
               .join("")}
           </ul>
-        </section>`
-      : "";
+        </section>`;
+  }
+
+  function patchGamesLibrarySuggested() {
+    if (!isGamesLibraryView()) return;
+    const MOCK = getMock();
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!MOCK || !canvas) return;
+    const panel = canvas.querySelector(".tlive-games-panel");
+    if (!panel) return;
+    const games = getSavedGamesList();
+    const html = buildSuggestedGamesBlockHtml(MOCK, games);
+    const existing = panel.querySelector(".tlive-lesson-games");
+    if (html) {
+      if (existing) existing.outerHTML = html;
+      else {
+        const toast = panel.querySelector("#tlive-games-toast");
+        const insertBefore = toast ? toast.nextSibling : panel.querySelector(".tlive-games-panel__scroll");
+        if (insertBefore) {
+          insertBefore.insertAdjacentHTML("beforebegin", html);
+        }
+      }
+    } else if (existing) {
+      existing.remove();
+    }
+  }
+
+  function pickGameFromCanvasClick(ev) {
+    const lessonBtn = ev.target.closest("[data-lesson-game]");
+    if (lessonBtn) {
+      const gameId = lessonBtn.getAttribute("data-lesson-game");
+      const slotId = lessonBtn.getAttribute("data-slot-id");
+      const slot = (window.__tliveLessonSlots || []).find((s) => String(s.id) === String(slotId));
+      let launchQ = null;
+      if (slot && typeof window.EAP_slotToLaunchQuestion === "function") {
+        launchQ = window.EAP_slotToLaunchQuestion(slot);
+      }
+      if (gameId) loadGame(gameId, { question: launchQ });
+      return;
+    }
+    const gameBtn = ev.target.closest("[data-game]");
+    if (gameBtn) {
+      const id = gameBtn.getAttribute("data-game");
+      if (id) loadGame(id);
+    }
+  }
+
+  function bindGamesCanvasDelegation() {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas || canvas.dataset.tliveGamesBound === "1") return;
+    canvas.dataset.tliveGamesBound = "1";
+    canvas.addEventListener("click", (ev) => {
+      if (!ev.target.closest("[data-game], [data-lesson-game]")) return;
+      ev.preventDefault();
+      pickGameFromCanvasClick(ev);
+    });
+  }
+
+  function bindGamesCanvasDelegation() {
+    const force = !!(opts && opts.force);
+    if (!force && isLiveGameActive()) return;
+    const MOCK = getMock();
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas || !MOCK) return;
+    const games = getSavedGamesList();
+    const suggestedBlock = buildSuggestedGamesBlockHtml(MOCK, games);
 
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
     canvas.innerHTML = `
@@ -3412,19 +3545,6 @@
       </div>
     `;
 
-    bindGameListActions(canvas, (id) => loadGame(id));
-    canvas.querySelectorAll("[data-lesson-game]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const gameId = btn.getAttribute("data-lesson-game");
-        const slotId = btn.getAttribute("data-slot-id");
-        const slot = (window.__tliveLessonSlots || []).find((s) => String(s.id) === String(slotId));
-        let launchQ = null;
-        if (slot && typeof window.EAP_slotToLaunchQuestion === "function") {
-          launchQ = window.EAP_slotToLaunchQuestion(slot);
-        }
-        loadGame(gameId, { question: launchQ });
-      });
-    });
   }
 
   function showGamesToast(text) {
@@ -3442,12 +3562,14 @@
   function showGamesTool() {
     syncLiveLessonFromActiveSource();
     stopLiveTimerIfMounted();
+    window.__tliveGameLaunchingId = null;
     clearLiveGameState();
-    renderGamesLibrary();
+    renderGamesLibrary({ force: true });
     const gen = (window.__tliveGamesLibraryRefreshGen = (window.__tliveGamesLibraryRefreshGen || 0) + 1);
-    void ensureLiveLessonSynced({ timeoutMs: 12000 }).then((ok) => {
+    void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 12000 }).then((ok) => {
       if (gen !== window.__tliveGamesLibraryRefreshGen) return;
-      if (ok && isGamesLibraryView()) renderGamesLibrary();
+      if (!ok || !isGamesLibraryView()) return;
+      patchGamesLibrarySuggested();
     });
   }
 
@@ -3459,9 +3581,16 @@
       window.__tliveGameLaunchingId = null;
       return;
     }
-    if (!syncLiveLessonFromActiveSource() && !(window.__tliveLessonSlots || []).length) {
-      showGamesToast(t("tlive_pq_no_lesson_html"));
-      window.__tliveGameLaunchingId = null;
+    syncLiveLessonFromActiveSource();
+    if (!(window.__tliveLessonSlots || []).length) {
+      void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 8000 }).then(() => {
+        if (!(window.__tliveLessonSlots || []).length) {
+          showGamesToast(t("tlive_pq_no_lesson_html"));
+          window.__tliveGameLaunchingId = null;
+          return;
+        }
+        loadGame(gameId, opts);
+      });
       return;
     }
     const games = getSavedGamesList();
@@ -3475,7 +3604,7 @@
       launchSelectedGame(game, MOCK, opts);
     } catch (err) {
       showGamesToast((err && err.message) || t("tlive_game_ai_failed"));
-      if (isGamesLibraryView()) renderGamesLibrary();
+      if (isGamesLibraryView()) renderGamesLibrary({ force: true });
       window.__tliveGameLaunchingId = null;
       return;
     }
@@ -3485,7 +3614,7 @@
       game.type === "matching_race" ||
       game.id === "matching-race";
     if (!asyncVocab) window.__tliveGameLaunchingId = null;
-    void ensureLiveLessonSynced({ timeoutMs: 12000 });
+    void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 12000 });
   }
 
   function renderNameWheelTool(ctx) {
@@ -3633,6 +3762,7 @@
 
     bindToolbar(ctx);
     bindModal();
+    bindGamesCanvasDelegation();
     if (!window.__tliveMessageBound) {
       window.__tliveMessageBound = true;
       window.addEventListener("message", (ev) => {
@@ -3685,7 +3815,7 @@
         tool === "games" &&
         isGamesLibraryView()
       ) {
-        renderGamesLibrary();
+        renderGamesLibrary({ force: true });
       } else if (window.__tliveBoard) {
         renderBoardRace(window.__tliveBoard, window.__tliveQuestionIndex || 0);
       } else if (window.__tliveBingo) {
