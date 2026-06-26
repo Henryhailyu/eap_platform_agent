@@ -58,7 +58,11 @@
     result: null,
     error: null,
     listeningAudioEnded: false,
+    listeningAudioRefreshing: false,
+    listeningAudioRefreshAttempted: false,
   };
+
+  const speechCtl = { idx: 0, playing: false, segments: [], voice: null };
 
   function redirectIfDisabled() {
     if (window.EAP_SELF_STUDY_ENABLED === false) {
@@ -209,6 +213,7 @@
     state.answers = {};
     state.listeningNotes = "";
     state.listeningPlays = 0;
+    state.listeningAudioRefreshAttempted = false;
     state.speaking = {};
     state.writingText = "";
     state.result = null;
@@ -300,27 +305,219 @@
     render();
   }
 
+  function hasServerListeningAudio(audio) {
+    if (!audio) return false;
+    if (audio.url) return true;
+    return !!(
+      audio.playlist &&
+      Array.isArray(audio.segments) &&
+      audio.segments.some((seg) => seg && seg.url)
+    );
+  }
+
+  function speechSupported() {
+    return !!(globalThis.speechSynthesis && globalThis.SpeechSynthesisUtterance);
+  }
+
+  function pickSpeechVoice(gender) {
+    const voices = globalThis.speechSynthesis.getVoices();
+    const g = String(gender || "female").toLowerCase();
+    const preferMale = g === "male";
+    const enGb = voices.filter((v) => /en-gb/i.test(v.lang || ""));
+    const enAny = voices.filter((v) => /^en/i.test(v.lang || ""));
+    const pool = enGb.length ? enGb : enAny.length ? enAny : voices;
+    const named = pool.find((v) => {
+      const n = (v.name || "").toLowerCase();
+      return preferMale ? /male|daniel|james|arthur|guy/.test(n) : /female|zira|sonia|hazel|samantha/.test(n);
+    });
+    return named || pool[0] || null;
+  }
+
+  function stopBrowserSpeech() {
+    speechCtl.playing = false;
+    if (globalThis.speechSynthesis) globalThis.speechSynthesis.cancel();
+  }
+
+  function segmentPartLabel(index) {
+    return t("self_study_listening_segment_part", { n: String(index + 1) });
+  }
+
+  function speakPlacementSegmentAt(root, index) {
+    const seg = speechCtl.segments[index];
+    if (!seg || !seg.text) return;
+    const utter = new globalThis.SpeechSynthesisUtterance(seg.text);
+    utter.lang = "en-GB";
+    utter.rate = 0.92;
+    if (speechCtl.voice) utter.voice = speechCtl.voice;
+    utter.onend = () => {
+      if (!speechCtl.playing) return;
+      if (index + 1 < speechCtl.segments.length) {
+        speechCtl.idx = index + 1;
+        root.querySelectorAll(".ssc-audio-seg-btn").forEach((btn) => {
+          btn.classList.toggle(
+            "ssc-audio-seg-btn--active",
+            parseInt(btn.getAttribute("data-seg"), 10) === speechCtl.idx,
+          );
+        });
+        speakPlacementSegmentAt(root, speechCtl.idx);
+      } else {
+        speechCtl.playing = false;
+        state.listeningAudioEnded = true;
+        const playBtn = root.querySelector("#ssc-speech-play");
+        const pauseBtn = root.querySelector("#ssc-speech-pause");
+        const stopBtn = root.querySelector("#ssc-speech-stop");
+        if (playBtn) playBtn.disabled = false;
+        if (pauseBtn) pauseBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = true;
+      }
+    };
+    utter.onerror = () => {
+      speechCtl.playing = false;
+    };
+    globalThis.speechSynthesis.speak(utter);
+  }
+
+  function browserListeningPlayerHtml(segments) {
+    const limit = state.exam?.listening?.audioPlayLimit ?? 1;
+    const playsLeft = Math.max(0, limit - state.listeningPlays);
+    const list = segments
+      .map(
+        (_, i) =>
+          `<li><button type="button" class="ssc-audio-seg-btn${i === 0 ? " ssc-audio-seg-btn--active" : ""}" data-seg="${i}" aria-label="${escapeHtml(segmentPartLabel(i))}">${escapeHtml(segmentPartLabel(i))}</button></li>`,
+      )
+      .join("");
+    return `
+      <div class="ssc-audio-player" id="ssc-placement-speech-wrap">
+        <p class="ssc-audio-player__label">${escapeHtml(t("self_study_placement_listen_once", { left: String(playsLeft) }))}</p>
+        <p class="ssc-audio-player__label">${escapeHtml(t("self_study_listening_browser_play"))}</p>
+        <div class="ssc-listening-speech-controls">
+          <button type="button" class="btn-primary" id="ssc-speech-play">${escapeHtml(t("self_study_listening_play"))}</button>
+          <button type="button" class="btn-secondary" id="ssc-speech-pause" disabled>${escapeHtml(t("self_study_listening_pause"))}</button>
+          <button type="button" class="btn-secondary" id="ssc-speech-stop" disabled>${escapeHtml(t("self_study_listening_stop"))}</button>
+        </div>
+        <p class="ssc-disclaimer ssc-listening-speech-hint">${escapeHtml(t("self_study_listening_browser_hint"))}</p>
+        <p class="ssc-audio-playlist__heading">${escapeHtml(t("self_study_listening_segments_heading"))}</p>
+        <ol class="ssc-audio-playlist">${list}</ol>
+      </div>
+    `;
+  }
+
+  function bindPlacementBrowserSpeech(root, segments) {
+    if (!speechSupported() || !segments || !segments.length) return;
+    speechCtl.segments = segments;
+    speechCtl.idx = 0;
+    speechCtl.playing = false;
+    const limit = state.exam?.listening?.audioPlayLimit ?? 1;
+
+    const refreshVoice = () => {
+      speechCtl.voice = pickSpeechVoice(speechCtl.segments[speechCtl.idx]?.gender);
+    };
+    refreshVoice();
+    if (globalThis.speechSynthesis.onvoiceschanged !== undefined) {
+      globalThis.speechSynthesis.onvoiceschanged = refreshVoice;
+    }
+    globalThis.speechSynthesis.getVoices();
+
+    const playBtn = root.querySelector("#ssc-speech-play");
+    const pauseBtn = root.querySelector("#ssc-speech-pause");
+    const stopBtn = root.querySelector("#ssc-speech-stop");
+
+    const updatePlayLabel = () => {
+      const label = root.querySelector("#ssc-placement-speech-wrap .ssc-audio-player__label");
+      const playsLeft = Math.max(0, limit - state.listeningPlays);
+      if (label) label.textContent = t("self_study_placement_listen_once", { left: String(playsLeft) });
+    };
+
+    playBtn?.addEventListener("click", () => {
+      if (state.listeningPlays >= limit) return;
+      if (speechCtl.playing && globalThis.speechSynthesis.paused) {
+        globalThis.speechSynthesis.resume();
+        return;
+      }
+      stopBrowserSpeech();
+      if (state.listeningPlays >= limit) return;
+      state.listeningPlays += 1;
+      updatePlayLabel();
+      speechCtl.playing = true;
+      speechCtl.voice = pickSpeechVoice(speechCtl.segments[speechCtl.idx]?.gender);
+      globalThis.speechSynthesis.getVoices();
+      if (pauseBtn) pauseBtn.disabled = false;
+      if (stopBtn) stopBtn.disabled = false;
+      globalThis.setTimeout(() => {
+        if (speechCtl.playing) speakPlacementSegmentAt(root, speechCtl.idx);
+      }, 0);
+    });
+
+    pauseBtn?.addEventListener("click", () => {
+      if (globalThis.speechSynthesis.speaking && !globalThis.speechSynthesis.paused) {
+        globalThis.speechSynthesis.pause();
+      }
+    });
+
+    stopBtn?.addEventListener("click", () => {
+      stopBrowserSpeech();
+      speechCtl.idx = 0;
+      if (playBtn) playBtn.disabled = state.listeningPlays >= limit;
+      if (pauseBtn) pauseBtn.disabled = true;
+      if (stopBtn) stopBtn.disabled = true;
+      root.querySelectorAll(".ssc-audio-seg-btn").forEach((btn) => btn.classList.remove("ssc-audio-seg-btn--active"));
+    });
+
+    root.querySelectorAll(".ssc-audio-seg-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (state.listeningPlays >= limit && !speechCtl.playing) return;
+        stopBrowserSpeech();
+        speechCtl.idx = parseInt(btn.getAttribute("data-seg"), 10);
+        if (state.listeningPlays < limit) {
+          state.listeningPlays += 1;
+          updatePlayLabel();
+        }
+        speechCtl.playing = true;
+        speechCtl.voice = pickSpeechVoice(speechCtl.segments[speechCtl.idx]?.gender);
+        if (pauseBtn) pauseBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = false;
+        root.querySelectorAll(".ssc-audio-seg-btn").forEach((b) => {
+          b.classList.toggle("ssc-audio-seg-btn--active", b === btn);
+        });
+        speakPlacementSegmentAt(root, speechCtl.idx);
+      });
+    });
+  }
+
   function listeningPlayerHtml() {
     const audio = state.exam?.listening?.audio;
     const limit = state.exam?.listening?.audioPlayLimit ?? 1;
     const playsLeft = Math.max(0, limit - state.listeningPlays);
-    if (audio?.playlist && Array.isArray(audio.segments) && audio.segments.length) {
-      const first = audio.segments.find((s) => s?.url);
-      const src = first ? escapeHtml(first.url) : "";
-      return `
-        <div class="ssc-audio-player">
-          <p class="ssc-audio-player__label">${escapeHtml(t("self_study_placement_listen_once", { left: String(playsLeft) }))}</p>
-          <audio id="ssc-placement-listen-audio" class="ssc-audio-player__el" preload="auto" ${src ? `src="${src}"` : ""} controls></audio>
-        </div>
-      `;
+    if (hasServerListeningAudio(audio)) {
+      if (audio.playlist && Array.isArray(audio.segments) && audio.segments.length) {
+        const first = audio.segments.find((s) => s?.url);
+        const src = first ? escapeHtml(first.url) : "";
+        return `
+          <div class="ssc-audio-player">
+            <p class="ssc-audio-player__label">${escapeHtml(t("self_study_placement_listen_once", { left: String(playsLeft) }))}</p>
+            <audio id="ssc-placement-listen-audio" class="ssc-audio-player__el" preload="auto" ${src ? `src="${src}"` : ""} controls></audio>
+          </div>
+        `;
+      }
+      if (audio.url) {
+        return `
+          <div class="ssc-audio-player">
+            <p class="ssc-audio-player__label">${escapeHtml(t("self_study_placement_listen_once", { left: String(playsLeft) }))}</p>
+            <audio id="ssc-placement-listen-audio" class="ssc-audio-player__el" preload="auto" src="${escapeHtml(audio.url)}" controls></audio>
+          </div>
+        `;
+      }
     }
-    if (audio?.url) {
-      return `
-        <div class="ssc-audio-player">
-          <p class="ssc-audio-player__label">${escapeHtml(t("self_study_placement_listen_once", { left: String(playsLeft) }))}</p>
-          <audio id="ssc-placement-listen-audio" class="ssc-audio-player__el" preload="auto" src="${escapeHtml(audio.url)}" controls></audio>
-        </div>
-      `;
+    const playbackSegments = state.exam?.listening?.playbackSegments;
+    if (playbackSegments?.length && speechSupported()) {
+      return browserListeningPlayerHtml(playbackSegments);
+    }
+    if (state.listeningAudioRefreshing) {
+      return `<p class="ssc-disclaimer" role="status">${escapeHtml(t("self_study_listening_loading_short"))}</p>`;
+    }
+    const ttsOn = state.exam?.audioStatus?.tts;
+    if (ttsOn) {
+      return `<p class="ssc-disclaimer" role="status">${escapeHtml(t("self_study_listening_audio_generating"))}</p>`;
     }
     return `<p class="ssc-disclaimer">${escapeHtml(t("self_study_listening_no_audio"))}</p>`;
   }
@@ -371,6 +568,44 @@
     });
   }
 
+  async function refreshPlacementListeningAudio(root) {
+    if (hasServerListeningAudio(state.exam?.listening?.audio)) return;
+    const playbackSegments = state.exam?.listening?.playbackSegments;
+    if (playbackSegments?.length && speechSupported()) return;
+    if (state.listeningAudioRefreshAttempted || state.listeningAudioRefreshing) return;
+
+    const SERVER = window.EAP_SELF_STUDY_SERVER;
+    const examId = state.exam?.examId;
+    if (!SERVER?.refreshPlacementListeningAudio || !examId) return;
+
+    state.listeningAudioRefreshAttempted = true;
+    state.listeningAudioRefreshing = true;
+    const notes = state.listeningNotes;
+    const card = root.querySelector(".ssc-question-card");
+    if (card) {
+      const player = card.querySelector(".ssc-audio-player, .ssc-disclaimer");
+      if (player) {
+        player.outerHTML = `<p class="ssc-disclaimer" role="status">${escapeHtml(t("self_study_listening_loading_short"))}</p>`;
+      }
+    }
+
+    try {
+      const data = await SERVER.refreshPlacementListeningAudio(examId);
+      if (data?.audio) state.exam.listening.audio = data.audio;
+      if (data?.playbackSegments?.length) {
+        state.exam.listening.playbackSegments = data.playbackSegments;
+      }
+      if (data?.audioStatus) state.exam.audioStatus = data.audioStatus;
+    } catch (_) {
+      /* browser fallback or static message */
+    } finally {
+      state.listeningAudioRefreshing = false;
+      const notesAfter = state.listeningNotes;
+      renderListeningListen(root);
+      state.listeningNotes = notesAfter;
+    }
+  }
+
   function renderListeningListen(root) {
     const meta = SECTION_META.listening_listen;
     root.innerHTML = `
@@ -391,7 +626,15 @@
     root.querySelector("#ssc-listening-notes")?.addEventListener("input", (ev) => {
       state.listeningNotes = ev.target.value;
     });
-    bindListeningAudio(root);
+    const audio = state.exam?.listening?.audio;
+    const playbackSegments = state.exam?.listening?.playbackSegments;
+    if (hasServerListeningAudio(audio)) {
+      bindListeningAudio(root);
+    } else if (playbackSegments?.length && speechSupported()) {
+      bindPlacementBrowserSpeech(root, playbackSegments);
+    } else {
+      void refreshPlacementListeningAudio(root);
+    }
     document.getElementById("ssc-placement-listen-start")?.addEventListener("click", () => {
       state.section = "listening";
       state.qIndex = 0;
@@ -826,6 +1069,9 @@
     renderProgress();
     if (!(state.screen === "section" && state.section === "writing")) {
       clearTimers();
+    }
+    if (state.screen !== "section" || state.section !== "listening_listen") {
+      stopBrowserSpeech();
     }
     if (state.screen === "intro") renderIntro(root);
     else if (state.screen === "generating") renderGenerating(root);

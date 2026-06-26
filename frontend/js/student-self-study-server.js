@@ -60,6 +60,14 @@
     });
   }
 
+  async function refreshPlacementListeningAudio(examId) {
+    return apiFetch("/api/student/self-study/placement/listening-audio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ examId }),
+    });
+  }
+
   async function patchSettings(body) {
     return apiFetch("/api/student/self-study/settings", {
       method: "PATCH",
@@ -247,6 +255,7 @@
     savePlacement,
     generatePlacementExam,
     submitPlacementExam,
+    refreshPlacementListeningAudio,
     patchSettings,
     getDailyOverview,
     getVocabOverview,

@@ -17,7 +17,16 @@ from typing import Any, Callable
 from flask import jsonify, request
 
 from eap_ai import ai_is_configured, create_chat_completion, format_ai_error, get_openai_client, parse_ai_json_object
-from tencent_audio import asr_ready, ensure_listening_audio, ensure_speaking_prompt_audio, prepare_audio_for_tencent, recognize_speech, tts_ready
+from tencent_audio import (
+    asr_ready,
+    ensure_listening_audio,
+    ensure_speaking_prompt_audio,
+    ensure_tts_audio,
+    expand_playback_segments,
+    prepare_audio_for_tencent,
+    recognize_speech,
+    tts_ready,
+)
 
 log = logging.getLogger("eap.placement")
 
@@ -354,12 +363,74 @@ def _generate_exam_content_once() -> dict[str, Any]:
     }
 
 
+def _playback_segments_for_listening(listening: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = listening.get("segments")
+    if isinstance(raw, list) and raw:
+        expanded = expand_playback_segments(raw)
+        if expanded:
+            return expanded
+
+    script = str(listening.get("script_en") or "").strip()
+    if not script:
+        return []
+
+    dialogue_segs: list[dict[str, Any]] = []
+    for line in re.split(r"\n+", script):
+        line = line.strip()
+        if not line:
+            continue
+        match = re.match(r"^([A-Za-z][A-Za-z\s]{0,30}):\s*(.+)$", line)
+        if match:
+            speaker = match.group(1).strip()
+            lower = speaker.lower()
+            gender = "male" if lower in {"john", "mike", "tom", "james", "david", "mark", "peter"} else "female"
+            dialogue_segs.append(
+                {"speaker": speaker, "gender": gender, "text": match.group(2).strip()}
+            )
+        else:
+            dialogue_segs.append({"speaker": "Narrator", "gender": "female", "text": line})
+
+    if len(dialogue_segs) > 1:
+        return expand_playback_segments(dialogue_segs)
+    return expand_playback_segments([{"speaker": "Narrator", "gender": "female", "text": script}])
+
+
+def _audio_has_urls(audio: dict[str, Any] | None) -> bool:
+    if not audio:
+        return False
+    if audio.get("url"):
+        return True
+    segments = audio.get("segments")
+    if isinstance(segments, list):
+        return any(isinstance(seg, dict) and seg.get("url") for seg in segments)
+    return False
+
+
+def _placement_listening_slot(exam_id: str) -> int:
+    return abs(hash(exam_id)) % 10_000_000
+
+
 def _attach_listening_audio(exam: dict[str, Any], exam_id: str) -> None:
     listening = exam.get("listening") or {}
-    script = str(listening.get("script_en") or "")
-    segments = listening.get("segments") if isinstance(listening.get("segments"), list) else None
-    slot = abs(hash(exam_id)) % 10_000_000
-    audio = ensure_listening_audio(slot, script, segments=segments)
+    script = str(listening.get("script_en") or "").strip()
+    raw_segments = listening.get("segments") if isinstance(listening.get("segments"), list) else None
+    playback_segments = _playback_segments_for_listening(listening)
+    listening["playbackSegments"] = playback_segments
+    slot = _placement_listening_slot(exam_id)
+
+    audio: dict[str, Any] | None = None
+    if tts_ready() and (script or playback_segments):
+        audio = ensure_listening_audio(slot, script, segments=raw_segments)
+        if not _audio_has_urls(audio):
+            audio = ensure_listening_audio(slot, script, segments=playback_segments)
+        if not _audio_has_urls(audio):
+            try:
+                merged = script or " ".join(str(seg.get("text") or "") for seg in playback_segments).strip()
+                if merged:
+                    audio = ensure_tts_audio(f"placement/listening-{slot}.mp3", merged)
+            except Exception as exc:
+                log.warning("Placement listening single-file TTS failed: %s", exc)
+
     listening["audio"] = audio
     listening["audioPlayLimit"] = 1
     exam["listening"] = listening
@@ -413,6 +484,7 @@ def _strip_answers(exam: dict[str, Any]) -> dict[str, Any]:
             "scriptHint": "Listen once and take notes before answering.",
             "audio": listening.get("audio"),
             "audioPlayLimit": listening.get("audioPlayLimit", 1),
+            "playbackSegments": listening.get("playbackSegments") or [],
             "questions": strip_qs(listening.get("questions") or []),
         },
         "reading": {
@@ -552,12 +624,15 @@ def register_placement_routes(
             exam_body = _generate_exam_content()
             exam_id = str(uuid.uuid4())
             exam_body["examId"] = exam_id
-            if tts_ready():
-                try:
-                    _attach_listening_audio(exam_body, exam_id)
-                    _attach_speaking_audio(exam_body, exam_id)
-                except Exception as exc:
-                    log.warning("Placement TTS attach failed: %s", exc)
+            try:
+                _attach_listening_audio(exam_body, exam_id)
+                if tts_ready():
+                    try:
+                        _attach_speaking_audio(exam_body, exam_id)
+                    except Exception as exc:
+                        log.warning("Placement speaking TTS attach failed: %s", exc)
+            except Exception as exc:
+                log.warning("Placement listening attach failed: %s", exc)
             now = _now_iso()
             conn.execute(
                 """
@@ -574,6 +649,70 @@ def register_placement_routes(
             conn.close()
             log.exception("placement generate failed")
             return jsonify({"error": format_ai_error(exc)}), 502
+
+    @app.route("/api/student/self-study/placement/listening-audio", methods=["POST"])
+    def placement_listening_audio_refresh():
+        conn = get_db_connection()
+        err = require_session_role_if_enabled(conn, "student")
+        if err is not None:
+            conn.close()
+            return err
+        username = get_effective_student_username(conn)
+        if not username:
+            conn.close()
+            return jsonify({"error": "Student session required"}), 401
+
+        data = request.get_json(silent=True) or {}
+        exam_id = str(data.get("examId") or data.get("exam_id") or "").strip()
+        if not exam_id:
+            conn.close()
+            return jsonify({"error": "examId is required"}), 400
+
+        row = conn.execute(
+            """
+            SELECT * FROM placement_exam_sessions
+            WHERE id = ? AND student_username = ?
+            """,
+            (exam_id, username),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "Placement session not found or expired"}), 404
+        if row["submitted_at"]:
+            conn.close()
+            return jsonify({"error": "This placement attempt was already submitted"}), 409
+
+        try:
+            exam = json.loads(row["exam_json"])
+        except json.JSONDecodeError:
+            conn.close()
+            return jsonify({"error": "Corrupt placement session"}), 500
+
+        listening = exam.get("listening") if isinstance(exam.get("listening"), dict) else {}
+        if not _audio_has_urls(listening.get("audio")):
+            try:
+                _attach_listening_audio(exam, exam_id)
+                listening = exam.get("listening") or {}
+                conn.execute(
+                    """
+                    UPDATE placement_exam_sessions
+                    SET exam_json = ?
+                    WHERE id = ? AND student_username = ?
+                    """,
+                    (json.dumps(exam, ensure_ascii=False), exam_id, username),
+                )
+                conn.commit()
+            except Exception as exc:
+                log.warning("Placement listening audio refresh failed: %s", exc)
+
+        conn.close()
+        return jsonify(
+            {
+                "audio": listening.get("audio"),
+                "playbackSegments": listening.get("playbackSegments") or [],
+                "audioStatus": {"tts": tts_ready(), "asr": asr_ready()},
+            }
+        )
 
     @app.route("/api/student/self-study/placement/submit", methods=["POST"])
     def placement_submit():
