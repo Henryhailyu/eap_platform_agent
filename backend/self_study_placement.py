@@ -23,6 +23,31 @@ log = logging.getLogger("eap.placement")
 
 VALID_LEVELS = frozenset({"beginner", "intermediate", "advanced"})
 _PLACEMENT_VERSION = 2
+_PLACEMENT_GENERATE_ATTEMPTS = 3
+
+_FALLBACK_SPEAKING_QUESTIONS: list[dict[str, str]] = [
+    {
+        "id": "s1",
+        "prompt": "Do you prefer studying alone or with other people? Why?",
+        "rubric": "Answer naturally in 2-4 sentences.",
+    },
+    {
+        "id": "s2",
+        "prompt": "What kinds of books or articles do you enjoy reading in your free time?",
+        "rubric": "Answer naturally in 2-4 sentences.",
+    },
+    {
+        "id": "s3",
+        "prompt": "How do you usually prepare when you have an important exam or assignment?",
+        "rubric": "Answer naturally in 2-4 sentences.",
+    },
+]
+
+_FALLBACK_WRITING_PROMPT = (
+    "Some people believe university students should be required to take courses outside their major. "
+    "Others think students should focus only on subjects related to their degree. "
+    "Discuss both views and give your own opinion."
+)
 
 
 def _now_iso() -> str:
@@ -81,8 +106,34 @@ def _ai_json(system: str, user: str, *, max_tokens: int = 4500) -> dict[str, Any
     return parse_ai_json_object(raw)
 
 
-def _normalize_mcq_questions(raw_list: Any, prefix: str, *, min_count: int, max_count: int) -> list[dict]:
-    items = raw_list if isinstance(raw_list, list) else []
+def _coerce_question_list(raw: Any, *nested_keys: str) -> list[Any]:
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict):
+        for key in nested_keys:
+            val = raw.get(key)
+            if isinstance(val, list):
+                return val
+    return []
+
+
+def _speaking_prompt_from_row(row: Any) -> str:
+    if isinstance(row, str):
+        return row.strip()
+    if isinstance(row, dict):
+        return str(
+            row.get("prompt")
+            or row.get("question")
+            or row.get("text")
+            or row.get("stem")
+            or row.get("content")
+            or ""
+        ).strip()
+    return ""
+
+
+def _normalize_mcq_questions(raw: Any, prefix: str, *, min_count: int, max_count: int) -> list[dict]:
+    items = _coerce_question_list(raw, "questions", "items", "mcq")
     out: list[dict] = []
     for i, row in enumerate(items):
         if not isinstance(row, dict):
@@ -119,7 +170,97 @@ def _normalize_mcq_questions(raw_list: Any, prefix: str, *, min_count: int, max_
     return out
 
 
+def _generate_speaking_via_ai(topic_seed: str) -> list[dict]:
+    system = (
+        "You write IELTS Speaking Part 1 questions. Return ONLY JSON with this exact shape: "
+        '{"questions":[{"id":"s1","prompt":"..."},{"id":"s2","prompt":"..."},{"id":"s3","prompt":"..."}]} '
+        "All prompts must be short personal questions in English."
+    )
+    user = f"Write exactly 3 distinct IELTS Part 1 questions themed around: {topic_seed}."
+    data = _ai_json(system, user, max_tokens=900)
+    return _normalize_speaking_questions(data, min_count=3, max_count=3, allow_ai_retry=False)
+
+
+def _normalize_speaking_questions(
+    raw: Any,
+    *,
+    min_count: int = 3,
+    max_count: int = 3,
+    allow_ai_retry: bool = True,
+    topic_seed: str = "",
+) -> list[dict]:
+    items: list[Any] = []
+    if isinstance(raw, list):
+        items = raw
+    elif isinstance(raw, dict):
+        items = _coerce_question_list(raw, "questions", "items", "part1", "part_1", "partOne")
+
+    out: list[dict] = []
+    seen: set[str] = set()
+    for i, row in enumerate(items):
+        prompt = _speaking_prompt_from_row(row)
+        if not prompt or prompt in seen:
+            continue
+        seen.add(prompt)
+        rubric = "Answer naturally in 2-4 sentences."
+        if isinstance(row, dict):
+            rubric = str(row.get("rubric") or rubric).strip() or rubric
+        out.append(
+            {
+                "id": str((row.get("id") if isinstance(row, dict) else None) or f"s{len(out) + 1}"),
+                "prompt": prompt,
+                "rubric": rubric,
+            }
+        )
+        if len(out) >= max_count:
+            break
+
+    if len(out) < min_count and allow_ai_retry and topic_seed:
+        try:
+            extra = _generate_speaking_via_ai(topic_seed)
+            for q in extra:
+                prompt = str(q.get("prompt") or "").strip()
+                if not prompt or prompt in seen:
+                    continue
+                seen.add(prompt)
+                out.append(q)
+                if len(out) >= max_count:
+                    break
+        except Exception as exc:
+            log.warning("Placement speaking mini-generation failed: %s", exc)
+
+    for fallback in _FALLBACK_SPEAKING_QUESTIONS:
+        if len(out) >= min_count:
+            break
+        prompt = fallback["prompt"]
+        if prompt in seen:
+            continue
+        seen.add(prompt)
+        out.append(
+            {
+                "id": f"s{len(out) + 1}",
+                "prompt": prompt,
+                "rubric": fallback["rubric"],
+            }
+        )
+
+    return out[:max_count]
+
+
 def _generate_exam_content() -> dict[str, Any]:
+    last_exc: Exception | None = None
+    for attempt in range(1, _PLACEMENT_GENERATE_ATTEMPTS + 1):
+        try:
+            return _generate_exam_content_once()
+        except Exception as exc:
+            last_exc = exc
+            log.warning("Placement exam generation attempt %s failed: %s", attempt, exc)
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Placement exam generation failed")
+
+
+def _generate_exam_content_once() -> dict[str, Any]:
     topic_seed = random.choice(
         [
             "university research ethics",
@@ -138,9 +279,10 @@ def _generate_exam_content() -> dict[str, Any]:
         "Listening: script_en (~280-340 words, academic conversation between two speakers like IELTS Section 3), "
         "segments array [{speaker,gender,text}] with gender male|female, and 8 MCQ questions referencing the script. "
         "Reading: title, passage (~550-700 words, academic), 10 MCQ questions (IELTS reading style). "
-        "Speaking: exactly 3 IELTS Part 1 personal questions (short answers expected). "
+        "Speaking: object with questions array of exactly 3 items, each {id, prompt} — IELTS Part 1 personal questions. "
         "Writing: task2_prompt (IELTS Writing Task 2 essay question). "
-        "Every question needs correctIndex (0-based) and a concise explanation."
+        "Example speaking shape: {\"questions\":[{\"id\":\"s1\",\"prompt\":\"Do you enjoy reading?\"}, ...]}. "
+        "Every MCQ needs correctIndex (0-based) and a concise explanation."
     )
     user = (
         f"Create a fresh placement exam themed around: {topic_seed}. "
@@ -154,7 +296,7 @@ def _generate_exam_content() -> dict[str, Any]:
     script_en = str(listening_raw.get("script_en") or listening_raw.get("script") or "").strip()
     segments = listening_raw.get("segments") if isinstance(listening_raw.get("segments"), list) else []
     listen_qs = _normalize_mcq_questions(
-        listening_raw.get("questions"),
+        listening_raw,
         "l",
         min_count=7,
         max_count=10,
@@ -166,7 +308,7 @@ def _generate_exam_content() -> dict[str, Any]:
     passage = str(reading_raw.get("passage") or "").strip()
     passage_title = str(reading_raw.get("title") or "Reading passage").strip()
     read_qs = _normalize_mcq_questions(
-        reading_raw.get("questions"),
+        reading_raw,
         "r",
         min_count=8,
         max_count=12,
@@ -174,31 +316,20 @@ def _generate_exam_content() -> dict[str, Any]:
     if not passage:
         raise RuntimeError("AI reading passage missing")
 
-    speaking_raw = data.get("speaking") if isinstance(data.get("speaking"), dict) else {}
-    speak_list = speaking_raw.get("questions") if isinstance(speaking_raw.get("questions"), list) else []
-    speaking_qs: list[dict] = []
-    for i, row in enumerate(speak_list):
-        if not isinstance(row, dict):
-            continue
-        prompt = str(row.get("prompt") or row.get("question") or "").strip()
-        if not prompt:
-            continue
-        speaking_qs.append(
-            {
-                "id": str(row.get("id") or f"s{i + 1}"),
-                "prompt": prompt,
-                "rubric": str(row.get("rubric") or "Answer naturally in 2-4 sentences.").strip(),
-            }
-        )
-        if len(speaking_qs) >= 3:
-            break
-    if len(speaking_qs) < 3:
-        raise RuntimeError("AI returned too few speaking questions")
+    speaking_raw = data.get("speaking")
+    speaking_qs = _normalize_speaking_questions(
+        speaking_raw,
+        min_count=3,
+        max_count=3,
+        allow_ai_retry=True,
+        topic_seed=topic_seed,
+    )
 
     writing_raw = data.get("writing") if isinstance(data.get("writing"), dict) else {}
     writing_prompt = str(writing_raw.get("task2_prompt") or writing_raw.get("prompt") or "").strip()
     if not writing_prompt:
-        raise RuntimeError("AI writing prompt missing")
+        log.warning("Placement writing prompt missing — using fallback Task 2 prompt")
+        writing_prompt = _FALLBACK_WRITING_PROMPT
 
     return {
         "version": _PLACEMENT_VERSION,
