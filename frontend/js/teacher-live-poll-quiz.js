@@ -399,7 +399,7 @@
 
   async function ensureAiGeneratedQuestion(tool, MOCK, ui) {
     if (typeof global.EAP_ensureActiveLessonSynced === "function") {
-      await global.EAP_ensureActiveLessonSynced();
+      await global.EAP_ensureActiveLessonSynced(undefined, { skipServer: true });
     }
     if (getToolSlots(tool).length) return;
     const html = getLessonHtmlCached();

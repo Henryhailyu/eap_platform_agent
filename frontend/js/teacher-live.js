@@ -43,9 +43,11 @@
     return true;
   }
 
-  async function ensureLiveLessonSynced() {
+  async function ensureLiveLessonSynced(opts) {
+    const pageId =
+      typeof resolveActiveLessonPageId === "function" ? resolveActiveLessonPageId() : "";
     if (typeof window.EAP_ensureActiveLessonSynced === "function") {
-      return window.EAP_ensureActiveLessonSynced(resolveActiveLessonPageId());
+      return window.EAP_ensureActiveLessonSynced(pageId, opts);
     }
     return syncLiveLessonFromActiveSource();
   }
@@ -283,7 +285,8 @@
   }
 
   async function mountPollQuizForTool(tool, MOCK) {
-    await ensureLiveLessonSynced();
+    syncLiveLessonFromActiveSource();
+    void ensureLiveLessonSynced({ timeoutMs: 12000 });
     const fp =
       typeof window.EAP_lessonHtmlFingerprint === "function"
         ? window.EAP_lessonHtmlFingerprint()
@@ -3181,118 +3184,22 @@
     });
   }
 
+  function showGameLaunchLoading() {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas) return;
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
+    canvas.innerHTML = `<div class="tlive-pq-empty tlive-pq-empty--loading">${escapeHtml(t("tlive_game_ai_generating"))}</div>`;
+  }
+
   function getSavedGamesList() {
     const MOCK = getMock();
     if (!MOCK) return [];
     return MOCK.SAVED_GAMES || [];
   }
 
-  function gameListItemHtml(g, MOCK) {
-    return `
-      <li class="tlive-games-panel__row">
-        <button type="button" class="tlive-game-item tlive-games-panel__item" data-game="${escapeHtml(g.id)}">
-          <strong>${escapeHtml(MOCK.gameLabel(g, "name"))}</strong>
-          <span>${escapeHtml(MOCK.gameLabel(g, "desc"))}</span>
-        </button>
-      </li>`;
-  }
-
-  function bindGameListActions(root, onPick) {
-    if (!root) return;
-    root.querySelectorAll("[data-game]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-game");
-        if (id) onPick(id);
-      });
-    });
-  }
-
-  function renderGamesLibrary() {
-    const MOCK = getMock();
-    const canvas = document.getElementById("tlive-canvas-inner");
-    if (!canvas || !MOCK) return;
-    const games = getSavedGamesList();
-    const gameSlots =
-      typeof window.EAP_gameSlotsPhase1 === "function"
-        ? window.EAP_gameSlotsPhase1(lessonSlotsForActiveSegment())
-        : [];
-    const suggestedBlock = gameSlots.length
-      ? `<section class="tlive-lesson-games">
-          <h3 class="tlive-lesson-games__title">${escapeHtml(t("tlive_lesson_games_heading"))}</h3>
-          <p class="tlive-lesson-games__lead">${escapeHtml(t("tlive_lesson_games_lead"))}</p>
-          <ul class="tlive-lesson-games__list">
-            ${gameSlots
-              .map((slot) => {
-                const g = games.find((x) => x.id === slot.gameId);
-                const name = g ? MOCK.gameLabel(g, "name") : slot.gameId;
-                const label = window.EAP_liveSlotLabel ? window.EAP_liveSlotLabel(slot) : name;
-                return `<li>
-                  <button type="button" class="btn-primary tlive-lesson-game-btn" data-lesson-game="${escapeHtml(slot.gameId)}" data-slot-id="${escapeHtml(slot.id)}">
-                    ${escapeHtml(name)} — ${escapeHtml(label.slice(0, 48))}
-                  </button>
-                </li>`;
-              })
-              .join("")}
-          </ul>
-        </section>`
-      : "";
-
-    canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
-    canvas.innerHTML = `
-      <div class="tlive-games-panel tlive-stage-fill">
-        <h2 class="tlive-games-panel__title">${escapeHtml(t("tlive_saved_games"))}</h2>
-        <p class="tlive-games-panel__lead">${escapeHtml(t("tlive_games_canvas_lead"))}</p>
-        ${suggestedBlock}
-        <p id="tlive-games-toast" class="tlive-games-toast hidden" role="status"></p>
-        <div class="tlive-games-panel__scroll" role="region" aria-label="${escapeHtml(t("tlive_games_list_region"))}">
-          <ul class="tlive-games-panel__list">
-            ${games.map((g) => gameListItemHtml(g, MOCK)).join("")}
-          </ul>
-        </div>
-        <p class="tlive-disclaimer">${escapeHtml(t("tlive_saved_games_hint"))}</p>
-      </div>
-    `;
-
-    bindGameListActions(canvas, (id) => void loadGame(id));
-    canvas.querySelectorAll("[data-lesson-game]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const gameId = btn.getAttribute("data-lesson-game");
-        const slotId = btn.getAttribute("data-slot-id");
-        const slot = (window.__tliveLessonSlots || []).find((s) => String(s.id) === String(slotId));
-        let launchQ = null;
-        if (slot && typeof window.EAP_slotToLaunchQuestion === "function") {
-          launchQ = window.EAP_slotToLaunchQuestion(slot);
-        }
-        void loadGame(gameId, { question: launchQ });
-      });
-    });
-  }
-
-  function showGamesToast(text) {
-    const el = document.getElementById("tlive-games-toast");
-    if (el) {
-      el.textContent = text;
-      el.classList.remove("hidden");
-    }
-  }
-
-  async function showGamesTool() {
-    await ensureLiveLessonSynced();
-    stopLiveTimerIfMounted();
-    renderGamesLibrary();
-  }
-
-  async function loadGame(gameId, opts) {
-    const MOCK = getMock();
-    if (!MOCK) return;
-    await ensureLiveLessonSynced();
-    const games = getSavedGamesList();
-    const game = games.find((g) => g.id === gameId);
-    if (!game) return;
+  function launchSelectedGame(game, MOCK, opts) {
     const keepQuestion =
-      opts && opts.question
-        ? opts.question
-        : window.__tliveOverrideQuestion || null;
+      opts && opts.question ? opts.question : window.__tliveOverrideQuestion || null;
     setActiveTool("games");
     clearLiveGameState();
     if (keepQuestion) window.__tliveOverrideQuestion = keepQuestion;
@@ -3303,14 +3210,14 @@
       return;
     }
     if (game.type === "vocab_bingo" || game.id === "vocab-bingo") {
-      startVocabGame("bingo", (terms) => {
+      void startVocabGame("bingo", (terms) => {
         window.__tliveBingo = MOCK.createBingoState(terms);
         renderVocabBingo(window.__tliveBingo);
       });
       return;
     }
     if (game.type === "matching_race" || game.id === "matching-race") {
-      startVocabGame("matching", (terms) => {
+      void startVocabGame("matching", (terms) => {
         window.__tliveMatching = MOCK.createMatchingState(terms);
         renderMatchingRace(window.__tliveMatching);
       });
@@ -3380,6 +3287,130 @@
         <p class="tlive-disclaimer">${escapeHtml(t("tlive_game_soon"))}</p>
       `;
     }
+  }
+
+  function gameListItemHtml(g, MOCK) {
+    return `
+      <li class="tlive-games-panel__row">
+        <button type="button" class="tlive-game-item tlive-games-panel__item" data-game="${escapeHtml(g.id)}">
+          <strong>${escapeHtml(MOCK.gameLabel(g, "name"))}</strong>
+          <span>${escapeHtml(MOCK.gameLabel(g, "desc"))}</span>
+        </button>
+      </li>`;
+  }
+
+  function bindGameListActions(root, onPick) {
+    if (!root) return;
+    root.querySelectorAll("[data-game]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-game");
+        if (id) onPick(id);
+      });
+    });
+  }
+
+  function renderGamesLibrary() {
+    const MOCK = getMock();
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas || !MOCK) return;
+    const games = getSavedGamesList();
+    const gameSlots =
+      typeof window.EAP_gameSlotsPhase1 === "function"
+        ? window.EAP_gameSlotsPhase1(lessonSlotsForActiveSegment())
+        : [];
+    const suggestedBlock = gameSlots.length
+      ? `<section class="tlive-lesson-games">
+          <h3 class="tlive-lesson-games__title">${escapeHtml(t("tlive_lesson_games_heading"))}</h3>
+          <p class="tlive-lesson-games__lead">${escapeHtml(t("tlive_lesson_games_lead"))}</p>
+          <ul class="tlive-lesson-games__list">
+            ${gameSlots
+              .map((slot) => {
+                const g = games.find((x) => x.id === slot.gameId);
+                const name = g ? MOCK.gameLabel(g, "name") : slot.gameId;
+                const label = window.EAP_liveSlotLabel ? window.EAP_liveSlotLabel(slot) : name;
+                return `<li>
+                  <button type="button" class="btn-primary tlive-lesson-game-btn" data-lesson-game="${escapeHtml(slot.gameId)}" data-slot-id="${escapeHtml(slot.id)}">
+                    ${escapeHtml(name)} — ${escapeHtml(label.slice(0, 48))}
+                  </button>
+                </li>`;
+              })
+              .join("")}
+          </ul>
+        </section>`
+      : "";
+
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
+    canvas.innerHTML = `
+      <div class="tlive-games-panel tlive-stage-fill">
+        <h2 class="tlive-games-panel__title">${escapeHtml(t("tlive_saved_games"))}</h2>
+        <p class="tlive-games-panel__lead">${escapeHtml(t("tlive_games_canvas_lead"))}</p>
+        ${suggestedBlock}
+        <p id="tlive-games-toast" class="tlive-games-toast hidden" role="status"></p>
+        <div class="tlive-games-panel__scroll" role="region" aria-label="${escapeHtml(t("tlive_games_list_region"))}">
+          <ul class="tlive-games-panel__list">
+            ${games.map((g) => gameListItemHtml(g, MOCK)).join("")}
+          </ul>
+        </div>
+        <p class="tlive-disclaimer">${escapeHtml(t("tlive_saved_games_hint"))}</p>
+      </div>
+    `;
+
+    bindGameListActions(canvas, (id) => loadGame(id));
+    canvas.querySelectorAll("[data-lesson-game]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const gameId = btn.getAttribute("data-lesson-game");
+        const slotId = btn.getAttribute("data-slot-id");
+        const slot = (window.__tliveLessonSlots || []).find((s) => String(s.id) === String(slotId));
+        let launchQ = null;
+        if (slot && typeof window.EAP_slotToLaunchQuestion === "function") {
+          launchQ = window.EAP_slotToLaunchQuestion(slot);
+        }
+        loadGame(gameId, { question: launchQ });
+      });
+    });
+  }
+
+  function showGamesToast(text) {
+    const el = document.getElementById("tlive-games-toast");
+    if (el) {
+      el.textContent = text;
+      el.classList.remove("hidden");
+    }
+  }
+
+  function showGamesTool() {
+    syncLiveLessonFromActiveSource();
+    stopLiveTimerIfMounted();
+    renderGamesLibrary();
+    void ensureLiveLessonSynced({ timeoutMs: 12000 }).then((ok) => {
+      if (ok && getActiveToolbarTool() === "games") renderGamesLibrary();
+    });
+  }
+
+  function loadGame(gameId, opts) {
+    const MOCK = getMock();
+    if (!MOCK) return;
+    showGameLaunchLoading();
+    if (!syncLiveLessonFromActiveSource()) {
+      showGamesToast(t("tlive_pq_no_lesson_html"));
+      renderGamesLibrary();
+      return;
+    }
+    const games = getSavedGamesList();
+    const game = games.find((g) => g.id === gameId);
+    if (!game) {
+      showGamesToast(t("tlive_game_not_phase1"));
+      renderGamesLibrary();
+      return;
+    }
+    try {
+      launchSelectedGame(game, MOCK, opts);
+    } catch (err) {
+      showGamesToast((err && err.message) || t("tlive_game_ai_failed"));
+      renderGamesLibrary();
+      return;
+    }
+    void ensureLiveLessonSynced({ timeoutMs: 12000 });
   }
 
   function renderNameWheelTool(ctx) {

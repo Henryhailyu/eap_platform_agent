@@ -221,7 +221,7 @@
 
   async function ensure() {
     if (typeof global.EAP_ensureActiveLessonSynced === "function") {
-      await global.EAP_ensureActiveLessonSynced();
+      await global.EAP_ensureActiveLessonSynced(undefined, { skipServer: true });
     }
     const cached = getCached();
     if (cached && cached.length >= MIN) return cached;

@@ -110,7 +110,7 @@
 
   async function ensure(index, MOCK) {
     if (typeof global.EAP_ensureActiveLessonSynced === "function") {
-      await global.EAP_ensureActiveLessonSynced();
+      await global.EAP_ensureActiveLessonSynced(undefined, { skipServer: true });
     }
     const i = Number.isInteger(index) ? index : 0;
     const existing = resolveSync(MOCK, i);
