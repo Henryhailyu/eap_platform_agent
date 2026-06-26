@@ -21,6 +21,9 @@ def _now_iso() -> str:
 
 
 def migrate_self_study_tables(conn) -> None:
+    from self_study_placement import migrate_placement_tables
+
+    migrate_placement_tables(conn)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS student_placement_results (

@@ -44,6 +44,22 @@
     });
   }
 
+  async function generatePlacementExam() {
+    return apiFetch("/api/student/self-study/placement/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+  }
+
+  async function submitPlacementExam(body) {
+    return apiFetch("/api/student/self-study/placement/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+  }
+
   async function patchSettings(body) {
     return apiFetch("/api/student/self-study/settings", {
       method: "PATCH",
@@ -229,6 +245,8 @@
     getStatus,
     getPlacement,
     savePlacement,
+    generatePlacementExam,
+    submitPlacementExam,
     patchSettings,
     getDailyOverview,
     getVocabOverview,

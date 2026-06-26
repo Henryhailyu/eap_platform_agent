@@ -9384,7 +9384,7 @@ register_homework_marking_routes(
     format_ai_error=format_ai_error,
 )
 
-from self_study import register_self_study_routes
+from self_study import register_self_study_routes, _placement_row_to_dict
 
 register_self_study_routes(
     app,
@@ -9393,6 +9393,16 @@ register_self_study_routes(
     get_current_authenticated_user=get_current_authenticated_user,
     get_effective_student_username=get_effective_student_username,
     normalize_class_name=normalize_class_name,
+)
+
+from self_study_placement import register_placement_routes
+
+register_placement_routes(
+    app,
+    get_db_connection=get_db_connection,
+    require_session_role_if_enabled=require_session_role_if_enabled,
+    get_effective_student_username=get_effective_student_username,
+    placement_row_to_dict=_placement_row_to_dict,
 )
 
 from self_study_vocabulary import register_self_study_vocabulary_routes
