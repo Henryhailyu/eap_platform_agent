@@ -286,6 +286,15 @@ def register_tencent_vod_routes(
                 ), 409
 
             stream_path = f"/api/student/recorded-lessons/{lesson_id}/stream"
+            from auth_v1 import get_access_token_from_request
+
+            token = get_access_token_from_request(
+                request.headers.get("Authorization"), request.args
+            )
+            if token:
+                from urllib.parse import quote
+
+                stream_path = f"{stream_path}?access_token={quote(token, safe='')}"
             return jsonify(
                 {
                     "mode": "local",

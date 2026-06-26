@@ -80,7 +80,36 @@
       role === "student"
         ? `/api/student/recorded-lessons/${lessonId}/stream`
         : `/api/teacher/recorded-lessons/${lessonId}/stream`;
-    return apiUrl(prefix);
+    return appendAccessToken(apiUrl(prefix));
+  }
+
+  const ACCESS_TOKEN_KEY = "eap_access_token";
+
+  function readAccessToken() {
+    try {
+      return sessionStorage.getItem(ACCESS_TOKEN_KEY) || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  /** HTML5 media elements cannot send Authorization — pass Bearer token in the query string. */
+  function appendAccessToken(url) {
+    const base = String(url || "").trim();
+    if (!base) return base;
+    if (/[?&]access_token=/.test(base)) return base;
+    const token = readAccessToken();
+    if (!token) return base;
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}access_token=${encodeURIComponent(token)}`;
+  }
+
+  function bindStreamMediaError(el, onFail) {
+    if (!el || typeof onFail !== "function") return;
+    el.addEventListener("error", () => {
+      const code = el.error && el.error.code;
+      onFail(code);
+    });
   }
 
   global.EAP_RECORDED_LESSONS = {
@@ -122,6 +151,12 @@
     },
     studentPlayAuth(lessonId) {
       return apiFetch(`/api/student/recorded-lessons/${lessonId}/play-auth`);
+    },
+    appendAccessToken(url) {
+      return appendAccessToken(url);
+    },
+    bindStreamMediaError(el, onFail) {
+      bindStreamMediaError(el, onFail);
     },
     vodStatus() {
       return apiFetch("/api/teacher/recorded-lessons/vod/status");

@@ -169,6 +169,14 @@
         audio.preload = "metadata";
         audio.src = api().studentStreamUrl(lesson.id);
         audio.addEventListener("contextmenu", (e) => e.preventDefault());
+        if (typeof api().bindStreamMediaError === "function") {
+          api().bindStreamMediaError(audio, () => {
+            const err = document.createElement("p");
+            err.className = "srec-lesson-card__pending srec-lesson-card__pending--error";
+            err.textContent = t("srec_playback_failed");
+            playerWrap.appendChild(err);
+          });
+        }
         playerWrap.appendChild(audio);
       } else {
         const video = document.createElement("video");
@@ -178,6 +186,14 @@
         video.setAttribute("controlsList", "nodownload");
         video.src = api().studentStreamUrl(lesson.id);
         video.addEventListener("contextmenu", (e) => e.preventDefault());
+        if (typeof api().bindStreamMediaError === "function") {
+          api().bindStreamMediaError(video, () => {
+            const err = document.createElement("p");
+            err.className = "srec-lesson-card__pending srec-lesson-card__pending--error";
+            err.textContent = t("srec_playback_failed");
+            playerWrap.appendChild(err);
+          });
+        }
         playerWrap.appendChild(video);
       }
       card.appendChild(playerWrap);

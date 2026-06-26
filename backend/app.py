@@ -44,7 +44,12 @@ from api_errors import (
     login_failure_response,
     teacher_not_authorized_response,
 )
-from auth_v1 import get_bearer_token_from_header, issue_access_token, verify_access_token
+from auth_v1 import (
+    get_access_token_from_request,
+    get_bearer_token_from_header,
+    issue_access_token,
+    verify_access_token,
+)
 from eap_config import config, setup_logging, validate_production_config
 from self_study_ai_prompts import (
     VOCABULARY_JSON_KEYS,
@@ -1604,7 +1609,9 @@ def get_current_authenticated_user(conn):
   When the browser sends Authorization, the token wins so each tab can keep its own
   role while a shared session cookie may reflect the most recent login in another tab.
     """
-    token = get_bearer_token_from_header(request.headers.get("Authorization"))
+    token = get_access_token_from_request(
+        request.headers.get("Authorization"), request.args
+    )
     if token:
         uid = verify_access_token(token)
         if uid is not None:

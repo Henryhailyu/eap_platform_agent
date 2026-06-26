@@ -2729,6 +2729,12 @@ function buildInlineRecordedVideoBlock(rec, role) {
   media.preload = "metadata";
   media.src = role === "teacher" ? api.teacherStreamUrl(rec.id) : api.studentStreamUrl(rec.id);
   media.addEventListener("contextmenu", (ev) => ev.preventDefault());
+  if (typeof api.bindStreamMediaError === "function") {
+    api.bindStreamMediaError(media, () => {
+      hint.textContent = t("srec_playback_failed");
+      hint.classList.add("eap-inline-recording__hint--error");
+    });
+  }
   const hint = document.createElement("p");
   hint.className = "eap-inline-recording__hint";
   hint.textContent = isAudio

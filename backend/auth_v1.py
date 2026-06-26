@@ -45,3 +45,21 @@ def get_bearer_token_from_header(authorization_header: str | None) -> str | None
         return None
     token = parts[1].strip()
     return token if token else None
+
+
+def get_access_token_from_request(auth_header: str | None, query_mapping) -> str | None:
+    """
+    Bearer header wins; else accept access_token (or token) query param.
+
+    HTML5 <video>/<audio> cannot send Authorization — stream URLs carry the token instead.
+    """
+    token = get_bearer_token_from_header(auth_header)
+    if token:
+        return token
+    if not query_mapping:
+        return None
+    raw = query_mapping.get("access_token") or query_mapping.get("token")
+    if not raw:
+        return None
+    token = str(raw).strip()
+    return token if token else None

@@ -6,6 +6,8 @@ from __future__ import annotations
 import logging
 import mimetypes
 import os
+import subprocess
+import tempfile
 import uuid
 from datetime import datetime, timezone
 
@@ -69,15 +71,149 @@ def normalize_stored_path(file_path: str) -> str:
     return base
 
 
-def save_recorded_video(upload_dir: str, original_name: str, data: bytes) -> tuple[str, str]:
-    """Return (stored_basename, absolute_path)."""
+def save_recorded_video(upload_dir: str, original_name: str, data: bytes) -> tuple[str, str, str]:
+    """Return (stored_basename, absolute_path, stored_ext)."""
     ext = original_name.rsplit(".", 1)[-1].lower()
+    data, ext = normalize_uploaded_video_bytes(data, ext)
     stored = f"{uuid.uuid4().hex}.{ext}"
     dest_dir = recorded_lessons_upload_dir(upload_dir)
     dest_abs = os.path.join(dest_dir, stored)
     with open(dest_abs, "wb") as f:
         f.write(data)
-    return stored, dest_abs
+    return stored, dest_abs, ext
+
+
+def _ffmpeg_available() -> bool:
+    from shutil import which
+
+    return which("ffmpeg") is not None
+
+
+def transcode_video_bytes_to_mp4(data: bytes, input_ext: str) -> bytes:
+    """Convert QuickTime uploads to H.264 MP4 for browser <video> playback."""
+    if not _ffmpeg_available():
+        raise RuntimeError("ffmpeg not available")
+    inp_path = ""
+    out_path = ""
+    try:
+        suffix = f".{(input_ext or 'mov').lower()}"
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as inp:
+            inp.write(data)
+            inp_path = inp.name
+        out_path = f"{inp_path}.mp4"
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                inp_path,
+                "-c:v",
+                "libx264",
+                "-preset",
+                "fast",
+                "-crf",
+                "23",
+                "-c:a",
+                "aac",
+                "-movflags",
+                "+faststart",
+                out_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip()[-400:]
+            raise RuntimeError(f"ffmpeg failed ({proc.returncode}): {detail}")
+        with open(out_path, "rb") as handle:
+            out = handle.read()
+        if len(out) < 1024:
+            raise RuntimeError("transcoded file too small")
+        return out
+    finally:
+        for path in (inp_path, out_path):
+            if path:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+
+def normalize_uploaded_video_bytes(data: bytes, ext: str) -> tuple[bytes, str]:
+    """
+    Return (bytes, ext) ready to store. MOV/M4V are transcoded to MP4 when ffmpeg is available.
+    """
+    e = (ext or "").lower()
+    if e not in ("mov", "m4v"):
+        return data, e
+    if not _ffmpeg_available():
+        log.warning("ffmpeg missing — storing %s without web transcode", e)
+        return data, e
+    try:
+        return transcode_video_bytes_to_mp4(data, e), "mp4"
+    except Exception as exc:
+        log.warning("Could not transcode %s to mp4, keeping original: %s", e, exc)
+        return data, e
+
+
+def ensure_web_playable_lesson_file(
+    conn, upload_dir: str, lesson_id: int, file_path: str, file_ext: str
+) -> tuple[str, str]:
+    """
+    One-time lazy transcode for legacy MOV/M4V uploads so Chrome can play them.
+    Updates the lesson row when a new MP4 is written.
+    """
+    ext = (file_ext or "").lower()
+    stored = normalize_stored_path(file_path)
+    if ext not in ("mov", "m4v") or not stored:
+        return stored, ext
+    dest_dir = recorded_lessons_upload_dir(upload_dir)
+    source_full = os.path.join(dest_dir, stored)
+    if not os.path.isfile(source_full):
+        return stored, ext
+    mp4_stored = f"{stored.rsplit('.', 1)[0]}.mp4"
+    mp4_full = os.path.join(dest_dir, mp4_stored)
+    if os.path.isfile(mp4_full):
+        now = _now_iso()
+        conn.execute(
+            """
+            UPDATE recorded_lessons
+            SET file_path = ?, file_ext = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (mp4_stored, "mp4", now, int(lesson_id)),
+        )
+        conn.commit()
+        return mp4_stored, "mp4"
+    if not _ffmpeg_available():
+        return stored, ext
+    try:
+        with open(source_full, "rb") as handle:
+            data = handle.read()
+        mp4_data = transcode_video_bytes_to_mp4(data, ext)
+        with open(mp4_full, "wb") as handle:
+            handle.write(mp4_data)
+        now = _now_iso()
+        conn.execute(
+            """
+            UPDATE recorded_lessons
+            SET file_path = ?, file_ext = ?, file_size_bytes = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (mp4_stored, "mp4", len(mp4_data), now, int(lesson_id)),
+        )
+        conn.commit()
+        try:
+            os.remove(source_full)
+        except OSError:
+            pass
+        log.info("Transcoded recorded lesson %s from %s to mp4", lesson_id, ext)
+        return mp4_stored, "mp4"
+    except Exception as exc:
+        log.warning("Lazy transcode for lesson %s failed: %s", lesson_id, exc)
+        return stored, ext
 
 
 def delete_recorded_video_file(upload_dir: str, file_path: str | None) -> None:
@@ -477,6 +613,8 @@ def register_recorded_lessons_routes(app):
                 if vis_raw == VISIBILITY_PUBLISHED
                 else VISIBILITY_DRAFT
             )
+            if calendar_task_id is not None:
+                initial_visibility = VISIBILITY_PUBLISHED
 
             if not class_name:
                 return jsonify({"error": "class_name is required"}), 400
@@ -533,7 +671,8 @@ def register_recorded_lessons_routes(app):
                 return jsonify({"error": "Empty file"}), 400
 
             upload_dir = _upload_root()
-            stored, _dest = save_recorded_video(upload_dir, name, data)
+            stored, _dest, stored_ext = save_recorded_video(upload_dir, name, data)
+            ext = stored_ext
             now = _now_iso()
             cur = conn.execute(
                 """
@@ -707,7 +846,11 @@ def register_recorded_lessons_routes(app):
                 )
                 if err is not None:
                     return err
-            return _stream_video(_upload_root(), row["file_path"], row["file_ext"])
+            upload_root = _upload_root()
+            stored, ext = ensure_web_playable_lesson_file(
+                conn, upload_root, lesson_id, row["file_path"], row["file_ext"]
+            )
+            return _stream_video(upload_root, stored, ext)
         finally:
             conn.close()
 
@@ -757,7 +900,11 @@ def register_recorded_lessons_routes(app):
             )
             if err is not None:
                 return err
-            resp = _stream_video(_upload_root(), row["file_path"], row["file_ext"])
+            upload_root = _upload_root()
+            stored, ext = ensure_web_playable_lesson_file(
+                conn, upload_root, lesson_id, row["file_path"], row["file_ext"]
+            )
+            resp = _stream_video(upload_root, stored, ext)
             if isinstance(resp, Response):
                 resp.headers["Cache-Control"] = "private, no-store"
                 resp.headers["X-Content-Type-Options"] = "nosniff"

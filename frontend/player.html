@@ -180,9 +180,22 @@
         var ld = document.getElementById("player-loading");
         if (ld) ld.style.display = "none";
       }
+      function playbackErrorMessage(code) {
+        if (code === 4) return t("srec_playback_unsupported");
+        return t("srec_playback_failed");
+      }
       function playLocal(streamUrl, titleParam, fileExt) {
         hideLoading();
-        var ext = (fileExt || streamUrl.split("?")[0].split(".").pop() || "").toLowerCase();
+        var api = window.EAP_RECORDED_LESSONS;
+        var resolved = streamUrl;
+        if (api && typeof api.appendAccessToken === "function") {
+          resolved = api.appendAccessToken(
+            String(streamUrl).indexOf("http") === 0
+              ? streamUrl
+              : (window.location.origin + streamUrl)
+          );
+        }
+        var ext = (fileExt || resolved.split("?")[0].split(".").pop() || "").toLowerCase();
         if (AUDIO_EXTS.includes(ext)) {
           var cover = document.getElementById("player-audio-cover");
           var audioEl = document.getElementById("player-media-audio");
@@ -190,16 +203,26 @@
           if (cover) cover.style.display = "flex";
           if (audioName && titleParam) audioName.textContent = decodeURIComponent(titleParam);
           if (audioEl) {
-            audioEl.src = streamUrl;
+            audioEl.src = resolved;
             audioEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+            if (api && typeof api.bindStreamMediaError === "function") {
+              api.bindStreamMediaError(audioEl, function (code) {
+                showError(playbackErrorMessage(code));
+              });
+            }
           }
           return;
         }
         var videoEl = document.getElementById("player-media-video");
         if (videoEl) {
           videoEl.style.display = "block";
-          videoEl.src = streamUrl;
+          videoEl.src = resolved;
           videoEl.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+          if (api && typeof api.bindStreamMediaError === "function") {
+            api.bindStreamMediaError(videoEl, function (code) {
+              showError(playbackErrorMessage(code));
+            });
+          }
         }
       }
       function playVod(auth, titleParam) {
@@ -243,10 +266,6 @@
           playLocal(api.teacherStreamUrl(Number(id)), titleParam, "");
           return;
         }
-        if (typeof api.studentPlayAuth !== "function") {
-          playLocal(api.studentStreamUrl(Number(id)), titleParam, "");
-          return;
-        }
         api.studentPlayAuth(Number(id))
           .then(function (auth) {
             if (auth && auth.mode === "vod") {
@@ -267,6 +286,14 @@
           .catch(function (err) {
             if (err && err.status === 202) {
               showError(t("srec_vod_processing"));
+              return;
+            }
+            if (err && (err.status === 401 || err.status === 403)) {
+              showError(err.message || t("srec_playback_auth_failed"));
+              return;
+            }
+            if (err && err.message) {
+              showError(err.message);
               return;
             }
             playLocal(api.studentStreamUrl(Number(id)), titleParam, "");
