@@ -1797,6 +1797,8 @@ window.EAP_STRINGS_ZH = {
   "tlive_saved_games_hint": "请先在展示库推送或选择课时 HTML，AI 才能生成活动题目。",
   "tlive_game_ai_generating": "正在根据课时内容生成活动题目…",
   "tlive_game_ai_failed": "无法根据本课时生成活动题目。",
+  "tlive_vocab_ai_generating": "正在从课时内容加载词汇…",
+  "tlive_vocab_ai_failed": "无法从本课时加载词汇。",
   "tlive_board_race_title": "棋盘竞赛",
   "tlive_board_round": "第 {round} 轮",
   "tlive_board_legend": "特殊格：奖励+1、退1格、词汇+2分、互助+1分。先到终点者获胜。",

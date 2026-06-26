@@ -244,6 +244,15 @@
     return parseJson(response);
   }
 
+  async function generateVocab(body) {
+    const response = await liveFetch(`${API_BASE}/api/teacher/live/generate-vocab`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    return parseJson(response);
+  }
+
   global.EAP_LIVE_TEACHING_API = {
     API_BASE,
     WAIT_TIMEOUT_SEC,
@@ -264,5 +273,6 @@
     studentDisplayFileUrl,
     studentRespond,
     generateQuestion,
+    generateVocab,
   };
 })(typeof window !== "undefined" ? window : globalThis);

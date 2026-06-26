@@ -1802,6 +1802,8 @@ window.EAP_STRINGS_EN = {
   "tlive_saved_games_hint": "Push or select a lesson HTML in the display library first so AI can generate activity questions.",
   "tlive_game_ai_generating": "Generating activity question from your lesson…",
   "tlive_game_ai_failed": "Could not generate an activity question from this lesson.",
+  "tlive_vocab_ai_generating": "Loading vocabulary from your lesson…",
+  "tlive_vocab_ai_failed": "Could not load vocabulary from this lesson.",
   "tlive_board_race_title": "Board Race",
   "tlive_board_round": "Round {round}",
   "tlive_board_legend": "Special squares: Bonus +1, Back 1, Vocab +2 pts, Team help +1 pt. First team to the finish wins.",

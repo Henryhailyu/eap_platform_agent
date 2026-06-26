@@ -588,7 +588,16 @@
     return isZh() ? item.defZh : item.defEn;
   }
 
-  function createBingoState() {
+  function createBingoState(terms) {
+    function expandPool(pool, count) {
+      const out = [];
+      for (let i = 0; i < count; i += 1) out.push(pool[i % pool.length]);
+      return out;
+    }
+    const pool =
+      Array.isArray(terms) && terms.length >= 8
+        ? expandPool(terms, 24)
+        : BINGO_TERMS;
     const cells = [];
     let termIdx = 0;
     for (let i = 0; i < 25; i += 1) {
@@ -603,7 +612,7 @@
           marks: { A: true, B: true, C: true, D: true },
         });
       } else {
-        const t = BINGO_TERMS[termIdx];
+        const t = pool[termIdx];
         termIdx += 1;
         cells.push({
           index: i,
@@ -659,9 +668,19 @@
     return { ...state, clueIndex: (state.clueIndex + 1) % nonFree.length };
   }
 
-  function createMatchingState() {
+  function createMatchingState(terms) {
+    const raw =
+      Array.isArray(terms) && terms.length >= 8
+        ? terms.slice(0, 8)
+        : MATCHING_PAIRS;
+    const pairs = raw.map((p, i) => ({
+      id: p.id || `p${i + 1}`,
+      term: p.term,
+      defEn: p.defEn,
+      defZh: p.defZh || p.defEn,
+    }));
     const defs = shuffleArr(
-      MATCHING_PAIRS.map((p) => ({
+      pairs.map((p) => ({
         id: `d-${p.id}`,
         pairId: p.id,
         textEn: p.defEn,
@@ -669,7 +688,7 @@
       })),
     );
     return {
-      pairs: MATCHING_PAIRS.map((p) => ({ ...p })),
+      pairs,
       defs,
       matched: {},
       scores: { A: 0, B: 0, C: 0, D: 0 },

@@ -692,3 +692,193 @@ def generate_live_question_from_html(
         "provider": profile["id"],
         "model": profile["model"],
     }
+
+
+_VOCAB_HEADING = re.compile(
+    r"(?i)(vocabulary|key\s+terms?|word\s+list|词汇|重点词|keyword|lexis|terminology|new\s+words?)"
+)
+
+_LIVE_VOCAB_TARGET = 24
+_LIVE_VOCAB_MIN = 8
+
+
+def _strip_html_tags(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", str(text or ""))).strip()
+
+
+def _parse_vocab_pairs_from_html(html: str) -> list[dict[str, str]]:
+    """Best-effort extraction of term/definition pairs from lesson HTML."""
+    raw = str(html or "")
+    pairs: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add(term: str, def_en: str, def_zh: str = "") -> None:
+        term = re.sub(r"\s+", " ", term).strip()
+        def_en = re.sub(r"\s+", " ", def_en).strip()
+        def_zh = (def_zh or def_en).strip()
+        if not term or not def_en or len(term) > 80 or len(def_en) > 200:
+            return
+        key = term.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        pairs.append({"term": term, "defEn": def_en, "defZh": def_zh})
+
+    for m in re.finditer(
+        r"(?is)<dt[^>]*>([\s\S]*?)</dt>\s*<dd[^>]*>([\s\S]*?)</dd>",
+        raw,
+    ):
+        add(_strip_html_tags(m.group(1)), _strip_html_tags(m.group(2)))
+
+    for m in re.finditer(r"(?is)<tr[^>]*>([\s\S]*?)</tr>", raw):
+        cells = re.findall(r"(?is)<t[dh][^>]*>([\s\S]*?)</t[dh]>", m.group(1))
+        if len(cells) >= 2:
+            add(_strip_html_tags(cells[0]), _strip_html_tags(cells[1]))
+
+    for m in re.finditer(r"(?is)<li[^>]*>([\s\S]*?)</li>", raw):
+        block = m.group(1)
+        strong = re.search(r"(?is)<(?:strong|b)[^>]*>([\s\S]*?)</(?:strong|b)>", block)
+        if not strong:
+            continue
+        term = _strip_html_tags(strong.group(1))
+        rest = block.replace(strong.group(0), " ")
+        rest = re.sub(r"^[:\-–—]\s*", "", _strip_html_tags(rest)).strip()
+        if rest:
+            add(term, rest)
+
+    for hm in re.finditer(r"(?is)<h[23][^>]*>([\s\S]*?)</h[23]>", raw):
+        heading = _strip_html_tags(hm.group(1))
+        if not _VOCAB_HEADING.search(heading):
+            continue
+        start = hm.end()
+        next_h = re.search(r"(?is)<h[23][^>]*>", raw[start:])
+        section = raw[start : start + next_h.start()] if next_h else raw[start : start + 12000]
+        plain = _strip_html_tags(section)
+        for line in re.split(r"[\n\r]+", plain):
+            line = line.strip()
+            if not line or len(line) < 4:
+                continue
+            for sep in (" — ", " – ", " - ", ": "):
+                if sep in line:
+                    left, right = line.split(sep, 1)
+                    add(left, right)
+                    break
+
+    return pairs
+
+
+def _normalize_vocab_terms(items: list[Any]) -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for raw in items or []:
+        if not isinstance(raw, dict):
+            continue
+        term = str(raw.get("term") or raw.get("word") or "").strip()
+        def_en = str(raw.get("defEn") or raw.get("definition") or raw.get("def") or "").strip()
+        def_zh = str(raw.get("defZh") or def_en).strip()
+        if not term or not def_en:
+            continue
+        key = term.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"term": term, "defEn": def_en, "defZh": def_zh})
+    return out
+
+
+def _merge_vocab_terms(primary: list[dict[str, str]], extra: list[dict[str, str]]) -> list[dict[str, str]]:
+    merged = _normalize_vocab_terms(primary)
+    seen = {p["term"].lower() for p in merged}
+    for item in _normalize_vocab_terms(extra):
+        key = item["term"].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(item)
+    return merged
+
+
+_LIVE_VOCAB_SYSTEM = """You are an EAP vocabulary specialist. Given lesson HTML text, produce vocabulary for classroom games (bingo + matching).
+Return ONLY valid JSON:
+{
+  "terms": [
+    {"term": "word or phrase", "defEn": "short English definition", "defZh": "Chinese definition"}
+  ]
+}
+Rules:
+- FIRST use vocabulary explicitly listed in the lesson (especially any vocabulary / key terms section).
+- If the lesson has fewer than 24 items, add important EAP terms or phrases from the lesson content until you have exactly 24.
+- Each definition: one short phrase (under 14 words), suitable as a bingo clue.
+- Terms must be distinct. Include useful collocations where appropriate.
+- Exactly 24 items."""
+
+
+def generate_live_vocab_from_html(
+    html: str,
+    *,
+    hint_terms: list[dict[str, Any]] | None = None,
+    provider: str | None = None,
+) -> dict[str, Any]:
+    """Extract or AI-generate vocabulary term/definition pairs from lesson HTML."""
+    parsed = _parse_vocab_pairs_from_html(html)
+    hints = _normalize_vocab_terms(hint_terms or [])
+    parsed = _merge_vocab_terms(parsed, hints)
+
+    if len(parsed) >= _LIVE_VOCAB_TARGET:
+        return {
+            "terms": parsed[:_LIVE_VOCAB_TARGET],
+            "source": "html",
+            "count": _LIVE_VOCAB_TARGET,
+        }
+
+    lesson_text = _lesson_plain_text_from_html(html)
+    if len(lesson_text) < 80 and len(parsed) < _LIVE_VOCAB_MIN:
+        raise ValueError("Lesson HTML has too little text to generate vocabulary")
+
+    hint_block = ""
+    if parsed:
+        hint_block = (
+            "Terms already found in the HTML (keep these; add more from the lesson to reach 24):\n"
+            + "\n".join(f"- {p['term']}: {p['defEn']}" for p in parsed[:20])
+            + "\n\n"
+        )
+
+    user_prompt = (
+        f"{hint_block}"
+        f"Lesson text (from HTML on screen):\n{lesson_text}\n\n"
+        "Return exactly 24 term/definition pairs for classroom vocabulary games."
+    )
+
+    client, profile = get_openai_client(provider)
+    response = create_chat_completion(
+        client,
+        profile,
+        messages=[
+            {"role": "system", "content": _LIVE_VOCAB_SYSTEM},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=2200,
+        temperature=0.3,
+        response_format={"type": "json_object"},
+    )
+    raw = ""
+    if response.choices:
+        raw = (response.choices[0].message.content or "").strip()
+    if not raw:
+        raise RuntimeError("Empty AI response")
+    payload = parse_ai_json_object(raw)
+    ai_terms = _normalize_vocab_terms(payload.get("terms") or payload.get("vocabulary") or [])
+    merged = _merge_vocab_terms(parsed, ai_terms)
+
+    if len(merged) < _LIVE_VOCAB_MIN:
+        raise ValueError("AI vocabulary list is too short")
+
+    source = "html+ai" if parsed else "ai"
+
+    return {
+        "terms": merged[:_LIVE_VOCAB_TARGET],
+        "source": source,
+        "count": min(len(merged), _LIVE_VOCAB_TARGET),
+        "provider": profile["id"],
+        "model": profile["model"],
+    }

@@ -89,6 +89,45 @@
     return { q: MOCK.MOCK_QUESTIONS[i % MOCK.MOCK_QUESTIONS.length], pending: false };
   }
 
+  function showVocabGameLoading() {
+    const canvas = document.getElementById("tlive-canvas-inner");
+    if (!canvas) return;
+    canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
+    canvas.innerHTML = `<div class="tlive-pq-empty tlive-pq-empty--loading">${escapeHtml(t("tlive_vocab_ai_generating"))}</div>`;
+  }
+
+  function startVocabGame(kind, onReady) {
+    const MOCK = getMock();
+    if (!MOCK) return;
+    const GV = window.EAP_LIVE_GAME_VOCAB;
+    const cached = GV && typeof GV.getCached === "function" ? GV.getCached() : null;
+    if (cached && cached.length >= (GV ? GV.MIN : 8)) {
+      window.__tliveLessonVocab = cached;
+      onReady(cached);
+      return;
+    }
+    if (window.__tliveVocabGameLoading) return;
+    window.__tliveVocabGameLoading = kind;
+    showVocabGameLoading();
+    const finish = (terms) => {
+      window.__tliveVocabGameLoading = null;
+      if (terms && terms.length >= (GV ? GV.MIN : 8)) {
+        window.__tliveLessonVocab = terms;
+        onReady(terms);
+      } else {
+        window.__tliveLessonVocab = null;
+        onReady(null);
+      }
+    };
+    if (GV && typeof GV.ensure === "function") {
+      GV.ensure()
+        .then(finish)
+        .catch(() => finish(null));
+    } else {
+      finish(null);
+    }
+  }
+
   const SIDE_PANEL_TOOLS = new Set(["poll", "quiz"]);
   const CANVAS_OVERLAY_TOOLS = new Set(["games", "timer", "wheel", "upload"]);
 
@@ -2948,7 +2987,7 @@
 
     document.getElementById("tlive-bingo-reset")?.addEventListener("click", () => {
       if (!window.confirm(t("tlive_board_reset_confirm"))) return;
-      window.__tliveBingo = MOCK.createBingoState();
+      window.__tliveBingo = MOCK.createBingoState(window.__tliveLessonVocab);
       renderVocabBingo(window.__tliveBingo);
     });
   }
@@ -3041,7 +3080,7 @@
 
     document.getElementById("tlive-matching-reset")?.addEventListener("click", () => {
       if (!window.confirm(t("tlive_board_reset_confirm"))) return;
-      window.__tliveMatching = MOCK.createMatchingState();
+      window.__tliveMatching = MOCK.createMatchingState(window.__tliveLessonVocab);
       renderMatchingRace(window.__tliveMatching);
     });
   }
@@ -3174,13 +3213,17 @@
       return;
     }
     if (game.type === "vocab_bingo" || game.id === "vocab-bingo") {
-      window.__tliveBingo = MOCK.createBingoState();
-      renderVocabBingo(window.__tliveBingo);
+      startVocabGame("bingo", (terms) => {
+        window.__tliveBingo = MOCK.createBingoState(terms);
+        renderVocabBingo(window.__tliveBingo);
+      });
       return;
     }
     if (game.type === "matching_race" || game.id === "matching-race") {
-      window.__tliveMatching = MOCK.createMatchingState();
-      renderMatchingRace(window.__tliveMatching);
+      startVocabGame("matching", (terms) => {
+        window.__tliveMatching = MOCK.createMatchingState(terms);
+        renderMatchingRace(window.__tliveMatching);
+      });
       return;
     }
     if (game.type === "quiz_battle" || game.id === "quiz-battle") {
