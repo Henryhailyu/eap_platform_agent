@@ -2952,7 +2952,6 @@
         <div class="tlive-bingo-clue">
           <p class="tlive-bingo-clue__label">${escapeHtml(t("tlive_bingo_clue"))} (${clue.index + 1}/${clue.total})</p>
           <p class="tlive-bingo-clue__text">${escapeHtml(MOCK.termDef(cell))}</p>
-          <p class="tlive-bingo-clue__hint">${escapeHtml(t("tlive_bingo_term_hint", { term: cell.term }))}</p>
         </div>
         <div class="tlive-bingo-teams">${teamBtns}</div>
         <p class="tlive-bingo-help">${escapeHtml(t("tlive_bingo_help"))}</p>

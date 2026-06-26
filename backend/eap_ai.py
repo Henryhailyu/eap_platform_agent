@@ -701,6 +701,69 @@ _VOCAB_HEADING = re.compile(
 _LIVE_VOCAB_TARGET = 24
 _LIVE_VOCAB_MIN = 8
 
+_BLOCKED_VOCAB_TERMS = frozenset({
+    "word",
+    "words",
+    "term",
+    "terms",
+    "definition",
+    "definitions",
+    "example",
+    "examples",
+    "meaning",
+    "meanings",
+    "vocabulary",
+    "title",
+    "question",
+    "answer",
+    "free",
+    "释义",
+    "词汇",
+    "单词",
+    "词",
+})
+
+_PLACEHOLDER_DEFS = frozenset({
+    "definition",
+    "definition (释义)",
+    "meaning",
+    "word",
+    "释义",
+    "词汇",
+    "单词",
+})
+
+
+def _is_valid_game_vocab_term(term: str, def_en: str) -> bool:
+    """Keep only letter-based EAP vocabulary suitable for bingo/matching."""
+    term = re.sub(r"\s+", " ", str(term or "")).strip()
+    def_en = re.sub(r"\s+", " ", str(def_en or "")).strip()
+    if not term or not def_en or len(term) > 64 or len(def_en) > 200:
+        return False
+    t_key = term.lower()
+    d_key = def_en.lower()
+    if t_key in _BLOCKED_VOCAB_TERMS or d_key in _PLACEHOLDER_DEFS:
+        return False
+    if re.search(r"(?i)definition\s*[\(（].*释义", def_en):
+        return False
+    if t_key in d_key and len(def_en) < 24:
+        return False
+    if re.search(r"\d", term):
+        return False
+    if re.search(r"[°±×÷/\\@#$%^&*+=<>{}[\]|~`]", term):
+        return False
+    if not re.match(r"^[a-zA-Z][a-zA-Z\s'\-]*$", term):
+        return False
+    if len(term.replace("-", "").replace(" ", "")) < 3:
+        return False
+    if len(def_en) < 10:
+        return False
+    return True
+
+
+def _filter_vocab_pairs(pairs: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [p for p in pairs if _is_valid_game_vocab_term(p.get("term", ""), p.get("defEn", ""))]
+
 
 def _strip_html_tags(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", str(text or ""))).strip()
@@ -716,7 +779,7 @@ def _parse_vocab_pairs_from_html(html: str) -> list[dict[str, str]]:
         term = re.sub(r"\s+", " ", term).strip()
         def_en = re.sub(r"\s+", " ", def_en).strip()
         def_zh = (def_zh or def_en).strip()
-        if not term or not def_en or len(term) > 80 or len(def_en) > 200:
+        if not _is_valid_game_vocab_term(term, def_en):
             return
         key = term.lower()
         if key in seen:
@@ -778,6 +841,8 @@ def _normalize_vocab_terms(items: list[Any]) -> list[dict[str, str]]:
         def_zh = str(raw.get("defZh") or def_en).strip()
         if not term or not def_en:
             continue
+        if not _is_valid_game_vocab_term(term, def_en):
+            continue
         key = term.lower()
         if key in seen:
             continue
@@ -807,9 +872,14 @@ Return ONLY valid JSON:
 }
 Rules:
 - FIRST use vocabulary explicitly listed in the lesson (especially any vocabulary / key terms section).
-- If the lesson has fewer than 24 items, add important EAP terms or phrases from the lesson content until you have exactly 24.
-- Each definition: one short phrase (under 14 words), suitable as a bingo clue.
-- Terms must be distinct. Include useful collocations where appropriate.
+- If the lesson has fewer than 24 items, add important EAP terms or short collocations from the lesson until you have exactly 24.
+- Terms MUST be English words or short phrases (1–4 words) made of letters, spaces, and hyphens only.
+- NEVER include numbers, units, measurements, dates, statistics, symbols, or placeholders (e.g. never "word", "term", "definition").
+- NEVER use table headers or template labels as terms or definitions.
+- Each defEn MUST be a real English definition/clue (at least 10 characters), never placeholder text like "Definition (释义)".
+- Pick one useful form per idea (prefer nouns); avoid duplicate roots (e.g. do not list both "innovation" and "innovations").
+- Each definition: one short phrase (under 14 words), suitable as a bingo clue read aloud.
+- Terms must be distinct academic/EAP vocabulary from the lesson topic.
 - Exactly 24 items."""
 
 
@@ -820,7 +890,7 @@ def generate_live_vocab_from_html(
     provider: str | None = None,
 ) -> dict[str, Any]:
     """Extract or AI-generate vocabulary term/definition pairs from lesson HTML."""
-    parsed = _parse_vocab_pairs_from_html(html)
+    parsed = _filter_vocab_pairs(_parse_vocab_pairs_from_html(html))
     hints = _normalize_vocab_terms(hint_terms or [])
     parsed = _merge_vocab_terms(parsed, hints)
 

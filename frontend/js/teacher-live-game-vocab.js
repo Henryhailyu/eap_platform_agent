@@ -10,6 +10,60 @@
   const VOCAB_HEADING = /vocabulary|key\s+terms?|word\s+list|词汇|重点词|keyword|lexis|terminology|new\s+words?/i;
   const TARGET = 24;
   const MIN = 8;
+  const CACHE_VERSION = "v2";
+
+  const BLOCKED_TERMS = new Set([
+    "word",
+    "words",
+    "term",
+    "terms",
+    "definition",
+    "definitions",
+    "example",
+    "examples",
+    "meaning",
+    "meanings",
+    "vocabulary",
+    "title",
+    "question",
+    "answer",
+    "free",
+    "释义",
+    "词汇",
+    "单词",
+    "词",
+  ]);
+
+  const PLACEHOLDER_DEFS = new Set([
+    "definition",
+    "definition (释义)",
+    "meaning",
+    "word",
+    "释义",
+    "词汇",
+    "单词",
+  ]);
+
+  function isValidGameVocab(term, defEn) {
+    const t0 = String(term || "").replace(/\s+/g, " ").trim();
+    const d0 = String(defEn || "").replace(/\s+/g, " ").trim();
+    if (!t0 || !d0 || t0.length > 64 || d0.length > 200) return false;
+    const tKey = t0.toLowerCase();
+    const dKey = d0.toLowerCase();
+    if (BLOCKED_TERMS.has(tKey) || PLACEHOLDER_DEFS.has(dKey)) return false;
+    if (/definition\s*[\(（].*释义/i.test(d0)) return false;
+    if (tKey.length && dKey.includes(tKey) && d0.length < 24) return false;
+    if (/\d/.test(t0)) return false;
+    if (/[°±×÷/\\@#$%^&*+=<>{}[\]|~`]/.test(t0)) return false;
+    if (!/^[a-zA-Z][a-zA-Z\s'\-]*$/.test(t0)) return false;
+    if (t0.replace(/[-\s]/g, "").length < 3) return false;
+    if (d0.length < 10) return false;
+    return true;
+  }
+
+  function filterValidTerms(items) {
+    return normalizeTerms(items).filter((item) => isValidGameVocab(item.term, item.defEn));
+  }
 
   function getLessonHtmlCached() {
     try {
@@ -21,7 +75,7 @@
 
   function lessonHtmlFingerprint(html) {
     const text = String(html || "");
-    return `${text.length}:${text.slice(0, 280)}`;
+    return `${CACHE_VERSION}:${text.length}:${text.slice(0, 280)}`;
   }
 
   function stripTags(text) {
@@ -39,7 +93,7 @@
       const term = String(raw.term || raw.word || "").trim();
       const defEn = String(raw.defEn || raw.definition || raw.def || "").trim();
       const defZh = String(raw.defZh || defEn).trim();
-      if (!term || !defEn) return;
+      if (!isValidGameVocab(term, defEn)) return;
       const key = term.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
@@ -52,7 +106,7 @@
     const t0 = String(term || "").replace(/\s+/g, " ").trim();
     const d0 = String(defEn || "").replace(/\s+/g, " ").trim();
     const z0 = String(defZh || d0).trim();
-    if (!t0 || !d0 || t0.length > 80 || d0.length > 200) return;
+    if (!isValidGameVocab(t0, d0)) return;
     const key = t0.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
@@ -118,14 +172,15 @@
       }
     });
 
-    return pairs;
+    return filterValidTerms(pairs);
   }
 
   function getCached() {
     const fp = lessonHtmlFingerprint(getLessonHtmlCached());
     const cache = global.__tliveAiQuestionCache;
     if (!cache || cache.fingerprint !== fp || !Array.isArray(cache.vocabTerms)) return null;
-    return cache.vocabTerms;
+    const terms = filterValidTerms(cache.vocabTerms);
+    return terms.length >= MIN ? terms : null;
   }
 
   function setCached(terms) {
@@ -153,12 +208,12 @@
       return terms;
     }
 
-    if (inflight) return inflight;
-
     const api = global.EAP_LIVE_TEACHING_API;
     if (!api || typeof api.generateVocab !== "function") {
       return parsed.length >= MIN ? parsed : null;
     }
+
+    if (inflight) return inflight;
 
     inflight = (async () => {
       try {
