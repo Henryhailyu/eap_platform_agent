@@ -291,6 +291,7 @@ def ensure_listening_audio(
     script_en: str,
     *,
     segments: list[dict[str, Any]] | None = None,
+    cos_namespace: str = "listening-v2",
 ) -> dict[str, Any] | None:
     if not tts_ready():
         return None
@@ -300,7 +301,7 @@ def ensure_listening_audio(
         if isinstance(seg, dict) and str(seg.get("text") or "").strip()
     ]
     if len(turns) >= 2:
-        playlist = ensure_dialogue_playlist_audio(item_id, turns, cos_namespace="listening")
+        playlist = ensure_dialogue_playlist_audio(item_id, turns, cos_namespace=cos_namespace)
         if playlist:
             return playlist
     try:
@@ -312,7 +313,7 @@ def ensure_listening_audio(
                 voice = _voice_id_for_gender(seg.get("gender"))
                 speaker = str(seg.get("speaker") or f"Part {i + 1}")
                 meta = ensure_tts_audio(
-                    f"listening/item-{item_id}-seg-{i}.mp3",
+                    f"{cos_namespace}/item-{item_id}-seg-{i}.mp3",
                     text,
                     voice_type=voice,
                 )
@@ -334,11 +335,11 @@ def ensure_listening_audio(
         if len(part_segs) == 1:
             seg = part_segs[0]
             return ensure_tts_audio(
-                f"listening/item-{item_id}.mp3",
+                f"{cos_namespace}/item-{item_id}.mp3",
                 str(seg.get("text") or script_en),
                 voice_type=_voice_id_for_gender(seg.get("gender")),
             )
-        return ensure_tts_audio(f"listening/item-{item_id}.mp3", script_en)
+        return ensure_tts_audio(f"{cos_namespace}/item-{item_id}.mp3", script_en)
     except Exception as exc:
         log.warning("Listening TTS failed for item %s: %s", item_id, exc)
         return None

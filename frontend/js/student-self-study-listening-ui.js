@@ -134,6 +134,7 @@
   function speakSegmentAt(root, index) {
     const seg = speechCtl.segments[index];
     if (!seg || !seg.text) return;
+    speechCtl.voice = pickSpeechVoice(seg.gender);
     const utter = new global.SpeechSynthesisUtterance(seg.text);
     utter.lang = "en-GB";
     utter.rate = 0.92;

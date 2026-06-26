@@ -7,6 +7,8 @@ import json
 import re
 from typing import Any
 
+from self_study_dialogue import assign_dialogue_genders
+
 _MIN_SCRIPT_WORDS = 650
 _MIN_QUESTION_COUNT = 10
 
@@ -107,9 +109,9 @@ def normalize_listening_content(raw: dict[str, Any]) -> dict[str, Any]:
 
     turns = []
     for t in raw.get("turns") or []:
-        gender = str(t.get("gender") or "female").lower()
+        gender = str(t.get("gender") or "").lower()
         if gender not in ("male", "female"):
-            gender = "female"
+            gender = ""
         turns.append(
             {
                 "speaker": str(t.get("speaker") or "Speaker").strip(),
@@ -117,6 +119,8 @@ def normalize_listening_content(raw: dict[str, Any]) -> dict[str, Any]:
                 "text": str(t.get("text") or "").strip(),
             }
         )
+    if part_type == "P3" and turns:
+        turns = assign_dialogue_genders(turns)
 
     paragraphs = [str(p).strip() for p in (raw.get("paragraphs") or []) if str(p).strip()]
     script_en = str(raw.get("scriptEn") or "").strip()

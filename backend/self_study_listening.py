@@ -13,7 +13,8 @@ from typing import Any, Callable
 
 from flask import Response, jsonify, request
 
-from tencent_audio import audio_status, ensure_listening_audio, expand_playback_segments
+from self_study_dialogue import listening_turns_from_content
+from tencent_audio import audio_status, ensure_dialogue_playlist_audio, ensure_listening_audio, expand_playback_segments
 
 LISTENING_SKILL = "listening"
 
@@ -1022,29 +1023,9 @@ def _ensure_item_for_day(
 
 def _playback_segments(content: dict[str, Any]) -> list[dict[str, Any]]:
     """Audio-only segments (text not shown in listen UI; script stays hidden)."""
-    raw: list[dict[str, Any]] = []
-    for t in content.get("turns") or []:
-        text = str(t.get("text") or "").strip()
-        if not text:
-            continue
-        raw.append(
-            {
-                "speaker": str(t.get("speaker") or "Speaker").strip(),
-                "gender": str(t.get("gender") or "female").lower(),
-                "text": text,
-            }
-        )
-    if raw:
-        return expand_playback_segments(raw)
-    for p in content.get("paragraphs") or []:
-        text = str(p).strip()
-        if text:
-            raw.append({"speaker": "Lecturer", "gender": "female", "text": text})
-    if raw:
-        return expand_playback_segments(raw)
-    script = str(content.get("scriptEn") or "").strip()
-    if script:
-        return expand_playback_segments([{"speaker": "Lecturer", "gender": "female", "text": script}])
+    rows = listening_turns_from_content(content)
+    if rows:
+        return expand_playback_segments(rows)
     return []
 
 
@@ -1283,8 +1264,22 @@ def register_self_study_listening_routes(
             (username, item["id"]),
         ).fetchone()
         script_en = content.get("scriptEn") or ""
-        playback_segments = _playback_segments(content)
-        audio = ensure_listening_audio(item["id"], script_en, segments=playback_segments)
+        turn_rows = listening_turns_from_content(content)
+        playback_segments = expand_playback_segments(turn_rows) if turn_rows else []
+        audio: dict[str, Any] | None = None
+        if turn_rows:
+            audio = ensure_dialogue_playlist_audio(
+                item["id"],
+                turn_rows,
+                cos_namespace="listening-v2",
+            )
+        if not audio or not (audio.get("url") or audio.get("segments")):
+            audio = ensure_listening_audio(
+                item["id"],
+                script_en,
+                segments=turn_rows,
+                cos_namespace="listening-v2",
+            )
         conn.close()
 
         return jsonify(
