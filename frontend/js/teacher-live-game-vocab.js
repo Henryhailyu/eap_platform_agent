@@ -10,7 +10,6 @@
   const VOCAB_HEADING = /vocabulary|key\s+terms?|word\s+list|词汇|重点词|keyword|lexis|terminology|new\s+words?/i;
   const TARGET = 24;
   const MIN = 8;
-  const CACHE_VERSION = "v3";
 
   const BLOCKED_TERMS = new Set([
     "word",
@@ -75,6 +74,9 @@
   }
 
   function getLessonHtmlCached() {
+    if (typeof global.EAP_getActiveLessonHtml === "function") {
+      return global.EAP_getActiveLessonHtml();
+    }
     try {
       return global.sessionStorage?.getItem("eap_last_lesson_html") || "";
     } catch (_) {
@@ -83,8 +85,18 @@
   }
 
   function lessonHtmlFingerprint(html) {
+    if (typeof global.EAP_lessonHtmlFingerprint === "function") {
+      return global.EAP_lessonHtmlFingerprint(html);
+    }
     const text = String(html || "");
-    return `${CACHE_VERSION}:${text.length}:${text.slice(0, 280)}`;
+    return `${text.length}:${text.slice(0, 280)}`;
+  }
+
+  function getLessonPageId() {
+    if (typeof global.EAP_getActiveLessonPageId === "function") {
+      return global.EAP_getActiveLessonPageId();
+    }
+    return global.__tliveLessonPageId || "";
   }
 
   function stripTags(text) {
@@ -226,7 +238,11 @@
 
     inflight = (async () => {
       try {
-        const data = await api.generateVocab({ html, hint_terms: parsed });
+        const data = await api.generateVocab({
+          html,
+          hint_terms: parsed,
+          lesson_page_id: getLessonPageId(),
+        });
         const terms = normalizeTerms((data && data.terms) || []);
         if (terms.length < MIN) {
           throw new Error(t("tlive_vocab_ai_failed"));

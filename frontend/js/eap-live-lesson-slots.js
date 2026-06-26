@@ -216,9 +216,83 @@
     return slots;
   }
 
-  function syncLessonSlotsFromHtml(html) {
+  const LIVE_LESSON_FP_VERSION = "live-v5";
+
+  function getActiveLessonHtml() {
+    const cache = global.__tliveLessonCache;
+    if (cache && cache.type === "html" && cache.html) {
+      return String(cache.html);
+    }
+    if (cache && cache.type === "file") {
+      return "";
+    }
+    try {
+      return global.sessionStorage?.getItem("eap_last_lesson_html") || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function getActiveLessonPageId() {
+    if (global.__tliveLessonPageId != null && global.__tliveLessonPageId !== "") {
+      return String(global.__tliveLessonPageId);
+    }
+    const cache = global.__tliveLessonCache;
+    if (cache && cache.pageId != null && cache.pageId !== "") {
+      return String(cache.pageId);
+    }
+    try {
+      return global.sessionStorage?.getItem("eap_last_lesson_page_id") || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function sampleHtmlHash(text) {
+    let hash = 0;
+    const step = Math.max(1, Math.floor(text.length / 640));
+    for (let i = 0; i < text.length; i += step) {
+      hash = (hash * 33 + text.charCodeAt(i)) | 0;
+    }
+    return hash;
+  }
+
+  function lessonHtmlFingerprint(html, pageId) {
+    const text = String(html != null ? html : getActiveLessonHtml());
+    const pid = pageId != null && pageId !== "" ? String(pageId) : getActiveLessonPageId();
+    const len = text.length;
+    const head = text.slice(0, 200);
+    const mid =
+      len > 400 ? text.slice(Math.floor(len / 2) - 80, Math.floor(len / 2) + 80) : "";
+    const tail = len > 120 ? text.slice(-120) : text;
+    return `${LIVE_LESSON_FP_VERSION}:${pid}:${len}:${sampleHtmlHash(text)}:${head}:${mid}:${tail.slice(0, 80)}`;
+  }
+
+  function invalidateLiveLessonAiCache() {
+    global.__tliveAiQuestionCache = null;
+    global.__tlivePollDraft = null;
+    global.__tliveQuizDraft = null;
+    global.__tliveLessonVocab = null;
+    global.__tliveOverrideQuestion = null;
+    global.__tliveGameQuestionLoading = null;
+    global.__tliveVocabGameLoading = null;
+  }
+
+  function syncLessonSlotsFromHtml(html, opts) {
     const text = String(html || "");
     if (!text) return;
+    const pageId =
+      opts && opts.pageId != null && opts.pageId !== ""
+        ? opts.pageId
+        : global.__tliveLessonPageId;
+    if (pageId != null && pageId !== "") {
+      global.__tliveLessonPageId = pageId;
+      try {
+        global.sessionStorage?.setItem("eap_last_lesson_page_id", String(pageId));
+      } catch (_) {
+        /* ignore */
+      }
+    }
     if (typeof global.EAP_parseLessonMetaFromHtml === "function") {
       const meta = global.EAP_parseLessonMetaFromHtml(text);
       global.__tliveLessonPlanSegments = meta.segments || [];
@@ -231,11 +305,10 @@
     } catch (_) {
       /* ignore */
     }
-    const fp = `${text.length}:${text.slice(0, 280)}`;
-    if (global.__tliveAiQuestionCache && global.__tliveAiQuestionCache.fingerprint !== fp) {
-      global.__tliveAiQuestionCache = null;
-      global.__tlivePollDraft = null;
-      global.__tliveQuizDraft = null;
+    const fp = lessonHtmlFingerprint(text, pageId);
+    if (!global.__tliveLessonHtmlFingerprint || global.__tliveLessonHtmlFingerprint !== fp) {
+      invalidateLiveLessonAiCache();
+      global.__tliveLessonHtmlFingerprint = fp;
     }
   }
 
@@ -303,4 +376,8 @@
   global.EAP_gameSlotsPhase1 = gameSlotsPhase1;
   global.EAP_liveSlotLabel = slotLabel;
   global.EAP_syncLessonSlotsFromHtml = syncLessonSlotsFromHtml;
+  global.EAP_getActiveLessonHtml = getActiveLessonHtml;
+  global.EAP_getActiveLessonPageId = getActiveLessonPageId;
+  global.EAP_lessonHtmlFingerprint = lessonHtmlFingerprint;
+  global.EAP_invalidateLiveLessonAiCache = invalidateLiveLessonAiCache;
 })(typeof window !== "undefined" ? window : globalThis);

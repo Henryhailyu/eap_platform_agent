@@ -68,6 +68,9 @@
   }
 
   function getLessonHtmlCached() {
+    if (typeof global.EAP_getActiveLessonHtml === "function") {
+      return global.EAP_getActiveLessonHtml();
+    }
     try {
       return global.sessionStorage?.getItem("eap_last_lesson_html") || "";
     } catch (_) {
@@ -76,8 +79,18 @@
   }
 
   function lessonHtmlFingerprint(html) {
+    if (typeof global.EAP_lessonHtmlFingerprint === "function") {
+      return global.EAP_lessonHtmlFingerprint(html);
+    }
     const text = String(html || "");
     return `${text.length}:${text.slice(0, 280)}`;
+  }
+
+  function getLessonPageId() {
+    if (typeof global.EAP_getActiveLessonPageId === "function") {
+      return global.EAP_getActiveLessonPageId();
+    }
+    return global.__tliveLessonPageId || "";
   }
 
   function getAiQuestionCache(tool) {
@@ -224,9 +237,9 @@
     if (!canvas || !MOCK) return;
 
     try {
-      const cached = global.sessionStorage?.getItem("eap_last_lesson_html");
+      const cached = getLessonHtmlCached();
       if (cached && typeof global.EAP_syncLessonSlotsFromHtml === "function") {
-        global.EAP_syncLessonSlotsFromHtml(cached);
+        global.EAP_syncLessonSlotsFromHtml(cached, { pageId: getLessonPageId() });
       }
     } catch (_) {
       /* ignore */
@@ -396,7 +409,11 @@
     global.__tliveAiQuestionLoading = tool;
     ui.refreshAiList();
     try {
-      const data = await api.generateQuestion({ html, tool });
+      const data = await api.generateQuestion({
+        html,
+        tool,
+        lesson_page_id: getLessonPageId(),
+      });
       const q = data && data.question;
       if (!q || !Array.isArray(q.optionsEn) || q.optionsEn.length < 2) {
         throw new Error(t("tlive_pq_ai_generate_failed"));

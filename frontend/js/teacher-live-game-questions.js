@@ -9,6 +9,9 @@
   }
 
   function getLessonHtmlCached() {
+    if (typeof global.EAP_getActiveLessonHtml === "function") {
+      return global.EAP_getActiveLessonHtml();
+    }
     try {
       return global.sessionStorage?.getItem("eap_last_lesson_html") || "";
     } catch (_) {
@@ -17,8 +20,18 @@
   }
 
   function lessonHtmlFingerprint(html) {
+    if (typeof global.EAP_lessonHtmlFingerprint === "function") {
+      return global.EAP_lessonHtmlFingerprint(html);
+    }
     const text = String(html || "");
     return `${text.length}:${text.slice(0, 280)}`;
+  }
+
+  function getLessonPageId() {
+    if (typeof global.EAP_getActiveLessonPageId === "function") {
+      return global.EAP_getActiveLessonPageId();
+    }
+    return global.__tliveLessonPageId || "";
   }
 
   function getCacheRoot() {
@@ -111,6 +124,7 @@
           tool: "game",
           question_index: i,
           avoid_questions: collectAvoidQuestions(i),
+          lesson_page_id: getLessonPageId(),
         });
         const q = data && data.question;
         if (!q || !Array.isArray(q.optionsEn) || q.optionsEn.length < 2) {
