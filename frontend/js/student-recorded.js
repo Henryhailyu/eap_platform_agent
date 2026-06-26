@@ -204,7 +204,6 @@
       const fsBtn = document.createElement("a");
       fsBtn.className = "btn-secondary srec-lesson-card__fs-btn";
       fsBtn.href = `player.html?id=${lesson.id}&role=student&title=${encodeURIComponent(lesson.title || "")}`;
-      fsBtn.target = "_blank";
       fsBtn.rel = "noopener noreferrer";
       fsBtn.textContent = t("srec_open_player");
       actions.appendChild(fsBtn);

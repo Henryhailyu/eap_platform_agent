@@ -80,12 +80,15 @@
       role === "student"
         ? `/api/student/recorded-lessons/${lessonId}/stream`
         : `/api/teacher/recorded-lessons/${lessonId}/stream`;
-    return appendAccessToken(apiUrl(prefix));
+    return appendAccessToken(apiUrl(prefix), role);
   }
 
   const ACCESS_TOKEN_KEY = "eap_access_token";
 
-  function readAccessToken() {
+  function readAccessToken(roleHint) {
+    if (typeof global.EAP_getAccessToken === "function") {
+      return global.EAP_getAccessToken(roleHint);
+    }
     try {
       return sessionStorage.getItem(ACCESS_TOKEN_KEY) || "";
     } catch (_) {
@@ -94,11 +97,11 @@
   }
 
   /** HTML5 media elements cannot send Authorization — pass Bearer token in the query string. */
-  function appendAccessToken(url) {
+  function appendAccessToken(url, roleHint) {
     const base = String(url || "").trim();
     if (!base) return base;
     if (/[?&]access_token=/.test(base)) return base;
-    const token = readAccessToken();
+    const token = readAccessToken(roleHint);
     if (!token) return base;
     const sep = base.includes("?") ? "&" : "?";
     return `${base}${sep}access_token=${encodeURIComponent(token)}`;
@@ -152,8 +155,8 @@
     studentPlayAuth(lessonId) {
       return apiFetch(`/api/student/recorded-lessons/${lessonId}/play-auth`);
     },
-    appendAccessToken(url) {
-      return appendAccessToken(url);
+    appendAccessToken(url, roleHint) {
+      return appendAccessToken(url, roleHint);
     },
     bindStreamMediaError(el, onFail) {
       bindStreamMediaError(el, onFail);

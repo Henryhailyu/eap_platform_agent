@@ -1618,6 +1618,8 @@ def get_current_authenticated_user(conn):
             row = load_user_by_id_for_auth(conn, uid)
             if row is not None and user_is_authorized(row):
                 return row
+        # Token was sent (header or stream URL) but is invalid — do not use another role's session cookie.
+        return None
     user = get_current_session_user(conn)
     if user is not None:
         return user

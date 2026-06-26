@@ -262,6 +262,11 @@ const SESSION_USER_KEY = "eap_user";
 /** Per-tab Bearer token — allows teacher + student tabs in the same browser. */
 const ACCESS_TOKEN_KEY = "eap_access_token";
 
+function accessTokenStorageKey(role) {
+  const r = String(role || "").trim().toLowerCase();
+  return r ? `${ACCESS_TOKEN_KEY}_${r}` : ACCESS_TOKEN_KEY;
+}
+
 /**
  * sessionStorage (built into the browser):
  * - Saves key/value strings for THIS TAB only.
@@ -287,20 +292,54 @@ function authStorageRemoveAll() {
   sessionStorage.removeItem(SESSION_USER_KEY);
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(SESSION_USER_KEY);
+  ["student", "teacher", "admin", "manager"].forEach((role) => {
+    localStorage.removeItem(accessTokenStorageKey(role));
+  });
 }
 
-function getAccessToken() {
+function getAccessToken(roleHint) {
   try {
-    return sessionStorage.getItem(ACCESS_TOKEN_KEY) || "";
+    const hints = [];
+    if (typeof window !== "undefined" && window.EAP_AUTH_ROLE_HINT) {
+      hints.push(window.EAP_AUTH_ROLE_HINT);
+    }
+    if (roleHint) hints.push(roleHint);
+    const logged = getLoggedInUser();
+    if (logged && logged.role) hints.push(logged.role);
+
+    const seen = new Set();
+    for (const raw of hints) {
+      const r = String(raw || "").trim().toLowerCase();
+      if (!r || seen.has(r)) continue;
+      seen.add(r);
+      const scoped = localStorage.getItem(accessTokenStorageKey(r));
+      if (scoped) return scoped;
+    }
+
+    const fromSession = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    if (fromSession) return fromSession;
+
+    for (const r of ["student", "teacher", "admin"]) {
+      if (seen.has(r)) continue;
+      const stored = localStorage.getItem(accessTokenStorageKey(r));
+      if (stored) return stored;
+    }
+    return "";
   } catch {
     return "";
   }
 }
 
-function saveAccessToken(token) {
+function saveAccessToken(token, role) {
   if (!token) return;
+  const r =
+    role ||
+    (typeof window !== "undefined" && window.EAP_AUTH_ROLE_HINT) ||
+    (getLoggedInUser() && getLoggedInUser().role) ||
+    "";
   try {
     sessionStorage.setItem(ACCESS_TOKEN_KEY, String(token));
+    if (r) localStorage.setItem(accessTokenStorageKey(r), String(token));
   } catch {
     /* ignore */
   }
@@ -310,7 +349,8 @@ function saveAccessToken(token) {
 function getAuthHeaders(extraHeaders) {
   const headers =
     extraHeaders && typeof extraHeaders === "object" ? { ...extraHeaders } : {};
-  const token = getAccessToken();
+  const logged = getLoggedInUser();
+  const token = getAccessToken(logged && logged.role);
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
@@ -325,6 +365,7 @@ function eapFetch(url, options) {
 if (typeof window !== "undefined") {
   window.EAP_API_BASE_RESOLVED = API_BASE;
   window.EAP_getAuthHeaders = getAuthHeaders;
+  window.EAP_getAccessToken = getAccessToken;
   window.EAP_fetch = eapFetch;
   window.eapPostMultipart = eapPostMultipart;
 }
@@ -2789,7 +2830,6 @@ function appendTaskRecordedLessonBlock(parent, task, role) {
       fsBtn.className = "btn-secondary eap-inline-recording__fullscreen-btn";
       const titleEnc = encodeURIComponent(rec.title || rec.file_name || "");
       fsBtn.href = `player.html?id=${rec.id}&role=student&title=${titleEnc}`;
-      fsBtn.target = "_blank";
       fsBtn.rel = "noopener noreferrer";
       fsBtn.textContent =
         visible.length > 1
@@ -3224,7 +3264,7 @@ function setupRoleLoginCard(config) {
         return;
       }
 
-      if (data.access_token) saveAccessToken(data.access_token);
+      if (data.access_token) saveAccessToken(data.access_token, data.user.role);
 
       const nextAfterLogin = loginNextRedirectUrl(expectedRole);
       if (nextAfterLogin) {

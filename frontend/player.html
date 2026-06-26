@@ -184,7 +184,7 @@
         if (code === 4) return t("srec_playback_unsupported");
         return t("srec_playback_failed");
       }
-      function playLocal(streamUrl, titleParam, fileExt) {
+      function playLocal(streamUrl, titleParam, fileExt, authRole) {
         hideLoading();
         var api = window.EAP_RECORDED_LESSONS;
         var resolved = streamUrl;
@@ -192,7 +192,8 @@
           resolved = api.appendAccessToken(
             String(streamUrl).indexOf("http") === 0
               ? streamUrl
-              : (window.location.origin + streamUrl)
+              : (window.location.origin + streamUrl),
+            authRole || "student"
           );
         }
         var ext = (fileExt || resolved.split("?")[0].split(".").pop() || "").toLowerCase();
@@ -246,24 +247,10 @@
           if (titleEl) titleEl.textContent = decodeURIComponent(titleParam);
         }
       }
-      function boot() {
-        var params = new URLSearchParams(location.search);
-        var id = params.get("id");
-        var role = params.get("role") || "student";
-        var titleParam = params.get("title");
-        if (!id || !/^\d+$/.test(id)) {
-          showError("No recording ID in URL.");
-          return;
-        }
+      function startPlayback(id, role, titleParam) {
         var api = window.EAP_RECORDED_LESSONS;
-        if (!api) { showError("Player not ready — please reload."); return; }
-        if (titleParam) {
-          var titleEl = document.getElementById("player-title");
-          if (titleEl) titleEl.textContent = decodeURIComponent(titleParam);
-          document.title = decodeURIComponent(titleParam) + " — EAP Platform";
-        }
         if (role === "teacher") {
-          playLocal(api.teacherStreamUrl(Number(id)), titleParam, "");
+          playLocal(api.teacherStreamUrl(Number(id)), titleParam, "", "teacher");
           return;
         }
         api.studentPlayAuth(Number(id))
@@ -281,7 +268,7 @@
                   ? auth.streamUrl
                   : (window.location.origin + auth.streamUrl))
               : api.studentStreamUrl(Number(id));
-            playLocal(url, titleParam, auth && auth.fileExt);
+            playLocal(url, titleParam, auth && auth.fileExt, "student");
           })
           .catch(function (err) {
             if (err && err.status === 202) {
@@ -296,13 +283,36 @@
               showError(err.message);
               return;
             }
-            playLocal(api.studentStreamUrl(Number(id)), titleParam, "");
+            playLocal(api.studentStreamUrl(Number(id)), titleParam, "", "student");
           });
       }
+      async function boot() {
+        var params = new URLSearchParams(location.search);
+        var id = params.get("id");
+        var role = params.get("role") || "student";
+        var titleParam = params.get("title");
+        if (!id || !/^\d+$/.test(id)) {
+          showError("No recording ID in URL.");
+          return;
+        }
+        window.EAP_AUTH_ROLE_HINT = role;
+        var api = window.EAP_RECORDED_LESSONS;
+        if (!api) { showError("Player not ready — please reload."); return; }
+        if (titleParam) {
+          var titleEl = document.getElementById("player-title");
+          if (titleEl) titleEl.textContent = decodeURIComponent(titleParam);
+          document.title = decodeURIComponent(titleParam) + " — EAP Platform";
+        }
+        if (role === "student" && typeof validatePageSessionOrFallback === "function") {
+          var user = await validatePageSessionOrFallback("student");
+          if (!user) return;
+        }
+        startPlayback(id, role, titleParam);
+      }
       if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", boot);
+        document.addEventListener("DOMContentLoaded", function () { void boot(); });
       } else {
-        boot();
+        void boot();
       }
     })();
     </script>
