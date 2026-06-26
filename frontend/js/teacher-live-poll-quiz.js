@@ -87,6 +87,10 @@
   }
 
   function getLessonPageId() {
+    if (typeof global.EAP_resolveActiveLessonPageId === "function") {
+      const resolved = global.EAP_resolveActiveLessonPageId();
+      if (resolved) return resolved;
+    }
     if (typeof global.EAP_getActiveLessonPageId === "function") {
       return global.EAP_getActiveLessonPageId();
     }
@@ -394,6 +398,9 @@
   }
 
   async function ensureAiGeneratedQuestion(tool, MOCK, ui) {
+    if (typeof global.EAP_ensureActiveLessonSynced === "function") {
+      await global.EAP_ensureActiveLessonSynced();
+    }
     if (getToolSlots(tool).length) return;
     const html = getLessonHtmlCached();
     if (!html || html.length < 80) return;

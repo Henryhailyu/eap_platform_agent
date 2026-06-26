@@ -504,6 +504,29 @@ def _teacher_activity_stats_payload(conn, sess, page_id=None):
     }
 
 
+def _resolve_live_lesson_html(conn, body: dict) -> str:
+    """Prefer saved teaching-page HTML when lesson_page_id is provided (LT-M3)."""
+    page_id_raw = body.get("lesson_page_id") or body.get("page_id")
+    client_html = str(body.get("html") or body.get("lesson_html") or "").strip()
+    if page_id_raw is not None and str(page_id_raw).strip():
+        try:
+            page_id = int(page_id_raw)
+        except (TypeError, ValueError):
+            page_id = None
+        if page_id:
+            row = conn.execute(
+                "SELECT html_content FROM teacher_teaching_pages WHERE id = ?",
+                (page_id,),
+            ).fetchone()
+            if row and row["html_content"]:
+                from teacher_teaching_pages import polish_teaching_html
+
+                db_html = polish_teaching_html(row["html_content"]).strip()
+                if len(db_html) >= 80:
+                    return db_html
+    return client_html
+
+
 def register_live_teaching_routes(app):
     from flask import jsonify, request
 
@@ -533,37 +556,37 @@ def register_live_teaching_routes(app):
             err = require_session_role_if_enabled(conn, "teacher")
             if err is not None:
                 return err
+
+            body = request.get_json(silent=True) or {}
+            html = _resolve_live_lesson_html(conn, body)
+            tool = str(body.get("tool") or "poll").strip().lower()
+            question_index = body.get("question_index", 0)
+            raw_avoid = body.get("avoid_questions") or []
+            avoid_questions = (
+                [str(x).strip() for x in raw_avoid if str(x).strip()]
+                if isinstance(raw_avoid, list)
+                else []
+            )
+            if not html:
+                return jsonify({"error": "html is required"}), 400
+            if len(html) > 200_000:
+                return jsonify({"error": "html too large"}), 400
+
+            try:
+                result = generate_live_question_from_html(
+                    html,
+                    tool=tool,
+                    question_index=question_index,
+                    avoid_questions=avoid_questions,
+                )
+                return jsonify(result)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except Exception as exc:  # noqa: BLE001
+                log.warning("live generate-question failed: %s", format_ai_error(exc))
+                return jsonify({"error": "AI request failed", "detail": format_ai_error(exc)}), 502
         finally:
             conn.close()
-
-        body = request.get_json(silent=True) or {}
-        html = str(body.get("html") or body.get("lesson_html") or "").strip()
-        tool = str(body.get("tool") or "poll").strip().lower()
-        question_index = body.get("question_index", 0)
-        raw_avoid = body.get("avoid_questions") or []
-        avoid_questions = (
-            [str(x).strip() for x in raw_avoid if str(x).strip()]
-            if isinstance(raw_avoid, list)
-            else []
-        )
-        if not html:
-            return jsonify({"error": "html is required"}), 400
-        if len(html) > 200_000:
-            return jsonify({"error": "html too large"}), 400
-
-        try:
-            result = generate_live_question_from_html(
-                html,
-                tool=tool,
-                question_index=question_index,
-                avoid_questions=avoid_questions,
-            )
-            return jsonify(result)
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
-        except Exception as exc:  # noqa: BLE001
-            log.warning("live generate-question failed: %s", format_ai_error(exc))
-            return jsonify({"error": "AI request failed", "detail": format_ai_error(exc)}), 502
 
     @app.route("/api/teacher/live/generate-vocab", methods=["POST"])
     def teacher_live_generate_vocab():
@@ -591,26 +614,26 @@ def register_live_teaching_routes(app):
             err = require_session_role_if_enabled(conn, "teacher")
             if err is not None:
                 return err
+
+            body = request.get_json(silent=True) or {}
+            html = _resolve_live_lesson_html(conn, body)
+            raw_hints = body.get("hint_terms") or body.get("terms") or []
+            hint_terms = raw_hints if isinstance(raw_hints, list) else []
+            if not html:
+                return jsonify({"error": "html is required"}), 400
+            if len(html) > 200_000:
+                return jsonify({"error": "html too large"}), 400
+
+            try:
+                result = generate_live_vocab_from_html(html, hint_terms=hint_terms)
+                return jsonify(result)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except Exception as exc:  # noqa: BLE001
+                log.warning("live generate-vocab failed: %s", format_ai_error(exc))
+                return jsonify({"error": "AI request failed", "detail": format_ai_error(exc)}), 502
         finally:
             conn.close()
-
-        body = request.get_json(silent=True) or {}
-        html = str(body.get("html") or body.get("lesson_html") or "").strip()
-        raw_hints = body.get("hint_terms") or body.get("terms") or []
-        hint_terms = raw_hints if isinstance(raw_hints, list) else []
-        if not html:
-            return jsonify({"error": "html is required"}), 400
-        if len(html) > 200_000:
-            return jsonify({"error": "html too large"}), 400
-
-        try:
-            result = generate_live_vocab_from_html(html, hint_terms=hint_terms)
-            return jsonify(result)
-        except ValueError as exc:
-            return jsonify({"error": str(exc)}), 400
-        except Exception as exc:  # noqa: BLE001
-            log.warning("live generate-vocab failed: %s", format_ai_error(exc))
-            return jsonify({"error": "AI request failed", "detail": format_ai_error(exc)}), 502
 
     @app.route("/api/teacher/live/sessions", methods=["POST"])
     def teacher_live_create_session():

@@ -93,6 +93,10 @@
   }
 
   function getLessonPageId() {
+    if (typeof global.EAP_resolveActiveLessonPageId === "function") {
+      const resolved = global.EAP_resolveActiveLessonPageId();
+      if (resolved) return resolved;
+    }
     if (typeof global.EAP_getActiveLessonPageId === "function") {
       return global.EAP_getActiveLessonPageId();
     }
@@ -216,6 +220,9 @@
   let inflight = null;
 
   async function ensure() {
+    if (typeof global.EAP_ensureActiveLessonSynced === "function") {
+      await global.EAP_ensureActiveLessonSynced();
+    }
     const cached = getCached();
     if (cached && cached.length >= MIN) return cached;
 

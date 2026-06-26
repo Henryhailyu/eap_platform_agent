@@ -28,6 +28,10 @@
   }
 
   function getLessonPageId() {
+    if (typeof global.EAP_resolveActiveLessonPageId === "function") {
+      const resolved = global.EAP_resolveActiveLessonPageId();
+      if (resolved) return resolved;
+    }
     if (typeof global.EAP_getActiveLessonPageId === "function") {
       return global.EAP_getActiveLessonPageId();
     }
@@ -105,6 +109,9 @@
   const inflight = {};
 
   async function ensure(index, MOCK) {
+    if (typeof global.EAP_ensureActiveLessonSynced === "function") {
+      await global.EAP_ensureActiveLessonSynced();
+    }
     const i = Number.isInteger(index) ? index : 0;
     const existing = resolveSync(MOCK, i);
     if (existing) return existing;

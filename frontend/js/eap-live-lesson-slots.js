@@ -276,6 +276,7 @@
     global.__tliveOverrideQuestion = null;
     global.__tliveGameQuestionLoading = null;
     global.__tliveVocabGameLoading = null;
+    global.__tliveGameQuestionFailed = null;
   }
 
   function syncLessonSlotsFromHtml(html, opts) {
@@ -310,6 +311,51 @@
       invalidateLiveLessonAiCache();
       global.__tliveLessonHtmlFingerprint = fp;
     }
+  }
+
+  function resolveLessonPageId(pageId) {
+    if (pageId != null && pageId !== "") return String(pageId);
+    if (typeof global.EAP_resolveActiveLessonPageId === "function") {
+      const resolved = global.EAP_resolveActiveLessonPageId();
+      if (resolved) return String(resolved);
+    }
+    return getActiveLessonPageId();
+  }
+
+  async function refreshActiveLessonHtmlFromServer(pageId) {
+    const pid = resolveLessonPageId(pageId);
+    if (!pid) return null;
+    const cache = global.__tliveLessonCache;
+    if (cache && cache.type === "file") return null;
+    const api = global.EAP_TEACHER_TEACHING_PAGES;
+    if (!api || typeof api.getPage !== "function") return null;
+    try {
+      const page = await api.getPage(pid);
+      const html = page && page.html_content ? String(page.html_content) : "";
+      if (html.length < 80) return null;
+      const title = (page && page.title ? String(page.title) : "").trim();
+      global.__tliveLessonOnStage = true;
+      global.__tliveLessonPageId = pid;
+      global.__tliveLessonCache = {
+        type: "html",
+        html,
+        title: title || (cache && cache.title) || "",
+        pageId: pid,
+      };
+      syncLessonSlotsFromHtml(html, { pageId: pid });
+      return html;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function ensureActiveLessonSynced(pageId) {
+    const fromServer = await refreshActiveLessonHtmlFromServer(pageId);
+    if (fromServer) return true;
+    const html = getActiveLessonHtml();
+    if (!html || html.length < 80) return false;
+    syncLessonSlotsFromHtml(html, { pageId: resolveLessonPageId(pageId) });
+    return true;
   }
 
   function slotToQuestion(slot) {
@@ -380,4 +426,6 @@
   global.EAP_getActiveLessonPageId = getActiveLessonPageId;
   global.EAP_lessonHtmlFingerprint = lessonHtmlFingerprint;
   global.EAP_invalidateLiveLessonAiCache = invalidateLiveLessonAiCache;
+  global.EAP_refreshActiveLessonHtmlFromServer = refreshActiveLessonHtmlFromServer;
+  global.EAP_ensureActiveLessonSynced = ensureActiveLessonSynced;
 })(typeof window !== "undefined" ? window : globalThis);
