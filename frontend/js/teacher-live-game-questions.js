@@ -126,13 +126,19 @@
 
     inflight[i] = (async () => {
       try {
-        const data = await api.generateQuestion({
+        const apiPromise = api.generateQuestion({
           html,
           tool: "game",
           question_index: i,
           avoid_questions: collectAvoidQuestions(i),
           lesson_page_id: getLessonPageId(),
         });
+        const data = await Promise.race([
+          apiPromise,
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error(t("tlive_game_ai_failed"))), 45000);
+          }),
+        ]);
         const q = data && data.question;
         if (!q || !Array.isArray(q.optionsEn) || q.optionsEn.length < 2) {
           throw new Error(t("tlive_game_ai_failed"));
