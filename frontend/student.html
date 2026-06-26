@@ -112,37 +112,43 @@
           </article>
         </div>
 
-        <div class="student-progress-dashboard__categories">
-          <h3 class="student-progress-dashboard__subheading" data-i18n="by_category">By category</h3>
-          <div id="student-progress-categories" class="eap-category-breakdown"></div>
-        </div>
-
-        <div class="student-progress-actions-panel">
-          <p id="student-progress-actions-empty" class="student-progress-actions-empty hidden" data-i18n="caught_up">
-            You’re all caught up for your class. Check the calendar for upcoming work.
-          </p>
-          <div id="student-progress-actions-has-items" class="student-progress-actions-has-items hidden">
-            <div class="student-progress-next-panel">
-              <h3 class="student-progress-next-panel__title" data-i18n="next_actions">Next actions</h3>
-              <p class="student-progress-next-panel__hint" data-i18n="next_actions_hint">
-                Up to three shortcuts. Your full schedule lives on the calendar below.
-              </p>
-              <ul id="student-progress-next-list" class="student-progress-actions-list student-progress-actions-list--next"></ul>
-            </div>
-            <details id="student-progress-actions-expand" class="student-progress-actions-expand hidden">
-              <summary id="student-progress-actions-expand-summary" class="student-progress-actions-expand__summary" data-i18n="view_all_actions">
-                View all action tasks
-              </summary>
-              <ul id="student-progress-actions-list" class="student-progress-actions-list student-progress-actions-list--more"></ul>
-            </details>
+        <details id="student-progress-categories-expand" class="student-progress-dashboard__expand">
+          <summary class="student-progress-dashboard__expand-summary" data-i18n="by_category">By category</summary>
+          <div class="student-progress-dashboard__expand-body">
+            <div id="student-progress-categories" class="eap-category-breakdown"></div>
           </div>
-        </div>
+        </details>
+
+        <details id="student-progress-next-actions-expand" class="student-progress-dashboard__expand hidden">
+          <summary class="student-progress-dashboard__expand-summary" data-i18n="next_actions">Next actions</summary>
+          <div class="student-progress-dashboard__expand-body">
+            <div class="student-progress-actions-panel">
+              <p id="student-progress-actions-empty" class="student-progress-actions-empty hidden" data-i18n="caught_up">
+                You’re all caught up for your class. Check the calendar for upcoming work.
+              </p>
+              <div id="student-progress-actions-has-items" class="student-progress-actions-has-items hidden">
+                <div class="student-progress-next-panel">
+                  <p class="student-progress-next-panel__hint" data-i18n="next_actions_hint">
+                    Up to three shortcuts. Your full schedule lives on the calendar below.
+                  </p>
+                  <ul id="student-progress-next-list" class="student-progress-actions-list student-progress-actions-list--next"></ul>
+                </div>
+                <details id="student-progress-actions-expand" class="student-progress-actions-expand hidden">
+                  <summary id="student-progress-actions-expand-summary" class="student-progress-actions-expand__summary" data-i18n="view_all_actions">
+                    View all action tasks
+                  </summary>
+                  <ul id="student-progress-actions-list" class="student-progress-actions-list student-progress-actions-list--more"></ul>
+                </details>
+              </div>
+            </div>
+          </div>
+        </details>
       </section>
 
 
       <section
         id="student-study-plan-progress"
-        class="student-study-plan-progress"
+        class="student-study-plan-progress hidden"
         aria-labelledby="student-study-plan-progress-heading"
       >
         <div class="student-study-plan-progress__header">
@@ -474,6 +480,6 @@
     <script src="js/pilot-wake.js"></script>
     <script src="js/site-icp-footer.js"></script>
     <script src="api-config.js"></script>
-    <script src="app.js?v=20260612-cal-roster"></script>
+    <script src="app.js?v=20260626-student-progress-compact"></script>
   </body>
 </html>

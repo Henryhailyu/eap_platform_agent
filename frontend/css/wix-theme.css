@@ -776,6 +776,10 @@ body.eap-wix .app-main {
   padding: 1.5rem 1.25rem 3rem;
 }
 
+body.eap-wix main.app-main--calendar {
+  padding-bottom: 1.25rem;
+}
+
 body.eap-wix.page-app .site-header__actions {
   display: flex;
   align-items: center;
@@ -954,8 +958,8 @@ body.eap-wix .student-learning-archive {
   background: var(--wix-card);
   border: 1px solid var(--wix-card-border);
   border-radius: var(--wix-radius);
-  padding: 1.25rem 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem 0.75rem;
+  margin-bottom: 0.75rem;
   box-shadow: var(--wix-shadow);
 }
 
@@ -1128,7 +1132,7 @@ body.eap-wix .student-progress-dashboard__subheading {
 }
 
 body.eap-wix .eap-progress-bar {
-  margin: 0.75rem 0 1rem;
+  margin: 0.35rem 0 0.55rem;
 }
 
 body.eap-wix .eap-progress-bar__label-row {

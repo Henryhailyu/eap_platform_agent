@@ -9692,6 +9692,7 @@ function initStudentPage() {
   const studyPlanProgressStatMinsCompleted = document.getElementById(
     "student-study-plan-progress-stat-mins-completed",
   );
+  const studyPlanProgressSection = document.getElementById("student-study-plan-progress");
 
   if (
     !masterListEl ||
@@ -9752,6 +9753,7 @@ function initStudentPage() {
   const progressHasItemsEl = document.getElementById("student-progress-actions-has-items");
   const progressExpandDetails = document.getElementById("student-progress-actions-expand");
   const progressExpandSummary = document.getElementById("student-progress-actions-expand-summary");
+  const progressNextActionsExpand = document.getElementById("student-progress-next-actions-expand");
   const progressOpenArchiveBtn = document.getElementById("student-progress-open-archive");
   const archiveSectionEl = document.getElementById("student-learning-archive");
   const archiveScopeEl = document.getElementById("student-archive-scope");
@@ -9905,6 +9907,7 @@ function initStudentPage() {
     studyPlanProgressEmptyEl.classList.add("hidden");
     studyPlanProgressBodyEl.classList.add("hidden");
     studyPlanProgressSkillsUl.innerHTML = "";
+    if (studyPlanProgressSection) studyPlanProgressSection.classList.add("hidden");
     const clearStat = (el) => {
       if (el) el.textContent = "—";
     };
@@ -9924,6 +9927,8 @@ function initStudentPage() {
       return;
     }
 
+    if (studyPlanProgressSection) studyPlanProgressSection.classList.remove("hidden");
+
     const qs = new URLSearchParams();
     qs.set("student_username", uname);
     qs.set("class_name", studentClassName);
@@ -9940,11 +9945,14 @@ function initStudentPage() {
       plannerState.studyPlanProgress = data;
 
       if (total === 0) {
+        if (studyPlanProgressSection) studyPlanProgressSection.classList.add("hidden");
         studyPlanProgressEmptyEl.textContent = "No personal study plans for this month yet.";
         studyPlanProgressEmptyEl.classList.remove("hidden");
         studyPlanProgressBodyEl.classList.add("hidden");
         return;
       }
+
+      if (studyPlanProgressSection) studyPlanProgressSection.classList.remove("hidden");
 
       studyPlanProgressEmptyEl.classList.add("hidden");
       studyPlanProgressBodyEl.classList.remove("hidden");
@@ -9977,6 +9985,7 @@ function initStudentPage() {
       });
     } catch {
       plannerState.studyPlanProgress = null;
+      if (studyPlanProgressSection) studyPlanProgressSection.classList.add("hidden");
       studyPlanProgressBodyEl.classList.add("hidden");
       studyPlanProgressEmptyEl.classList.add("hidden");
       studyPlanProgressErrorEl.textContent = "Could not load study plan progress.";
@@ -10291,6 +10300,12 @@ function initStudentPage() {
       if (progressHasItemsEl) {
         progressHasItemsEl.classList.toggle("hidden", items.length === 0);
       }
+      if (progressNextActionsExpand) {
+        progressNextActionsExpand.classList.toggle("hidden", items.length === 0);
+        if (items.length === 0) {
+          progressNextActionsExpand.removeAttribute("open");
+        }
+      }
 
       if (items.length > 0) {
         nextItems.forEach((row) => appendStudentProgressActionItem(progressNextListEl, row));
@@ -10323,6 +10338,10 @@ function initStudentPage() {
       if (progressListEl) progressListEl.innerHTML = "";
       if (progressEmptyEl) progressEmptyEl.classList.add("hidden");
       if (progressHasItemsEl) progressHasItemsEl.classList.add("hidden");
+      if (progressNextActionsExpand) {
+        progressNextActionsExpand.classList.add("hidden");
+        progressNextActionsExpand.removeAttribute("open");
+      }
       if (progressExpandDetails) {
         progressExpandDetails.classList.add("hidden");
         progressExpandDetails.removeAttribute("open");

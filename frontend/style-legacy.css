@@ -1223,8 +1223,8 @@ main.app-main--calendar {
 
 /* ── Calendar wrapper ─────────────────────────────────────────────── */
 .student-calendar-bridge {
-  margin-top: 0.35rem;
-  padding: 1.1rem 0.85rem 0;
+  margin-top: 0.15rem;
+  padding: 0.85rem 0.85rem 0;
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(241, 245, 249, 0.55) 0%, rgba(255, 255, 255, 0.25) 55%);
   border: 1px solid rgba(15, 23, 42, 0.06);
@@ -1960,8 +1960,8 @@ main.app-main--calendar {
 }
 
 .page-hero--student-compact {
-  margin-bottom: 1.25rem;
-  padding-bottom: 1rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.55rem;
 }
 
 .page-hero--student-compact p {
@@ -3725,8 +3725,63 @@ main.app-main--calendar {
 
 .student-progress-dashboard {
   max-width: 72rem;
-  margin: 0 auto 1rem;
-  padding: 0 1rem 0.65rem;
+  margin: 0 auto 0.5rem;
+  padding: 0 1rem 0.35rem;
+}
+
+.student-progress-dashboard__progress {
+  margin-bottom: 0.45rem;
+}
+
+.student-progress-dashboard__expand {
+  margin-top: 0.45rem;
+  border-radius: 11px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(248, 250, 252, 0.65);
+  overflow: hidden;
+}
+
+.student-progress-dashboard__expand-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.48rem 0.58rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #0c4a6e;
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+
+.student-progress-dashboard__expand-summary::-webkit-details-marker {
+  display: none;
+}
+
+.student-progress-dashboard__expand-summary::after {
+  content: "";
+  display: inline-block;
+  width: 0.35em;
+  height: 0.35em;
+  margin-left: 0.4em;
+  border-right: 2px solid rgba(12, 74, 110, 0.45);
+  border-bottom: 2px solid rgba(12, 74, 110, 0.45);
+  transform: rotate(45deg) translateY(-0.08em);
+  transition: transform 0.2s ease;
+}
+
+.student-progress-dashboard__expand[open] .student-progress-dashboard__expand-summary::after {
+  transform: rotate(225deg) translateY(0.1em);
+}
+
+.student-progress-dashboard__expand-body {
+  padding: 0 0.55rem 0.55rem;
+}
+
+.student-progress-dashboard__expand-body .student-progress-actions-panel {
+  margin-top: 0;
+  padding: 0.45rem 0.5rem;
+  box-shadow: none;
+  border: none;
+  background: transparent;
 }
 
 .student-progress-dashboard__header {
@@ -3830,7 +3885,7 @@ main.app-main--calendar {
 }
 
 .student-progress-actions-panel {
-  margin-top: 0.7rem;
+  margin-top: 0;
   padding: 0.65rem 0.8rem;
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.78);
@@ -3910,8 +3965,8 @@ main.app-main--calendar {
 
 .student-study-plan-progress {
   max-width: 72rem;
-  margin: 0 auto 1rem;
-  padding: 0 1rem 0.55rem;
+  margin: 0 auto 0.5rem;
+  padding: 0 1rem 0.35rem;
 }
 
 .student-study-plan-progress__header {
