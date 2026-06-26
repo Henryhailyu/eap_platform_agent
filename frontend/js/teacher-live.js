@@ -1246,6 +1246,16 @@
     `;
   }
 
+  function responsesModalLoadingHtml() {
+    return `
+      <div class="tlive-responses-modal__loading" role="status" aria-live="polite" aria-busy="true">
+        <div class="tlive-responses-modal__loading-box">
+          <span class="tlive-responses-modal__spinner" aria-hidden="true"></span>
+          <p class="tlive-responses-modal__loading-text">${escapeHtml(t("tlive_responses_loading"))}</p>
+        </div>
+      </div>`;
+  }
+
   function hasBoardContext(boardState) {
     return !!(boardState && boardState.teams);
   }
@@ -1265,6 +1275,100 @@
     modal.classList.add("hidden");
     modal.setAttribute("hidden", "");
     document.body.classList.remove("tlive-modal-open");
+  }
+
+  function buildResponsesModalFootHtml(board) {
+    const rankingMode = window.__tliveRanking && !window.__tliveRanking.winnerId;
+    const debateMode = window.__tliveDebate && !window.__tliveDebate.winnerId && !rankingMode;
+    const hotSeatMode = window.__tliveHotSeat && !window.__tliveHotSeat.winnerId && !debateMode && !rankingMode;
+    const memoryMode =
+      window.__tliveMemory && !window.__tliveMemory.winnerId && !hotSeatMode && !debateMode && !rankingMode;
+    const summaryMode = window.__tliveSummary && !window.__tliveSummary.winnerId && !memoryMode;
+    const argumentMode =
+      window.__tliveArgument && !window.__tliveArgument.winnerId && !summaryMode && !memoryMode;
+    const sentenceMode =
+      window.__tliveSentence && !window.__tliveSentence.winnerId && !argumentMode && !summaryMode && !memoryMode;
+    const ladderMode =
+      window.__tliveLadder &&
+      !window.__tliveLadder.winnerId &&
+      !sentenceMode &&
+      !argumentMode &&
+      !summaryMode &&
+      !memoryMode;
+    const escapeMode =
+      window.__tliveEscape &&
+      !window.__tliveEscape.winnerId &&
+      !ladderMode &&
+      !sentenceMode &&
+      !argumentMode &&
+      !summaryMode &&
+      !memoryMode;
+    const treasureMode =
+      window.__tliveTreasure &&
+      !window.__tliveTreasure.winnerId &&
+      !escapeMode &&
+      !ladderMode &&
+      !sentenceMode &&
+      !argumentMode &&
+      !summaryMode &&
+      !memoryMode;
+    const quizMode =
+      window.__tliveQuiz &&
+      !window.__tliveQuiz.winnerId &&
+      !treasureMode &&
+      !escapeMode &&
+      !ladderMode &&
+      !sentenceMode &&
+      !argumentMode &&
+      !summaryMode &&
+      !memoryMode;
+    const boardMode =
+      hasBoardContext(board) &&
+      !quizMode &&
+      !treasureMode &&
+      !escapeMode &&
+      !ladderMode &&
+      !sentenceMode &&
+      !argumentMode &&
+      !summaryMode &&
+      !memoryMode;
+    return rankingMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-ranking-score">${escapeHtml(t("tlive_ranking_award_btn"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : debateMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-debate-score">${escapeHtml(t("tlive_debate_award_btn"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : hotSeatMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-hotseat-score">${escapeHtml(t("tlive_hotseat_award_btn"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : memoryMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-memory-score">${escapeHtml(t("tlive_memory_award_btn"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : summaryMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-summary-score">${escapeHtml(t("tlive_summary_award"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : argumentMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-argument-score">${escapeHtml(t("tlive_argument_award"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : sentenceMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-sentence-score">${escapeHtml(t("tlive_sentence_award"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : ladderMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-ladder-climb">${escapeHtml(t("tlive_ladder_climb"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : escapeMode
+      ? `<button type="button" class="btn-primary" id="tlive-modal-escape-score">${escapeHtml(t("tlive_escape_score_complete"))}</button>
+         <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+      : treasureMode
+        ? `<button type="button" class="btn-primary" id="tlive-modal-treasure-score">${escapeHtml(t("tlive_treasure_score_unlock"))}</button>
+           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+        : quizMode
+        ? `<button type="button" class="btn-primary" id="tlive-modal-quiz-award">${escapeHtml(t("tlive_quiz_award_correct"))}</button>
+           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+        : boardMode
+          ? `<button type="button" class="btn-primary" id="tlive-modal-roll-correct">${escapeHtml(t("tlive_board_roll_correct"))}</button>
+             <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
+          : `<button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`;
   }
 
   async function openResponsesModal(question, boardState) {
@@ -1322,6 +1426,17 @@
       if (window.EAP_I18N) window.EAP_I18N.applyStatic();
     }
 
+    body.innerHTML = responsesModalLoadingHtml();
+    if (foot) {
+      foot.innerHTML = `<button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`;
+    }
+    modal.classList.remove("hidden");
+    modal.removeAttribute("hidden");
+    document.body.classList.add("tlive-modal-open");
+    if (window.EAP_I18N) window.EAP_I18N.applyStatic();
+    document.getElementById("tlive-modal-close-btn")?.addEventListener("click", closeResponsesModal);
+    document.getElementById("tlive-responses-modal-close")?.focus();
+
     await paintBody();
 
     async function pollResponsesLive() {
@@ -1345,103 +1460,8 @@
     }
 
     if (foot) {
-      const rankingMode = window.__tliveRanking && !window.__tliveRanking.winnerId;
-      const debateMode = window.__tliveDebate && !window.__tliveDebate.winnerId && !rankingMode;
-      const hotSeatMode = window.__tliveHotSeat && !window.__tliveHotSeat.winnerId && !debateMode && !rankingMode;
-      const memoryMode =
-        window.__tliveMemory && !window.__tliveMemory.winnerId && !hotSeatMode && !debateMode && !rankingMode;
-      const summaryMode = window.__tliveSummary && !window.__tliveSummary.winnerId && !memoryMode;
-      const argumentMode =
-        window.__tliveArgument && !window.__tliveArgument.winnerId && !summaryMode && !memoryMode;
-      const sentenceMode =
-        window.__tliveSentence && !window.__tliveSentence.winnerId && !argumentMode && !summaryMode && !memoryMode;
-      const ladderMode =
-        window.__tliveLadder &&
-        !window.__tliveLadder.winnerId &&
-        !sentenceMode &&
-        !argumentMode &&
-        !summaryMode &&
-        !memoryMode;
-      const escapeMode =
-        window.__tliveEscape &&
-        !window.__tliveEscape.winnerId &&
-        !ladderMode &&
-        !sentenceMode &&
-        !argumentMode &&
-        !summaryMode &&
-        !memoryMode;
-      const treasureMode =
-        window.__tliveTreasure &&
-        !window.__tliveTreasure.winnerId &&
-        !escapeMode &&
-        !ladderMode &&
-        !sentenceMode &&
-        !argumentMode &&
-        !summaryMode &&
-        !memoryMode;
-      const quizMode =
-        window.__tliveQuiz &&
-        !window.__tliveQuiz.winnerId &&
-        !treasureMode &&
-        !escapeMode &&
-        !ladderMode &&
-        !sentenceMode &&
-        !argumentMode &&
-        !summaryMode &&
-        !memoryMode;
-      const boardMode =
-        hasBoardContext(board) &&
-        !quizMode &&
-        !treasureMode &&
-        !escapeMode &&
-        !ladderMode &&
-        !sentenceMode &&
-        !argumentMode &&
-        !summaryMode &&
-        !memoryMode;
-      foot.innerHTML = rankingMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-ranking-score">${escapeHtml(t("tlive_ranking_award_btn"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : debateMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-debate-score">${escapeHtml(t("tlive_debate_award_btn"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : hotSeatMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-hotseat-score">${escapeHtml(t("tlive_hotseat_award_btn"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : memoryMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-memory-score">${escapeHtml(t("tlive_memory_award_btn"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : summaryMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-summary-score">${escapeHtml(t("tlive_summary_award"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : argumentMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-argument-score">${escapeHtml(t("tlive_argument_award"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : sentenceMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-sentence-score">${escapeHtml(t("tlive_sentence_award"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : ladderMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-ladder-climb">${escapeHtml(t("tlive_ladder_climb"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : escapeMode
-        ? `<button type="button" class="btn-primary" id="tlive-modal-escape-score">${escapeHtml(t("tlive_escape_score_complete"))}</button>
-           <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-        : treasureMode
-          ? `<button type="button" class="btn-primary" id="tlive-modal-treasure-score">${escapeHtml(t("tlive_treasure_score_unlock"))}</button>
-             <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-          : quizMode
-          ? `<button type="button" class="btn-primary" id="tlive-modal-quiz-award">${escapeHtml(t("tlive_quiz_award_correct"))}</button>
-             <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-          : boardMode
-            ? `<button type="button" class="btn-primary" id="tlive-modal-roll-correct">${escapeHtml(t("tlive_board_roll_correct"))}</button>
-               <button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`
-            : `<button type="button" class="btn-secondary" id="tlive-modal-close-btn">${escapeHtml(t("tlive_close_modal"))}</button>`;
+      foot.innerHTML = buildResponsesModalFootHtml(board);
     }
-
-    modal.classList.remove("hidden");
-    modal.removeAttribute("hidden");
-    document.body.classList.add("tlive-modal-open");
-    if (window.EAP_I18N) window.EAP_I18N.applyStatic();
 
     document.getElementById("tlive-modal-roll-correct")?.addEventListener("click", () => {
       if (!MOCK) return;
@@ -1532,8 +1552,6 @@
     if (liveSessionActive() && window.__tliveLiveSession.launchId) {
       void pollResponsesLive();
     }
-
-    document.getElementById("tlive-responses-modal-close")?.focus();
   }
 
   function clearLiveGameState() {

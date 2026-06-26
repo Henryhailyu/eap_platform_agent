@@ -1868,6 +1868,7 @@ window.EAP_STRINGS_ZH = {
   "tlive_col_ok": "正确",
   "tlive_col_time": "用时",
   "tlive_responses_mock": "模拟回复仅供演示 — 请发布题目并分享加入码，让学生用真设备作答。",
+  "tlive_responses_loading": "学生信息正在收集中，请稍等…",
   "tlive_responses_live": "学生实时回复（已提交 {n} 条）。表格将自动刷新。",
   "tlive_responses_empty": "暂无回复 — 请让学生打开加入链接并提交答案。",
   "tlive_join_label": "学生使用以下链接或课堂码加入：",

@@ -1873,6 +1873,7 @@ window.EAP_STRINGS_EN = {
   "tlive_col_ok": "Correct",
   "tlive_col_time": "Time",
   "tlive_responses_mock": "Sample responses for layout testing — launch a question and share the join code for real devices.",
+  "tlive_responses_loading": "Collecting student responses — please wait…",
   "tlive_responses_live": "Live student responses ({n} submitted). Table refreshes every few seconds.",
   "tlive_responses_empty": "No responses yet — ask students to open the join link and submit.",
   "tlive_join_label": "Students join with this link or code:",
