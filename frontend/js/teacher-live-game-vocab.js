@@ -138,6 +138,43 @@
     pairs.push({ term: t0, defEn: d0, defZh: z0 });
   }
 
+  function addLinePair(pairs, seen, line) {
+    const trimmed = String(line || "")
+      .replace(/^\d+[.)]\s*/, "")
+      .trim();
+    if (!trimmed || trimmed.length < 4) return;
+    for (const sep of [" — ", " – ", " - ", ": "]) {
+      if (!trimmed.includes(sep)) continue;
+      const parts = trimmed.split(sep);
+      addPair(pairs, seen, parts[0], parts.slice(1).join(sep));
+      return;
+    }
+  }
+
+  function parseVocabMeta(doc, pairs, seen) {
+    const node = doc.getElementById("eap-lesson-meta");
+    if (!node || !node.textContent) return;
+    try {
+      const data = JSON.parse(node.textContent);
+      const lists = [data.vocabulary, data.vocab_terms, data.key_terms, data.terms];
+      lists.forEach((list) => {
+        if (!Array.isArray(list)) return;
+        list.forEach((raw) => {
+          if (!raw || typeof raw !== "object") return;
+          addPair(
+            pairs,
+            seen,
+            raw.term || raw.word,
+            raw.defEn || raw.definition || raw.def,
+            raw.defZh,
+          );
+        });
+      });
+    } catch (_) {
+      /* ignore malformed meta */
+    }
+  }
+
   function parseVocabFromHtml(html) {
     const pairs = [];
     const seen = new Set();
@@ -150,6 +187,8 @@
       return pairs;
     }
 
+    parseVocabMeta(doc, pairs, seen);
+
     doc.querySelectorAll("dt").forEach((dt) => {
       const dd = dt.nextElementSibling;
       if (dd && dd.tagName === "DD") {
@@ -160,18 +199,33 @@
     doc.querySelectorAll("tr").forEach((tr) => {
       const cells = tr.querySelectorAll("th, td");
       if (cells.length >= 2) {
+        const head = stripTags(cells[0].innerHTML).toLowerCase();
+        if (/^(term|word|vocabulary|definition|meaning)\b/.test(head)) return;
         addPair(pairs, seen, stripTags(cells[0].innerHTML), stripTags(cells[1].innerHTML));
       }
     });
 
+    doc.querySelectorAll("p").forEach((p) => {
+      const emphasis = p.querySelector("strong, b, em");
+      if (!emphasis) return;
+      const term = stripTags(emphasis.innerHTML);
+      const clone = p.cloneNode(true);
+      clone.querySelectorAll("strong, b, em").forEach((el) => el.remove());
+      const rest = stripTags(clone.innerHTML).replace(/^[:\-–—]\s*/, "");
+      if (term && rest) addPair(pairs, seen, term, rest);
+    });
+
     doc.querySelectorAll("li").forEach((li) => {
       const strong = li.querySelector("strong, b");
-      if (!strong) return;
-      const term = stripTags(strong.innerHTML);
-      const clone = li.cloneNode(true);
-      clone.querySelectorAll("strong, b").forEach((el) => el.remove());
-      let rest = stripTags(clone.innerHTML).replace(/^[:\-–—]\s*/, "");
-      if (term && rest) addPair(pairs, seen, term, rest);
+      if (strong) {
+        const term = stripTags(strong.innerHTML);
+        const clone = li.cloneNode(true);
+        clone.querySelectorAll("strong, b").forEach((el) => el.remove());
+        let rest = stripTags(clone.innerHTML).replace(/^[:\-–—]\s*/, "");
+        if (term && rest) addPair(pairs, seen, term, rest);
+        return;
+      }
+      addLinePair(pairs, seen, stripTags(li.innerHTML));
     });
 
     doc.querySelectorAll("h2, h3").forEach((heading) => {
@@ -180,18 +234,44 @@
       let steps = 0;
       while (el && steps < 12) {
         if (/^H[23]$/i.test(el.tagName)) break;
-        const plain = stripTags(el.innerHTML || el.textContent || "");
-        plain.split(/\n+/).forEach((line) => {
-          const trimmed = line.trim();
-          if (!trimmed) return;
-          for (const sep of [" — ", " – ", " - ", ": "]) {
-            if (trimmed.includes(sep)) {
-              const parts = trimmed.split(sep);
-              addPair(pairs, seen, parts[0], parts.slice(1).join(sep));
-              break;
+        if (/^UL|OL|DL|P|TABLE$/i.test(el.tagName)) {
+          if (/^P$/i.test(el.tagName)) {
+            const emphasis = el.querySelector("strong, b, em");
+            if (emphasis) {
+              const term = stripTags(emphasis.innerHTML);
+              const clone = el.cloneNode(true);
+              clone.querySelectorAll("strong, b, em").forEach((node) => node.remove());
+              const rest = stripTags(clone.innerHTML).replace(/^[:\-–—]\s*/, "");
+              if (term && rest) addPair(pairs, seen, term, rest);
+            } else {
+              addLinePair(pairs, seen, stripTags(el.innerHTML || el.textContent || ""));
             }
+          } else {
+            el.querySelectorAll("li, dt, dd, p").forEach((node) => {
+              if (/^DD$/i.test(node.tagName)) return;
+              if (node.matches("dt")) {
+                const dd = node.nextElementSibling;
+                if (dd && dd.tagName === "DD") {
+                  addPair(pairs, seen, stripTags(node.innerHTML), stripTags(dd.innerHTML));
+                }
+                return;
+              }
+              const emphasis = node.querySelector("strong, b, em");
+              if (emphasis) {
+                const term = stripTags(emphasis.innerHTML);
+                const clone = node.cloneNode(true);
+                clone.querySelectorAll("strong, b, em").forEach((item) => item.remove());
+                const rest = stripTags(clone.innerHTML).replace(/^[:\-–—]\s*/, "");
+                if (term && rest) addPair(pairs, seen, term, rest);
+              } else {
+                addLinePair(pairs, seen, stripTags(node.innerHTML || node.textContent || ""));
+              }
+            });
           }
-        });
+        } else {
+          const plain = stripTags(el.innerHTML || el.textContent || "");
+          plain.split(/\n+/).forEach((line) => addLinePair(pairs, seen, line));
+        }
         el = el.nextElementSibling;
         steps += 1;
       }
@@ -256,6 +336,12 @@
         }
         setCached(terms);
         return terms;
+      } catch (_) {
+        if (parsed.length >= MIN) {
+          setCached(parsed);
+          return parsed;
+        }
+        return null;
       } finally {
         inflight = null;
       }

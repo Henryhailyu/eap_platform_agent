@@ -36,6 +36,50 @@
     return 0;
   }
 
+  function isLiveLaunchControl(node) {
+    if (!node || node.nodeType !== 1) return false;
+    if (node.classList && node.classList.contains("eap-live-launch")) return true;
+    if (node.hasAttribute && node.hasAttribute("data-eap-live-launch")) return true;
+    if (node.classList && (node.classList.contains("eap-reveal") || node.classList.contains("eap-submit"))) {
+      return true;
+    }
+    const txt = (node.textContent || "").trim();
+    if (/^launch to (class|students)\b/i.test(txt)) return true;
+    if (/^(show|reveal)\s+(the\s+)?answer/i.test(txt)) return true;
+    return false;
+  }
+
+  function isLaunchOptionText(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return true;
+    const plain = raw.replace(/^[A-Da-d][.)]\s*/, "").trim();
+    return (
+      /^launch to (class|students)\b/i.test(raw) ||
+      /^launch to (class|students)\b/i.test(plain) ||
+      /^(show|reveal)\s+(the\s+)?answer/i.test(plain)
+    );
+  }
+
+  function filterLaunchOptions(optionsEn, optionsZh) {
+    const en = [];
+    const zh = [];
+    (optionsEn || []).forEach((line, i) => {
+      const raw = String(line || "").trim();
+      if (!raw || isLaunchOptionText(raw)) return;
+      en.push(raw);
+      zh.push(optionsZh && optionsZh[i] != null ? optionsZh[i] : raw);
+    });
+    return { optionsEn: en, optionsZh: zh };
+  }
+
+  function collectOptionNodes(el) {
+    const tagged = el.querySelectorAll("[data-eap-option]");
+    if (tagged.length) return tagged;
+    return Array.from(el.querySelectorAll(".eap-options button")).filter(
+      (node) => !isLiveLaunchControl(node),
+    );
+  }
+
   function parseBlock(el) {
     const tool = normalizeTool(el.getAttribute("data-eap-live-tool"));
     if (!tool) return null;
@@ -60,14 +104,15 @@
 
     const textZh = el.getAttribute("data-eap-live-question-zh") || textEn;
 
-    const optNodes = el.querySelectorAll("[data-eap-option], .eap-options button");
     const optionsEn = [];
     const optionsZh = [];
-    optNodes.forEach((node) => {
+    collectOptionNodes(el).forEach((node) => {
+      if (isLiveLaunchControl(node)) return;
       const letter = node.getAttribute("data-eap-option") || "";
       const txt = (node.textContent || "").trim();
+      if (!txt || isLaunchOptionText(txt)) return;
       const line = letter ? `${letter}. ${txt}` : txt;
-      if (line) {
+      if (line && !isLaunchOptionText(line)) {
         optionsEn.push(line);
         optionsZh.push(line);
       }
@@ -78,11 +123,13 @@
       if (rawOpts) {
         rawOpts.split("|").forEach((part) => {
           const p = part.trim();
-          if (p) optionsEn.push(p);
+          if (p && !isLaunchOptionText(p)) optionsEn.push(p);
         });
         optionsZh.push(...optionsEn);
       }
     }
+
+    const filtered = filterLaunchOptions(optionsEn, optionsZh);
 
     const answerAttr =
       el.getAttribute("data-eap-answer") || el.getAttribute("data-eap-live-answer") || "A";
@@ -107,8 +154,8 @@
       label: label || textEn.slice(0, 80),
       textEn,
       textZh,
-      optionsEn,
-      optionsZh,
+      optionsEn: filtered.optionsEn,
+      optionsZh: filtered.optionsZh,
       correctIndex,
       source: "html",
     };
@@ -380,14 +427,18 @@
 
   function slotToQuestion(slot) {
     if (!slot) return null;
-    const optionsEn = Array.isArray(slot.optionsEn) ? slot.optionsEn.filter(Boolean) : [];
+    const filtered = filterLaunchOptions(
+      Array.isArray(slot.optionsEn) ? slot.optionsEn : [],
+      Array.isArray(slot.optionsZh) ? slot.optionsZh : [],
+    );
+    const optionsEn = filtered.optionsEn.filter(Boolean);
     if (!optionsEn.length) return null;
     return {
       id: slot.id,
       textEn: slot.textEn || "",
       textZh: slot.textZh || slot.textEn || "",
       optionsEn,
-      optionsZh: slot.optionsZh && slot.optionsZh.length ? slot.optionsZh : optionsEn,
+      optionsZh: filtered.optionsZh.length ? filtered.optionsZh : optionsEn,
       correctIndex: Number.isInteger(slot.correctIndex) ? slot.correctIndex : 0,
       source: "lesson",
       slotId: slot.id,

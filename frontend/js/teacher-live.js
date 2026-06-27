@@ -171,6 +171,7 @@
   async function startVocabGame(kind, onReady) {
     window.__tliveGameLaunchingId = kind;
     try {
+      await ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 12000 });
       await ensureLiveLessonSynced({ timeoutMs: 12000 });
       const MOCK = getMock();
       if (!MOCK) {
@@ -787,15 +788,33 @@
     }
   }
 
+  function stripLaunchOptionsFromQuestion(optionsEn, optionsZh) {
+    const en = [];
+    const zh = [];
+    (optionsEn || []).forEach((line, i) => {
+      const raw = String(line || "").trim();
+      if (!raw) return;
+      const plain = raw.replace(/^[A-Da-d][.)]\s*/, "").trim();
+      if (/^launch to (class|students)\b/i.test(raw) || /^launch to (class|students)\b/i.test(plain)) {
+        return;
+      }
+      if (/^(show|reveal)\s+(the\s+)?answer/i.test(plain)) return;
+      en.push(raw);
+      zh.push(optionsZh && optionsZh[i] != null ? optionsZh[i] : raw);
+    });
+    return { optionsEn: en, optionsZh: zh };
+  }
+
   function normalizeQuestionForLaunch(question) {
     if (!question || typeof question !== "object") return null;
-    const optionsEn = Array.isArray(question.optionsEn) ? question.optionsEn : [];
-    const optionsZh = Array.isArray(question.optionsZh) ? question.optionsZh : [];
+    const rawEn = Array.isArray(question.optionsEn) ? question.optionsEn : [];
+    const rawZh = Array.isArray(question.optionsZh) ? question.optionsZh : [];
+    const filtered = stripLaunchOptionsFromQuestion(rawEn, rawZh);
     return {
       textEn: String(question.textEn || "").trim(),
       textZh: String(question.textZh || "").trim(),
-      optionsEn,
-      optionsZh: optionsZh.length ? optionsZh : optionsEn,
+      optionsEn: filtered.optionsEn,
+      optionsZh: filtered.optionsZh.length ? filtered.optionsZh : filtered.optionsEn,
       correctIndex: Number.isInteger(question.correctIndex) ? question.correctIndex : 0,
     };
   }
