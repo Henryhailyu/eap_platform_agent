@@ -7,7 +7,8 @@
     return key;
   }
 
-  const VOCAB_HEADING = /vocabulary|key\s+terms?|word\s+list|词汇|重点词|keyword|lexis|terminology|new\s+words?/i;
+  const VOCAB_HEADING =
+    /vocabulary|key\s+terms?|word\s+list|word\s+bank|language\s+focus|lexical|academic\s+word|terms\s+from|词汇|重点词|keyword|lexis|terminology|new\s+words?/i;
   const TARGET = 24;
   const MIN = 8;
 
@@ -127,9 +128,25 @@
     return out;
   }
 
+  function cleanTermForGame(raw) {
+    return stripChinese(String(raw || ""))
+      .replace(/\s*\((?:n|v|adj|adv|noun|verb|adjective|adverb)\.?\)\s*/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function cleanDefForGame(raw) {
+    let d0 = stripChinese(String(raw || "").replace(/\s+/g, " ").trim());
+    d0 = d0.replace(/^[:\-–—]\s*/, "");
+    if (d0.length >= 6 && d0.length < 10) {
+      d0 = `${d0.charAt(0).toUpperCase()}${d0.slice(1)} — from lesson`;
+    }
+    return d0;
+  }
+
   function addPair(pairs, seen, term, defEn, defZh) {
-    const t0 = stripChinese(String(term || "").replace(/\s+/g, " ").trim());
-    const d0 = stripChinese(String(defEn || "").replace(/\s+/g, " ").trim());
+    const t0 = cleanTermForGame(term);
+    const d0 = cleanDefForGame(defEn);
     const z0 = d0;
     if (!isValidGameVocab(t0, d0)) return;
     const key = t0.toLowerCase();
@@ -175,6 +192,19 @@
     }
   }
 
+  function parseTableRows(doc, pairs, seen) {
+    doc.querySelectorAll("table.eap-excel-table tr, table tr").forEach((tr) => {
+      const cells = tr.querySelectorAll("th, td");
+      if (cells.length < 2) return;
+      const left = stripTags(cells[0].innerHTML);
+      const right = stripTags(cells[1].innerHTML);
+      const head = left.toLowerCase();
+      if (/^(term|word|vocabulary|definition|meaning|words|terms)\b/.test(head)) return;
+      if (/^(term|word|vocabulary|definition|meaning|words|terms)\b/.test(right.toLowerCase())) return;
+      addPair(pairs, seen, left, right);
+    });
+  }
+
   function parseVocabFromHtml(html) {
     const pairs = [];
     const seen = new Set();
@@ -188,6 +218,7 @@
     }
 
     parseVocabMeta(doc, pairs, seen);
+    parseTableRows(doc, pairs, seen);
 
     doc.querySelectorAll("dt").forEach((dt) => {
       const dd = dt.nextElementSibling;
@@ -197,6 +228,7 @@
     });
 
     doc.querySelectorAll("tr").forEach((tr) => {
+      if (tr.closest("table")) return;
       const cells = tr.querySelectorAll("th, td");
       if (cells.length >= 2) {
         const head = stripTags(cells[0].innerHTML).toLowerCase();
@@ -280,6 +312,36 @@
     return filterValidTerms(pairs);
   }
 
+  function termsFromHtml(html) {
+    const parsed = parseVocabFromHtml(html);
+    if (!parsed.length) return null;
+    return parsed.slice(0, TARGET);
+  }
+
+  function resolveSync() {
+    const cached = getCached();
+    if (cached && cached.length >= MIN) return cached;
+    const html = getLessonHtmlCached();
+    if (!html || html.length < 80) return null;
+    const terms = termsFromHtml(html);
+    if (terms && terms.length >= MIN) {
+      setCached(terms);
+      return terms;
+    }
+    return null;
+  }
+
+  function warmFromHtml(html) {
+    const text = String(html || "");
+    if (text.length < 80) return null;
+    const terms = termsFromHtml(text);
+    if (terms && terms.length >= MIN) {
+      setCached(terms);
+      return terms;
+    }
+    return null;
+  }
+
   function getCached() {
     const fp = lessonHtmlFingerprint(getLessonHtmlCached());
     const cache = global.__tliveAiQuestionCache;
@@ -303,14 +365,14 @@
     if (typeof global.EAP_ensureActiveLessonSynced === "function") {
       await global.EAP_ensureActiveLessonSynced(undefined, { skipServer: true });
     }
-    const cached = getCached();
-    if (cached && cached.length >= MIN) return cached;
+    const sync = resolveSync();
+    if (sync && sync.length >= MIN) return sync;
 
     const html = getLessonHtmlCached();
     if (!html || html.length < 80) return null;
 
     const parsed = parseVocabFromHtml(html);
-    if (parsed.length >= TARGET) {
+    if (parsed.length >= MIN) {
       const terms = parsed.slice(0, TARGET);
       setCached(terms);
       return terms;
@@ -318,18 +380,23 @@
 
     const api = global.EAP_LIVE_TEACHING_API;
     if (!api || typeof api.generateVocab !== "function") {
-      return parsed.length >= MIN ? parsed : null;
+      return null;
     }
 
     if (inflight) return inflight;
 
     inflight = (async () => {
       try {
-        const data = await api.generateVocab({
-          html,
-          hint_terms: parsed,
-          lesson_page_id: getLessonPageId(),
-        });
+        const data = await Promise.race([
+          api.generateVocab({
+            html,
+            hint_terms: parsed,
+            lesson_page_id: getLessonPageId(),
+          }),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("vocab timeout")), 8000);
+          }),
+        ]);
         const terms = normalizeTerms((data && data.terms) || []);
         if (terms.length < MIN) {
           throw new Error(t("tlive_vocab_ai_failed"));
@@ -338,8 +405,9 @@
         return terms;
       } catch (_) {
         if (parsed.length >= MIN) {
-          setCached(parsed);
-          return parsed;
+          const terms = parsed.slice(0, TARGET);
+          setCached(terms);
+          return terms;
         }
         return null;
       } finally {
@@ -354,6 +422,8 @@
     getLessonHtmlCached,
     parseVocabFromHtml,
     getCached,
+    resolveSync,
+    warmFromHtml,
     ensure,
     MIN,
     TARGET,

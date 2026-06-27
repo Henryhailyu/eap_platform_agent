@@ -30,6 +30,9 @@
     if (window.__tliveLessonSegmentFilter == null) {
       window.__tliveLessonSegmentFilter = "all";
     }
+    if (window.EAP_LIVE_GAME_VOCAB && typeof window.EAP_LIVE_GAME_VOCAB.warmFromHtml === "function") {
+      window.EAP_LIVE_GAME_VOCAB.warmFromHtml(html);
+    }
   }
 
   function syncLiveLessonFromActiveSource() {
@@ -169,46 +172,59 @@
   }
 
   async function startVocabGame(kind, onReady) {
+    if (window.__tliveVocabGameLoading) return;
     window.__tliveGameLaunchingId = kind;
+    window.__tliveVocabGameLoading = kind;
+    showVocabGameLoading();
+
+    const finish = (terms) => {
+      window.__tliveVocabGameLoading = null;
+      window.__tliveGameLaunchingId = null;
+      const GV = window.EAP_LIVE_GAME_VOCAB;
+      const min = GV && GV.MIN ? GV.MIN : 8;
+      if (terms && terms.length >= min) {
+        window.__tliveLessonVocab = terms;
+        onReady(terms);
+      } else {
+        window.__tliveLessonVocab = null;
+        onReady(null);
+      }
+    };
+
     try {
-      await ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 12000 });
-      await ensureLiveLessonSynced({ timeoutMs: 12000 });
+      syncLiveLessonFromActiveSource();
       const MOCK = getMock();
       if (!MOCK) {
-        window.__tliveGameLaunchingId = null;
+        finish(null);
         return;
       }
       const GV = window.EAP_LIVE_GAME_VOCAB;
-      const cached = GV && typeof GV.getCached === "function" ? GV.getCached() : null;
-      if (cached && cached.length >= (GV ? GV.MIN : 8)) {
-        window.__tliveLessonVocab = cached;
-        onReady(cached);
-        window.__tliveGameLaunchingId = null;
+      if (GV && typeof GV.resolveSync === "function") {
+        const fast = GV.resolveSync();
+        if (fast && fast.length >= (GV.MIN || 8)) {
+          finish(fast);
+          return;
+        }
+      }
+      if (!lessonHtmlAvailable()) {
+        await ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 4000 });
+        syncLiveLessonFromActiveSource();
+      }
+      if (GV && typeof GV.resolveSync === "function") {
+        const fast = GV.resolveSync();
+        if (fast && fast.length >= (GV.MIN || 8)) {
+          finish(fast);
+          return;
+        }
+      }
+      if (GV && typeof GV.ensure === "function") {
+        const terms = await GV.ensure();
+        finish(terms);
         return;
       }
-      if (window.__tliveVocabGameLoading) return;
-      window.__tliveVocabGameLoading = kind;
-      showVocabGameLoading();
-      const finish = (terms) => {
-        window.__tliveVocabGameLoading = null;
-        window.__tliveGameLaunchingId = null;
-        if (terms && terms.length >= (GV ? GV.MIN : 8)) {
-          window.__tliveLessonVocab = terms;
-          onReady(terms);
-        } else {
-          window.__tliveLessonVocab = null;
-          onReady(null);
-        }
-      };
-      if (GV && typeof GV.ensure === "function") {
-        GV.ensure()
-          .then(finish)
-          .catch(() => finish(null));
-      } else {
-        finish(null);
-      }
+      finish(null);
     } catch (_) {
-      window.__tliveGameLaunchingId = null;
+      finish(null);
     }
   }
 
@@ -3629,6 +3645,10 @@
     });
   }
 
+  function isVocabRaceGameId(gameId) {
+    return gameId === "vocab-bingo" || gameId === "matching-race";
+  }
+
   function loadGame(gameId, opts) {
     window.__tliveGamesLibraryRefreshGen = (window.__tliveGamesLibraryRefreshGen || 0) + 1;
     window.__tliveGameLaunchingId = gameId;
@@ -3638,7 +3658,22 @@
       return;
     }
     syncLiveLessonFromActiveSource();
-    if (!(window.__tliveLessonSlots || []).length) {
+    const vocabRace = isVocabRaceGameId(gameId);
+    if (vocabRace) {
+      if (!lessonHtmlAvailable()) {
+        showVocabGameLoading();
+        void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 4000 }).then(() => {
+          syncLiveLessonFromActiveSource();
+          if (!lessonHtmlAvailable()) {
+            showGamesToast(t("tlive_pq_no_lesson_html"));
+            window.__tliveGameLaunchingId = null;
+            return;
+          }
+          loadGame(gameId, opts);
+        });
+        return;
+      }
+    } else if (!(window.__tliveLessonSlots || []).length) {
       void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 8000 }).then(() => {
         if (!(window.__tliveLessonSlots || []).length) {
           showGamesToast(t("tlive_pq_no_lesson_html"));
