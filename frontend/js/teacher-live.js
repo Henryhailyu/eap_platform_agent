@@ -412,9 +412,9 @@
   function contextFromUrl() {
     const p = new URLSearchParams(window.location.search);
     return {
-      className: p.get("class_name") || "EAP047",
+      className: p.get("class_name") || p.get("class") || "EAP047",
       date: p.get("date") || "",
-      taskId: p.get("task_id") || "",
+      taskId: p.get("task_id") || p.get("task") || "",
     };
   }
 
@@ -1073,10 +1073,13 @@
     const api = getDisplayApi();
     if (libItem && api) {
       try {
-        const res = await api.activateItem(libItem.id);
+        const teacher = await liveTeacherContext();
+        const res = await api.activateItem(libItem.id, teacher?.username || "");
+        displayLibrary.activeId = libItem.id;
+        renderDisplayLibraryList();
         if (res.display) return pushDisplayToClass(res.display);
       } catch (_) {
-        /* fall through */
+        /* fall through to direct push */
       }
     }
     const payload = { mode: "html", title };
@@ -1393,17 +1396,29 @@
 
   async function addHtmlToDisplayLibrary(className, pageId, title, activate) {
     const api = getDisplayApi();
-    if (!api) return null;
+    if (!api || pageId == null || pageId === "") return null;
+    const cls = className || displayLibrary.className || contextFromUrl().className;
+    const existing = displayLibrary.items.find(
+      (i) => i.item_type === "html" && String(i.page_id) === String(pageId),
+    );
+    if (existing) {
+      if (displayLibrary.className === cls) renderDisplayLibraryList();
+      if (activate) await showDisplayLibraryItem(existing, true);
+      return existing;
+    }
     try {
-      const item = await api.addHtmlPage(className, pageId, title);
-      if (displayLibrary.className === className) {
+      const teacher = await liveTeacherContext();
+      const teacherUsername = (teacher && teacher.username) || "";
+      const item = await api.addHtmlPage(cls, pageId, title, teacherUsername);
+      if (displayLibrary.className === cls) {
         const exists = displayLibrary.items.some((i) => String(i.id) === String(item.id));
         if (!exists) displayLibrary.items.push(item);
         renderDisplayLibraryList();
       }
       if (activate) await showDisplayLibraryItem(item, true);
       return item;
-    } catch (_) {
+    } catch (err) {
+      updateLaunchStatus((err && err.message) || t("tlive_display_load_failed"), false);
       return null;
     }
   }
@@ -3581,8 +3596,10 @@
   function showGamesTool() {
     syncLiveLessonFromActiveSource();
     stopLiveTimerIfMounted();
+    dismissSidePanelIfOpen();
     window.__tliveGameLaunchingId = null;
     clearLiveGameState();
+    setActiveTool("games");
     renderGamesLibrary({ force: true });
     const gen = (window.__tliveGamesLibraryRefreshGen = (window.__tliveGamesLibraryRefreshGen || 0) + 1);
     void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 12000 }).then((ok) => {
@@ -3928,6 +3945,12 @@
       if (document.hidden) return;
       void liveTeacherContext().then((user) => {
         if (user && typeof initAppPageHeader === "function") initAppPageHeader();
+      });
+      const ctx = contextFromUrl();
+      void loadDisplayLibrary(ctx).then(() => {
+        if (getActiveToolbarTool() !== "games" || isLiveGameActive()) return;
+        if (!document.querySelector(".tlive-games-panel")) showGamesTool();
+        else patchGamesLibrarySuggested();
       });
     });
   }

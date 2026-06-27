@@ -45,6 +45,19 @@
   let sourceFiles = [];
   let lastSavedPageId = null;
 
+  async function teacherPushOpts() {
+    if (typeof global.fetchCurrentSessionUser !== "function") return {};
+    try {
+      const teacher = await global.fetchCurrentSessionUser();
+      if (teacher && teacher.role === "teacher" && teacher.username) {
+        return { teacher_username: teacher.username };
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return {};
+  }
+
   async function pushDraftToClass(statusEl) {
     const api = API();
     const liveApi = global.EAP_LIVE_TEACHING_API;
@@ -75,31 +88,50 @@
         pageId = saved.id;
         lastSavedPageId = pageId;
       }
-      if (typeof global.fetchCurrentSessionUser === "function") {
-        const teacher = await global.fetchCurrentSessionUser();
-        if (!teacher || teacher.role !== "teacher") {
-          setStatus(statusEl, t("tla_push_fail_login"), true);
+      const teacherOpts = await teacherPushOpts();
+      if (typeof global.fetchCurrentSessionUser === "function" && !teacherOpts.teacher_username) {
+        setStatus(statusEl, t("tla_push_fail_login"), true);
+        return;
+      }
+      const live = global.EAP_TEACHER_LIVE;
+      if (live && typeof live.pushHtmlLessonToClass === "function") {
+        const ok = await live.pushHtmlLessonToClass({
+          html: draftHtml,
+          title: title || draftTopic,
+          page_id: pageId,
+          class_name: className,
+        });
+        if (!ok) {
+          setStatus(statusEl, t("tla_push_failed"), true);
           return;
         }
+        if (typeof live.loadDisplayLibrary === "function") {
+          await live.loadDisplayLibrary({ className });
+        }
+        setStatus(statusEl, t("tla_pushed_ok"), false);
+        return;
       }
       let sessCode = global.__tliveLiveSession?.code;
       if (!sessCode) {
-        const created = await liveApi.createSession(className, "", {});
+        const created = await liveApi.createSession(className, "", teacherOpts);
         sessCode = created.session_code;
       }
       await liveApi.pushDisplay(
         sessCode,
         { mode: "html", title: title || draftTopic, page_id: pageId },
-        {},
+        teacherOpts,
       );
       const libApi = global.EAP_CLASSROOM_DISPLAY;
       if (libApi && pageId) {
-        const item = await libApi.addHtmlPage(className, pageId, title || draftTopic);
-        if (item && item.id) await libApi.activateItem(item.id);
-      }
-      const live = global.EAP_TEACHER_LIVE;
-      if (live && typeof live.renderHtmlLessonOnCanvas === "function") {
-        live.renderHtmlLessonOnCanvas(draftHtml, title, pageId);
+        const item = await libApi.addHtmlPage(
+          className,
+          pageId,
+          title || draftTopic,
+          teacherOpts.teacher_username,
+        );
+        if (item && item.id) {
+          await libApi.activateItem(item.id, teacherOpts.teacher_username);
+        }
       }
       setStatus(statusEl, t("tla_pushed_ok"), false);
     } catch (err) {
@@ -318,14 +350,17 @@
     frame.srcdoc = bridged;
   }
 
-  function presentHtmlInCanvas(html, title) {
+  function presentHtmlInCanvas(html, title, pageId) {
     const live = global.EAP_TEACHER_LIVE;
     if (live && typeof live.renderHtmlLessonOnCanvas === "function") {
-      live.renderHtmlLessonOnCanvas(html, title, null);
+      live.renderHtmlLessonOnCanvas(html, title, pageId != null ? pageId : null);
       return;
     }
     const canvas = document.getElementById("tlive-canvas-inner");
     if (!canvas || !html) return;
+    if (typeof global.EAP_syncLessonSlotsFromHtml === "function") {
+      global.EAP_syncLessonSlotsFromHtml(html, { pageId: pageId != null ? pageId : undefined });
+    }
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
     canvas.innerHTML = `
       <div class="tla-live-present">
@@ -407,7 +442,7 @@
       container.querySelectorAll("[data-present]").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const page = await api.getPage(btn.getAttribute("data-present"));
-          presentHtmlInCanvas(page.html_content, page.title);
+          presentHtmlInCanvas(page.html_content, page.title, page.id);
         });
       });
       container.querySelectorAll("[data-push]").forEach((btn) => {
@@ -420,7 +455,17 @@
           lastSavedPageId = page.id;
           const live = global.EAP_TEACHER_LIVE;
           if (live && typeof live.pushHtmlLessonToClass === "function") {
-            await live.pushHtmlLessonToClass({ html: page.html_content, title: page.title, pageId: page.id });
+            const ok = await live.pushHtmlLessonToClass({
+              html: page.html_content,
+              title: page.title,
+              page_id: page.id,
+              class_name: page.class_name || readPageContext().className,
+            });
+            const statusEl = document.getElementById("tla-status") || document.getElementById("tla-live-status");
+            setStatus(statusEl, ok ? t("tla_pushed_ok") : t("tla_push_failed"), !ok);
+            if (ok && typeof live.loadDisplayLibrary === "function") {
+              await live.loadDisplayLibrary({ className: page.class_name || readPageContext().className });
+            }
           } else {
             const statusEl = document.getElementById("tla-status") || document.getElementById("tla-live-status");
             await pushDraftToClass(statusEl);
@@ -494,6 +539,7 @@
       draftTopic = topic;
       draftSource = page.source_text_used || (sourceEl?.value || "").trim();
       draftTemplateKey = page.template_key || currentTemplateKey(compact);
+      if (page.id) lastSavedPageId = page.id;
       setPreviewHtml(draftHtml);
       const titleEl = document.getElementById("tla-title");
       if (titleEl && !titleEl.value.trim()) titleEl.value = page.title || topic;
@@ -505,7 +551,7 @@
       let msg = activityCount ? t("tla_generated_ok") : `${t("tla_generated_ok")} ${t("tla_no_interactive_warn")}`;
       if (warn) msg = `${msg} ${t("tla_html_warnings_prefix")} ${warn}`;
       setStatus(statusEl, msg, !activityCount && !warn);
-      if (compact) presentHtmlInCanvas(draftHtml, page.title || topic);
+      if (compact) presentHtmlInCanvas(draftHtml, page.title || topic, page.id || lastSavedPageId);
     };
     try {
       if (generateBtn) await runAi(generateBtn, work);
@@ -549,6 +595,7 @@
         </div>
         <div class="tla-actions">
           <button type="button" class="btn-primary" id="tla-live-generate" data-eap-ai-busy-key="eap_ai_busy_html">${escapeHtml(t("tla_generate_btn"))}</button>
+          <button type="button" class="btn-primary" id="tla-live-push-class">${escapeHtml(t("tla_push_class"))}</button>
           <a class="btn-secondary" href="teacher-lesson-ai.html">${escapeHtml(t("tla_open_full"))}</a>
         </div>
         <p id="tla-live-status" class="tla-status hidden" role="status"></p>
@@ -568,8 +615,11 @@
     document.getElementById("tla-live-generate")?.addEventListener("click", () => {
       void runGenerate(document.getElementById("tla-live-status"), true);
     });
+    document.getElementById("tla-live-push-class")?.addEventListener("click", () => {
+      void pushDraftToClass(document.getElementById("tla-live-status"));
+    });
     void refreshSavedList(document.getElementById("tla-live-saved"), (page) => {
-      presentHtmlInCanvas(page.html_content, page.title);
+      presentHtmlInCanvas(page.html_content, page.title, page.id);
     });
   }
 

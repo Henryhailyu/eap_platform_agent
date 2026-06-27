@@ -40,22 +40,25 @@
     return readJson(response);
   }
 
-  async function addHtmlPage(className, pageId, title) {
+  async function addHtmlPage(className, pageId, title, teacherUsername) {
+    const body = { class_name: className, page_id: pageId, title: title || "" };
+    if (teacherUsername) body.teacher_username = String(teacherUsername);
     const response = await fetchFn()(`${API_BASE}/api/teacher/classroom-display`, {
       method: "POST",
       credentials: "include",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ class_name: className, page_id: pageId, title: title || "" }),
+      body: JSON.stringify(body),
     });
     const data = await readJson(response);
     return data.item;
   }
 
-  async function uploadFile(className, file, title) {
+  async function uploadFile(className, file, title, teacherUsername) {
     const form = new FormData();
     form.append("class_name", className);
     form.append("file", file);
     if (title) form.append("title", title);
+    if (teacherUsername) form.append("teacher_username", String(teacherUsername));
     const response = await fetchFn()(`${API_BASE}/api/teacher/classroom-display`, {
       method: "POST",
       credentials: "include",
@@ -75,14 +78,16 @@
     return readJson(response);
   }
 
-  async function activateItem(itemId) {
+  async function activateItem(itemId, teacherUsername) {
+    const body = {};
+    if (teacherUsername) body.teacher_username = String(teacherUsername);
     const response = await fetchFn()(
       `${API_BASE}/api/teacher/classroom-display/${encodeURIComponent(itemId)}/activate`,
       {
         method: "PUT",
         credentials: "include",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({}),
+        body: JSON.stringify(body),
       },
     );
     return readJson(response);
