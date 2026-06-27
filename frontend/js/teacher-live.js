@@ -1067,6 +1067,7 @@
     const pageId = o.page_id || o.pageId || null;
     const className = o.class_name || o.className || contextFromUrl().className;
     if (!html) return false;
+    displayLibrary.className = className;
     let libItem = null;
     if (pageId) libItem = await addHtmlToDisplayLibrary(className, pageId, title, false);
     renderHtmlLessonOnCanvas(html, title, pageId);
@@ -1264,7 +1265,8 @@
     renderDisplayLibraryList();
     if (api && pushLive) {
       try {
-        const res = await api.activateItem(item.id);
+        const teacher = await liveTeacherContext();
+        const res = await api.activateItem(item.id, (teacher && teacher.username) || "");
         if (res.item) {
           mergeDisplayLibraryItem(res.item);
           item = res.item;
@@ -1398,11 +1400,12 @@
     const api = getDisplayApi();
     if (!api || pageId == null || pageId === "") return null;
     const cls = className || displayLibrary.className || contextFromUrl().className;
+    displayLibrary.className = cls;
     const existing = displayLibrary.items.find(
       (i) => i.item_type === "html" && String(i.page_id) === String(pageId),
     );
     if (existing) {
-      if (displayLibrary.className === cls) renderDisplayLibraryList();
+      renderDisplayLibraryList();
       if (activate) await showDisplayLibraryItem(existing, true);
       return existing;
     }
@@ -1410,11 +1413,9 @@
       const teacher = await liveTeacherContext();
       const teacherUsername = (teacher && teacher.username) || "";
       const item = await api.addHtmlPage(cls, pageId, title, teacherUsername);
-      if (displayLibrary.className === cls) {
-        const exists = displayLibrary.items.some((i) => String(i.id) === String(item.id));
-        if (!exists) displayLibrary.items.push(item);
-        renderDisplayLibraryList();
-      }
+      const exists = displayLibrary.items.some((i) => String(i.id) === String(item.id));
+      if (!exists) displayLibrary.items.push(item);
+      renderDisplayLibraryList();
       if (activate) await showDisplayLibraryItem(item, true);
       return item;
     } catch (err) {
@@ -3554,7 +3555,7 @@
     });
   }
 
-  function bindGamesCanvasDelegation() {
+  function renderGamesLibrary(opts) {
     const force = !!(opts && opts.force);
     if (!force && isLiveGameActive()) return;
     const MOCK = getMock();
