@@ -1173,10 +1173,21 @@
 
   async function loadDisplayLibrary(ctx) {
     const api = getDisplayApi();
-    if (!api) return;
+    displayLibrary.loadError = null;
+    if (!api) {
+      renderDisplayLibraryList();
+      return;
+    }
     displayLibrary.className = ctx.className || "EAP047";
     try {
-      const data = await api.listItems(displayLibrary.className);
+      let teacherUsername = "";
+      try {
+        const teacher = await liveTeacherContext();
+        teacherUsername = (teacher && teacher.username) || "";
+      } catch (_) {
+        /* session optional in demo */
+      }
+      const data = await api.listItems(displayLibrary.className, teacherUsername);
       displayLibrary.items = (data.items || []).slice().sort((a, b) => {
         const ta = String(a.updated_at || a.created_at || "");
         const tb = String(b.updated_at || b.created_at || "");
@@ -1184,14 +1195,22 @@
       });
       displayLibrary.activeId = data.active_item_id || null;
       renderDisplayLibraryList();
-    } catch (_) {
-      /* ignore */
+    } catch (err) {
+      displayLibrary.items = [];
+      displayLibrary.activeId = null;
+      displayLibrary.loadError = (err && err.message) || t("tlive_display_load_failed");
+      renderDisplayLibraryList();
+      updateLaunchStatus(displayLibrary.loadError, false);
     }
   }
 
   function renderDisplayLibraryList() {
     const list = document.getElementById("tlive-display-list");
     if (!list) return;
+    if (displayLibrary.loadError) {
+      list.innerHTML = `<li class="tlive-display-list__empty">${escapeHtml(displayLibrary.loadError)}</li>`;
+      return;
+    }
     if (!displayLibrary.items.length) {
       list.innerHTML = `<li class="tlive-display-list__empty">${escapeHtml(t("tlive_display_empty"))}</li>`;
       return;
@@ -3738,6 +3757,44 @@
     });
   }
 
+  function reapplyActiveToolView(ctx) {
+    const tool = getActiveToolbarTool();
+    const MOCK = getMock();
+    if (tool === "games") {
+      showGamesTool();
+      return true;
+    }
+    if ((tool === "poll" || tool === "quiz") && MOCK) {
+      void mountPollQuizForTool(tool, MOCK);
+      return true;
+    }
+    if (tool === "timer") {
+      renderTimerTool();
+      return true;
+    }
+    if (tool === "wheel") {
+      renderNameWheelTool(ctx);
+      return true;
+    }
+    return false;
+  }
+
+  async function applyBootCanvas(ctx) {
+    const tool = getActiveToolbarTool();
+    if (tool && tool !== "slides") {
+      reapplyActiveToolView(ctx);
+      return;
+    }
+    if (displayLibrary.activeId) {
+      await ensureLiveSession(ctx);
+      const active = displayLibrary.items.find((i) => i.id === displayLibrary.activeId);
+      if (active) await showDisplayLibraryItem(active, true);
+      else renderWelcome(ctx);
+    } else {
+      renderWelcome(ctx);
+    }
+  }
+
   function initLiveUi(ctx) {
     const titleEl = document.getElementById("tlive-session-title");
     const metaEl = document.getElementById("tlive-session-meta");
@@ -3774,17 +3831,11 @@
     setActiveTool("slides");
     void (async () => {
       await loadDisplayLibrary(ctx);
-      if (displayLibrary.activeId) {
-        await ensureLiveSession(ctx);
-        const active = displayLibrary.items.find((i) => i.id === displayLibrary.activeId);
-        if (active) await showDisplayLibraryItem(active, true);
-      } else {
-        renderWelcome(ctx);
-      }
+      await applyBootCanvas(ctx);
       const urlTool = new URLSearchParams(window.location.search).get("tool");
       if (urlTool === "games") {
         setActiveTool("games");
-        void showGamesTool();
+        showGamesTool();
       }
     })();
   }

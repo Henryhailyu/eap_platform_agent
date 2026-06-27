@@ -1840,6 +1840,7 @@ window.EAP_STRINGS_ZH = {
   "tlive_display_library": "展示库",
   "tlive_display_library_hint": "为本班提前准备 HTML 课时与文件，删除前会一直保留。",
   "tlive_display_empty": "暂无展示内容。可从 AI 课时生成推送，或上传文件。",
+  "tlive_display_load_failed": "无法加载展示库，请刷新页面或重新登录。",
   "tlive_display_upload": "上传文件",
   "tlive_display_type_html": "HTML",
   "tlive_display_type_file": "文件",

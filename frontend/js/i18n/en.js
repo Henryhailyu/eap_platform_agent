@@ -1845,6 +1845,7 @@ window.EAP_STRINGS_EN = {
   "tlive_display_library": "Display library",
   "tlive_display_library_hint": "Prepare HTML lessons and files for this class. They stay here until you delete them.",
   "tlive_display_empty": "No display items yet. Push from AI Lesson Builder or upload a file.",
+  "tlive_display_load_failed": "Could not load display library. Refresh the page or sign in again.",
   "tlive_display_upload": "Upload file",
   "tlive_display_type_html": "HTML",
   "tlive_display_type_file": "File",

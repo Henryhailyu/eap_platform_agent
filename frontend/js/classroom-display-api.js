@@ -28,8 +28,11 @@
     return data;
   }
 
-  async function listItems(className) {
-    const q = className ? `?class_name=${encodeURIComponent(className)}` : "";
+  async function listItems(className, teacherUsername) {
+    const params = new URLSearchParams();
+    if (className) params.set("class_name", className);
+    if (teacherUsername) params.set("teacher_username", String(teacherUsername));
+    const q = params.toString() ? `?${params.toString()}` : "";
     const response = await fetchFn()(`${API_BASE}/api/teacher/classroom-display${q}`, {
       credentials: "include",
       headers: authHeaders(),
