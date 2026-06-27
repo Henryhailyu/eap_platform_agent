@@ -590,16 +590,19 @@
 
   function createBingoState(terms) {
     function expandPool(pool, count) {
+      const shuffled = shuffleArr(pool);
       const out = [];
-      for (let i = 0; i < count; i += 1) out.push(pool[i % pool.length]);
+      for (let i = 0; i < count; i += 1) out.push(shuffled[i % shuffled.length]);
       return out;
     }
     const pool =
       Array.isArray(terms) && terms.length >= 8
         ? expandPool(terms, 24)
-        : BINGO_TERMS;
+        : expandPool(BINGO_TERMS, 24);
+    const openSlots = shuffleArr(
+      Array.from({ length: 25 }, (_, i) => i).filter((i) => i !== 12),
+    );
     const cells = [];
-    let termIdx = 0;
     for (let i = 0; i < 25; i += 1) {
       if (i === 12) {
         cells.push({
@@ -612,22 +615,26 @@
           marks: { A: true, B: true, C: true, D: true },
         });
       } else {
-        const t = pool[termIdx];
-        termIdx += 1;
-        cells.push({
-          index: i,
-          free: false,
-          term: t.term,
-          termZh: t.term,
-          defEn: t.defEn,
-          defZh: t.defZh,
-          marks: { A: false, B: false, C: false, D: false },
-        });
+        cells.push(null);
       }
     }
+    pool.forEach((t, pi) => {
+      const slot = openSlots[pi];
+      cells[slot] = {
+        index: slot,
+        free: false,
+        term: t.term,
+        termZh: t.term,
+        defEn: t.defEn,
+        defZh: t.defZh,
+        marks: { A: false, B: false, C: false, D: false },
+      };
+    });
+    const clueOrder = shuffleArr(openSlots.slice());
     return {
       cells,
       clueIndex: 0,
+      clueOrder,
       selectedTeam: "A",
       winnerId: null,
       teams: LIVE_TEAMS.map((x) => ({ ...x })),
@@ -635,10 +642,15 @@
   }
 
   function bingoClue(state) {
-    const nonFree = state.cells.filter((c) => !c.free);
-    const idx = state.clueIndex % nonFree.length;
-    const cell = nonFree[idx];
-    return { cell, index: idx, total: nonFree.length };
+    const nonFree = state.cells.filter((c) => c && !c.free);
+    const order =
+      Array.isArray(state.clueOrder) && state.clueOrder.length === nonFree.length
+        ? state.clueOrder
+        : nonFree.map((c) => c.index);
+    const pos = state.clueIndex % order.length;
+    const cellIndex = order[pos];
+    const cell = state.cells.find((c) => c && c.index === cellIndex) || nonFree[pos];
+    return { cell, index: pos, total: order.length };
   }
 
   function markBingoCell(state, cellIndex, teamId) {
@@ -664,7 +676,7 @@
   }
 
   function advanceBingoClue(state) {
-    const nonFree = state.cells.filter((c) => !c.free);
+    const nonFree = state.cells.filter((c) => c && !c.free);
     return { ...state, clueIndex: (state.clueIndex + 1) % nonFree.length };
   }
 
@@ -673,12 +685,14 @@
       Array.isArray(terms) && terms.length >= 8
         ? terms.slice(0, 8)
         : MATCHING_PAIRS;
-    const pairs = raw.map((p, i) => ({
-      id: p.id || `p${i + 1}`,
-      term: p.term,
-      defEn: p.defEn,
-      defZh: p.defZh || p.defEn,
-    }));
+    const pairs = shuffleArr(
+      raw.map((p, i) => ({
+        id: p.id || `p${i + 1}`,
+        term: p.term,
+        defEn: p.defEn,
+        defZh: p.defZh || p.defEn,
+      })),
+    );
     const defs = shuffleArr(
       pairs.map((p) => ({
         id: `d-${p.id}`,
@@ -2894,9 +2908,18 @@
     return isZh() ? card.textZh : card.textEn;
   }
 
-  function buildMemoryDeck() {
+  function buildMemoryDeck(terms) {
     const raw = [];
-    MATCHING_PAIRS.forEach((p) => {
+    const source =
+      Array.isArray(terms) && terms.length >= 6
+        ? terms.slice(0, MEMORY_WIN_PAIRS).map((p, i) => ({
+            id: p.id || `p${i + 1}`,
+            term: p.term,
+            defEn: p.defEn,
+            defZh: p.defZh || p.defEn,
+          }))
+        : MATCHING_PAIRS.slice(0, MEMORY_WIN_PAIRS);
+    source.forEach((p) => {
       raw.push({ pairId: p.id, side: "term", textEn: p.term, textZh: p.term });
       raw.push({ pairId: p.id, side: "def", textEn: p.defEn, textZh: p.defZh });
     });
@@ -2914,9 +2937,9 @@
     );
   }
 
-  function createMemoryCardState() {
+  function createMemoryCardState(terms) {
     return {
-      cards: buildMemoryDeck(),
+      cards: buildMemoryDeck(terms),
       selectedTeam: "A",
       scores: { A: 0, B: 0, C: 0, D: 0 },
       questionIndex: 0,

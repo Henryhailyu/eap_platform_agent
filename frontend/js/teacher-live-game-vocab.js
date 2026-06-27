@@ -205,6 +205,91 @@
     });
   }
 
+  function addCommaTermLists(doc, pairs, seen) {
+    doc.querySelectorAll("h2, h3").forEach((heading) => {
+      if (!VOCAB_HEADING.test(stripTags(heading.textContent || ""))) return;
+      let el = heading.nextElementSibling;
+      let steps = 0;
+      while (el && steps < 10) {
+        if (/^H[23]$/i.test(el.tagName)) break;
+        const plain = stripTags(el.textContent || "");
+        if (/[,;·]/.test(plain)) {
+          plain.split(/[,;·]+/).forEach((chunk) => {
+            const term = cleanTermForGame(chunk);
+            if (!term || term.split(/\s+/).length > 4) return;
+            addPair(
+              pairs,
+              seen,
+              term,
+              `${term.charAt(0).toUpperCase()}${term.slice(1)} — key vocabulary from this lesson`,
+            );
+          });
+        }
+        el = el.nextElementSibling;
+        steps += 1;
+      }
+    });
+  }
+
+  function parseVocabSegments(doc, pairs, seen) {
+    doc.querySelectorAll("section.eap-segment, section[data-eap-live-segment]").forEach((section) => {
+      const heading = section.querySelector(":scope > h2, :scope > h3");
+      if (!heading) return;
+      const title = stripTags(heading.textContent || "");
+      if (!VOCAB_HEADING.test(title) && !/\b(language|lexis|word|terminology|reading)\b/i.test(title)) {
+        return;
+      }
+      section.querySelectorAll("p, li, td").forEach((node) => {
+        const emphasis = node.querySelector("strong, b, em");
+        if (emphasis) {
+          const term = stripTags(emphasis.innerHTML);
+          const clone = node.cloneNode(true);
+          clone.querySelectorAll("strong, b, em").forEach((el) => el.remove());
+          const rest = stripTags(clone.innerHTML).replace(/^[:\-–—]\s*/, "");
+          if (term && rest) addPair(pairs, seen, term, rest);
+        } else {
+          addLinePair(pairs, seen, stripTags(node.textContent || ""));
+        }
+      });
+    });
+  }
+
+  function parseInlineKeywordMarks(doc, pairs, seen) {
+    doc.querySelectorAll("mark, .key-term, .vocab-term, [data-vocab-term]").forEach((node) => {
+      const term = cleanTermForGame(stripTags(node.textContent || ""));
+      if (!term) return;
+      const parent = node.closest("p, li, td");
+      let context = parent ? stripTags(parent.textContent || "") : "";
+      context = context.replace(new RegExp(term, "i"), "").replace(/^[:\-–—]\s*/, "").trim();
+      const def =
+        context.length >= 10
+          ? context.slice(0, 140)
+          : `${term.charAt(0).toUpperCase()}${term.slice(1)} — key vocabulary from this lesson`;
+      addPair(pairs, seen, term, def);
+    });
+  }
+
+  function parseVocabFromLessonSlots(pairs, seen) {
+    const slots = global.__tliveLessonSlots || [];
+    slots.forEach((slot) => {
+      if (!slot) return;
+      const q = String(slot.textEn || slot.label || "");
+      const wordMatch =
+        q.match(/\bword\s+[''""]([^''""\n]+)[''""]/i) ||
+        q.match(/\bterm\s+[''""]([^''""\n]+)[''""]/i);
+      if (!wordMatch) return;
+      const term = cleanTermForGame(wordMatch[1]);
+      const opts = Array.isArray(slot.optionsEn) ? slot.optionsEn : [];
+      if (!opts.length) return;
+      let idx = Number.isInteger(slot.correctIndex) ? slot.correctIndex : 0;
+      if (idx < 0 || idx >= opts.length) idx = 0;
+      const def = String(opts[idx] || "")
+        .replace(/^[A-Da-d][.)]\s*/, "")
+        .trim();
+      if (term && def) addPair(pairs, seen, term, def);
+    });
+  }
+
   function parseVocabFromHtml(html) {
     const pairs = [];
     const seen = new Set();
@@ -309,22 +394,29 @@
       }
     });
 
+    parseVocabSegments(doc, pairs, seen);
+    addCommaTermLists(doc, pairs, seen);
+    parseInlineKeywordMarks(doc, pairs, seen);
+    parseVocabFromLessonSlots(pairs, seen);
+
     return filterValidTerms(pairs);
   }
 
-  function termsFromHtml(html) {
+  function termsFromHtml(html, minRequired) {
+    const min = Number.isFinite(minRequired) && minRequired > 0 ? minRequired : MIN;
     const parsed = parseVocabFromHtml(html);
-    if (!parsed.length) return null;
+    if (parsed.length < min) return null;
     return parsed.slice(0, TARGET);
   }
 
-  function resolveSync() {
+  function resolveSync(minRequired) {
+    const min = Number.isFinite(minRequired) && minRequired > 0 ? minRequired : MIN;
     const cached = getCached();
-    if (cached && cached.length >= MIN) return cached;
+    if (cached && cached.length >= min) return cached;
     const html = getLessonHtmlCached();
     if (!html || html.length < 80) return null;
-    const terms = termsFromHtml(html);
-    if (terms && terms.length >= MIN) {
+    const terms = termsFromHtml(html, min);
+    if (terms && terms.length >= min) {
       setCached(terms);
       return terms;
     }
@@ -334,7 +426,7 @@
   function warmFromHtml(html) {
     const text = String(html || "");
     if (text.length < 80) return null;
-    const terms = termsFromHtml(text);
+    const terms = termsFromHtml(text, MIN);
     if (terms && terms.length >= MIN) {
       setCached(terms);
       return terms;

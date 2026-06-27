@@ -177,12 +177,13 @@
     window.__tliveVocabGameLoading = kind;
     showVocabGameLoading();
 
+    const GV = window.EAP_LIVE_GAME_VOCAB;
+    const minTerms = kind === "memory" ? 6 : GV && GV.MIN ? GV.MIN : 8;
+
     const finish = (terms) => {
       window.__tliveVocabGameLoading = null;
       window.__tliveGameLaunchingId = null;
-      const GV = window.EAP_LIVE_GAME_VOCAB;
-      const min = GV && GV.MIN ? GV.MIN : 8;
-      if (terms && terms.length >= min) {
+      if (terms && terms.length >= minTerms) {
         window.__tliveLessonVocab = terms;
         onReady(terms);
       } else {
@@ -198,10 +199,9 @@
         finish(null);
         return;
       }
-      const GV = window.EAP_LIVE_GAME_VOCAB;
       if (GV && typeof GV.resolveSync === "function") {
-        const fast = GV.resolveSync();
-        if (fast && fast.length >= (GV.MIN || 8)) {
+        const fast = GV.resolveSync(minTerms);
+        if (fast && fast.length >= minTerms) {
           finish(fast);
           return;
         }
@@ -211,8 +211,8 @@
         syncLiveLessonFromActiveSource();
       }
       if (GV && typeof GV.resolveSync === "function") {
-        const fast = GV.resolveSync();
-        if (fast && fast.length >= (GV.MIN || 8)) {
+        const fast = GV.resolveSync(minTerms);
+        if (fast && fast.length >= minTerms) {
           finish(fast);
           return;
         }
@@ -3421,6 +3421,7 @@
     }
     if (game.type === "vocab_bingo" || game.id === "vocab-bingo") {
       void startVocabGame("bingo", (terms) => {
+        if (!terms) showGamesToast(t("tlive_vocab_ai_failed"));
         window.__tliveBingo = MOCK.createBingoState(terms);
         renderVocabBingo(window.__tliveBingo);
       });
@@ -3428,6 +3429,7 @@
     }
     if (game.type === "matching_race" || game.id === "matching-race") {
       void startVocabGame("matching", (terms) => {
+        if (!terms) showGamesToast(t("tlive_vocab_ai_failed"));
         window.__tliveMatching = MOCK.createMatchingState(terms);
         renderMatchingRace(window.__tliveMatching);
       });
@@ -3469,8 +3471,11 @@
       return;
     }
     if (game.type === "memory_card" || game.id === "memory-card") {
-      window.__tliveMemory = MOCK.createMemoryCardState();
-      renderMemoryCard(window.__tliveMemory);
+      void startVocabGame("memory", (terms) => {
+        if (!terms) showGamesToast(t("tlive_vocab_ai_failed"));
+        window.__tliveMemory = MOCK.createMemoryCardState(terms);
+        renderMemoryCard(window.__tliveMemory);
+      });
       return;
     }
     if (game.type === "hot_seat" || game.id === "hot-seat") {
@@ -3645,8 +3650,8 @@
     });
   }
 
-  function isVocabRaceGameId(gameId) {
-    return gameId === "vocab-bingo" || gameId === "matching-race";
+  function isVocabLessonGameId(gameId) {
+    return gameId === "vocab-bingo" || gameId === "matching-race" || gameId === "memory-card";
   }
 
   function loadGame(gameId, opts) {
@@ -3658,8 +3663,8 @@
       return;
     }
     syncLiveLessonFromActiveSource();
-    const vocabRace = isVocabRaceGameId(gameId);
-    if (vocabRace) {
+    const vocabLesson = isVocabLessonGameId(gameId);
+    if (vocabLesson) {
       if (!lessonHtmlAvailable()) {
         showVocabGameLoading();
         void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 4000 }).then(() => {
@@ -3703,7 +3708,9 @@
       game.type === "vocab_bingo" ||
       game.id === "vocab-bingo" ||
       game.type === "matching_race" ||
-      game.id === "matching-race";
+      game.id === "matching-race" ||
+      game.type === "memory_card" ||
+      game.id === "memory-card";
     if (!asyncVocab) window.__tliveGameLaunchingId = null;
     void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 12000 });
   }
