@@ -731,6 +731,119 @@ _PLACEHOLDER_DEFS = frozenset({
     "单词",
 })
 
+_PLAIN_VOCAB_STOPWORDS = frozenset({
+    "about",
+    "above",
+    "after",
+    "again",
+    "against",
+    "also",
+    "although",
+    "among",
+    "another",
+    "because",
+    "before",
+    "being",
+    "below",
+    "between",
+    "could",
+    "does",
+    "doing",
+    "during",
+    "each",
+    "either",
+    "enough",
+    "every",
+    "first",
+    "further",
+    "having",
+    "however",
+    "into",
+    "itself",
+    "later",
+    "might",
+    "never",
+    "nothing",
+    "often",
+    "other",
+    "perhaps",
+    "rather",
+    "second",
+    "several",
+    "shall",
+    "should",
+    "since",
+    "something",
+    "sometimes",
+    "still",
+    "such",
+    "than",
+    "that",
+    "their",
+    "them",
+    "then",
+    "there",
+    "these",
+    "they",
+    "this",
+    "those",
+    "though",
+    "through",
+    "under",
+    "until",
+    "very",
+    "were",
+    "what",
+    "when",
+    "where",
+    "whether",
+    "which",
+    "while",
+    "would",
+    "your",
+    "lesson",
+    "students",
+    "student",
+    "teacher",
+    "class",
+    "classroom",
+    "question",
+    "activity",
+    "section",
+    "segment",
+    "reading",
+    "chapter",
+    "title",
+    "english",
+    "language",
+    "university",
+    "academic",
+    "writing",
+    "learning",
+    "discussion",
+    "example",
+    "group",
+    "groups",
+    "launch",
+    "option",
+    "options",
+    "button",
+    "reveal",
+    "correct",
+    "incorrect",
+    "score",
+    "slide",
+    "slides",
+    "content",
+    "focus",
+    "notes",
+    "summary",
+    "objective",
+    "objectives",
+    "material",
+    "materials",
+})
+
 
 def _is_valid_game_vocab_term(term: str, def_en: str) -> bool:
     """Keep only letter-based EAP vocabulary suitable for bingo/matching."""
@@ -937,6 +1050,66 @@ def _merge_vocab_terms(primary: list[dict[str, str]], extra: list[dict[str, str]
     return merged
 
 
+def _pad_vocab_terms(terms: list[dict[str, str]], target: int) -> list[dict[str, str]]:
+    if not terms:
+        return []
+    out: list[dict[str, str]] = []
+    for i in range(target):
+        src = terms[i % len(terms)]
+        out.append(
+            {
+                "term": src["term"],
+                "defEn": src["defEn"],
+                "defZh": src.get("defZh") or src["defEn"],
+            }
+        )
+    return out
+
+
+def _extract_vocab_from_lesson_plain(html: str, *, max_terms: int = 24) -> list[dict[str, str]]:
+    """Frequency-based fallback: academic-ish words from lesson body text."""
+    from collections import Counter
+
+    plain = _lesson_plain_text_from_html(html)
+    words = re.findall(r"\b[a-z]{5,}\b", plain.lower())
+    freq = Counter(words)
+    pairs: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for word, _count in freq.most_common(500):
+        if word in _BLOCKED_VOCAB_TERMS or word in _PLAIN_VOCAB_STOPWORDS:
+            continue
+        def_en = "Important vocabulary from this lesson"
+        if not _is_valid_game_vocab_term(word, def_en):
+            continue
+        if word in seen:
+            continue
+        seen.add(word)
+        pairs.append({"term": word, "defEn": def_en, "defZh": def_en})
+        if len(pairs) >= max_terms:
+            break
+    return pairs
+
+
+def extract_live_vocab_from_html(
+    html: str,
+    *,
+    hint_terms: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Extract vocabulary from lesson HTML only (no AI)."""
+    parsed = _filter_vocab_pairs(_parse_vocab_pairs_from_html(html))
+    hints = _normalize_vocab_terms(hint_terms or [])
+    parsed = _merge_vocab_terms(parsed, hints)
+    if len(parsed) < _LIVE_VOCAB_MIN:
+        parsed = _merge_vocab_terms(parsed, _extract_vocab_from_lesson_plain(html))
+    if len(parsed) < _LIVE_VOCAB_MIN:
+        raise ValueError("Not enough vocabulary found in lesson HTML")
+    return {
+        "terms": _pad_vocab_terms(parsed, _LIVE_VOCAB_TARGET),
+        "source": "html",
+        "count": min(len(parsed), _LIVE_VOCAB_TARGET),
+    }
+
+
 _LIVE_VOCAB_SYSTEM = """You are an EAP vocabulary specialist. Given lesson HTML text, produce vocabulary for classroom games (bingo + matching).
 Return ONLY valid JSON:
 {
@@ -968,12 +1141,14 @@ def generate_live_vocab_from_html(
     parsed = _filter_vocab_pairs(_parse_vocab_pairs_from_html(html))
     hints = _normalize_vocab_terms(hint_terms or [])
     parsed = _merge_vocab_terms(parsed, hints)
+    if len(parsed) < _LIVE_VOCAB_MIN:
+        parsed = _merge_vocab_terms(parsed, _extract_vocab_from_lesson_plain(html))
 
-    if len(parsed) >= _LIVE_VOCAB_TARGET:
+    if len(parsed) >= _LIVE_VOCAB_MIN:
         return {
-            "terms": parsed[:_LIVE_VOCAB_TARGET],
+            "terms": _pad_vocab_terms(parsed, _LIVE_VOCAB_TARGET),
             "source": "html",
-            "count": _LIVE_VOCAB_TARGET,
+            "count": min(len(parsed), _LIVE_VOCAB_TARGET),
         }
 
     lesson_text = _lesson_plain_text_from_html(html)

@@ -44,6 +44,22 @@
     "单词",
   ]);
 
+  const PLAIN_STOPWORDS = new Set([
+    "about", "above", "after", "again", "against", "also", "although", "among", "another",
+    "because", "before", "being", "below", "between", "could", "does", "doing", "during",
+    "each", "either", "enough", "every", "first", "further", "having", "however", "into",
+    "itself", "later", "might", "never", "nothing", "often", "other", "perhaps", "rather",
+    "second", "several", "shall", "should", "since", "something", "sometimes", "still",
+    "such", "than", "that", "their", "them", "then", "there", "these", "they", "this",
+    "those", "though", "through", "under", "until", "very", "were", "what", "when",
+    "where", "whether", "which", "while", "would", "your", "lesson", "students", "student",
+    "teacher", "class", "classroom", "question", "activity", "section", "segment", "reading",
+    "chapter", "title", "english", "language", "university", "academic", "writing", "learning",
+    "discussion", "example", "group", "groups", "launch", "option", "options", "button",
+    "reveal", "correct", "incorrect", "score", "slide", "slides", "content", "focus", "notes",
+    "summary", "objective", "objectives", "material", "materials",
+  ]);
+
   function isValidGameVocab(term, defEn) {
     const t0 = String(term || "").replace(/\s+/g, " ").trim();
     const d0 = String(defEn || "").replace(/\s+/g, " ").trim();
@@ -323,6 +339,69 @@
     }
   }
 
+  function mergeTerms(primary, extra) {
+    const out = normalizeTerms(primary);
+    const seen = new Set(out.map((item) => item.term.toLowerCase()));
+    normalizeTerms(extra).forEach((item) => {
+      const key = item.term.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(item);
+    });
+    return out;
+  }
+
+  function padTerms(terms, target) {
+    const base = normalizeTerms(terms);
+    if (!base.length) return [];
+    const count = Number.isFinite(target) && target > 0 ? target : TARGET;
+    const out = [];
+    for (let i = 0; i < count; i += 1) out.push(base[i % base.length]);
+    return out;
+  }
+
+  function lessonPlainText(html) {
+    return String(html || "")
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function parsePlainTextLessonVocab(html) {
+    const plain = lessonPlainText(html).toLowerCase();
+    const freq = new Map();
+    plain.match(/\b[a-z]{5,}\b/g)?.forEach((word) => {
+      freq.set(word, (freq.get(word) || 0) + 1);
+    });
+    const ranked = [...freq.entries()].sort((a, b) => b[1] - a[1]);
+    const pairs = [];
+    const seen = new Set();
+    ranked.forEach(([word]) => {
+      if (seen.has(word) || BLOCKED_TERMS.has(word) || PLAIN_STOPWORDS.has(word)) return;
+      const defEn = "Important vocabulary from this lesson";
+      if (!isValidGameVocab(word, defEn)) return;
+      seen.add(word);
+      pairs.push({ term: word, defEn, defZh: defEn });
+    });
+    return filterValidTerms(pairs);
+  }
+
+  function collectTermsFromHtml(html, minRequired) {
+    const min = Number.isFinite(minRequired) && minRequired > 0 ? minRequired : MIN;
+    let merged = parseVocabFromHtml(html);
+    if (merged.length < min) {
+      merged = mergeTerms(merged, parsePlainTextLessonVocab(html));
+    }
+    if (merged.length < min) return null;
+    return padTerms(merged, TARGET);
+  }
+
+  function termsFromHtml(html, minRequired) {
+    return collectTermsFromHtml(html, minRequired);
+  }
+
   function parseVocabFromHtml(html) {
     const pairs = [];
     const seen = new Set();
@@ -436,13 +515,6 @@
     return filterValidTerms(pairs);
   }
 
-  function termsFromHtml(html, minRequired) {
-    const min = Number.isFinite(minRequired) && minRequired > 0 ? minRequired : MIN;
-    const parsed = parseVocabFromHtml(html);
-    if (parsed.length < min) return null;
-    return parsed.slice(0, TARGET);
-  }
-
   function resolveSync(minRequired) {
     const min = Number.isFinite(minRequired) && minRequired > 0 ? minRequired : MIN;
     const cached = getCached();
@@ -505,16 +577,16 @@
     const html = getLessonHtmlCached();
     if (!html || html.length < 80) return null;
 
-    const parsed = parseVocabFromHtml(html);
-    if (parsed.length >= MIN) {
-      const terms = parsed.slice(0, TARGET);
-      setCached(terms);
-      return terms;
+    const local = collectTermsFromHtml(html, MIN);
+    if (local && local.length >= MIN) {
+      setCached(local);
+      return local;
     }
 
+    const parsed = parseVocabFromHtml(html);
     const api = global.EAP_LIVE_TEACHING_API;
     if (!api || typeof api.generateVocab !== "function") {
-      return null;
+      return local;
     }
 
     if (inflight) return inflight;
@@ -535,13 +607,14 @@
         if (terms.length < MIN) {
           throw new Error(t("tlive_vocab_ai_failed"));
         }
-        setCached(terms);
-        return terms;
+        const padded = padTerms(terms, TARGET);
+        setCached(padded);
+        return padded;
       } catch (_) {
-        if (parsed.length >= MIN) {
-          const terms = parsed.slice(0, TARGET);
-          setCached(terms);
-          return terms;
+        const fallback = collectTermsFromHtml(html, MIN);
+        if (fallback && fallback.length >= MIN) {
+          setCached(fallback);
+          return fallback;
         }
         return null;
       } finally {

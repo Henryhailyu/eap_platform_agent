@@ -428,6 +428,13 @@ def enrich_lesson_meta_vocabulary(html: str, *, min_terms: int = 8) -> str:
     pairs = _merge_vocab_terms(pairs, _vocab_from_interaction_slots(data.get("interaction_slots") or []))
     if isinstance(existing, list):
         pairs = _merge_vocab_terms(pairs, existing)
+    if len(pairs) < min_terms:
+        try:
+            from eap_ai import _extract_vocab_from_lesson_plain
+
+            pairs = _merge_vocab_terms(pairs, _extract_vocab_from_lesson_plain(text))
+        except ImportError:
+            pass
 
     if not pairs:
         return text

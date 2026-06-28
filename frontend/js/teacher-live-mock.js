@@ -596,7 +596,7 @@
       return out;
     }
     const pool =
-      Array.isArray(terms) && terms.length >= 8
+      Array.isArray(terms) && terms.length > 0
         ? expandPool(terms, 24)
         : expandPool(BINGO_TERMS, 24);
     const openSlots = shuffleArr(
@@ -682,7 +682,7 @@
 
   function createMatchingState(terms) {
     const raw =
-      Array.isArray(terms) && terms.length >= 8
+      Array.isArray(terms) && terms.length > 0
         ? terms.slice(0, 8)
         : MATCHING_PAIRS;
     const pairs = shuffleArr(
