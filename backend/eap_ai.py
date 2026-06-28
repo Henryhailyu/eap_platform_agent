@@ -767,6 +767,37 @@ def _strip_html_tags(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", str(text or ""))).strip()
 
 
+def _vocab_from_interaction_slots(slots: list[Any]) -> list[dict[str, str]]:
+    """Extract term/definition pairs from lesson-plan word-definition MCQ slots."""
+    pairs: list[dict[str, str]] = []
+    for slot in slots or []:
+        if not isinstance(slot, dict):
+            continue
+        q = str(
+            slot.get("text")
+            or slot.get("textEn")
+            or slot.get("label")
+            or slot.get("question")
+            or ""
+        )
+        word_match = re.search(r"""\bword\s+['"]([^'"\n]+)['"]""", q, re.I)
+        if not word_match:
+            word_match = re.search(r"""\bterm\s+['"]([^'"\n]+)['"]""", q, re.I)
+        if not word_match:
+            continue
+        term = re.sub(r"\s+", " ", word_match.group(1)).strip()
+        opts = slot.get("options") or slot.get("optionsEn") or []
+        if not isinstance(opts, list) or not opts:
+            continue
+        idx = slot.get("correctIndex")
+        if not isinstance(idx, int) or idx < 0 or idx >= len(opts):
+            idx = 0
+        def_en = re.sub(r"^[A-Da-d][.)]\s*", "", str(opts[idx] or "")).strip()
+        if term and def_en and _is_valid_game_vocab_term(term, def_en):
+            pairs.append({"term": term, "defEn": def_en, "defZh": def_en})
+    return pairs
+
+
 def _parse_vocab_pairs_from_html(html: str) -> list[dict[str, str]]:
     """Best-effort extraction of term/definition pairs from lesson HTML."""
     raw = str(html or "")
@@ -786,6 +817,25 @@ def _parse_vocab_pairs_from_html(html: str) -> list[dict[str, str]]:
             return
         seen.add(key)
         pairs.append({"term": term, "defEn": def_en, "defZh": def_zh})
+
+    meta_m = re.search(
+        r'(?is)<script[^>]*\bid\s*=\s*["\']eap-lesson-meta["\'][^>]*>([\s\S]*?)</script>',
+        raw,
+    )
+    if meta_m:
+        try:
+            meta_data = json.loads(meta_m.group(1))
+            if isinstance(meta_data, dict):
+                for item in meta_data.get("vocabulary") or []:
+                    if isinstance(item, dict):
+                        add(
+                            str(item.get("term") or item.get("word") or ""),
+                            str(item.get("defEn") or item.get("definition") or item.get("def") or ""),
+                        )
+                for item in _vocab_from_interaction_slots(meta_data.get("interaction_slots") or []):
+                    add(item["term"], item["defEn"], item.get("defZh") or item["defEn"])
+        except json.JSONDecodeError:
+            pass
 
     for m in re.finditer(
         r"(?is)<dt[^>]*>([\s\S]*?)</dt>\s*<dd[^>]*>([\s\S]*?)</dd>",
@@ -808,6 +858,26 @@ def _parse_vocab_pairs_from_html(html: str) -> list[dict[str, str]]:
         rest = re.sub(r"^[:\-–—]\s*", "", _strip_html_tags(rest)).strip()
         if rest:
             add(term, rest)
+
+    for m in re.finditer(r"(?is)<p[^>]*>([\s\S]*?)</p>", raw):
+        block = m.group(1)
+        strong = re.search(r"(?is)<(?:strong|b|em)[^>]*>([\s\S]*?)</(?:strong|b|em)>", block)
+        if not strong:
+            continue
+        term = _strip_html_tags(strong.group(1))
+        rest = block.replace(strong.group(0), " ")
+        rest = re.sub(r"^[:\-–—]\s*", "", _strip_html_tags(rest)).strip()
+        if term and rest:
+            add(term, rest)
+
+    for m in re.finditer(
+        r"(?is)<(?:mark|span)[^>]*(?:class\s*=\s*['\"][^'\"]*(?:key-term|vocab-term)[^'\"]*['\"]|data-vocab-term)[^>]*>([\s\S]*?)</(?:mark|span)>",
+        raw,
+    ):
+        term = _strip_html_tags(m.group(1))
+        if not term:
+            continue
+        add(term, f"{term.capitalize()} — key vocabulary from this lesson")
 
     for hm in re.finditer(r"(?is)<h[23][^>]*>([\s\S]*?)</h[23]>", raw):
         heading = _strip_html_tags(hm.group(1))

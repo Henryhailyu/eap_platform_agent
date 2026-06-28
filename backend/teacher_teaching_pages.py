@@ -232,9 +232,14 @@ def polish_teaching_html(html: str) -> str:
     text = _strip_ai_preamble(text)
     text = _normalize_decorative_opacity(text)
     try:
-        from lesson_html_postprocess import inject_icp_footer_html, strip_chinese_from_html
+        from lesson_html_postprocess import (
+            enrich_lesson_meta_vocabulary,
+            inject_icp_footer_html,
+            strip_chinese_from_html,
+        )
 
         text = strip_chinese_from_html(text)
+        text = enrich_lesson_meta_vocabulary(text)
         text = inject_icp_footer_html(text)
     except ImportError:
         pass

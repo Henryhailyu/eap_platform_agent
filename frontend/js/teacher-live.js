@@ -199,17 +199,11 @@
         finish(null);
         return;
       }
-      if (GV && typeof GV.resolveSync === "function") {
-        const fast = GV.resolveSync(minTerms);
-        if (fast && fast.length >= minTerms) {
-          finish(fast);
-          return;
-        }
+      if (window.__tliveAiQuestionCache) {
+        window.__tliveAiQuestionCache.vocabTerms = null;
       }
-      if (!lessonHtmlAvailable()) {
-        await ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 4000 });
-        syncLiveLessonFromActiveSource();
-      }
+      await ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 8000, forceRefresh: true });
+      syncLiveLessonFromActiveSource();
       if (GV && typeof GV.resolveSync === "function") {
         const fast = GV.resolveSync(minTerms);
         if (fast && fast.length >= minTerms) {
@@ -1161,6 +1155,7 @@
     const pageId = String(item.page_id);
     const cache = window.__tliveLessonCache;
     if (
+      !options.forceRefresh &&
       cache &&
       cache.type === "html" &&
       String(cache.pageId) === pageId &&

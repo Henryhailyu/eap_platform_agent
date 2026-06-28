@@ -381,6 +381,71 @@ font-size:.75rem;line-height:1.5;color:#6e6e73;border-top:1px solid rgba(0,0,0,.
 """
 
 
+_META_SCRIPT_RE = re.compile(
+    r'(?is)<script[^>]*\bid\s*=\s*["\']eap-lesson-meta["\'][^>]*>([\s\S]*?)</script>'
+)
+
+
+def enrich_lesson_meta_vocabulary(html: str, *, min_terms: int = 8) -> str:
+    """Embed vocabulary[] in eap-lesson-meta so live vocab games can read lesson terms."""
+    text = str(html or "")
+    if len(text) < 80:
+        return text
+
+    meta_match = _META_SCRIPT_RE.search(text)
+    data: dict[str, Any] = {}
+    if meta_match:
+        try:
+            parsed = json.loads(meta_match.group(1))
+            if isinstance(parsed, dict):
+                data = parsed
+        except json.JSONDecodeError:
+            data = {}
+
+    existing = data.get("vocabulary")
+    if isinstance(existing, list):
+        try:
+            from eap_ai import _filter_vocab_pairs, _normalize_vocab_terms
+
+            normalized = _filter_vocab_pairs(_normalize_vocab_terms(existing))
+            if len(normalized) >= min_terms:
+                return text
+        except ImportError:
+            if len(existing) >= min_terms:
+                return text
+
+    try:
+        from eap_ai import (
+            _filter_vocab_pairs,
+            _merge_vocab_terms,
+            _parse_vocab_pairs_from_html,
+            _vocab_from_interaction_slots,
+        )
+    except ImportError:
+        return text
+
+    pairs = _filter_vocab_pairs(_parse_vocab_pairs_from_html(text))
+    pairs = _merge_vocab_terms(pairs, _vocab_from_interaction_slots(data.get("interaction_slots") or []))
+    if isinstance(existing, list):
+        pairs = _merge_vocab_terms(pairs, existing)
+
+    if not pairs:
+        return text
+
+    data["vocabulary"] = pairs[:24]
+    new_script = (
+        f'<script type="application/json" id="eap-lesson-meta">'
+        f"{json.dumps(data, ensure_ascii=False)}</script>"
+    )
+    if meta_match:
+        return text[: meta_match.start()] + new_script + text[meta_match.end() :]
+    lower = text.lower()
+    if "</body>" in lower:
+        idx = lower.rindex("</body>")
+        return text[:idx] + new_script + text[idx:]
+    return text + new_script
+
+
 def inject_icp_footer_html(html: str) -> str:
     """Append MIIT ICP footer per Tencent 备案号悬挂说明 (non-Guangdong: 服务备案号)."""
     text = str(html or "")

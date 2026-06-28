@@ -290,6 +290,39 @@
     });
   }
 
+  function parseMetaInteractionSlots(doc, pairs, seen) {
+    const node = doc.getElementById("eap-lesson-meta");
+    if (!node || !node.textContent) return;
+    try {
+      const data = JSON.parse(node.textContent);
+      (data.interaction_slots || []).forEach((slot) => {
+        if (!slot || typeof slot !== "object") return;
+        const q = String(
+          slot.text || slot.textEn || slot.label || slot.question || "",
+        );
+        const wordMatch =
+          q.match(/\bword\s+[''""]([^''""\n]+)[''""]/i) ||
+          q.match(/\bterm\s+[''""]([^''""\n]+)[''""]/i);
+        if (!wordMatch) return;
+        const term = cleanTermForGame(wordMatch[1]);
+        const opts = Array.isArray(slot.options)
+          ? slot.options
+          : Array.isArray(slot.optionsEn)
+            ? slot.optionsEn
+            : [];
+        if (!opts.length) return;
+        let idx = Number.isInteger(slot.correctIndex) ? slot.correctIndex : 0;
+        if (idx < 0 || idx >= opts.length) idx = 0;
+        const def = String(opts[idx] || "")
+          .replace(/^[A-Da-d][.)]\s*/, "")
+          .trim();
+        if (term && def) addPair(pairs, seen, term, def);
+      });
+    } catch (_) {
+      /* ignore malformed meta */
+    }
+  }
+
   function parseVocabFromHtml(html) {
     const pairs = [];
     const seen = new Set();
@@ -303,6 +336,7 @@
     }
 
     parseVocabMeta(doc, pairs, seen);
+    parseMetaInteractionSlots(doc, pairs, seen);
     parseTableRows(doc, pairs, seen);
 
     doc.querySelectorAll("dt").forEach((dt) => {
@@ -454,11 +488,19 @@
   let inflight = null;
 
   async function ensure() {
-    if (typeof global.EAP_ensureActiveLessonSynced === "function") {
-      await global.EAP_ensureActiveLessonSynced(undefined, { skipServer: true });
-    }
     const sync = resolveSync();
     if (sync && sync.length >= MIN) return sync;
+
+    if (typeof global.EAP_refreshActiveLessonHtmlFromServer === "function") {
+      const pageId = getLessonPageId();
+      const fresh = await global.EAP_refreshActiveLessonHtmlFromServer(pageId, 8000);
+      if (fresh) {
+        const retry = resolveSync();
+        if (retry && retry.length >= MIN) return retry;
+      }
+    } else if (typeof global.EAP_ensureActiveLessonSynced === "function") {
+      await global.EAP_ensureActiveLessonSynced(undefined, { timeoutMs: 8000 });
+    }
 
     const html = getLessonHtmlCached();
     if (!html || html.length < 80) return null;

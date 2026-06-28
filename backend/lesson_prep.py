@@ -325,6 +325,20 @@ def inject_lesson_meta_script(html: str, plan: dict, pack: dict) -> str:
         "segments": plan.get("segments") or [],
         "interaction_slots": plan.get("interaction_slots") or [],
     }
+    try:
+        from eap_ai import (
+            _filter_vocab_pairs,
+            _merge_vocab_terms,
+            _parse_vocab_pairs_from_html,
+            _vocab_from_interaction_slots,
+        )
+
+        pairs = _filter_vocab_pairs(_parse_vocab_pairs_from_html(html))
+        pairs = _merge_vocab_terms(pairs, _vocab_from_interaction_slots(meta.get("interaction_slots") or []))
+        if pairs:
+            meta["vocabulary"] = pairs[:24]
+    except ImportError:
+        pass
     snippet = (
         f'<script type="application/json" id="eap-lesson-meta">'
         f"{json.dumps(meta, ensure_ascii=False)}</script>"
