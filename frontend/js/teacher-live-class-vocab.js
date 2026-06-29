@@ -302,9 +302,9 @@
       <p class="tlive-vocab-panel__hint">${escapeHtml(t("tlive_vocab_panel_hint"))}</p>
       <div id="tlive-vocab-status">${statusSummaryHtml()}</div>
       <div class="tlive-vocab-panel__actions">
-        <button type="button" class="btn-secondary btn-small" id="tlive-vocab-import-btn">${escapeHtml(t("tlive_vocab_import_btn"))}</button>
-        <button type="button" class="btn-secondary btn-small" id="tlive-vocab-load-lesson-btn">${escapeHtml(t("tlive_vocab_load_lesson_btn"))}</button>
-        <button type="button" class="btn-secondary btn-small" id="tlive-vocab-clear-btn">${escapeHtml(t("tlive_vocab_clear_btn"))}</button>
+        <button type="button" class="btn-secondary btn-small" data-tlive-vocab="import" id="tlive-vocab-import-btn">${escapeHtml(t("tlive_vocab_import_btn"))}</button>
+        <button type="button" class="btn-secondary btn-small" data-tlive-vocab="load-lesson" id="tlive-vocab-load-lesson-btn">${escapeHtml(t("tlive_vocab_load_lesson_btn"))}</button>
+        <button type="button" class="btn-secondary btn-small" data-tlive-vocab="clear" id="tlive-vocab-clear-btn">${escapeHtml(t("tlive_vocab_clear_btn"))}</button>
       </div>
     </section>`;
   }
@@ -340,18 +340,81 @@
     refreshGamesPanelStatus();
   }
 
-  function bindGamesPanelActions(root) {
-    const scope = root || document;
-    scope.getElementById("tlive-vocab-import-btn")?.addEventListener("click", () => openEditorModal());
-    scope.getElementById("tlive-vocab-load-lesson-btn")?.addEventListener("click", () => {
+  function findVocabControl(id, root) {
+    if (root && root !== document && typeof root.querySelector === "function") {
+      const inRoot = root.querySelector(`#${id}`);
+      if (inRoot) return inRoot;
+    }
+    return document.getElementById(id);
+  }
+
+  function resolveLessonPageId() {
+    if (typeof global.EAP_resolveActiveLessonPageId === "function") {
+      const resolved = global.EAP_resolveActiveLessonPageId();
+      if (resolved) return String(resolved);
+    }
+    if (state.pageId) return String(state.pageId);
+    if (global.__tliveLessonPageId != null && global.__tliveLessonPageId !== "") {
+      return String(global.__tliveLessonPageId);
+    }
+    const cache = global.__tliveLessonCache;
+    if (cache && cache.pageId != null && cache.pageId !== "") {
+      return String(cache.pageId);
+    }
+    return "";
+  }
+
+  function resolveClassName() {
+    return (
+      state.className ||
+      global.__tliveDisplayClassName ||
+      global.__tliveClassName ||
+      ""
+    );
+  }
+
+  function handleVocabPanelAction(action) {
+    if (action === "import") {
+      openEditorModal();
+      return;
+    }
+    if (action === "load-lesson") {
       void loadFromLessonSuggestions();
-    });
-    scope.getElementById("tlive-vocab-clear-btn")?.addEventListener("click", () => {
+      return;
+    }
+    if (action === "clear") {
       if (!global.confirm(t("tlive_vocab_clear_confirm"))) return;
       void clearConfirmed().catch(() => {
         setConfirmed([]);
         refreshGamesPanelStatus();
       });
+    }
+  }
+
+  function bindGamesPanelActions(root) {
+    const scope = root && root.nodeType === 1 ? root : document;
+    ["tlive-vocab-import-btn", "tlive-vocab-load-lesson-btn", "tlive-vocab-clear-btn"].forEach((id) => {
+      const btn = findVocabControl(id, scope);
+      if (!btn || btn.dataset.tliveVocabBound === "1") return;
+      btn.dataset.tliveVocabBound = "1";
+      const action = btn.getAttribute("data-tlive-vocab");
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        handleVocabPanelAction(action);
+      });
+    });
+  }
+
+  function bindVocabPanelDelegation() {
+    if (global.__tliveVocabPanelDelegationBound) return;
+    global.__tliveVocabPanelDelegationBound = true;
+    document.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-tlive-vocab]");
+      if (!btn) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      handleVocabPanelAction(btn.getAttribute("data-tlive-vocab"));
     });
   }
 
@@ -361,21 +424,25 @@
   }
 
   async function loadFromLessonSuggestions() {
-    const pageId =
-      typeof global.EAP_resolveActiveLessonPageId === "function"
-        ? global.EAP_resolveActiveLessonPageId()
-        : state.pageId;
+    const pageId = resolveLessonPageId();
     if (!pageId) {
       global.alert(t("tlive_vocab_no_lesson_page"));
       return;
     }
+    state.pageId = pageId;
     try {
-      const draft = await fetchSuggestions(pageId);
+      let draft = state.draft && state.draft.length ? state.draft.slice() : [];
+      if (!draft.length) {
+        draft = await fetchSuggestions(pageId);
+      }
       if (!draft.length) {
         global.alert(t("tlive_vocab_suggest_empty"));
         return;
       }
-      openEditorModal({ initialTerms: draft, initialPaste: draft.map((x) => `${x.term} — ${x.defEn}`).join("\n") });
+      openEditorModal({
+        initialTerms: draft,
+        initialPaste: draft.map((x) => `${x.term} — ${x.defEn}`).join("\n"),
+      });
     } catch (err) {
       global.alert((err && err.message) || t("tlive_vocab_suggest_failed"));
     }
@@ -426,6 +493,9 @@
     if (preview) preview.innerHTML = previewTableHtml(parsePasted(initialPaste));
     modal.classList.remove("hidden");
     modal.hidden = false;
+    modal.removeAttribute("aria-hidden");
+    document.body.classList.add("tlive-vocab-modal-open");
+    pasteEl?.focus();
   }
 
   function closeEditorModal() {
@@ -433,6 +503,8 @@
     if (!modal) return;
     modal.classList.add("hidden");
     modal.hidden = true;
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("tlive-vocab-modal-open");
   }
 
   async function confirmEditorModal() {
@@ -443,13 +515,17 @@
       global.alert(t("tlive_vocab_min_required", { n: String(MIN_MEMORY) }));
       return;
     }
-    const pageId =
-      typeof global.EAP_resolveActiveLessonPageId === "function"
-        ? global.EAP_resolveActiveLessonPageId()
-        : state.pageId;
-    const className = state.className || global.__tliveDisplayClassName || "";
+    const pageId = resolveLessonPageId();
+    const className = resolveClassName();
+    if (!className && pageId) {
+      state.className = global.__tliveDisplayClassName || global.__tliveClassName || "";
+    }
     try {
-      await saveConfirmed(terms, { pageId, className, saveToPage: !!pageId });
+      await saveConfirmed(terms, {
+        pageId,
+        className: className || resolveClassName(),
+        saveToPage: !!pageId,
+      });
       closeEditorModal();
       refreshGamesPanelStatus();
       if (typeof global.EAP_onLiveClassVocabSaved === "function") {
@@ -466,8 +542,8 @@
       <p class="tlive-vocab-required__lead">${escapeHtml(t("tlive_vocab_required_lead"))}</p>
       ${statusSummaryHtml()}
       <div class="tlive-vocab-panel__actions">
-        <button type="button" class="btn-primary" id="tlive-vocab-import-btn">${escapeHtml(t("tlive_vocab_import_btn"))}</button>
-        <button type="button" class="btn-secondary" id="tlive-vocab-load-lesson-btn">${escapeHtml(t("tlive_vocab_load_lesson_btn"))}</button>
+        <button type="button" class="btn-primary" data-tlive-vocab="import" id="tlive-vocab-import-btn">${escapeHtml(t("tlive_vocab_import_btn"))}</button>
+        <button type="button" class="btn-secondary" data-tlive-vocab="load-lesson" id="tlive-vocab-load-lesson-btn">${escapeHtml(t("tlive_vocab_load_lesson_btn"))}</button>
         <button type="button" class="btn-secondary" id="tlive-vocab-back-games-btn">${escapeHtml(t("tlive_vocab_back_games"))}</button>
       </div>
     </div>`;
@@ -503,8 +579,11 @@
     setConfirmed,
     gamesPanelBlockHtml,
     bindGamesPanelActions,
+    bindVocabPanelDelegation,
     refreshGamesPanelStatus,
     openEditorModal,
     showVocabRequiredScreen,
   };
+
+  bindVocabPanelDelegation();
 })(typeof window !== "undefined" ? window : globalThis);
