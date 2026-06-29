@@ -8,7 +8,7 @@ For **WeChat mini-program**, **mobile web**, and API clients using `wx.uploadFil
 
 | Item | Value |
 |------|--------|
-| **Endpoints** | `POST /api/tasks/<id>/submit`, `PUT /api/submissions/<id>/revision` |
+| **Endpoints** | `POST /api/tasks/<id>/submit`, `PUT` or `POST /api/submissions/<id>/revision` |
 | **Content-Type** | `multipart/form-data` |
 | **File field name** | `file` |
 | **Allowed extensions** | `pdf`, `doc`, `docx`, `txt`, `jpg`, `png` |
@@ -30,6 +30,7 @@ wx.uploadFile({
 - Default WeChat per-file limit: **10 MB** (platform limit; cannot be raised in mini-program).  
 - Server has no hard byte cap in code today; keep files **≤ 10 MB** for WeChat compatibility.  
 - Recommended pilot limit: **16 MB** on reverse proxy (nginx `client_max_body_size`) if you add large teacher uploads on web only.
+- **Revision:** use **POST** on `/api/submissions/<id>/revision` (`wx.uploadFile` cannot send PUT). Web clients may use PUT.
 
 ### Text-only submit (no attachment)
 

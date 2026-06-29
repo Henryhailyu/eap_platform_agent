@@ -1,10 +1,78 @@
+.section-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.task-title {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.status-line {
+  display: block;
+  font-size: 28rpx;
+  color: #0a7ea4;
+  margin-bottom: 16rpx;
+}
+
+.desc,
+.answer {
+  display: block;
+  margin-top: 16rpx;
+  line-height: 1.5;
+}
+
+.block {
+  display: block;
+  margin-top: 8rpx;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 180rpx;
+  margin: 16rpx 0;
+  padding: 20rpx;
+  box-sizing: border-box;
+  border: 2rpx solid #e5e5ea;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+}
+
+.file-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.pick {
+  flex: 1;
+}
+
+.pick.clear {
+  flex: 0 0 auto;
+}
+
+.submit,
+.toggle {
+  margin-top: 8rpx;
+}
+
 .feedback {
   display: block;
   margin-top: 16rpx;
   padding-top: 16rpx;
   border-top: 1rpx solid #e5e5ea;
+  line-height: 1.5;
 }
 
 .file-btn {
   margin-top: 16rpx;
+}
+
+.retry {
+  margin-top: 20rpx;
 }

@@ -1,8 +1,9 @@
 <view class="container">
   <view class="header-row">
     <view class="header-main">
-      <text class="class-label" bindtap="onPickClass">{{className}} ▾</text>
+      <text class="class-label" bindtap="onPickClass">{{className}}{{classes.length > 1 ? ' ▾' : ''}}</text>
       <text class="muted">{{userName}}</text>
+      <text class="muted calendar-sub">{{L.calendar_subtitle}}</text>
       <text class="week-hint muted" wx:if="{{weekHint}}">{{weekHint}}</text>
     </view>
     <view class="header-actions">

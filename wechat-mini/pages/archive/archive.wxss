@@ -1,17 +1,62 @@
-.item-title {
-  font-weight: 600;
+.header-row {
+  margin-bottom: 24rpx;
+}
+
+.class-label {
   display: block;
-  margin-bottom: 8rpx;
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #0071e3;
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-btn {
+  font-size: 44rpx;
+  color: #0071e3;
+  padding: 0 24rpx;
+}
+
+.month-title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.archive-item:active {
+  opacity: 0.85;
+}
+
+.row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.item-title {
+  font-weight: 500;
+  flex: 1;
+}
+
+.link-hint {
+  display: block;
+  margin-top: 12rpx;
+  color: #0071e3;
+  font-size: 26rpx;
 }
 
 .feedback {
   display: block;
-  margin-top: 16rpx;
-  padding-top: 16rpx;
-  border-top: 1rpx solid #e5e5ea;
-  font-size: 28rpx;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.45;
+  color: #1d1d1f;
 }
 
-.archive-item {
-  margin-bottom: 16rpx;
+.retry {
+  margin-top: 20rpx;
 }

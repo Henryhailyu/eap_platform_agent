@@ -1,6 +1,11 @@
 const config = require('../config');
 const auth = require('./auth');
+const i18n = require('./i18n');
 const { errorMessage } = require('./format');
+
+function apiHostLabel() {
+  return (config.apiBase || '').replace(/^https?:\/\//, '') || 'elc-eap-platform.top';
+}
 
 function apiUrl(path) {
   const base = (config.apiBase || '').replace(/\/$/, '');
@@ -24,7 +29,7 @@ function request(method, path, options = {}) {
     };
     const timer = setTimeout(() => {
       finish(reject, {
-        error: 'Request timed out — is Flask running on config.js apiBase?',
+        error: i18n.t('request_timeout', { host: apiHostLabel() }),
       });
     }, 20000);
 
@@ -38,7 +43,7 @@ function request(method, path, options = {}) {
         if (res.statusCode === 401) {
           auth.clearSession();
           wx.reLaunch({ url: '/pages/login/login' });
-          reject(new Error('Session expired — please log in again'));
+          reject(new Error(i18n.t('session_expired')));
           return;
         }
         if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -50,7 +55,7 @@ function request(method, path, options = {}) {
       fail(err) {
         const detail = (err && err.errMsg) ? err.errMsg : 'request:fail';
         finish(reject, {
-          error: `Network error — ${detail}. Try apiBase http://localhost:5051, keep Flask running, 不校验合法域名 on.`,
+          error: i18n.t('network_error', { detail, host: apiHostLabel() }),
         });
       },
     });
@@ -103,6 +108,17 @@ function writeTempTextFile(text) {
   });
 }
 
+function sanitizeUploadError(body, statusCode) {
+  const raw = body && body.error;
+  if (
+    typeof raw === 'string'
+    && (raw.indexOf('<html') >= 0 || raw.indexOf('<!DOCTYPE') >= 0 || raw.length > 200)
+  ) {
+    return { error: i18n.t('network_error', { detail: `HTTP ${statusCode}`, host: apiHostLabel() }) };
+  }
+  return body || { error: `HTTP ${statusCode}` };
+}
+
 function uploadMultipart(url, formData, filePath) {
   const session = auth.getSession();
   return new Promise((resolve, reject) => {
@@ -120,7 +136,7 @@ function uploadMultipart(url, formData, filePath) {
         if (res.statusCode === 401) {
           auth.clearSession();
           wx.reLaunch({ url: '/pages/login/login' });
-          reject(new Error('Session expired'));
+          reject(new Error(i18n.t('session_expired')));
           return;
         }
         let body = res.data;
@@ -135,10 +151,13 @@ function uploadMultipart(url, formData, filePath) {
           resolve(body);
           return;
         }
-        reject(body || { error: `HTTP ${res.statusCode}` });
+        reject(sanitizeUploadError(body, res.statusCode));
       },
-      fail() {
-        reject({ error: 'Upload failed' });
+      fail(err) {
+        const detail = (err && err.errMsg) ? err.errMsg : 'upload:fail';
+        reject({
+          error: i18n.t('network_error', { detail, host: apiHostLabel() }),
+        });
       },
     });
   });

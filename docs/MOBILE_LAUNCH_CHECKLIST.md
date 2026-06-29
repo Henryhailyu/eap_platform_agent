@@ -33,14 +33,14 @@ No extra deploy beyond web checklist.
 
 **Resume when:** 备案 + 微信企业认证 approved.  
 **Full guide:** [`WECHAT_GO_LIVE.md`](WECHAT_GO_LIVE.md)  
-**AppID (configured):** `wx1b1247067a43152` · **EAP学习助手**
+**AppID (configured):** `wx1b12474067a43152` · **EAP伴学助手**
 
 ### Already built ✅
 
 - [x] Bearer token API (`/api/v1/auth/login`, student routes) — I2a–I2e  
 - [x] API doc — `docs/API_STUDENT_MINI.md`  
 - [x] Mini-program MVP — `wechat-mini/` (login, calendar, day, task, archive)  
-- [x] Production API host in `wechat-mini/config.js` → `eap-platform-pilot.onrender.com`  
+- [x] Production API host in `wechat-mini/config.js` → `elc-eap-platform.top`  
 
 ### Not in mini-program MVP (defer to v2)
 

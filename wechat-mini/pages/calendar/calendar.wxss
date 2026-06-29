@@ -17,6 +17,11 @@
   margin-top: 6rpx;
 }
 
+.calendar-sub {
+  display: block;
+  margin-top: 8rpx;
+}
+
 .header-actions {
   text-align: right;
   flex-shrink: 0;

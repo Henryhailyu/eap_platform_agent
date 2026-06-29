@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "Task"
+  "navigationBarTitleText": "Task",
+  "enablePullDownRefresh": true
 }

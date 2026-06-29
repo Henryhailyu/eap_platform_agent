@@ -42,7 +42,7 @@ Page({
       this.setData({ error: L.login_enter_both });
       return;
     }
-    if ((config.apiBase || '').includes('your-pilot-host')) {
+    if ((config.apiBase || '').includes('your-pilot-host') || (config.apiBase || '').includes('onrender.com')) {
       this.setData({ error: L.config_api_base });
       return;
     }
@@ -74,7 +74,13 @@ Page({
         wx.reLaunch({ url: '/pages/calendar/calendar' });
       })
       .catch((err) => {
-        this.setData({ error: errorMessage(err) });
+        const msg = errorMessage(err);
+        const code = err && err.code;
+        if (code === 'AUTH_INVALID_CREDENTIALS' || /invalid username or password/i.test(msg)) {
+          this.setData({ error: L.login_failed });
+        } else {
+          this.setData({ error: msg });
+        }
       })
       .finally(() => {
         this.setData({ loading: false });

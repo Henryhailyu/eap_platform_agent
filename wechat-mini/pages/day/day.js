@@ -23,7 +23,7 @@ Page({
       date: options.date || '',
       className: options.class_name || '',
     });
-    wx.setNavigationBarTitle({ title: options.date || '' });
+    wx.setNavigationBarTitle({ title: options.date || i18n.t('day_tasks') });
     this.loadDay();
   },
 

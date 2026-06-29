@@ -2008,7 +2008,7 @@ def resolve_student_with_optional_enforcement(conn, fallback_username, class_nam
 
     Used by student GET routes (Phase D9), **`GET /api/tasks`** (Phase D38),
     **`POST /api/tasks/<id>/submit`** (Phase D35), **`PUT /api/tasks/<id>/my-completion`** (Phase D36),
-    and **`PUT /api/submissions/<id>/revision`** (Phase D36).
+    and **`PUT`/`POST` `/api/submissions/<id>/revision`** (Phase D36).
     Returns (student_username, error_response) where error_response is None or (jsonify, status).
     """
     err = require_session_role_if_enabled(conn, "student")
@@ -4465,10 +4465,12 @@ def delete_submission_attachment(attachment_id):
     return jsonify({"ok": True})
 
 
-@app.route("/api/submissions/<int:submission_id>/revision", methods=["PUT"])
+@app.route("/api/submissions/<int:submission_id>/revision", methods=["PUT", "POST"])
 def submit_submission_revision(submission_id):
     """
-    Student uploads a revised answer after teacher feedback (one revision slot per row; PUT overwrites).
+    Student uploads a revised answer after teacher feedback (one revision slot per row; overwrites).
+
+    Accepts PUT (browser FormData) or POST (WeChat ``wx.uploadFile``, which only supports POST).
 
     multipart/form-data (FormData from the browser):
         revision_text   — optional if a file is attached; otherwise should be non-empty
@@ -4753,7 +4755,7 @@ def home():
                 "task_my_completion_put": "/api/tasks/<id>/my-completion (PUT JSON: class_name, optional student_username, optional status Pending|Completed)",
                 "tasks_my_completions_batch": "/api/tasks/my-completions?class_name=&task_ids=1,2&student_username= (GET; Phase D7)",
                 "submission_feedback": "/api/submissions/<id>/feedback (PUT JSON or multipart FormData)",
-                "submission_revision": "/api/submissions/<id>/revision (PUT multipart / FormData)",
+                "submission_revision": "/api/submissions/<id>/revision (PUT or POST multipart / FormData)",
                 "submissions_by_class": "/api/submissions?class_name=EAP047 (GET)",
                 "file_download_example": "/uploads/<filename>",
                 "homework_file_download_example": "/submission-files/<filename>",

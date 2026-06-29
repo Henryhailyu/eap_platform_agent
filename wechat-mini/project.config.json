@@ -1,15 +1,19 @@
 {
   "description": "EAP student mini-program (Phase I3)",
-  "packOptions": { "ignore": [] },
+  "packOptions": {
+    "ignore": []
+  },
   "setting": {
     "urlCheck": false,
     "es6": true,
     "postcss": true,
-    "minified": true
+    "minified": true,
+    "condition": true
   },
   "compileType": "miniprogram",
-  "libVersion": "3.4.0",
-  "appid": "wx1b1247067a43152",
-  "projectname": "eap-student",
-  "condition": {}
+  "libVersion": "3.5.8",
+  "appid": "wx1b12474067a43152",
+  "projectname": "EAP伴学助手",
+  "condition": {},
+  "projectArchitecture": "multiPlatform"
 }

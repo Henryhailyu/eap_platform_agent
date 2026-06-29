@@ -25,7 +25,7 @@
       <view class="row-top">
         <text class="task-title">{{item.title}}</text>
         <text class="badge" wx:if="{{item.completion.completed}}">{{L.completed}}</text>
-        <text class="badge pending" wx:else>{{L.pending}}</text>
+        <text class="badge pending" wx:else>{{item.completion.status || L.pending}}</text>
       </view>
       <text class="muted" wx:if="{{item.category}}">{{item.category}}</text>
     </view>

@@ -2,19 +2,25 @@ const STORAGE_KEY = 'eap_lang';
 
 const en = {
   lang_toggle: '中文',
-  app_name: 'EAP Learning',
+  app_name: 'EAP Companion',
+  app_name_zh: 'EAP伴学助手',
   sign_in: 'Sign in',
   student_sign_in: 'Student sign in',
   username: 'Username',
   password: 'Password',
   login_enter_both: 'Enter username and password',
-  config_api_base: 'Set apiBase in config.js first',
+  login_failed: 'Invalid username or password',
+  config_api_base: 'Set apiBase in config.js (https://elc-eap-platform.top)',
   signing_in: 'Signing in…',
   calendar: 'Calendar',
+  calendar_subtitle: 'Tap a day to view tasks',
   archive: 'Archive',
   logout: 'Log out',
   loading_tasks: 'Loading tasks…',
   retry: 'Retry',
+  request_timeout: 'Request timed out — check network and {host}',
+  network_error: 'Network error: {detail}. API host: {host}. On phone, add domain in WeChat admin (request合法域名).',
+  session_expired: 'Session expired — please sign in again',
   no_tasks_day: 'No tasks on this day.',
   pending: 'Pending',
   completed: 'Done',
@@ -44,23 +50,41 @@ const en = {
   teaching_week: 'Week {n}',
   holiday: 'Holiday',
   weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  back: 'Back',
+  day_tasks: 'Tasks',
+  task_detail: 'Task',
+  opening_file: 'Opening…',
+  download_failed: 'Download failed',
+  cannot_open_file: 'Cannot open this file type',
+  not_logged_in: 'Not signed in',
+  clear_file: 'Clear file',
+  revision_needed: 'Revision needed',
+  feedback_given: 'Feedback received',
+  open_task: 'View task',
+  reload: 'Reload',
 };
 
 const zh = {
   lang_toggle: 'EN',
-  app_name: 'EAP 学习',
+  app_name: 'EAP Companion',
+  app_name_zh: 'EAP伴学助手',
   sign_in: '登录',
   student_sign_in: '学生登录',
   username: '用户名',
   password: '密码',
   login_enter_both: '请输入用户名和密码',
-  config_api_base: '请先在 config.js 设置 apiBase',
+  login_failed: '用户名或密码错误',
+  config_api_base: '请先在 config.js 设置 apiBase（https://elc-eap-platform.top）',
   signing_in: '登录中…',
-  calendar: '日历',
+  calendar: '学习日历',
+  calendar_subtitle: '点击日期查看当日任务',
   archive: '学习档案',
   logout: '退出',
   loading_tasks: '加载任务中…',
   retry: '重试',
+  request_timeout: '请求超时，请检查网络与服务器 {host}',
+  network_error: '网络错误：{detail}。接口：{host}。真机请在公众平台配置 request 合法域名。',
+  session_expired: '登录已过期，请重新登录',
   no_tasks_day: '本日暂无任务。',
   pending: '待完成',
   completed: '已完成',
@@ -90,6 +114,18 @@ const zh = {
   teaching_week: '第 {n} 周',
   holiday: '假期',
   weekdays: ['日', '一', '二', '三', '四', '五', '六'],
+  back: '返回',
+  day_tasks: '当日任务',
+  task_detail: '任务详情',
+  opening_file: '正在打开…',
+  download_failed: '下载失败',
+  cannot_open_file: '无法打开此文件类型',
+  not_logged_in: '未登录',
+  clear_file: '清除文件',
+  revision_needed: '需要订正',
+  feedback_given: '已收到反馈',
+  open_task: '查看任务',
+  reload: '刷新',
 };
 
 function getLang() {
@@ -113,6 +149,11 @@ function strings() {
   return getLang() === 'zh' ? zh : en;
 }
 
+/** Display name for current language */
+function appName() {
+  return getLang() === 'zh' ? zh.app_name_zh : en.app_name;
+}
+
 function t(key, vars) {
   let s = strings()[key] || en[key] || key;
   if (vars) {
@@ -125,7 +166,7 @@ function t(key, vars) {
 
 /** Merge i18n labels into page data object */
 function labels(extra) {
-  return Object.assign({}, strings(), extra || {});
+  return Object.assign({}, strings(), { app_name: appName() }, extra || {});
 }
 
 module.exports = {
@@ -135,4 +176,5 @@ module.exports = {
   t,
   labels,
   strings,
+  appName,
 };

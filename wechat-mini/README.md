@@ -13,12 +13,12 @@ Teachers and managers continue to use the web UI at `/ui/`.
 
 ## Setup
 
-**Account:** EAP学习助手 · AppID `wx1b1247067a43152` (in `project.config.json`).  
+**Account:** EAP伴学助手 · AppID `wx1b12474067a43152` (in `project.config.json`).  
 **Do not** put AppSecret in this repo — backend env only when you add `wx.login` later.
 
 1. Install [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html).  
 2. **导入项目** → choose this `wechat-mini/` folder (not an empty template).  
-3. **`config.js`** — production URL is preset (`https://eap-platform-pilot.onrender.com`).  
+3. **`config.js`** — production URL is preset (`https://elc-eap-platform.top`).  
    For **local Mac backend only:** set `USE_LOCAL_DEV = true` in `config.js`.
 
 4. Local DevTools: enable **详情 → 本地设置 → 不校验合法域名、web-view、TLS**.  

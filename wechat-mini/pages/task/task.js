@@ -4,14 +4,28 @@ const i18n = require('../../utils/i18n');
 const files = require('../../utils/files');
 const { errorMessage } = require('../../utils/format');
 
+function needsRevision(submission, completion) {
+  if (!submission) return false;
+  if (submission.teacher_feedback && String(submission.teacher_feedback).trim()) {
+    return true;
+  }
+  const subSt = String(submission.status || '').toLowerCase();
+  const compSt = String((completion && completion.status) || '').toLowerCase();
+  if (subSt.includes('revision needed') || compSt.includes('revision needed')) return true;
+  if (subSt.includes('revision') && !subSt.includes('revision submitted')) return true;
+  return false;
+}
+
 Page({
   data: {
     L: i18n.labels(),
     taskId: null,
     className: '',
+    date: '',
     task: null,
     completion: { completed: false, status: 'Pending' },
     submission: null,
+    showRevision: false,
     answerText: '',
     filePath: '',
     fileName: '',
@@ -32,13 +46,31 @@ Page({
     this.setData({
       taskId: Number(options.id),
       className: options.class_name || '',
+      date: options.date || '',
     });
     this.loadTask();
   },
 
-  loadTask() {
+  onPullDownRefresh() {
+    this.loadTask(true);
+  },
+
+  applyTaskState(task, completion, submission) {
+    this.setData({
+      task,
+      completion: completion || { completed: false, status: 'Pending' },
+      submission: submission || null,
+      showRevision: needsRevision(submission, completion),
+      loading: false,
+    });
+    wx.setNavigationBarTitle({ title: task.title || i18n.t('task_detail') });
+  },
+
+  loadTask(fromPull) {
     const { taskId, className, L } = this.data;
-    this.setData({ loading: true, error: '' });
+    if (!fromPull) {
+      this.setData({ loading: true, error: '' });
+    }
 
     Promise.all([
       api.get('/api/tasks', { class_name: className }).then((list) =>
@@ -52,26 +84,31 @@ Page({
           this.setData({ loading: false, error: L.task_not_found });
           return;
         }
-        this.setData({
-          task,
-          completion: completion || { completed: false, status: 'Pending' },
-          submission: submission || null,
-          loading: false,
-        });
-        wx.setNavigationBarTitle({ title: task.title || 'Task' });
+        this.applyTaskState(task, completion, submission);
       })
       .catch((err) => {
         this.setData({ loading: false, error: errorMessage(err) });
+      })
+      .finally(() => {
+        if (fromPull) wx.stopPullDownRefresh();
       });
   },
 
   openMaterial() {
-    const fp = this.data.task && this.data.task.file_path;
+    const task = this.data.task;
+    const fp = task && (task.file_path || task.file_name);
     if (fp) files.downloadAndOpen(fp, true);
   },
 
   openSubmissionFile() {
-    const fp = this.data.submission && this.data.submission.file_path;
+    const sub = this.data.submission;
+    const fp = sub && (sub.file_path || sub.file_name);
+    if (fp) files.downloadAndOpen(fp, false);
+  },
+
+  openRevisionFile() {
+    const sub = this.data.submission;
+    const fp = sub && (sub.revision_file_path || sub.revision_file_name);
     if (fp) files.downloadAndOpen(fp, false);
   },
 
@@ -116,6 +153,10 @@ Page({
     });
   },
 
+  clearFile() {
+    this.setData({ filePath: '', fileName: '' });
+  },
+
   pickRevisionFile() {
     wx.chooseMessageFile({
       count: 1,
@@ -125,6 +166,10 @@ Page({
         this.setData({ revisionFilePath: f.path, revisionFileName: f.name });
       },
     });
+  },
+
+  clearRevisionFile() {
+    this.setData({ revisionFilePath: '', revisionFileName: '' });
   },
 
   onSubmit() {
@@ -148,7 +193,13 @@ Page({
         filePath
       )
       .then((sub) => {
-        this.setData({ submission: sub, answerText: '', filePath: '', fileName: '' });
+        this.setData({
+          submission: sub,
+          showRevision: needsRevision(sub, this.data.completion),
+          answerText: '',
+          filePath: '',
+          fileName: '',
+        });
         wx.showToast({ title: L.submitted, icon: 'success' });
       })
       .catch((err) => {
@@ -180,6 +231,7 @@ Page({
       .then((sub) => {
         this.setData({
           submission: sub,
+          showRevision: needsRevision(sub, this.data.completion),
           revisionText: '',
           revisionFilePath: '',
           revisionFileName: '',

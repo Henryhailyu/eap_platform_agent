@@ -1,4 +1,9 @@
 <view class="container">
+  <view class="header-row">
+    <text class="class-label">{{className}}</text>
+    <text class="muted">{{L.archive}}</text>
+  </view>
+
   <view class="card month-nav">
     <text class="nav-btn" bindtap="prevMonth">‹</text>
     <text class="month-title">{{monthLabel}}</text>
@@ -11,6 +16,7 @@
 
   <view class="card" wx:elif="{{error}}">
     <text class="text-error">{{error}}</text>
+    <button class="btn-secondary retry" bindtap="loadArchive">{{L.retry}}</button>
   </view>
 
   <view wx:elif="{{items.length === 0}}" class="card">
@@ -18,10 +24,20 @@
   </view>
 
   <block wx:else>
-    <view class="card archive-item" wx:for="{{items}}" wx:key="task_id">
-      <text class="item-title">{{item.title}}</text>
+    <view
+      class="card archive-item"
+      wx:for="{{items}}"
+      wx:key="task_id"
+      data-id="{{item.task_id}}"
+      data-date="{{item.date}}"
+      bindtap="openItem"
+    >
+      <view class="row-top">
+        <text class="item-title">{{item.title}}</text>
+        <text class="badge" wx:if="{{item.workflow_state}}">{{item.workflow_state}}</text>
+      </view>
       <text class="muted">{{item.date}} · {{item.category}}</text>
-      <text class="badge" wx:if="{{item.workflow_state}}">{{item.workflow_state}}</text>
+      <text class="link-hint">{{L.open_task}} ›</text>
       <text class="feedback" wx:if="{{item.submission.teacher_feedback}}">{{L.feedback}}: {{item.submission.teacher_feedback}}</text>
     </view>
   </block>

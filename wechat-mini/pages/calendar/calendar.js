@@ -13,13 +13,18 @@ const {
   errorMessage,
 } = require('../../utils/format');
 
+function currentMonthAnchor() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`;
+}
+
 Page({
   data: {
     L: i18n.labels(),
     className: config.defaultClass,
     classes: [],
     userName: '',
-    monthDate: new Date(),
+    monthDate: currentMonthAnchor(),
     monthLabel: '',
     weekHint: '',
     weekdays: i18n.strings().weekdays,
@@ -129,7 +134,7 @@ Page({
     this.setData({
       cells,
       monthLabel: formatMonthLabel(monthDate, i18n.getLang()),
-      monthDate,
+      monthDate: `${y}-${pad2(m + 1)}-01`,
       tasksByDate,
       weekHint,
     });
@@ -164,20 +169,22 @@ Page({
 
   prevMonth() {
     const d = toDate(this.data.monthDate);
-    const monthDate = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const anchor = `${prev.getFullYear()}-${pad2(prev.getMonth() + 1)}-01`;
     this.setData({
-      monthDate,
-      monthLabel: formatMonthLabel(monthDate, i18n.getLang()),
+      monthDate: anchor,
+      monthLabel: formatMonthLabel(anchor, i18n.getLang()),
     });
     this.loadTasks();
   },
 
   nextMonth() {
     const d = toDate(this.data.monthDate);
-    const monthDate = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    const anchor = `${next.getFullYear()}-${pad2(next.getMonth() + 1)}-01`;
     this.setData({
-      monthDate,
-      monthLabel: formatMonthLabel(monthDate, i18n.getLang()),
+      monthDate: anchor,
+      monthLabel: formatMonthLabel(anchor, i18n.getLang()),
     });
     this.loadTasks();
   },

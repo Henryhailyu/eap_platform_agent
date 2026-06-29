@@ -4,12 +4,14 @@
     <text class="badge" wx:if="{{task.category}}">{{task.category}}</text>
     <text class="muted block">{{task.date}} · {{className}}</text>
     <text class="desc" wx:if="{{task.description}}">{{task.description}}</text>
-    <button class="btn-secondary file-btn" wx:if="{{task.file_path}}" bindtap="openMaterial">{{L.open_material}}</button>
+    <button class="btn-secondary file-btn" wx:if="{{task.file_path || task.file_name}}" bindtap="openMaterial">
+      {{L.open_material}}{{task.file_name ? ' — ' + task.file_name : ''}}
+    </button>
   </view>
 
   <view class="card">
     <text class="section-title">{{L.completion}}</text>
-    <text class="muted">{{completion.status || 'Pending'}}</text>
+    <text class="status-line">{{completion.status || 'Pending'}}</text>
     <button class="btn-secondary toggle" bindtap="toggleComplete">
       {{completion.completed ? L.mark_pending : L.mark_completed}}
     </button>
@@ -17,29 +19,46 @@
 
   <view class="card" wx:if="{{submission}}">
     <text class="section-title">{{L.your_submission}}</text>
-    <text class="muted">{{submission.status}}</text>
-    <text class="block" wx:if="{{submission.answer_text}}">{{submission.answer_text}}</text>
-    <button class="btn-secondary file-btn" wx:if="{{submission.file_path}}" bindtap="openSubmissionFile">{{L.open_file}}</button>
+    <text class="status-line">{{submission.status}}</text>
+    <text class="block answer" wx:if="{{submission.answer_text}}">{{submission.answer_text}}</text>
+    <button class="btn-secondary file-btn" wx:if="{{submission.file_path || submission.file_name}}" bindtap="openSubmissionFile">
+      {{L.open_file}}{{submission.file_name ? ' — ' + submission.file_name : ''}}
+    </button>
     <text class="feedback" wx:if="{{submission.teacher_feedback}}">{{L.feedback}}: {{submission.teacher_feedback}}</text>
+    <text class="block muted" wx:if="{{submission.revision_text}}">{{L.revision}}: {{submission.revision_text}}</text>
+    <button class="btn-secondary file-btn" wx:if="{{submission.revision_file_path || submission.revision_file_name}}" bindtap="openRevisionFile">
+      {{L.open_file}} ({{L.revision}})
+    </button>
   </view>
 
   <view class="card" wx:if="{{!submission}}">
     <text class="section-title">{{L.submit_homework}}</text>
     <textarea class="textarea" placeholder="{{L.answer_placeholder}}" value="{{answerText}}" bindinput="onAnswer" />
-    <button class="btn-secondary pick" bindtap="pickFile">{{fileName || L.choose_file}}</button>
-    <button class="btn-primary submit" loading="{{submitting}}" bindtap="onSubmit">{{L.submit}}</button>
+    <view class="file-row">
+      <button class="btn-secondary pick" bindtap="pickFile">{{fileName || L.choose_file}}</button>
+      <button class="btn-secondary pick clear" wx:if="{{fileName}}" bindtap="clearFile">{{L.clear_file}}</button>
+    </view>
+    <button class="btn-primary submit" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">{{L.submit}}</button>
   </view>
 
-  <view class="card" wx:if="{{submission && submission.teacher_feedback}}">
+  <view class="card" wx:if="{{submission && showRevision}}">
     <text class="section-title">{{L.revision}}</text>
+    <text class="muted block" wx:if="{{submission.teacher_feedback}}">{{L.feedback_given}}</text>
+    <text class="muted block" wx:else>{{L.revision_needed}}</text>
     <textarea class="textarea" placeholder="{{L.revision_placeholder}}" value="{{revisionText}}" bindinput="onRevision" />
-    <button class="btn-secondary pick" bindtap="pickRevisionFile">{{revisionFileName || L.choose_file}}</button>
-    <button class="btn-primary submit" loading="{{submitting}}" bindtap="onRevision">{{L.send_revision}}</button>
+    <view class="file-row">
+      <button class="btn-secondary pick" bindtap="pickRevisionFile">{{revisionFileName || L.choose_file}}</button>
+      <button class="btn-secondary pick clear" wx:if="{{revisionFileName}}" bindtap="clearRevisionFile">{{L.clear_file}}</button>
+    </view>
+    <button class="btn-primary submit" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onRevision">{{L.send_revision}}</button>
   </view>
 
   <text class="text-error" wx:if="{{error}}">{{error}}</text>
 </view>
 
 <view class="container" wx:else>
-  <view class="card"><text class="muted">{{loading ? L.loading : error}}</text></view>
+  <view class="card">
+    <text class="muted">{{loading ? L.loading : error}}</text>
+    <button class="btn-secondary retry" wx:if="{{error}}" bindtap="loadTask">{{L.reload}}</button>
+  </view>
 </view>

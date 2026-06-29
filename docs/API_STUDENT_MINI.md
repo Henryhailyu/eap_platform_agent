@@ -105,7 +105,7 @@ With Bearer + strict flags, **do not** send `student_username` in query/body unl
 5. **Completions overlay** → `GET /api/tasks/my-completions?class_name=EAP047&task_ids=1,2,3`.
 6. **Task detail** → task from list + `GET /api/tasks/{id}/my-submission?class_name=EAP047`.
 7. **Submit** → `POST /api/tasks/{id}/submit` (multipart).
-8. **Revision** → `PUT /api/submissions/{id}/revision` (multipart).
+8. **Revision** → `POST /api/submissions/{id}/revision` (multipart; `PUT` also accepted for web).
 9. **Mark complete** → `PUT /api/tasks/{id}/my-completion` (JSON).
 10. **Archive** → `GET /api/student/learning-archive?class_name=EAP047&month=2026-04`.
 
@@ -261,9 +261,9 @@ WeChat: use `wx.uploadFile` with `name: "file"` and other fields in `formData`.
 
 ### Homework — revision
 
-**PUT** `/api/submissions/{submission_id}/revision`
+**PUT** or **POST** `/api/submissions/{submission_id}/revision`
 
-`multipart/form-data`
+`multipart/form-data` — mini-program uses **POST** (`wx.uploadFile`); web uses **PUT**.
 
 | Field | Required |
 |-------|----------|

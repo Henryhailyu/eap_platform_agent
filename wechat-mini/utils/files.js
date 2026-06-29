@@ -1,18 +1,27 @@
 const api = require('./api');
 const auth = require('./auth');
+const i18n = require('./i18n');
+
+function basenameFromPath(pathOrUrl) {
+  if (!pathOrUrl) return '';
+  const raw = String(pathOrUrl);
+  const noQuery = raw.split('?')[0];
+  const parts = noQuery.split('/');
+  return parts[parts.length - 1] || raw;
+}
 
 function downloadAndOpen(pathOrUrl, isUpload) {
   const session = auth.getSession();
   if (!session || !session.token) {
-    wx.showToast({ title: 'Not logged in', icon: 'none' });
+    wx.showToast({ title: i18n.t('not_logged_in'), icon: 'none' });
     return Promise.reject();
   }
   let url = pathOrUrl;
   if (!pathOrUrl.startsWith('http')) {
-    const base = pathOrUrl.split('/').pop();
+    const base = basenameFromPath(pathOrUrl);
     url = isUpload ? api.apiUrl(`/uploads/${base}`) : api.apiUrl(`/submission-files/${base}`);
   }
-  wx.showLoading({ title: 'Opening…' });
+  wx.showLoading({ title: i18n.t('opening_file') });
   return new Promise((resolve, reject) => {
     wx.downloadFile({
       url,
@@ -20,7 +29,10 @@ function downloadAndOpen(pathOrUrl, isUpload) {
       success(res) {
         wx.hideLoading();
         if (res.statusCode !== 200) {
-          wx.showToast({ title: `Download failed (${res.statusCode})`, icon: 'none' });
+          wx.showToast({
+            title: `${i18n.t('download_failed')} (${res.statusCode})`,
+            icon: 'none',
+          });
           reject();
           return;
         }
@@ -28,7 +40,7 @@ function downloadAndOpen(pathOrUrl, isUpload) {
           filePath: res.tempFilePath,
           showMenu: true,
           fail() {
-            wx.showToast({ title: 'Cannot open this file type', icon: 'none' });
+            wx.showToast({ title: i18n.t('cannot_open_file'), icon: 'none' });
             reject();
           },
           success: resolve,
@@ -36,7 +48,7 @@ function downloadAndOpen(pathOrUrl, isUpload) {
       },
       fail() {
         wx.hideLoading();
-        wx.showToast({ title: 'Download failed', icon: 'none' });
+        wx.showToast({ title: i18n.t('download_failed'), icon: 'none' });
         reject();
       },
     });
@@ -45,4 +57,5 @@ function downloadAndOpen(pathOrUrl, isUpload) {
 
 module.exports = {
   downloadAndOpen,
+  basenameFromPath,
 };

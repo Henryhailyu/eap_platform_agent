@@ -1,8 +1,8 @@
 # WeChat mini-program go-live (after 备案 / 认证)
 
-**App:** EAP学习助手 · AppID `wx1b1247067a43152`  
-**API host:** `eap-platform-pilot.onrender.com`  
-**Status:** **ON HOLD** (2026-05-21) — product focus is web-first until 备案/认证. Code remains on `main`; resume with this checklist when approved.
+**App:** EAP伴学助手 · AppID `wx1b12474067a43152`  
+**API host:** `elc-eap-platform.top` (Tencent Lighthouse production)  
+**Status:** Active development — web pilot on Tencent; mini-program targets same API.
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Prerequisite | Check |
 |--------------|-------|
-| Render pilot **Live** | https://eap-platform-pilot.onrender.com/api/health → `"status":"ok"` |
+| Production API **Live** | https://elc-eap-platform.top/api/health → `"status":"ok"` |
 | Passwords rotated | `seed_pilot.py` on Render Shell |
 | `verify_pilot.py` | All checks passed on HTTPS |
 | 备案 + 微信认证 | Approved in mp.weixin.qq.com |
@@ -22,7 +22,7 @@
 `wechat-mini/config.js`:
 
 - `USE_LOCAL_DEV = false`
-- `apiBase = https://eap-platform-pilot.onrender.com`
+- `apiBase = https://elc-eap-platform.top`
 
 For **DevTools-only** testing on your Mac: set `USE_LOCAL_DEV = true`, run `./start_dev.sh`, enable **不校验合法域名**.
 
@@ -36,9 +36,9 @@ For **DevTools-only** testing on your Mac: set `USE_LOCAL_DEV = true`, run `./st
 
 | Type | Domain |
 |------|--------|
-| request 合法域名 | `eap-platform-pilot.onrender.com` |
-| uploadFile 合法域名 | `eap-platform-pilot.onrender.com` |
-| downloadFile 合法域名 | `eap-platform-pilot.onrender.com` |
+| request 合法域名 | `elc-eap-platform.top` |
+| uploadFile 合法域名 | `elc-eap-platform.top` |
+| downloadFile 合法域名 | `elc-eap-platform.top` |
 
 4. Save and wait for WeChat approval (can take hours).
 
@@ -79,9 +79,9 @@ When 体验版 is stable:
 
 ---
 
-## 6. Cold start (Render)
+## 6. Server health
 
-First open after idle may delay **30–90 s**. Optional: open `/api/health` in browser before demo.
+Tencent Lighthouse has no Render-style cold start. If API fails, SSH to server and run `curl -s https://elc-eap-platform.top/api/health`.
 
 ---
 
@@ -89,11 +89,11 @@ First open after idle may delay **30–90 s**. Optional: open `/api/health` in b
 
 | Symptom | Fix |
 |---------|-----|
-| `request:fail url not in domain list` | Whitelist `eap-platform-pilot.onrender.com` |
-| Login 401 | Password must match Render `seed_pilot.py` |
-| 502 on API | Wait for Render wake-up; retry |
+| `request:fail url not in domain list` | Whitelist `elc-eap-platform.top` |
+| Login 401 | Password must match production `seed_pilot.py` / admin-set password |
+| 502 on API | Check Tencent Lighthouse Docker / Nginx; `curl /api/health` |
 | DevTools OK, phone fails | Domains not approved or `USE_LOCAL_DEV` still true |
 
 ---
 
-*Teachers stay on web:* https://eap-platform-pilot.onrender.com/ui/teacher.html
+*Teachers stay on web:* https://elc-eap-platform.top/ui/teacher.html
