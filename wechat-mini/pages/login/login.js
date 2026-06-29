@@ -11,6 +11,8 @@ Page({
     password: '',
     loading: false,
     error: '',
+    showPrivacy: false,
+    privacyReady: false,
   },
 
   onShow() {
@@ -18,7 +20,42 @@ Page({
     const s = auth.getSession();
     if (s && s.token) {
       wx.reLaunch({ url: '/pages/calendar/calendar' });
+      return;
     }
+    this.checkPrivacy();
+  },
+
+  checkPrivacy() {
+    if (!wx.getPrivacySetting) {
+      this.setData({ privacyReady: true, showPrivacy: false });
+      return;
+    }
+    wx.getPrivacySetting({
+      success: (res) => {
+        const need = !!(res && res.needAuthorization);
+        this.setData({
+          showPrivacy: need,
+          privacyReady: !need,
+        });
+      },
+      fail: () => {
+        this.setData({ privacyReady: true, showPrivacy: false });
+      },
+    });
+  },
+
+  onPrivacyAgree() {
+    this.setData({ showPrivacy: false, privacyReady: true });
+  },
+
+  onPrivacyDecline() {
+    this.setData({ showPrivacy: false });
+    wx.showToast({ title: this.data.L.privacy_agree_first, icon: 'none' });
+  },
+
+  openLegal(e) {
+    const type = (e.currentTarget.dataset.type || 'privacy');
+    wx.navigateTo({ url: `/pages/legal/legal?type=${type}` });
   },
 
   onToggleLang() {
@@ -38,6 +75,10 @@ Page({
     const username = (this.data.username || '').trim();
     const password = (this.data.password || '').trim();
     const L = this.data.L;
+    if (!this.data.privacyReady) {
+      this.setData({ showPrivacy: true });
+      return;
+    }
     if (!username || !password) {
       this.setData({ error: L.login_enter_both });
       return;

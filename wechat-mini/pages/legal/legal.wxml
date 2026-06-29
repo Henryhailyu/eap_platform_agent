@@ -1,0 +1,8 @@
+<view class="container">
+  <view class="card">
+    <text class="doc-title">{{title}}</text>
+    <text class="muted block">{{updated}}</text>
+    <text class="para" wx:for="{{paragraphs}}" wx:key="*this">{{item}}</text>
+    <button class="btn-secondary copy-btn" bindtap="copyUrl">{{L.copy_policy_url}}</button>
+  </view>
+</view>

@@ -1,8 +1,8 @@
-# EAP Student — WeChat Mini Program (Phase I3 scaffold)
-
-> **ON HOLD (2026-05-21):** Web-first roadmap until WeChat authorization. See [`docs/WEB_FIRST_ROADMAP.md`](../docs/WEB_FIRST_ROADMAP.md).
+# EAP Student — WeChat Mini Program (Phase I3)
 
 Native WeChat mini-program for the **student daily loop**: login → month calendar → day tasks → submit / revision → learning archive.
+
+**API:** `https://elc-eap-platform.top` · **Next:** P4 体验版真机 — see [`docs/WECHAT_GO_LIVE.md`](../docs/WECHAT_GO_LIVE.md).
 
 Teachers and managers continue to use the web UI at `/ui/`.
 
@@ -53,7 +53,9 @@ wechat-mini/
 
 ## WeChat admin (go-live)
 
-- Add `apiBase` host to **request合法域名** and **uploadFile合法域名**.  
+- Add `apiBase` host to **request合法域名**, **uploadFile合法域名**, **downloadFile合法域名**.  
+- Privacy policy URL for review: `https://elc-eap-platform.top/ui/privacy.html`  
+- Configure **用户隐私保护指引** in mp admin to match `frontend/privacy.html`.  
 - Submit for review (education category).  
 - Future: `wx.login` + server openid bind (not in this scaffold).
 

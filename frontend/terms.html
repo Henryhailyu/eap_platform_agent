@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EAP Companion — Terms of Service / 用户服务协议</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --text: #1d1d1f;
+        --muted: #6e6e73;
+        --accent: #0071e3;
+        --bg: #f5f5f7;
+        --card: #fff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        font-size: 16px;
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+      }
+      .card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 28px 24px;
+        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+      }
+      h1 { font-size: 1.5rem; margin: 0 0 8px; font-weight: 600; }
+      .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+      h2 { font-size: 1.05rem; margin: 28px 0 10px; font-weight: 600; }
+      p, li { margin: 0 0 10px; }
+      ul { padding-left: 1.25rem; margin: 0 0 12px; }
+      a { color: var(--accent); }
+      .lang-toggle {
+        float: right;
+        background: none;
+        border: 1px solid #d2d2d7;
+        border-radius: 8px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+      [data-lang] { display: none; }
+      [data-lang].active { display: block; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <button type="button" class="lang-toggle" id="lang-toggle" aria-label="Switch language">English</button>
+        <div data-lang="zh" class="active">
+          <h1>EAP伴学助手 — 用户服务协议</h1>
+          <p class="meta">生效日期：2026年6月29日</p>
+          <p>使用本小程序即表示您同意以下条款。本服务仅供已注册入学的 EAP 学生使用。</p>
+          <h2>一、账号</h2>
+          <p>账号由学校分配。请妥善保管密码，不得与他人共享账号。您对账号下的操作负责。</p>
+          <h2>二、服务内容</h2>
+          <p>本小程序提供学习日历、作业提交、订正与学习档案查询。具体功能以学校课程安排为准。</p>
+          <h2>三、用户行为规范</h2>
+          <ul>
+            <li>上传的作业与文件应为本人学习成果或学校允许的材料；</li>
+            <li>不得上传违法、侵权、恶意或无关内容；</li>
+            <li>不得干扰系统正常运行或尝试未授权访问。</li>
+          </ul>
+          <h2>四、知识产权</h2>
+          <p>平台界面、教学材料版权归原作者或学校所有。学生提交的作业供教学评价使用。</p>
+          <h2>五、服务变更与中止</h2>
+          <p>学校或运营方可因教学安排、维护或合规原因调整或暂停服务，并将通过适当渠道通知。</p>
+          <h2>六、免责声明</h2>
+          <p>在法律允许范围内，因网络故障、设备问题或不可抗力导致的服务中断，我们将尽力恢复但不承担超出学校规定范围的责任。</p>
+          <h2>七、其他</h2>
+          <p>个人信息处理见 <a href="privacy.html">隐私政策</a>。本协议未尽事宜，适用学校相关规定。</p>
+        </div>
+        <div data-lang="en">
+          <h1>EAP Companion — Terms of Service</h1>
+          <p class="meta">Effective: 29 June 2026</p>
+          <p>By using this mini-program you agree to these terms. The service is for enrolled EAP students only.</p>
+          <h2>1. Accounts</h2>
+          <p>Accounts are issued by your school. Keep your password confidential and do not share your account. You are responsible for activity under your account.</p>
+          <h2>2. Service</h2>
+          <p>The app provides a learning calendar, homework submission, revision, and learning archive. Features follow your school's course schedule.</p>
+          <h2>3. Acceptable use</h2>
+          <ul>
+            <li>Upload only your own work or materials permitted by your school;</li>
+            <li>Do not upload illegal, infringing, or harmful content;</li>
+            <li>Do not disrupt the system or attempt unauthorised access.</li>
+          </ul>
+          <h2>4. Intellectual property</h2>
+          <p>Platform UI and teaching materials belong to their authors or your school. Submitted homework is used for teaching and assessment.</p>
+          <h2>5. Changes</h2>
+          <p>The school or operator may adjust or suspend the service for academic, maintenance, or compliance reasons with notice where practical.</p>
+          <h2>6. Limitation</h2>
+          <p>We will work to restore service after outages caused by network, device, or force majeure events, within limits set by school policy.</p>
+          <h2>7. Other</h2>
+          <p>See our <a href="privacy.html">Privacy Policy</a> for personal data. School rules apply where not covered here.</p>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var btn = document.getElementById('lang-toggle');
+        var zh = document.querySelector('[data-lang="zh"]');
+        var en = document.querySelector('[data-lang="en"]');
+        var isZh = true;
+        btn.addEventListener('click', function () {
+          isZh = !isZh;
+          zh.classList.toggle('active', isZh);
+          en.classList.toggle('active', !isZh);
+          btn.textContent = isZh ? 'English' : '中文';
+          document.documentElement.lang = isZh ? 'zh-CN' : 'en';
+        });
+      })();
+    </script>
+  </body>
+</html>

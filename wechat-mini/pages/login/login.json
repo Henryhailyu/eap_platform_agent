@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "Sign in"
+  "navigationBarTitleText": "Sign in",
+  "usingComponents": {
+    "privacy-popup": "/components/privacy-popup/privacy-popup"
+  }
 }

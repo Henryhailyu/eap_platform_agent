@@ -54,6 +54,12 @@ wait_ready() {
 
 if command -v curl >/dev/null 2>&1; then
   wait_ready "http://127.0.0.1:5051"
+  echo "Legal pages (P5)…"
+  for path in privacy.html terms.html; do
+    code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:5051/ui/${path}" || echo "000")
+    echo "  /ui/${path} → HTTP ${code}"
+  done
+  echo
 fi
 
 run_verify() {

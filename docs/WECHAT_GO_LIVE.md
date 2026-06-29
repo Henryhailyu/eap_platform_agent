@@ -11,7 +11,7 @@
 | Prerequisite | Check |
 |--------------|-------|
 | Production API **Live** | https://elc-eap-platform.top/api/health → `"status":"ok"` |
-| Passwords rotated | `seed_pilot.py` on Render Shell |
+| Passwords rotated | `seed_pilot.py` on Tencent server |
 | `verify_pilot.py` | All checks passed on HTTPS |
 | 备案 + 微信认证 | Approved in mp.weixin.qq.com |
 
@@ -73,9 +73,25 @@ If **request:fail** or domain errors → recheck 服务器域名 and `config.js`
 When 体验版 is stable:
 
 1. mp.weixin.qq.com → **版本管理** → submit **审核**  
-2. Category: education / 教育  
-3. Privacy policy URL (school or simple page) — prepare with I5  
-4. After approval → **发布**
+2. Category: education / **教育**  
+3. **Privacy policy URL:** `https://elc-eap-platform.top/ui/privacy.html`  
+4. **User agreement URL (optional):** `https://elc-eap-platform.top/ui/terms.html`  
+5. In **设置 → 服务内容声明 → 用户隐私保护指引**, declare:
+   - 账号信息（学校用户名、班级）
+   - 选中的文件（作业/订正上传）
+   - 不收集位置、通讯录、摄像头（本 MVP 未使用）
+6. Mini-program login shows privacy popup (`__usePrivacyCheck__`) and links to in-app legal pages.  
+7. After approval → **发布**
+
+### P5 admin checklist (you)
+
+| Step | Where | Value |
+|------|-------|-------|
+| Privacy URL | 审核表单 | `https://elc-eap-platform.top/ui/privacy.html` |
+| 用户隐私保护指引 | 设置 → 服务内容声明 | 与 `privacy.html` 一致 |
+| 服务器域名 | 开发设置 | `elc-eap-platform.top` (request/upload/download) |
+| 上传版本 | 开发者工具 | 备注 e.g. `pilot-2026-06-p5` |
+| 提交审核 | 版本管理 | 教育类，说明：学生日历与作业提交 |
 
 ---
 

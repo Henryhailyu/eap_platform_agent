@@ -18,5 +18,15 @@
     </view>
     <text class="text-error" wx:if="{{error}}">{{error}}</text>
     <button class="btn-primary login-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="onLogin">{{L.sign_in}}</button>
+    <view class="legal-footer">
+      <text class="legal-muted">{{L.legal_footer}}</text>
+      <view class="legal-links">
+        <text class="legal-link" bindtap="openLegal" data-type="privacy">{{L.privacy_policy}}</text>
+        <text class="legal-sep"> · </text>
+        <text class="legal-link" bindtap="openLegal" data-type="terms">{{L.user_terms}}</text>
+      </view>
+    </view>
   </view>
 </view>
+
+<privacy-popup show="{{showPrivacy}}" bind:agree="onPrivacyAgree" bind:decline="onPrivacyDecline" />

@@ -62,6 +62,12 @@ const en = {
   feedback_given: 'Feedback received',
   open_task: 'View task',
   reload: 'Reload',
+  privacy_policy: 'Privacy Policy',
+  user_terms: 'Terms of Service',
+  privacy_agree_first: 'Please agree to the Privacy Policy first',
+  copy_policy_url: 'Copy full policy URL',
+  link_copied: 'Link copied',
+  legal_footer: 'By signing in you agree to our policies',
 };
 
 const zh = {
@@ -126,6 +132,12 @@ const zh = {
   feedback_given: '已收到反馈',
   open_task: '查看任务',
   reload: '刷新',
+  privacy_policy: '隐私政策',
+  user_terms: '用户协议',
+  privacy_agree_first: '请先同意隐私保护指引',
+  copy_policy_url: '复制完整政策链接',
+  link_copied: '链接已复制',
+  legal_footer: '登录即表示同意相关协议',
 };
 
 function getLang() {

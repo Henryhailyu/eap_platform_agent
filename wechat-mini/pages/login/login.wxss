@@ -48,3 +48,27 @@
 .login-btn {
   margin-top: 16rpx;
 }
+
+.legal-footer {
+  margin-top: 28rpx;
+  text-align: center;
+}
+
+.legal-muted {
+  display: block;
+  font-size: 22rpx;
+  color: #86868b;
+  margin-bottom: 8rpx;
+}
+
+.legal-links {
+  font-size: 24rpx;
+}
+
+.legal-link {
+  color: #0071e3;
+}
+
+.legal-sep {
+  color: #86868b;
+}

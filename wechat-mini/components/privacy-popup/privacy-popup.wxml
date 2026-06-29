@@ -1,0 +1,14 @@
+<view class="privacy-mask" wx:if="{{show}}">
+  <view class="privacy-panel">
+    <text class="privacy-title">用户隐私保护指引</text>
+    <text class="privacy-body">
+      在使用 EAP伴学助手 前，请阅读并同意
+      <text class="privacy-link" bindtap="onOpenContract">《用户隐私保护指引》</text>
+      。我们将收集账号、作业与学习记录用于教学服务。
+    </text>
+    <view class="privacy-actions">
+      <button class="btn-decline" bindtap="onDecline">不同意</button>
+      <button class="btn-agree" open-type="agreePrivacyAuthorization" bindagreeprivacyauthorization="onAgree">同意</button>
+    </view>
+  </view>
+</view>

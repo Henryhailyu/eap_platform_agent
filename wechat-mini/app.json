@@ -4,7 +4,8 @@
     "pages/calendar/calendar",
     "pages/day/day",
     "pages/task/task",
-    "pages/archive/archive"
+    "pages/archive/archive",
+    "pages/legal/legal"
   ],
   "window": {
     "navigationBarTitleText": "EAP伴学助手",
@@ -14,5 +15,6 @@
     "backgroundTextStyle": "dark"
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "__usePrivacyCheck__": true
 }
