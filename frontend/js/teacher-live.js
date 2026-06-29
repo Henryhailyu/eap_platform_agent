@@ -173,12 +173,17 @@
 
   async function startVocabGame(kind, onReady) {
     if (window.__tliveVocabGameLoading) return;
+    const CV = window.EAP_LIVE_CLASS_VOCAB;
     window.__tliveGameLaunchingId = kind;
     window.__tliveVocabGameLoading = kind;
     showVocabGameLoading();
 
-    const GV = window.EAP_LIVE_GAME_VOCAB;
-    const minTerms = kind === "memory" ? 6 : GV && GV.MIN ? GV.MIN : 8;
+    const minTerms =
+      CV && typeof CV.minForGameKind === "function"
+        ? CV.minForGameKind(kind)
+        : kind === "memory"
+          ? 6
+          : 8;
 
     const finish = (terms) => {
       window.__tliveVocabGameLoading = null;
@@ -193,30 +198,13 @@
     };
 
     try {
-      syncLiveLessonFromActiveSource();
-      const MOCK = getMock();
-      if (!MOCK) {
+      if (!CV) {
         finish(null);
         return;
       }
-      if (window.__tliveAiQuestionCache) {
-        window.__tliveAiQuestionCache.vocabTerms = null;
-      }
-      await ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 8000, forceRefresh: true });
-      syncLiveLessonFromActiveSource();
-      if (GV && typeof GV.resolveSync === "function") {
-        const fast = GV.resolveSync(minTerms);
-        if (fast && fast.length >= minTerms) {
-          finish(fast);
-          return;
-        }
-      }
-      if (GV && typeof GV.ensure === "function") {
-        const terms = await GV.ensure();
-        finish(terms);
-        return;
-      }
-      finish(null);
+      await CV.syncActive();
+      const terms = typeof CV.getTermsForGame === "function" ? CV.getTermsForGame(kind) : null;
+      finish(terms);
     } catch (_) {
       finish(null);
     }
@@ -1100,6 +1088,12 @@
     let libItem = null;
     if (pageId) libItem = await addHtmlToDisplayLibrary(className, pageId, title, false);
     renderHtmlLessonOnCanvas(html, title, pageId);
+    if (pageId) {
+      const CV = window.EAP_LIVE_CLASS_VOCAB;
+      if (CV && typeof CV.fetchSuggestions === "function") {
+        void CV.fetchSuggestions(String(pageId));
+      }
+    }
     const api = getDisplayApi();
     if (libItem && api) {
       try {
@@ -1213,6 +1207,11 @@
       return;
     }
     displayLibrary.className = ctx.className || "EAP047";
+    window.__tliveDisplayClassName = displayLibrary.className;
+    const CV = window.EAP_LIVE_CLASS_VOCAB;
+    if (CV && typeof CV.loadForClass === "function") {
+      void CV.loadForClass(displayLibrary.className);
+    }
     try {
       let teacherUsername = "";
       try {
@@ -1312,6 +1311,15 @@
         try {
           const page = await tapi.getPage(item.page_id);
           renderHtmlLessonOnCanvas(page.html_content, page.title, item.page_id);
+          const CV = window.EAP_LIVE_CLASS_VOCAB;
+          if (CV && typeof CV.loadForPage === "function") {
+            void CV.loadForPage(String(item.page_id)).then((data) => {
+              if (CV && typeof CV.refreshGamesPanelStatus === "function") CV.refreshGamesPanelStatus();
+              if (data && !(data.terms || []).length && typeof CV.fetchSuggestions === "function") {
+                void CV.fetchSuggestions(String(item.page_id));
+              }
+            });
+          }
           return;
         } catch (_) {
           /* fall through */
@@ -3416,7 +3424,16 @@
     }
     if (game.type === "vocab_bingo" || game.id === "vocab-bingo") {
       void startVocabGame("bingo", (terms) => {
-        if (!terms) showGamesToast(t("tlive_vocab_ai_failed"));
+        const CV = window.EAP_LIVE_CLASS_VOCAB;
+        if (!terms) {
+          if (CV && typeof CV.showVocabRequiredScreen === "function") {
+            CV.showVocabRequiredScreen("bingo", () => renderGamesLibrary({ force: true }));
+          } else {
+            showGamesToast(t("tlive_vocab_required_lead"));
+            renderGamesLibrary({ force: true });
+          }
+          return;
+        }
         window.__tliveBingo = MOCK.createBingoState(terms);
         renderVocabBingo(window.__tliveBingo);
       });
@@ -3424,7 +3441,16 @@
     }
     if (game.type === "matching_race" || game.id === "matching-race") {
       void startVocabGame("matching", (terms) => {
-        if (!terms) showGamesToast(t("tlive_vocab_ai_failed"));
+        const CV = window.EAP_LIVE_CLASS_VOCAB;
+        if (!terms) {
+          if (CV && typeof CV.showVocabRequiredScreen === "function") {
+            CV.showVocabRequiredScreen("matching", () => renderGamesLibrary({ force: true }));
+          } else {
+            showGamesToast(t("tlive_vocab_required_lead"));
+            renderGamesLibrary({ force: true });
+          }
+          return;
+        }
         window.__tliveMatching = MOCK.createMatchingState(terms);
         renderMatchingRace(window.__tliveMatching);
       });
@@ -3467,7 +3493,16 @@
     }
     if (game.type === "memory_card" || game.id === "memory-card") {
       void startVocabGame("memory", (terms) => {
-        if (!terms) showGamesToast(t("tlive_vocab_ai_failed"));
+        const CV = window.EAP_LIVE_CLASS_VOCAB;
+        if (!terms) {
+          if (CV && typeof CV.showVocabRequiredScreen === "function") {
+            CV.showVocabRequiredScreen("memory", () => renderGamesLibrary({ force: true }));
+          } else {
+            showGamesToast(t("tlive_vocab_required_lead"));
+            renderGamesLibrary({ force: true });
+          }
+          return;
+        }
         window.__tliveMemory = MOCK.createMemoryCardState(terms);
         renderMemoryCard(window.__tliveMemory);
       });
@@ -3598,12 +3633,15 @@
     if (!canvas || !MOCK) return;
     const games = getSavedGamesList();
     const suggestedBlock = buildSuggestedGamesBlockHtml(MOCK, games);
+    const CV = window.EAP_LIVE_CLASS_VOCAB;
+    const vocabBlock = CV && typeof CV.gamesPanelBlockHtml === "function" ? CV.gamesPanelBlockHtml() : "";
 
     canvas.className = "tlive-canvas__inner tlive-canvas__inner--stage";
     canvas.innerHTML = `
       <div class="tlive-games-panel tlive-stage-fill">
         <h2 class="tlive-games-panel__title">${escapeHtml(t("tlive_saved_games"))}</h2>
         <p class="tlive-games-panel__lead">${escapeHtml(t("tlive_games_canvas_lead"))}</p>
+        ${vocabBlock}
         ${suggestedBlock}
         <p id="tlive-games-toast" class="tlive-games-toast hidden" role="status"></p>
         <div class="tlive-games-panel__scroll" role="region" aria-label="${escapeHtml(t("tlive_games_list_region"))}">
@@ -3614,7 +3652,9 @@
         <p class="tlive-disclaimer">${escapeHtml(t("tlive_saved_games_hint"))}</p>
       </div>
     `;
-
+    if (CV && typeof CV.bindGamesPanelActions === "function") {
+      CV.bindGamesPanelActions(canvas);
+    }
   }
 
   function showGamesToast(text) {
@@ -3638,10 +3678,20 @@
     setActiveTool("games");
     renderGamesLibrary({ force: true });
     const gen = (window.__tliveGamesLibraryRefreshGen = (window.__tliveGamesLibraryRefreshGen || 0) + 1);
+    const CV = window.EAP_LIVE_CLASS_VOCAB;
+    void (CV && typeof CV.syncActive === "function" ? CV.syncActive() : Promise.resolve()).then(() => {
+      if (gen !== window.__tliveGamesLibraryRefreshGen) return;
+      if (CV && typeof CV.refreshGamesPanelStatus === "function") CV.refreshGamesPanelStatus();
+    });
     void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 12000 }).then((ok) => {
       if (gen !== window.__tliveGamesLibraryRefreshGen) return;
       if (!ok || !isGamesLibraryView()) return;
       patchGamesLibrarySuggested();
+      const pageId = resolveActiveLessonPageId();
+      const cv = window.EAP_LIVE_CLASS_VOCAB;
+      if (pageId && cv && typeof cv.fetchSuggestions === "function" && !cv.getConfirmed().length) {
+        void cv.fetchSuggestions(pageId);
+      }
     });
   }
 
@@ -3660,27 +3710,40 @@
     syncLiveLessonFromActiveSource();
     const vocabLesson = isVocabLessonGameId(gameId);
     if (vocabLesson) {
-      if (!lessonHtmlAvailable()) {
-        showVocabGameLoading();
-        void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 4000 }).then(() => {
-          syncLiveLessonFromActiveSource();
-          if (!lessonHtmlAvailable()) {
-            showGamesToast(t("tlive_pq_no_lesson_html"));
-            window.__tliveGameLaunchingId = null;
-            return;
+      const CV = window.EAP_LIVE_CLASS_VOCAB;
+      void (CV && typeof CV.syncActive === "function" ? CV.syncActive() : Promise.resolve()).then(() => {
+        const kind = gameId === "memory-card" ? "memory" : "bingo";
+        if (CV && typeof CV.isReadyForGame === "function" && !CV.isReadyForGame(kind)) {
+          window.__tliveGameLaunchingId = null;
+          if (typeof CV.showVocabRequiredScreen === "function") {
+            CV.showVocabRequiredScreen(kind, () => renderGamesLibrary({ force: true }));
+          } else {
+            showGamesToast(t("tlive_vocab_required_lead"));
+            renderGamesLibrary({ force: true });
           }
-          loadGame(gameId, opts);
-        });
-        return;
-      }
-    } else if (!(window.__tliveLessonSlots || []).length) {
+          return;
+        }
+        loadGameContinue(gameId, opts);
+      });
+      return;
+    }
+    loadGameContinue(gameId, opts);
+  }
+
+  function loadGameContinue(gameId, opts) {
+    const MOCK = getMock();
+    if (!MOCK) {
+      window.__tliveGameLaunchingId = null;
+      return;
+    }
+    if (!isVocabLessonGameId(gameId) && !(window.__tliveLessonSlots || []).length) {
       void ensureLessonHtmlForActiveDisplayItem({ timeoutMs: 8000 }).then(() => {
         if (!(window.__tliveLessonSlots || []).length) {
           showGamesToast(t("tlive_pq_no_lesson_html"));
           window.__tliveGameLaunchingId = null;
           return;
         }
-        loadGame(gameId, opts);
+        loadGameContinue(gameId, opts);
       });
       return;
     }

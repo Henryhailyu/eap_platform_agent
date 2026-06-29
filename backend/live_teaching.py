@@ -146,6 +146,9 @@ def init_live_teaching_tables(conn):
     """)
     migrate_live_k6(conn)
     migrate_live_lp4(conn)
+    from lesson_vocabulary import init_lesson_vocabulary_tables
+
+    init_lesson_vocabulary_tables(conn)
 
 
 _CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -646,6 +649,176 @@ def register_live_teaching_routes(app):
             except Exception as exc:  # noqa: BLE001
                 log.warning("live generate-vocab failed: %s", format_ai_error(exc))
                 return jsonify({"error": "AI request failed", "detail": format_ai_error(exc)}), 502
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/teaching-pages/<int:page_id>/vocabulary", methods=["GET", "PUT"])
+    def teacher_teaching_page_vocabulary(page_id):
+        """Confirmed vocabulary list for a teaching page (Class activity games)."""
+        from app import get_current_authenticated_user, get_db_connection, require_session_role_if_enabled
+        from lesson_vocabulary import (
+            get_page_vocabulary,
+            get_page_vocabulary_draft,
+            normalize_vocab_list,
+            parse_pasted_vocabulary,
+            save_page_vocabulary,
+        )
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+            actor = get_current_authenticated_user(conn)
+            teacher = str(actor["username"] or "").strip() if actor else ""
+            row = conn.execute(
+                "SELECT id FROM teacher_teaching_pages WHERE id = ? AND teacher_username = ?",
+                (page_id, teacher),
+            ).fetchone()
+            if not row:
+                return jsonify({"error": "Not found"}), 404
+
+            if request.method == "GET":
+                terms = get_page_vocabulary(conn, page_id, teacher)
+                draft = get_page_vocabulary_draft(conn, page_id, teacher)
+                return jsonify(
+                    {
+                        "page_id": page_id,
+                        "terms": terms,
+                        "count": len(terms),
+                        "draft_terms": draft,
+                        "draft_count": len(draft),
+                        "confirmed": len(terms) >= 6,
+                    }
+                )
+
+            body = request.get_json(silent=True) or {}
+            if body.get("clear"):
+                from lesson_vocabulary import clear_page_vocabulary
+
+                clear_page_vocabulary(conn, page_id, teacher)
+                conn.commit()
+                return jsonify({"page_id": page_id, "terms": [], "count": 0, "confirmed": False})
+
+            raw_terms = body.get("terms")
+            if raw_terms is None and body.get("paste"):
+                raw_terms = parse_pasted_vocabulary(str(body.get("paste") or ""))
+            terms = normalize_vocab_list(raw_terms if isinstance(raw_terms, list) else [])
+            if len(terms) < 6:
+                return jsonify({"error": "At least 6 vocabulary items are required"}), 400
+            saved = save_page_vocabulary(conn, page_id, teacher, terms)
+            conn.commit()
+            return jsonify({"page_id": page_id, "terms": saved, "count": len(saved), "confirmed": True})
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/teaching-pages/<int:page_id>/vocabulary/suggest", methods=["POST"])
+    def teacher_teaching_page_vocabulary_suggest(page_id):
+        """Extract suggested vocabulary from lesson HTML (teacher must confirm before games)."""
+        from app import get_current_authenticated_user, get_db_connection, require_session_role_if_enabled
+        from lesson_vocabulary import get_page_vocabulary_draft, refresh_page_vocabulary_draft_from_html
+
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+            actor = get_current_authenticated_user(conn)
+            teacher = str(actor["username"] or "").strip() if actor else ""
+            row = conn.execute(
+                "SELECT id FROM teacher_teaching_pages WHERE id = ? AND teacher_username = ?",
+                (page_id, teacher),
+            ).fetchone()
+            if not row:
+                return jsonify({"error": "Not found"}), 404
+
+            suggested = refresh_page_vocabulary_draft_from_html(conn, page_id, teacher)
+            if not suggested:
+                suggested = get_page_vocabulary_draft(conn, page_id, teacher)
+            conn.commit()
+            return jsonify(
+                {
+                    "page_id": page_id,
+                    "draft_terms": suggested,
+                    "draft_count": len(suggested),
+                }
+            )
+        finally:
+            conn.close()
+
+    @app.route("/api/teacher/live/class-vocabulary", methods=["GET", "PUT"])
+    def teacher_live_class_vocabulary():
+        """Session vocabulary for the active class (used when no page vocab or as override)."""
+        from app import get_current_authenticated_user, get_db_connection, require_session_role_if_enabled
+        from lesson_vocabulary import (
+            get_class_vocabulary,
+            normalize_vocab_list,
+            parse_pasted_vocabulary,
+            save_class_vocabulary,
+        )
+
+        class_name = str(request.args.get("class_name") or "").strip()
+        conn = get_db_connection()
+        try:
+            err = require_session_role_if_enabled(conn, "teacher")
+            if err is not None:
+                return err
+            actor = get_current_authenticated_user(conn)
+            teacher = str(actor["username"] or "").strip() if actor else ""
+
+            if request.method == "GET":
+                if not class_name:
+                    return jsonify({"error": "class_name is required"}), 400
+                payload = get_class_vocabulary(conn, teacher, class_name)
+                terms = payload.get("terms") or []
+                return jsonify(
+                    {
+                        "class_name": class_name,
+                        "terms": terms,
+                        "count": len(terms),
+                        "source_page_id": payload.get("source_page_id"),
+                        "updated_at": payload.get("updated_at") or "",
+                        "confirmed": len(terms) >= 6,
+                    }
+                )
+
+            body = request.get_json(silent=True) or {}
+            class_name = str(body.get("class_name") or class_name or "").strip()
+            if not class_name:
+                return jsonify({"error": "class_name is required"}), 400
+            if body.get("clear"):
+                from lesson_vocabulary import clear_class_vocabulary
+
+                clear_class_vocabulary(conn, teacher, class_name)
+                conn.commit()
+                return jsonify({"class_name": class_name, "terms": [], "count": 0, "confirmed": False})
+            raw_terms = body.get("terms")
+            if raw_terms is None and body.get("paste"):
+                raw_terms = parse_pasted_vocabulary(str(body.get("paste") or ""))
+            terms = normalize_vocab_list(raw_terms if isinstance(raw_terms, list) else [])
+            if len(terms) < 6:
+                return jsonify({"error": "At least 6 vocabulary items are required"}), 400
+            page_id_raw = body.get("source_page_id") or body.get("page_id")
+            source_page_id = None
+            if page_id_raw is not None and str(page_id_raw).strip().isdigit():
+                source_page_id = int(page_id_raw)
+            saved = save_class_vocabulary(
+                conn,
+                teacher,
+                class_name,
+                terms,
+                source_page_id=source_page_id,
+            )
+            conn.commit()
+            return jsonify(
+                {
+                    "class_name": class_name,
+                    "terms": saved,
+                    "count": len(saved),
+                    "source_page_id": source_page_id,
+                    "confirmed": True,
+                }
+            )
         finally:
             conn.close()
 
