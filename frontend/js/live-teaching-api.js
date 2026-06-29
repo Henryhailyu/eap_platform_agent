@@ -253,6 +253,15 @@
     return parseJson(response);
   }
 
+  async function generateVocabDefinitions(body) {
+    const response = await liveFetch(`${API_BASE}/api/teacher/live/generate-vocab-definitions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    return parseJson(response);
+  }
+
   global.EAP_LIVE_TEACHING_API = {
     API_BASE,
     WAIT_TIMEOUT_SEC,
@@ -274,5 +283,6 @@
     studentRespond,
     generateQuestion,
     generateVocab,
+    generateVocabDefinitions,
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -5,6 +5,7 @@
   const MIN_BINGO = 8;
   const MIN_MEMORY = 6;
   const TARGET = 24;
+  const RECOMMENDED_WORDS = 20;
 
   function t(key, vars) {
     if (typeof global.t === "function") return global.t(key, vars);
@@ -50,8 +51,16 @@
     return out;
   }
 
-  function parsePasted(text) {
-    const pairs = [];
+  function isValidWordTerm(term) {
+    const t0 = String(term || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!t0 || t0.length < 3 || t0.length > 64) return false;
+    return /^[a-zA-Z][a-zA-Z\s'\-]*$/.test(t0);
+  }
+
+  function parseWordsOnly(text) {
+    const words = [];
     const seen = new Set();
     String(text || "")
       .split(/\r?\n/)
@@ -61,37 +70,33 @@
           .trim();
         if (!line) return;
         line = line.replace(/^\d+[.)]\s*/, "");
-        let term = "";
-        let defEn = "";
-        if (line.includes("\t")) {
-          const parts = line.split("\t");
-          term = parts[0];
-          defEn = parts.slice(1).join(" ").trim();
-        } else {
-          let matched = false;
-          for (const sep of [" — ", " – ", " - ", ": ", "："]) {
-            if (!line.includes(sep)) continue;
-            const parts = line.split(sep);
-            term = parts[0];
-            defEn = parts.slice(1).join(sep).trim();
-            matched = true;
-            break;
-          }
-          if (!matched) {
-            term = line;
-            defEn = `${line.charAt(0).toUpperCase()}${line.slice(1)} — key vocabulary for this class`;
-          }
-        }
-        term = term.trim();
-        defEn = defEn.trim();
-        if (!term || !defEn || term.length < 3 || defEn.length < 6) return;
-        if (!/^[a-zA-Z][a-zA-Z\s'\-]*$/.test(term)) return;
-        const key = term.toLowerCase();
+        if (!isValidWordTerm(line)) return;
+        const key = line.toLowerCase();
         if (seen.has(key)) return;
         seen.add(key);
-        pairs.push({ term, defEn, defZh: defEn });
+        words.push(line);
       });
-    return pairs;
+    return words;
+  }
+
+  function rowsFromWords(words, defsByTerm) {
+    const map = defsByTerm && typeof defsByTerm === "object" ? defsByTerm : {};
+    return (words || []).map((term) => ({
+      term,
+      defEn: map[term.toLowerCase()] || "",
+      defZh: map[term.toLowerCase()] || "",
+    }));
+  }
+
+  /** @deprecated use parseWordsOnly + editable table */
+  function parsePasted(text) {
+    return normalizeTerms(
+      parseWordsOnly(text).map((term) => ({
+        term,
+        defEn: `${term.charAt(0).toUpperCase()}${term.slice(1)} — key vocabulary for this class`,
+        defZh: `${term.charAt(0).toUpperCase()}${term.slice(1)} — key vocabulary for this class`,
+      })),
+    );
   }
 
   function padTerms(terms, count) {
@@ -271,6 +276,112 @@
       .replace(/"/g, "&quot;");
   }
 
+  function editableTableHtml(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      return `<p class="tlive-vocab-editor__empty">${escapeHtml(t("tlive_vocab_table_empty"))}</p>`;
+    }
+    const body = list
+      .map(
+        (item, i) =>
+          `<tr data-vocab-row="${i}">
+            <td>${i + 1}</td>
+            <td><input type="text" class="tlive-vocab-edit-term" value="${escapeHtml(item.term || "")}" aria-label="${escapeHtml(t("tlive_vocab_col_term"))}" /></td>
+            <td><input type="text" class="tlive-vocab-edit-def" value="${escapeHtml(item.defEn || "")}" placeholder="${escapeHtml(t("tlive_vocab_def_placeholder"))}" aria-label="${escapeHtml(t("tlive_vocab_col_def"))}" /></td>
+          </tr>`,
+      )
+      .join("");
+    return `<div class="tlive-vocab-editor__table-wrap"><table class="tlive-vocab-editor__table tlive-vocab-editor__table--edit"><thead><tr><th>#</th><th>${escapeHtml(t("tlive_vocab_col_term"))}</th><th>${escapeHtml(t("tlive_vocab_col_def"))}</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  }
+
+  function readEditableTable(modal) {
+    if (!modal) return [];
+    const rows = [];
+    modal.querySelectorAll("tr[data-vocab-row]").forEach((tr) => {
+      const term = tr.querySelector(".tlive-vocab-edit-term")?.value || "";
+      const defEn = tr.querySelector(".tlive-vocab-edit-def")?.value || "";
+      rows.push({ term, defEn, defZh: defEn });
+    });
+    return normalizeTerms(rows);
+  }
+
+  function updateWordCountHint(modal) {
+    const hintEl = modal?.querySelector("#tlive-vocab-word-count");
+    const wordsEl = modal?.querySelector("#tlive-vocab-words");
+    if (!hintEl || !wordsEl) return;
+    const n = parseWordsOnly(wordsEl.value).length;
+    if (!n) {
+      hintEl.textContent = "";
+      hintEl.className = "tlive-vocab-word-count";
+      return;
+    }
+    if (n < RECOMMENDED_WORDS) {
+      hintEl.textContent = t("tlive_vocab_word_count_low", { n: String(n), rec: String(RECOMMENDED_WORDS) });
+      hintEl.className = "tlive-vocab-word-count tlive-vocab-word-count--warn";
+    } else {
+      hintEl.textContent = t("tlive_vocab_word_count_ok", { n: String(n) });
+      hintEl.className = "tlive-vocab-word-count tlive-vocab-word-count--ok";
+    }
+  }
+
+  function setGenerateStatus(modal, message, kind) {
+    const el = modal?.querySelector("#tlive-vocab-generate-status");
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.className = "tlive-vocab-generate-status hidden";
+      el.hidden = true;
+      return;
+    }
+    el.textContent = message;
+    el.className = `tlive-vocab-generate-status tlive-vocab-generate-status--${kind || "info"}`;
+    el.hidden = false;
+  }
+
+  async function generateDefinitionsInModal(modal) {
+    const wordsEl = modal?.querySelector("#tlive-vocab-words");
+    const tableHost = modal?.querySelector("#tlive-vocab-edit-table");
+    const genBtn = modal?.querySelector("#tlive-vocab-generate-defs");
+    const words = parseWordsOnly(wordsEl ? wordsEl.value : "");
+    if (!words.length) {
+      global.alert(t("tlive_vocab_words_required"));
+      return;
+    }
+    updateWordCountHint(modal);
+    if (genBtn) {
+      genBtn.disabled = true;
+      genBtn.textContent = t("tlive_vocab_generating_defs");
+    }
+    setGenerateStatus(modal, t("tlive_vocab_generating_defs"), "loading");
+    try {
+      const data = await readJson(
+        await authFetch(`${apiBase()}/api/teacher/live/generate-vocab-definitions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ terms: words }),
+        }),
+      );
+      const terms = normalizeTerms((data && data.terms) || []);
+      const byKey = {};
+      terms.forEach((item) => {
+        byKey[item.term.toLowerCase()] = item.defEn;
+      });
+      const rows = rowsFromWords(words, byKey);
+      if (tableHost) tableHost.innerHTML = editableTableHtml(rows);
+      setGenerateStatus(modal, t("tlive_vocab_defs_generated", { n: String(rows.length) }), "ok");
+    } catch (err) {
+      const rows = rowsFromWords(words, {});
+      if (tableHost) tableHost.innerHTML = editableTableHtml(rows);
+      const msg = (err && err.message) || t("tlive_vocab_defs_ai_failed");
+      setGenerateStatus(modal, t("tlive_vocab_defs_manual_hint", { detail: msg }), "warn");
+    } finally {
+      if (genBtn) {
+        genBtn.disabled = false;
+        genBtn.textContent = t("tlive_vocab_generate_defs_btn");
+      }
+    }
+  }
+
   function previewTableHtml(terms) {
     const rows = normalizeTerms(terms)
       .slice(0, 48)
@@ -300,6 +411,7 @@
     return `<section class="tlive-vocab-panel" aria-labelledby="tlive-vocab-panel-title">
       <h3 id="tlive-vocab-panel-title" class="tlive-vocab-panel__title">${escapeHtml(t("tlive_vocab_panel_title"))}</h3>
       <p class="tlive-vocab-panel__hint">${escapeHtml(t("tlive_vocab_panel_hint"))}</p>
+      <p class="tlive-vocab-panel__recommend">${escapeHtml(t("tlive_vocab_panel_recommend"))}</p>
       <div id="tlive-vocab-status">${statusSummaryHtml()}</div>
       <div class="tlive-vocab-panel__actions">
         <button type="button" class="btn-secondary btn-small" data-tlive-vocab="import" id="tlive-vocab-import-btn">${escapeHtml(t("tlive_vocab_import_btn"))}</button>
@@ -440,62 +552,89 @@
         return;
       }
       openEditorModal({
-        initialTerms: draft,
-        initialPaste: draft.map((x) => `${x.term} — ${x.defEn}`).join("\n"),
+        initialWords: draft.map((x) => x.term),
+        initialRows: draft,
       });
     } catch (err) {
       global.alert((err && err.message) || t("tlive_vocab_suggest_failed"));
     }
   }
 
+  function ensureEditorModal() {
+    let modal = document.getElementById("tlive-vocab-modal");
+    if (modal && modal.querySelector("#tlive-vocab-words")) return modal;
+    if (modal) modal.remove();
+    modal = document.createElement("div");
+    modal.id = "tlive-vocab-modal";
+    modal.className = "tlive-vocab-modal hidden";
+    modal.hidden = true;
+    modal.innerHTML = `<div class="tlive-vocab-modal__backdrop" data-vocab-close aria-hidden="true"></div>
+      <div class="tlive-vocab-modal__card" role="dialog" aria-modal="true" aria-labelledby="tlive-vocab-modal-title">
+        <header class="tlive-vocab-modal__head">
+          <h2 id="tlive-vocab-modal-title">${escapeHtml(t("tlive_vocab_modal_title"))}</h2>
+          <button type="button" class="tlive-float__close" data-vocab-close aria-label="Close">×</button>
+        </header>
+        <p class="tlive-vocab-modal__hint">${escapeHtml(t("tlive_vocab_modal_hint"))}</p>
+        <p class="tlive-vocab-modal__recommend">${escapeHtml(t("tlive_vocab_modal_recommend"))}</p>
+        <label class="tlive-vocab-modal__label" for="tlive-vocab-words">${escapeHtml(t("tlive_vocab_words_label"))}</label>
+        <textarea id="tlive-vocab-words" class="tlive-vocab-modal__textarea" rows="8" placeholder="${escapeHtml(t("tlive_vocab_modal_placeholder"))}"></textarea>
+        <p id="tlive-vocab-word-count" class="tlive-vocab-word-count" aria-live="polite"></p>
+        <div class="tlive-vocab-modal__toolbar">
+          <button type="button" class="btn-secondary" id="tlive-vocab-generate-defs">${escapeHtml(t("tlive_vocab_generate_defs_btn"))}</button>
+        </div>
+        <p id="tlive-vocab-generate-status" class="tlive-vocab-generate-status hidden" hidden aria-live="polite"></p>
+        <div id="tlive-vocab-edit-table">${editableTableHtml([])}</div>
+        <footer class="tlive-vocab-modal__foot">
+          <button type="button" class="btn-secondary" data-vocab-close>${escapeHtml(t("tlive_vocab_cancel"))}</button>
+          <button type="button" class="btn-primary" id="tlive-vocab-confirm-btn">${escapeHtml(t("tlive_vocab_confirm_btn"))}</button>
+        </footer>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelectorAll("[data-vocab-close]").forEach((btn) => {
+      btn.addEventListener("click", () => closeEditorModal());
+    });
+    modal.querySelector("#tlive-vocab-words")?.addEventListener("input", () => {
+      updateWordCountHint(modal);
+    });
+    modal.querySelector("#tlive-vocab-generate-defs")?.addEventListener("click", () => {
+      void generateDefinitionsInModal(modal);
+    });
+    modal.querySelector("#tlive-vocab-confirm-btn")?.addEventListener("click", () => {
+      void confirmEditorModal();
+    });
+    return modal;
+  }
+
   function openEditorModal(opts) {
     const options = opts && typeof opts === "object" ? opts : {};
-    let modal = document.getElementById("tlive-vocab-modal");
-    if (!modal) {
-      modal = document.createElement("div");
-      modal.id = "tlive-vocab-modal";
-      modal.className = "tlive-vocab-modal hidden";
-      modal.hidden = true;
-      modal.innerHTML = `<div class="tlive-vocab-modal__backdrop" data-vocab-close aria-hidden="true"></div>
-        <div class="tlive-vocab-modal__card" role="dialog" aria-modal="true" aria-labelledby="tlive-vocab-modal-title">
-          <header class="tlive-vocab-modal__head">
-            <h2 id="tlive-vocab-modal-title">${escapeHtml(t("tlive_vocab_modal_title"))}</h2>
-            <button type="button" class="tlive-float__close" data-vocab-close aria-label="Close">×</button>
-          </header>
-          <p class="tlive-vocab-modal__hint">${escapeHtml(t("tlive_vocab_modal_hint"))}</p>
-          <textarea id="tlive-vocab-paste" class="tlive-vocab-modal__textarea" rows="8" placeholder="${escapeHtml(t("tlive_vocab_modal_placeholder"))}"></textarea>
-          <div id="tlive-vocab-preview">${previewTableHtml([])}</div>
-          <footer class="tlive-vocab-modal__foot">
-            <button type="button" class="btn-secondary" data-vocab-close>${escapeHtml(t("tlive_vocab_cancel"))}</button>
-            <button type="button" class="btn-primary" id="tlive-vocab-confirm-btn">${escapeHtml(t("tlive_vocab_confirm_btn"))}</button>
-          </footer>
-        </div>`;
-      document.body.appendChild(modal);
-      modal.querySelectorAll("[data-vocab-close]").forEach((btn) => {
-        btn.addEventListener("click", () => closeEditorModal());
-      });
-      modal.querySelector("#tlive-vocab-paste")?.addEventListener("input", (ev) => {
-        const preview = modal.querySelector("#tlive-vocab-preview");
-        if (preview) preview.innerHTML = previewTableHtml(parsePasted(ev.target.value));
-      });
-      modal.querySelector("#tlive-vocab-confirm-btn")?.addEventListener("click", () => {
-        void confirmEditorModal();
-      });
+    const modal = ensureEditorModal();
+    const wordsEl = modal.querySelector("#tlive-vocab-words");
+    const tableHost = modal.querySelector("#tlive-vocab-edit-table");
+    let initialWords = [];
+    if (Array.isArray(options.initialWords) && options.initialWords.length) {
+      initialWords = options.initialWords;
+    } else if (Array.isArray(options.initialRows) && options.initialRows.length) {
+      initialWords = options.initialRows.map((x) => x.term);
+    } else if (options.initialPaste) {
+      initialWords = parseWordsOnly(options.initialPaste);
+    } else if (state.confirmed.length) {
+      initialWords = state.confirmed.map((x) => x.term);
     }
-    const pasteEl = modal.querySelector("#tlive-vocab-paste");
-    const initialPaste =
-      options.initialPaste ||
-      (options.initialTerms || state.draft || state.confirmed)
-        .map((x) => `${x.term} — ${x.defEn}`)
-        .join("\n");
-    if (pasteEl) pasteEl.value = initialPaste;
-    const preview = modal.querySelector("#tlive-vocab-preview");
-    if (preview) preview.innerHTML = previewTableHtml(parsePasted(initialPaste));
+    if (wordsEl) wordsEl.value = initialWords.join("\n");
+    updateWordCountHint(modal);
+    setGenerateStatus(modal, "", "");
+    if (Array.isArray(options.initialRows) && options.initialRows.length) {
+      if (tableHost) tableHost.innerHTML = editableTableHtml(options.initialRows);
+    } else if (state.confirmed.length && !options.initialWords && !options.initialPaste) {
+      if (tableHost) tableHost.innerHTML = editableTableHtml(state.confirmed);
+    } else if (tableHost) {
+      tableHost.innerHTML = editableTableHtml([]);
+    }
     modal.classList.remove("hidden");
     modal.hidden = false;
     modal.removeAttribute("aria-hidden");
     document.body.classList.add("tlive-vocab-modal-open");
-    pasteEl?.focus();
+    wordsEl?.focus();
   }
 
   function closeEditorModal() {
@@ -509,8 +648,16 @@
 
   async function confirmEditorModal() {
     const modal = document.getElementById("tlive-vocab-modal");
-    const pasteEl = modal && modal.querySelector("#tlive-vocab-paste");
-    const terms = parsePasted(pasteEl ? pasteEl.value : "");
+    let terms = readEditableTable(modal);
+    if (!terms.length) {
+      const words = parseWordsOnly(modal?.querySelector("#tlive-vocab-words")?.value || "");
+      if (words.length) {
+        global.alert(t("tlive_vocab_generate_before_save"));
+        return;
+      }
+      global.alert(t("tlive_vocab_words_required"));
+      return;
+    }
     if (terms.length < MIN_MEMORY) {
       global.alert(t("tlive_vocab_min_required", { n: String(MIN_MEMORY) }));
       return;
@@ -564,6 +711,7 @@
     MIN_BINGO,
     MIN_MEMORY,
     TARGET,
+    parseWordsOnly,
     parsePasted,
     normalizeTerms,
     padTerms,

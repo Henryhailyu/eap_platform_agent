@@ -3833,3 +3833,74 @@ body.tlive-modal-open {
   gap: 0.5rem;
   margin-top: 0.25rem;
 }
+
+.tlive-vocab-panel__recommend,
+.tlive-vocab-modal__recommend {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #9a6700;
+}
+
+.tlive-vocab-modal__label {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0a4d68;
+}
+
+.tlive-vocab-modal__toolbar {
+  margin: 0.5rem 0 0.75rem;
+}
+
+.tlive-vocab-word-count {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.tlive-vocab-word-count--warn {
+  color: #9a6700;
+}
+
+.tlive-vocab-word-count--ok {
+  color: #1a6b48;
+}
+
+.tlive-vocab-generate-status {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.tlive-vocab-generate-status--loading {
+  color: #0a7ea4;
+}
+
+.tlive-vocab-generate-status--ok {
+  color: #1a6b48;
+}
+
+.tlive-vocab-generate-status--warn {
+  color: #9a6700;
+}
+
+.tlive-vocab-editor__table--edit .tlive-vocab-edit-term,
+.tlive-vocab-editor__table--edit .tlive-vocab-edit-def {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.tlive-vocab-editor__table--edit .tlive-vocab-edit-term {
+  min-width: 7rem;
+}
+
+.tlive-vocab-editor__table--edit .tlive-vocab-edit-def {
+  min-width: 12rem;
+}

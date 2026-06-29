@@ -97,6 +97,36 @@ def parse_pasted_vocabulary(text: str) -> list[dict[str, str]]:
     return pairs
 
 
+def parse_pasted_words_only(text: str) -> list[str]:
+    """Parse one English vocabulary term per line (no definitions)."""
+    words: list[str] = []
+    seen: set[str] = set()
+    for raw_line in str(text or "").splitlines():
+        line = _clean_line(raw_line)
+        if not line:
+            continue
+        line = re.sub(r"^\d+[.)]\s*", "", line)
+        term = _clean_line(line)
+        if not term or len(term) < _MIN_TERM_LEN or len(term) > _MAX_TERM_LEN:
+            continue
+        if not re.match(r"^[a-zA-Z][a-zA-Z\s'\-]*$", term):
+            continue
+        key = term.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        words.append(term)
+    return words
+
+
+def words_to_term_rows(words: list[str]) -> list[dict[str, str]]:
+    """Build term rows with empty definitions for manual entry."""
+    rows: list[dict[str, str]] = []
+    for word in parse_pasted_words_only("\n".join(words)) if words else []:
+        rows.append({"term": word, "defEn": "", "defZh": ""})
+    return rows
+
+
 def vocab_json_load(raw: str | None) -> list[dict[str, str]]:
     if not raw or not str(raw).strip():
         return []

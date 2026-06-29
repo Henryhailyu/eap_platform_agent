@@ -1202,3 +1202,101 @@ def generate_live_vocab_from_html(
         "provider": profile["id"],
         "model": profile["model"],
     }
+
+
+_LIVE_VOCAB_DEFS_SYSTEM = """You are an EAP vocabulary specialist. Given a list of English academic vocabulary terms, write short English definitions for classroom games (bingo clues read aloud, matching).
+Return ONLY valid JSON:
+{
+  "terms": [
+    {"term": "exact term from input", "defEn": "short English definition", "defZh": "same as defEn"}
+  ]
+}
+Rules:
+- Include EVERY term from the input list exactly once, in the same order as given.
+- Terms and definitions MUST be English only — no Chinese.
+- Each defEn: one short phrase (under 14 words), at least 10 characters, suitable as a bingo clue.
+- Use standard academic English dictionary-style definitions.
+- Do not invent extra terms beyond the input list."""
+
+
+def generate_live_vocab_definitions(
+    words: list[str],
+    *,
+    provider: str | None = None,
+) -> dict[str, Any]:
+    """Generate English definitions for a teacher-supplied word list (no lesson HTML)."""
+    from lesson_vocabulary import parse_pasted_words_only
+
+    if isinstance(words, str):
+        clean_words = parse_pasted_words_only(words)
+    else:
+        clean_words = parse_pasted_words_only("\n".join(str(w) for w in (words or [])))
+
+    if not clean_words:
+        raise ValueError("No valid vocabulary terms provided")
+
+    if len(clean_words) > 48:
+        clean_words = clean_words[:48]
+
+    user_prompt = (
+        "Write definitions for these EAP vocabulary terms:\n"
+        + "\n".join(f"- {w}" for w in clean_words)
+    )
+
+    client, profile = get_openai_client(provider)
+    response = create_chat_completion(
+        client,
+        profile,
+        messages=[
+            {"role": "system", "content": _LIVE_VOCAB_DEFS_SYSTEM},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=2200,
+        temperature=0.3,
+        response_format={"type": "json_object"},
+    )
+    raw = ""
+    if response.choices:
+        raw = (response.choices[0].message.content or "").strip()
+    if not raw:
+        raise RuntimeError("Empty AI response")
+    payload = parse_ai_json_object(raw)
+    ai_terms = _normalize_vocab_terms(payload.get("terms") or payload.get("vocabulary") or [])
+
+    by_term = {item["term"].lower(): item for item in ai_terms}
+    merged: list[dict[str, str]] = []
+    for word in clean_words:
+        key = word.lower()
+        if key in by_term:
+            merged.append(by_term[key])
+        else:
+            for item in ai_terms:
+                if item["term"].lower() == key:
+                    merged.append(item)
+                    break
+
+    merged = _merge_vocab_terms(merged, ai_terms)
+    ordered: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for word in clean_words:
+        key = word.lower()
+        match = next((m for m in merged if m["term"].lower() == key), None)
+        if match and key not in seen:
+            seen.add(key)
+            ordered.append(match)
+    for item in merged:
+        key = item["term"].lower()
+        if key not in seen:
+            seen.add(key)
+            ordered.append(item)
+
+    if not ordered:
+        raise ValueError("AI did not return usable definitions")
+
+    return {
+        "terms": ordered,
+        "source": "ai",
+        "count": len(ordered),
+        "provider": profile["id"],
+        "model": profile["model"],
+    }
