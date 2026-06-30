@@ -18,8 +18,8 @@ Teachers and managers continue to use the web UI at `/ui/`.
 
 1. Install [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html).  
 2. **导入项目** → choose this `wechat-mini/` folder (not an empty template).  
-3. **`config.js`** — production URL is preset (`https://elc-eap-platform.top`).  
-   For **local Mac backend only:** set `USE_LOCAL_DEV = true` in `config.js`.
+3. **`utils/config.js`** — production URL is preset (`https://elc-eap-platform.top`).  
+   For **local Mac backend only:** set `USE_LOCAL_DEV = true` in `utils/config.js`.
 
 4. Local DevTools: enable **详情 → 本地设置 → 不校验合法域名、web-view、TLS**.  
 5. Build & preview with demo account `student1` and your pilot password.
@@ -46,7 +46,8 @@ Teachers and managers continue to use the web UI at `/ui/`.
 ```
 wechat-mini/
   app.js / app.json / app.wxss
-  config.js          ← set apiBase here
+  config.js          ← re-exports utils/config.js
+  utils/config.js    ← set apiBase here (production vs local)
   utils/api.js       ← Bearer requests + upload
   pages/…
 ```
